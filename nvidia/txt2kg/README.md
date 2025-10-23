@@ -130,6 +130,9 @@ You can also access individual services:
 Stop all services and optionally remove containers:
 
 ```bash
+## Change to deployment directory
+cd ./nvidia/txt2kg/assets/deploy/compose
+
 ## Stop services
 docker compose down
 
