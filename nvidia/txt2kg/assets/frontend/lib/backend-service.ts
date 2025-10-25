@@ -1,15 +1,15 @@
 import axios from 'axios';
 import { GraphDBService, GraphDBType } from './graph-db-service';
-import { PineconeService } from './pinecone';
+import { QdrantService } from './qdrant';
 import { getGraphDbService } from './graph-db-util';
 import type { Triple } from '@/types/graph';
 
 /**
- * Backend service that combines graph database for storage and Pinecone for embeddings
+ * Backend service that combines graph database for storage and Qdrant for embeddings
  */
 export class BackendService {
   private graphDBService: GraphDBService;
-  private pineconeService: PineconeService;
+  private pineconeService: QdrantService;
   private sentenceTransformerUrl: string = 'http://sentence-transformers:80';
   private modelName: string = 'all-MiniLM-L6-v2';
   private static instance: BackendService;
@@ -18,7 +18,7 @@ export class BackendService {
   
   private constructor() {
     this.graphDBService = GraphDBService.getInstance();
-    this.pineconeService = PineconeService.getInstance();
+    this.pineconeService = QdrantService.getInstance();
     
     // Use environment variables if available
     if (process.env.SENTENCE_TRANSFORMER_URL) {
@@ -426,6 +426,108 @@ export class BackendService {
     return relevantTriples.slice(0, topK * 5);
   }
   
+  /**
+   * Query with LLM enhancement: retrieve triples and use LLM to generate answer
+   * This makes traditional graph search comparable to RAG by adding LLM generation
+   * @param queryText - The user's question
+   * @param topK - Number of top triples to use as context (default 5)
+   * @param useTraditional - Whether to use traditional (keyword-based) or vector search
+   * @param llmModel - Optional LLM model to use (defaults to environment variable)
+   * @param llmProvider - Optional LLM provider (ollama, nvidia, etc.)
+   * @returns Generated answer from LLM based on retrieved triples
+   */
+  public async queryWithLLM(
+    queryText: string,
+    topK: number = 5,
+    useTraditional: boolean = true,
+    llmModel?: string,
+    llmProvider?: string
+  ): Promise<{ answer: string; triples: Triple[]; count: number }> {
+    console.log(`Querying with LLM enhancement: "${queryText}", topK=${topK}, traditional=${useTraditional}`);
+    
+    // Step 1: Retrieve relevant triples using graph search
+    const allTriples = await this.query(queryText, 4096, 400, 2, useTraditional);
+    
+    // Step 2: Take top K triples for context
+    const topTriples = allTriples.slice(0, topK);
+    console.log(`Using top ${topTriples.length} triples as context for LLM`);
+    
+    if (topTriples.length === 0) {
+      return {
+        answer: "I couldn't find any relevant information in the knowledge graph to answer this question.",
+        triples: [],
+        count: 0
+      };
+    }
+    
+    // Step 3: Format triples as natural language context
+    const context = topTriples
+      .map(triple => {
+        // Convert triple to natural language
+        const predicate = triple.predicate
+          .replace(/_/g, ' ')
+          .replace(/-/g, ' ')
+          .toLowerCase();
+        return `${triple.subject} ${predicate} ${triple.object}`;
+      })
+      .join('. ');
+    
+    // Step 4: Use LLM to generate answer from context
+    try {
+      // Research-backed prompt structure for KG-enhanced RAG
+      // Based on: "Retrieval-Augmented Generation with Knowledge Graphs" (Lewis et al.)
+      // and "Enhancing LLMs with Structured Knowledge" (Pan et al.)
+      const prompt = `You are a knowledgeable research assistant with access to a curated scientific knowledge base.
+
+Context: ${context}
+
+Based on the information provided above, please answer the following question. Be direct and informative, synthesizing the key facts into a coherent response. Draw reasonable scientific inferences when appropriate, but clearly distinguish between what is directly stated and what is inferred. If critical information is missing, note this briefly.
+
+Question: ${queryText}
+
+Answer:`;
+
+      // Determine LLM endpoint and model
+      const finalProvider = llmProvider || 'ollama';
+      const ollamaUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434/v1';
+      const finalModel = llmModel || process.env.OLLAMA_MODEL || 'llama3.1:8b';
+      
+      console.log(`Using LLM: provider=${finalProvider}, model=${finalModel}`);
+      
+      const response = await axios.post(`${ollamaUrl}/chat/completions`, {
+        model: finalModel,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a knowledgeable research assistant specializing in biomedical and scientific literature. Provide accurate, well-structured answers based on the provided context. Maintain a professional yet accessible tone, and clearly indicate when information is limited or uncertain.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.2,  // Lower for more factual, consistent responses
+        max_tokens: 800    // Increased for more comprehensive answers
+      });
+      
+      const answer = response.data.choices[0].message.content;
+      
+      return {
+        answer,
+        triples: topTriples,
+        count: topTriples.length
+      };
+    } catch (error) {
+      console.error('Error calling LLM for answer generation:', error);
+      // Fallback: return triples without LLM enhancement
+      return {
+        answer: `Found ${topTriples.length} relevant triples:\n\n${context}`,
+        triples: topTriples,
+        count: topTriples.length
+      };
+    }
+  }
+
   /**
    * Close connections to backend services
    */

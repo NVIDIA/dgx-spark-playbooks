@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { PineconeService } from '@/lib/pinecone';
+import { QdrantService } from '@/lib/qdrant';
 
 /**
  * Create Pinecone index API endpoint
@@ -8,7 +8,7 @@ import { PineconeService } from '@/lib/pinecone';
 export async function POST() {
   try {
     // Get the Pinecone service instance
-    const pineconeService = PineconeService.getInstance();
+    const pineconeService = QdrantService.getInstance();
     
     // Force re-initialization to create the index
     (pineconeService as any).initialized = false;

@@ -1,7 +1,7 @@
 /**
- * Retrieval Augmented Generation (RAG) implementation using Pinecone and LangChain
- * This module provides a RetrievalQA chain using Pinecone as the vector store
- * Note: xAI integration has been removed - needs alternative LLM provider implementation
+ * Retrieval Augmented Generation (RAG) implementation using Qdrant and LangChain
+ * This module provides a RetrievalQA chain using Qdrant as the vector store
+ * Uses NVIDIA API for LLM inference
  */
 
 import { ChatOpenAI } from "@langchain/openai";
@@ -9,27 +9,42 @@ import { Document } from "@langchain/core/documents";
 import { RunnableSequence } from "@langchain/core/runnables";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import { PromptTemplate } from "@langchain/core/prompts";
-import { PineconeService, DocumentSearchResult } from './pinecone';
+import { QdrantVectorStore } from "@langchain/community/vectorstores/qdrant";
+import { Embeddings } from "@langchain/core/embeddings";
 import { EmbeddingsService } from './embeddings';
 
-// Interface for records to store in Pinecone
-interface PineconeRecord {
-  id: string;
-  values: number[];
-  metadata?: Record<string, any>;
+// Custom embeddings adapter to use our EmbeddingsService with LangChain
+class CustomEmbeddings extends Embeddings {
+  private embeddingsService: EmbeddingsService;
+
+  constructor() {
+    super({});
+    this.embeddingsService = EmbeddingsService.getInstance();
+  }
+
+  async embedDocuments(documents: string[]): Promise<number[][]> {
+    await this.embeddingsService.initialize();
+    return await this.embeddingsService.encode(documents);
+  }
+
+  async embedQuery(query: string): Promise<number[]> {
+    await this.embeddingsService.initialize();
+    const embeddings = await this.embeddingsService.encode([query]);
+    return embeddings[0];
+  }
 }
 
 export class RAGService {
   private static instance: RAGService;
-  private pineconeService: PineconeService;
-  private embeddingsService: EmbeddingsService;
+  private vectorStore: QdrantVectorStore | null = null;
+  private embeddingsService: CustomEmbeddings;
   private llm: ChatOpenAI | null = null;
   private initialized: boolean = false;
   private isInitializing: boolean = false;
+  private collectionName: string = 'entity-embeddings';
 
   private constructor() {
-    this.pineconeService = PineconeService.getInstance();
-    this.embeddingsService = EmbeddingsService.getInstance();
+    this.embeddingsService = new CustomEmbeddings();
   }
 
   /**
@@ -51,28 +66,56 @@ export class RAGService {
     }
 
     this.isInitializing = true;
-    
+
     try {
       console.log('Initializing RAG service...');
 
-      // Initialize dependencies
-      await this.pineconeService.initialize();
-      await this.embeddingsService.initialize();
-
-      // Initialize LLM - Try NVIDIA first, then fall back to error
+      // Check for NVIDIA API key
       const nvidiaApiKey = process.env.NVIDIA_API_KEY;
       if (!nvidiaApiKey) {
-        throw new Error('RAG service requires NVIDIA_API_KEY to be set in environment variables. xAI integration has been removed.');
+        const error = new Error('NVIDIA_API_KEY is required for RAG service. Please set the NVIDIA_API_KEY environment variable.');
+        console.error('❌ RAG Initialization Error:', error.message);
+        throw error;
       }
-      
-      // Note: This is a placeholder - NVIDIA LLM integration would need to be implemented
-      // For now, we'll throw an error to indicate RAG service is not available
-      throw new Error('RAG service is temporarily unavailable after xAI removal. Please implement alternative LLM provider.');
+
+      // Initialize NVIDIA LLM using ChatOpenAI with NVIDIA's base URL
+      this.llm = new ChatOpenAI({
+        modelName: "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+        temperature: 0.2,
+        maxTokens: 1024,
+        openAIApiKey: nvidiaApiKey,
+        configuration: {
+          baseURL: "https://integrate.api.nvidia.com/v1",
+          timeout: 120000, // 120 second timeout
+        },
+        modelKwargs: {
+          top_p: 0.95,
+          frequency_penalty: 0,
+          presence_penalty: 0
+        }
+      });
+
+      console.log('✅ NVIDIA LLM initialized successfully');
+
+      // Initialize Qdrant vector store
+      const qdrantUrl = process.env.QDRANT_URL || 'http://localhost:6333';
+
+      this.vectorStore = await QdrantVectorStore.fromExistingCollection(
+        this.embeddingsService,
+        {
+          url: qdrantUrl,
+          collectionName: this.collectionName,
+          contentPayloadKey: 'text', // Map payload.text to pageContent
+        }
+      );
+
+      console.log('✅ Qdrant vector store connected successfully');
 
       this.initialized = true;
-      console.log('RAG service initialized successfully');
+      console.log('✅ RAG service initialized successfully');
     } catch (error) {
-      console.error('Error initializing RAG service:', error);
+      console.error('❌ Error initializing RAG service:', error);
+      this.isInitializing = false;
       throw error;
     } finally {
       this.isInitializing = false;
@@ -80,7 +123,7 @@ export class RAGService {
   }
 
   /**
-   * Store documents in Pinecone for retrieval
+   * Store documents in Qdrant for retrieval
    * @param documents Array of text documents to store
    * @param metadata Optional metadata for the documents
    */
@@ -97,29 +140,28 @@ export class RAGService {
       return;
     }
 
-    console.log(`Storing ${documents.length} documents in Pinecone`);
+    if (!this.vectorStore) {
+      throw new Error('Vector store not initialized');
+    }
 
-    // Generate embeddings for documents
-    const embeddings = await this.embeddingsService.encode(documents);
+    console.log(`Storing ${documents.length} documents in Qdrant`);
 
-    // Prepare records for Pinecone
-    const records: PineconeRecord[] = embeddings.map((embedding, i) => ({
-      id: `doc_${Date.now()}_${i}`,
-      values: embedding,
+    // Create Document objects with metadata
+    const docs = documents.map((text, i) => new Document({
+      pageContent: text,
       metadata: {
-        text: documents[i],
         timestamp: new Date().toISOString(),
         ...(metadata && metadata[i] ? metadata[i] : {})
       }
     }));
 
-    // Store in Pinecone
-    await this.pineconeService.upsertVectors(records);
-    console.log(`Successfully stored ${records.length} document embeddings`);
+    // Store in Qdrant using LangChain
+    await this.vectorStore.addDocuments(docs);
+    console.log(`✅ Successfully stored ${docs.length} document embeddings`);
   }
 
   /**
-   * Perform question answering with document retrieval
+   * Perform question answering with document retrieval using proper RAG implementation
    * @param query User query
    * @param topK Number of most similar documents to retrieve
    * @returns Answer generated from relevant context
@@ -133,15 +175,18 @@ export class RAGService {
       throw new Error('LLM not initialized');
     }
 
-    // Generate embedding for query
-    const queryEmbedding = (await this.embeddingsService.encode([query]))[0];
+    if (!this.vectorStore) {
+      throw new Error('Vector store not initialized');
+    }
 
-    // Retrieve similar documents from Pinecone
-    const similarDocs = await this.pineconeService.findSimilarDocuments(queryEmbedding, topK);
-    
+    console.log(`🔍 Performing RAG query with topK=${topK}`);
+
+    // Use LangChain's similarity search to retrieve relevant documents
+    const similarDocs = await this.vectorStore.similaritySearch(query, topK);
+
     if (!similarDocs || similarDocs.length === 0) {
-      console.log('No relevant documents found, falling back to LLM');
-      
+      console.log('⚠️ No relevant documents found, falling back to LLM general knowledge');
+
       // Define prompt template for standalone LLM response
       const fallbackPromptTemplate = PromptTemplate.fromTemplate(`
 You are a helpful assistant answering questions based on your general knowledge.
@@ -167,15 +212,64 @@ Answer:
       return `[Note: No specific information was found in the knowledge base. This answer is based on general knowledge.]\n\n${answer}`;
     }
 
+    console.log(`✅ Found ${similarDocs.length} relevant documents`);
+
+    // Log first document structure for debugging
+    if (similarDocs.length > 0) {
+      console.log('📄 First document structure:', {
+        hasPageContent: !!similarDocs[0].pageContent,
+        pageContentLength: similarDocs[0].pageContent?.length || 0,
+        hasMetadata: !!similarDocs[0].metadata,
+        metadataKeys: similarDocs[0].metadata ? Object.keys(similarDocs[0].metadata) : []
+      });
+    }
+
     // Extract text from retrieved documents
+    // Support both pageContent (LangChain standard) and metadata.text (legacy format)
     const context = similarDocs
-      .map((doc: DocumentSearchResult) => doc.metadata?.text || '')
-      .filter((text: string) => text.length > 0)
+      .map((doc) => {
+        // Try pageContent first (LangChain standard)
+        if (doc.pageContent && doc.pageContent.trim().length > 0) {
+          return doc.pageContent;
+        }
+        // Fall back to metadata.text (legacy Qdrant storage format)
+        if (doc.metadata?.text && doc.metadata.text.trim().length > 0) {
+          return doc.metadata.text;
+        }
+        return '';
+      })
+      .filter((text) => text.length > 0)
       .join('\n\n');
 
-    // Define prompt template for QA
+    console.log(`📝 Extracted context length: ${context.length} characters`);
+
+    if (!context || context.trim().length === 0) {
+      console.log('⚠️ Retrieved documents have no content, falling back to LLM');
+      const fallbackPromptTemplate = PromptTemplate.fromTemplate(`
+You are a helpful assistant answering questions based on your general knowledge.
+
+Question: {query}
+
+Answer:
+`);
+
+      const fallbackChain = RunnableSequence.from([
+        {
+          query: () => query,
+        },
+        fallbackPromptTemplate,
+        this.llm,
+        new StringOutputParser(),
+      ]);
+
+      const answer = await fallbackChain.invoke({});
+      return `[Note: No specific information was found in the knowledge base. This answer is based on general knowledge.]\n\n${answer}`;
+    }
+
+    // Define prompt template for RAG
     const promptTemplate = PromptTemplate.fromTemplate(`
-Answer the question based only on the following context:
+Answer the question based only on the following context from the knowledge base.
+If you cannot find the answer in the context, say "I cannot find this information in the knowledge base."
 
 Context:
 {context}
@@ -185,7 +279,7 @@ Question: {query}
 Answer:
 `);
 
-    // Create retrieval chain
+    // Create retrieval chain using RunnableSequence
     const retrievalChain = RunnableSequence.from([
       {
         context: () => context,
@@ -196,9 +290,18 @@ Answer:
       new StringOutputParser(),
     ]);
 
+    console.log('🤖 Generating answer with NVIDIA LLM...');
+
     // Execute chain
-    const answer = await retrievalChain.invoke({});
-    return answer;
+    try {
+      const answer = await retrievalChain.invoke({});
+      console.log('✅ RAG query completed successfully');
+      console.log(`📝 Answer length: ${answer.length} characters`);
+      return answer;
+    } catch (error) {
+      console.error('❌ Error generating answer with NVIDIA LLM:', error);
+      throw error;
+    }
   }
 
   /**
@@ -215,15 +318,16 @@ Answer:
       await this.initialize();
     }
 
-    // Generate embedding for query
-    const queryEmbedding = (await this.embeddingsService.encode([query]))[0];
+    if (!this.vectorStore) {
+      throw new Error('Vector store not initialized');
+    }
 
-    // Retrieve similar documents from Pinecone
-    const similarDocs = await this.pineconeService.findSimilarDocuments(queryEmbedding, topK);
-    
-    return similarDocs.map((doc: DocumentSearchResult) => ({
-      text: doc.metadata?.text || '',
-      score: doc.score,
+    // Use LangChain's similarity search with scores
+    const results = await this.vectorStore.similaritySearchWithScore(query, topK);
+
+    return results.map(([doc, score]) => ({
+      text: doc.pageContent,
+      score: score,
       metadata: doc.metadata
     }));
   }

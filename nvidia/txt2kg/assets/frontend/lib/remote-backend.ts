@@ -1,18 +1,18 @@
 import { GraphDBService, GraphDBType } from './graph-db-service';
-import { PineconeService } from './pinecone';
+import { QdrantService } from './qdrant';
 import { EmbeddingsService } from './embeddings';
 import { TextProcessor } from './text-processor';
 import type { Triple } from '@/types/graph';
 
 /**
  * Remote backend implementation that uses a graph database for storage,
- * Pinecone for vector embeddings, and SentenceTransformer for generating embeddings.
+ * Qdrant for vector embeddings, and SentenceTransformer for generating embeddings.
  * Follows the implementation in PyTorch Geometric's txt2kg.py
  * Enhanced with LangChain text processing for better extraction
  */
 export class RemoteBackendService {
   private graphDBService: GraphDBService;
-  private pineconeService: PineconeService;
+  private pineconeService: QdrantService;
   private embeddingsService: EmbeddingsService;
   private textProcessor: TextProcessor;
   private initialized: boolean = false;
@@ -20,7 +20,7 @@ export class RemoteBackendService {
 
   private constructor() {
     this.graphDBService = GraphDBService.getInstance();
-    this.pineconeService = PineconeService.getInstance();
+    this.pineconeService = QdrantService.getInstance();
     this.embeddingsService = EmbeddingsService.getInstance();
     this.textProcessor = TextProcessor.getInstance();
   }

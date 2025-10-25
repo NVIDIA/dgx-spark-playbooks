@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PineconeService } from '@/lib/pinecone';
+import { QdrantService } from '@/lib/qdrant';
 
 /**
  * Get Pinecone vector database stats
@@ -7,7 +7,7 @@ import { PineconeService } from '@/lib/pinecone';
 export async function GET() {
   try {
     // Initialize Pinecone service
-    const pineconeService = PineconeService.getInstance();
+    const pineconeService = QdrantService.getInstance();
     
     // We can now directly call getStats() which handles initialization and error recovery
     const stats = await pineconeService.getStats();

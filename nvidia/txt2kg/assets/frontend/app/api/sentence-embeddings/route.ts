@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processSentenceEmbeddings, SentenceEmbedding } from '@/lib/text-processor';
-import { PineconeService } from '@/lib/pinecone';
+import { QdrantService } from '@/lib/qdrant';
 
 /**
  * API endpoint for splitting text into sentences and generating embeddings
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
         });
         
         // Store in Pinecone
-        const pineconeService = PineconeService.getInstance();
+        const pineconeService = QdrantService.getInstance();
         await pineconeService.storeEmbeddingsWithMetadata(
           embeddingsMap,
           textContentMap, 

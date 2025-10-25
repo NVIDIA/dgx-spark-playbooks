@@ -12,6 +12,7 @@ import { ArrowLeft, BarChart2, Search as SearchIcon } from "lucide-react";
 export default function RagPage() {
   const router = useRouter();
   const [results, setResults] = useState<Triple[] | null>(null);
+  const [llmAnswer, setLlmAnswer] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [vectorEnabled, setVectorEnabled] = useState(false);
@@ -20,6 +21,7 @@ export default function RagPage() {
     avgRelevance: number;
     precision: number;
     recall: number;
+    queryTimesByMode?: Record<string, number>;
   } | null>(null);
   const [currentParams, setCurrentParams] = useState<RagParams>({
     kNeighbors: 4096,
@@ -64,7 +66,8 @@ export default function RagPage() {
             avgQueryTime: data.avgQueryTime,
             avgRelevance: data.avgRelevance,
             precision: data.precision,
-            recall: data.recall
+            recall: data.recall,
+            queryTimesByMode: data.queryTimesByMode
           });
         }
       } catch (error) {
@@ -84,12 +87,20 @@ export default function RagPage() {
     let resultCount = 0;
     let relevanceScore = 0;
     
+    // Debug logging
+    console.log('🔍 Query params:', {
+      usePureRag: params.usePureRag,
+      useVectorSearch: params.useVectorSearch,
+      vectorEnabled,
+      queryMode: params.queryMode
+    });
+    
     try {
       // If using pure RAG (Pinecone + LangChain) without graph search
       if (params.usePureRag) {
         queryMode = 'pure-rag';
         try {
-          console.log('Using pure RAG with just Pinecone and LangChain for query:', query);
+          console.log('Using pure RAG with Qdrant and NVIDIA LLM for query:', query);
           const ragResponse = await fetch('/api/rag-query', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -101,16 +112,17 @@ export default function RagPage() {
           
           if (ragResponse.ok) {
             const data = await ragResponse.json();
+            console.log('📥 RAG Response data:', { hasAnswer: !!data.answer, answerLength: data.answer?.length });
             // Handle the answer - we might need to display differently than triples
             if (data.answer) {
-              // Special UI handling for text answer rather than triples
-              setResults([{
-                subject: 'Answer',
-                predicate: '',
-                object: data.answer,
-                usedFallback: data.usedFallback
-              }]);
-              
+              console.log('✅ Setting answer in results:', data.answer.substring(0, 100) + '...');
+
+              // Set the LLM answer for display (same as traditional mode)
+              setLlmAnswer(data.answer);
+
+              // Set empty results array since Pure RAG doesn't return triples
+              setResults([]);
+
               resultCount = 1;
               relevanceScore = data.relevanceScore || 0;
               
@@ -136,8 +148,8 @@ export default function RagPage() {
         }
       }
       
-      // If we have vector embeddings, use enhanced query with metadata
-      if (vectorEnabled && params.useVectorSearch) {
+      // If we have vector embeddings AND explicitly selected vector search, use enhanced query with metadata
+      if (vectorEnabled && params.useVectorSearch && !params.usePureRag) {
         queryMode = 'vector-search';
         try {
           console.log('Using enhanced RAG with LangChain for query:', query);
@@ -184,35 +196,71 @@ export default function RagPage() {
         }
       }
       
-      // Call the traditional backend API as fallback or if explicitly selected
+      // Call the LLM-enhanced graph query API
+      console.log('✅ Using Traditional Graph + LLM approach');
       queryMode = 'traditional';
-      const response = await fetch(`/api/query`, {
+      
+      // Get selected LLM model from localStorage
+      let llmModel = undefined;
+      let llmProvider = undefined;
+      try {
+        const savedModel = localStorage.getItem("selectedModelForRAG");
+        if (savedModel) {
+          const modelData = JSON.parse(savedModel);
+          llmModel = modelData.model;
+          llmProvider = modelData.provider;
+          console.log(`Using LLM: ${llmModel} (${llmProvider})`);
+        }
+      } catch (e) {
+        console.warn("Could not load selected LLM model, using default");
+      }
+      
+      const response = await fetch(`/api/graph-query-llm`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           query,
-          kNeighbors: params.kNeighbors,
-          fanout: params.fanout,
-          numHops: params.numHops,
-          topK: params.topK,
-          queryMode: queryMode, // Explicitly pass the query mode
-          useTraditional: true  // Force use of the direct pattern matching approach
+          topK: params.topK || 5,
+          useTraditional: true,
+          llmModel,
+          llmProvider
         }),
       });
       
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to query the RAG backend');
+        throw new Error(errorData.error || 'Failed to query with LLM');
       }
       
       const data = await response.json();
       
-      // Update the results
-      setResults(data.relevantTriples || []);
+      // Log the retrieved triples for debugging
+      console.log('📊 Retrieved Triples:', data.triples);
+      console.log('🤖 LLM-Generated Answer:', data.answer);
+      console.log('📈 Triple Count:', data.count);
+      
+      // Update the results with the triples (for display)
+      setResults(data.triples || []);
       resultCount = data.count || 0;
-      relevanceScore = data.relevanceScore || 0;
+      relevanceScore = 0; // No relevance score for traditional search
+      
+      // Store the LLM answer for display
+      console.log('🔍 Checking answer:', { 
+        hasAnswer: !!data.answer, 
+        answerLength: data.answer?.length,
+        answerPreview: data.answer?.substring(0, 100)
+      });
+      
+      if (data.answer) {
+        console.log('💬 Full Answer:', data.answer);
+        console.log('✅ Setting llmAnswer state');
+        setLlmAnswer(data.answer);
+      } else {
+        console.log('⚠️ No answer in response, setting null');
+        setLlmAnswer(null);
+      }
       
       // Log the query with performance metrics
       logQuery(query, queryMode, {
@@ -279,6 +327,7 @@ export default function RagPage() {
 
   const clearResults = () => {
     setResults(null);
+    setLlmAnswer(null);
     setErrorMessage(null);
   };
 
@@ -318,22 +367,34 @@ export default function RagPage() {
                 </div>
                 
                 <div className="space-y-3 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Avg. Query Time:</span>
-                    <span className="font-medium">{metrics.avgQueryTime > 0 ? `${metrics.avgQueryTime.toFixed(2)}ms` : "No data"}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Relevance Score:</span>
-                    <span className="font-medium">{metrics.avgRelevance > 0 ? `${(metrics.avgRelevance * 100).toFixed(1)}%` : "No data"}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Precision:</span>
-                    <span className="font-medium">{metrics.precision > 0 ? `${(metrics.precision * 100).toFixed(1)}%` : "No data"}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Recall:</span>
-                    <span className="font-medium">{metrics.recall > 0 ? `${(metrics.recall * 100).toFixed(1)}%` : "No data"}</span>
-                  </div>
+                  {/* Query times by mode */}
+                  {metrics.queryTimesByMode && Object.keys(metrics.queryTimesByMode).length > 0 ? (
+                    <>
+                      {metrics.queryTimesByMode['pure-rag'] !== undefined && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Pure RAG:</span>
+                          <span className="font-medium">{metrics.queryTimesByMode['pure-rag'].toFixed(2)}ms</span>
+                        </div>
+                      )}
+                      {metrics.queryTimesByMode['traditional'] !== undefined && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Traditional Graph:</span>
+                          <span className="font-medium">{metrics.queryTimesByMode['traditional'].toFixed(2)}ms</span>
+                        </div>
+                      )}
+                      {metrics.queryTimesByMode['vector-search'] !== undefined && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">GraphRAG:</span>
+                          <span className="font-medium">{metrics.queryTimesByMode['vector-search'].toFixed(2)}ms</span>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Avg. Query Time:</span>
+                      <span className="font-medium">{metrics.avgQueryTime > 0 ? `${metrics.avgQueryTime.toFixed(2)}ms` : "No data"}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -349,14 +410,73 @@ export default function RagPage() {
               vectorEnabled={vectorEnabled}
             />
             
+            {/* LLM Answer Section */}
+            {llmAnswer && (
+              <div className="mt-8 nvidia-build-card">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-6 h-6 rounded-md bg-nvidia-green/15 flex items-center justify-center">
+                    <SearchIcon className="h-3 w-3 text-nvidia-green" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-foreground">Answer</h3>
+                  {currentParams.queryMode && (
+                    <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-nvidia-green/10 text-nvidia-green border border-nvidia-green/20">
+                      {currentParams.queryMode === 'pure-rag' ? 'Pure RAG' :
+                       currentParams.queryMode === 'vector-search' ? 'GraphRAG' :
+                       'Traditional Graph'}
+                    </span>
+                  )}
+                </div>
+                <div className="prose prose-sm dark:prose-invert max-w-none">
+                  {(() => {
+                    // Parse <think> tags
+                    const thinkMatch = llmAnswer.match(/<think>([\s\S]*?)<\/think>/);
+                    const thinkContent = thinkMatch ? thinkMatch[1].trim() : null;
+                    const mainAnswer = thinkContent
+                      ? llmAnswer.replace(/<think>[\s\S]*?<\/think>/, '').trim()
+                      : llmAnswer;
+
+                    return (
+                      <>
+                        {thinkContent && (
+                          <details className="mb-4 bg-muted/10 border border-border/20 rounded-xl overflow-hidden">
+                            <summary className="cursor-pointer p-4 hover:bg-muted/20 transition-colors flex items-center gap-2">
+                              <svg className="w-4 h-4 transform transition-transform" style={{ transform: 'rotate(0deg)' }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                              <span className="text-sm font-medium text-muted-foreground">Reasoning Process</span>
+                            </summary>
+                            <div className="p-4 pt-0 text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap border-t border-border/10">
+                              {thinkContent}
+                            </div>
+                          </details>
+                        )}
+                        <div className="bg-muted/20 border border-border/20 p-6 rounded-xl">
+                          <div
+                            className="text-foreground leading-relaxed whitespace-pre-wrap"
+                            dangerouslySetInnerHTML={{
+                              __html: mainAnswer
+                                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                            }}
+                          />
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
+            
             {/* Results Section */}
-            {results && results.length > 0 && (
+            {results && results.length > 0 && !currentParams.usePureRag && (
               <div className="mt-8 nvidia-build-card">
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-6 h-6 rounded-md bg-nvidia-green/15 flex items-center justify-center">
                     <SearchIcon className="h-3 w-3 text-nvidia-green" />
                   </div>
-                  <h3 className="text-lg font-semibold text-foreground">Results ({results.length})</h3>
+                  <h3 className="text-lg font-semibold text-foreground">
+                    {llmAnswer ? `Retrieved Knowledge (${results.length})` : `Results (${results.length})`}
+                  </h3>
                 </div>
                 <div className="space-y-4">
                   {results.map((triple, index) => (
@@ -399,7 +519,7 @@ export default function RagPage() {
               </div>
             )}
             
-            {results && results.length === 0 && !isLoading && (
+            {results && results.length === 0 && !isLoading && !currentParams.usePureRag && (
               <div className="mt-8 nvidia-build-card border-dashed">
                 <div className="text-center py-8">
                   <div className="w-12 h-12 rounded-xl bg-muted/30 flex items-center justify-center mx-auto mb-4">

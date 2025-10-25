@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PineconeService } from '@/lib/pinecone';
+import { QdrantService } from '@/lib/qdrant';
 
 /**
  * Clear all data from the Pinecone vector database
@@ -7,7 +7,7 @@ import { PineconeService } from '@/lib/pinecone';
  */
 export async function POST() {
   // Get the Pinecone service instance
-  const pineconeService = PineconeService.getInstance();
+  const pineconeService = QdrantService.getInstance();
   
   // Clear all vectors from the database
   const deleteSuccess = await pineconeService.deleteAllEntities();

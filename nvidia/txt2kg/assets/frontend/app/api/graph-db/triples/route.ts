@@ -160,6 +160,16 @@ export async function POST(req: NextRequest) {
     // Store triples in the graph database
     await graphDbService.importTriples(validTriples);
 
+    // Mark document as processed if documentName is provided (only for ArangoDB)
+    if (graphDbType === 'arangodb' && documentName) {
+      try {
+        await (graphDbService as any).markDocumentAsProcessed(documentName, validTriples.length);
+      } catch (error) {
+        console.error('Error marking document as processed:', error);
+        // Don't fail the request if marking fails
+      }
+    }
+
     // Return success response
     return NextResponse.json({
       success: true,

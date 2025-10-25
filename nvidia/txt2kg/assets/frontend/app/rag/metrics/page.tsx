@@ -17,6 +17,7 @@ interface MetricsData {
   recall: number;
   f1Score: number;
   topQueries: { query: string; count: number }[];
+  queryTimesByMode?: Record<string, number>;
   queryLogStats?: {
     totalQueryLogs: number;
     totalExecutions: number;

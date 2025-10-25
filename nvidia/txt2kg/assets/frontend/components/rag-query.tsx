@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Triple } from "@/types/graph";
 import { Search as SearchIcon, Zap, Database, Cpu } from "lucide-react";
+import { LLMSelectorCompact } from "./llm-selector-compact";
 
 interface RagQueryProps {
   onQuerySubmit: (query: string, params: RagParams) => Promise<void>;
@@ -124,14 +125,14 @@ export function RagQuery({
       </div>
       
       {/* Query Type Selection */}
-      <div className="mb-6">
-        <h3 className="text-sm font-semibold text-foreground mb-4">Select Query Type</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="mb-5">
+        <h3 className="text-xs font-semibold text-foreground mb-3">Select Query Type</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <button
             type="button"
             onClick={() => handleQueryModeChange('pure-rag')}
             disabled={!vectorEnabled}
-            className={`relative flex flex-col items-center p-4 border rounded-xl transition-all duration-200 hover:shadow-md ${
+            className={`relative flex flex-col items-center p-3 border rounded-lg transition-all duration-200 hover:shadow-md ${
               queryMode === 'pure-rag' 
                 ? 'border-nvidia-green bg-nvidia-green/10 text-nvidia-green shadow-sm' 
                 : vectorEnabled 
@@ -139,66 +140,67 @@ export function RagQuery({
                   : 'border-border/30 opacity-50 cursor-not-allowed'
             }`}
           >
-            <div className="w-6 h-6 rounded-md bg-nvidia-green/15 flex items-center justify-center mb-2">
-              <Zap className="h-3 w-3 text-nvidia-green" />
+            <div className="w-5 h-5 rounded-md bg-nvidia-green/15 flex items-center justify-center mb-1.5">
+              <Zap className="h-2.5 w-2.5 text-nvidia-green" />
             </div>
-            <span className="font-semibold">Pure RAG</span>
-            <span className="text-xs mt-1 text-center text-muted-foreground">
-              Pinecone + LangChain without graph database
+            <span className="text-sm font-semibold">Pure RAG</span>
+            <span className="text-[10px] mt-0.5 text-center text-muted-foreground leading-tight">
+              Vector DB + LLM
             </span>
             {queryMode === 'pure-rag' && (
-              <div className="absolute top-3 right-3 w-2 h-2 bg-nvidia-green rounded-full"></div>
+              <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-nvidia-green rounded-full"></div>
             )}
           </button>
 
           <button
             type="button"
             onClick={() => handleQueryModeChange('traditional')}
-            className={`relative flex flex-col items-center p-4 border rounded-xl transition-all duration-200 hover:shadow-md ${
+            className={`relative flex flex-col items-center p-3 border rounded-lg transition-all duration-200 hover:shadow-md ${
               queryMode === 'traditional' 
                 ? 'border-nvidia-green bg-nvidia-green/10 text-nvidia-green shadow-sm' 
                 : 'border-border/40 hover:border-border/60 hover:bg-muted/20'
             }`}
           >
-            <div className="w-6 h-6 rounded-md bg-nvidia-green/15 flex items-center justify-center mb-2">
-              <Database className="h-3 w-3 text-nvidia-green" />
+            <div className="w-5 h-5 rounded-md bg-nvidia-green/15 flex items-center justify-center mb-1.5">
+              <Database className="h-2.5 w-2.5 text-nvidia-green" />
             </div>
-            <span className="font-semibold">Traditional Graph</span>
-            <span className="text-xs mt-1 text-center text-muted-foreground">
-              Uses graph database search only
+            <span className="text-sm font-semibold">Traditional Graph</span>
+            <span className="text-[10px] mt-0.5 text-center text-muted-foreground leading-tight">
+              Graph DB + LLM
             </span>
             {queryMode === 'traditional' && (
-              <div className="absolute top-3 right-3 w-2 h-2 bg-nvidia-green rounded-full"></div>
+              <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-nvidia-green rounded-full"></div>
             )}
           </button>
           
           <button
             type="button"
             onClick={() => handleQueryModeChange('vector-search')}
-            disabled={!vectorEnabled}
-            className={`relative flex flex-col items-center p-4 border rounded-xl transition-all duration-200 hover:shadow-md ${
-              queryMode === 'vector-search' 
-                ? 'border-nvidia-green bg-nvidia-green/10 text-nvidia-green shadow-sm' 
-                : vectorEnabled 
-                  ? 'border-border/40 hover:border-border/60 hover:bg-muted/20' 
-                  : 'border-border/30 opacity-50 cursor-not-allowed'
-            }`}
+            disabled={true}
+            title="GraphRAG requires a GNN model (not yet available)"
+            className="relative flex flex-col items-center p-3 border rounded-lg border-border/30 opacity-50 cursor-not-allowed"
           >
-            <div className="w-6 h-6 rounded-md bg-nvidia-green/15 flex items-center justify-center mb-2">
-              <Cpu className="h-3 w-3 text-nvidia-green" />
+            <div className="w-5 h-5 rounded-md bg-muted/15 flex items-center justify-center mb-1.5">
+              <Cpu className="h-2.5 w-2.5 text-muted-foreground" />
             </div>
-            <span className="font-semibold">GraphRAG</span>
-            <span className="text-xs mt-1 text-center text-muted-foreground">
-              Uses G-Retriever - RAG + GNN
+            <span className="text-sm font-semibold text-muted-foreground">GraphRAG</span>
+            <span className="text-[10px] mt-0.5 text-center text-muted-foreground leading-tight">
+              RAG + GNN
             </span>
-            <div className="nvidia-build-tag mt-2">
-              New
+            <div className="text-[9px] px-1.5 py-0.5 bg-amber-500/20 text-amber-700 dark:text-amber-500 rounded mt-1 font-medium">
+              COMING SOON
             </div>
-            {queryMode === 'vector-search' && (
-              <div className="absolute top-3 right-3 w-2 h-2 bg-nvidia-green rounded-full"></div>
-            )}
           </button>
         </div>
+      </div>
+      
+      {/* LLM Selection */}
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-foreground mb-1">LLM Model</h3>
+          <p className="text-xs text-muted-foreground">Select the LLM for answer generation</p>
+        </div>
+        <LLMSelectorCompact />
       </div>
       
       <form onSubmit={handleSubmit} className="space-y-6">

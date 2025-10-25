@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { EmbeddingsService } from '@/lib/embeddings';
-import { PineconeService } from '@/lib/pinecone';
+import { QdrantService } from '@/lib/qdrant';
 
 /**
- * Generate embeddings for text chunks and store them in Pinecone
+ * Generate embeddings for text chunks and store them in Qdrant
  */
 export async function POST(request: NextRequest) {
   try {
@@ -38,15 +38,15 @@ export async function POST(request: NextRequest) {
     console.log('Generating embeddings for chunks...');
     const embeddings = await embeddingsService.encode(chunks);
     console.log(`Generated ${embeddings.length} embeddings`);
-    
-    // Initialize PineconeService
-    const pineconeService = PineconeService.getInstance();
-    
-    // Check if Pinecone server is running
-    const isPineconeRunning = await pineconeService.isPineconeRunning();
+
+    // Initialize QdrantService
+    const pineconeService = QdrantService.getInstance();
+
+    // Check if Qdrant server is running
+    const isPineconeRunning = await pineconeService.isQdrantRunning();
     if (!isPineconeRunning) {
       return NextResponse.json(
-        { error: 'Pinecone server is not available. Please make sure it is running.' },
+        { error: 'Qdrant server is not available. Please make sure it is running.' },
         { status: 503 }
       );
     }

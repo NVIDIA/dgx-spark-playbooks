@@ -78,6 +78,32 @@ else
   exit 1
 fi
 
+# Check Docker daemon permissions
+echo "Checking Docker permissions..."
+if ! docker info &> /dev/null; then
+  echo ""
+  echo "=========================================="
+  echo "ERROR: Docker Permission Denied"
+  echo "=========================================="
+  echo ""
+  echo "You don't have permission to connect to the Docker daemon."
+  echo ""
+  echo "To fix this, run one of the following:"
+  echo ""
+  echo "Option 1 (Recommended): Add your user to the docker group"
+  echo "  sudo usermod -aG docker \$USER"
+  echo "  newgrp docker"
+  echo ""
+  echo "Option 2: Run this script with sudo (not recommended)"
+  echo "  sudo ./start.sh"
+  echo ""
+  echo "After adding yourself to the docker group, you may need to log out"
+  echo "and log back in for the changes to take effect."
+  echo ""
+  exit 1
+fi
+echo "✓ Docker permissions OK"
+
 # Build the docker-compose command
 if [ "$USE_COMPLETE" = true ]; then
   CMD="$DOCKER_COMPOSE_CMD -f $(pwd)/deploy/compose/docker-compose.complete.yml"
@@ -121,6 +147,7 @@ echo "  2. Open http://localhost:3001 in your browser"
 echo "  3. Upload documents and start building your knowledge graph!"
 echo ""
 echo "Other options:"
+echo "  • Stop services: ./stop.sh"
 echo "  • Run frontend in dev mode: ./start.sh --dev-frontend"
 echo "  • Use complete stack: ./start.sh --complete"
 echo "  • View logs: docker compose logs -f"

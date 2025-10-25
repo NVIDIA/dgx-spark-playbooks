@@ -29,7 +29,8 @@ export async function POST(req: NextRequest) {
       ollamaModel,
       ollamaBaseUrl,
       vllmModel,
-      vllmBaseUrl
+      vllmBaseUrl,
+      nvidiaModel
     } = body;
 
     if (!text || typeof text !== 'string') {
@@ -136,7 +137,8 @@ export async function POST(req: NextRequest) {
         ollamaModel: ollamaModel,
         ollamaBaseUrl: ollamaBaseUrl,
         vllmModel: vllmModel,
-        vllmBaseUrl: vllmBaseUrl
+        vllmBaseUrl: vllmBaseUrl,
+        nvidiaModel: nvidiaModel
       });
     }
 

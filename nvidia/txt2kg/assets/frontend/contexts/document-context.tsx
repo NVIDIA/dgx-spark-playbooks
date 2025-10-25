@@ -379,7 +379,8 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
           console.log(`🦙 Using Ollama model: ${requestBody.ollamaModel}`);
         } else if (model.id === "nvidia-nemotron" || model.id === "nvidia-nemotron-nano") {
           requestBody.llmProvider = "nvidia";
-          console.log(`🖥️ Using NVIDIA model: ${model.id}`);
+          requestBody.nvidiaModel = model.model; // Pass the actual model name
+          console.log(`🖥️ Using NVIDIA model: ${model.model}`);
         }
       } catch (e) {
         // Ignore parsing errors, will use default
@@ -498,8 +499,51 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
     setIsProcessing(true);
     
     try {
+      // Check which documents are already processed in ArangoDB
+      console.log('🔍 Checking which documents are already processed in ArangoDB...');
+      let alreadyProcessedDocs: Set<string> = new Set();
+      
+      try {
+        const response = await fetch('/api/graph-db/check-document', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            documentNames: docsToProcess.map(d => d.name)
+          })
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          if (result.processedDocuments) {
+            Object.entries(result.processedDocuments).forEach(([docName, isProcessed]) => {
+              if (isProcessed) {
+                alreadyProcessedDocs.add(docName);
+              }
+            });
+            console.log(`✅ Found ${alreadyProcessedDocs.size} documents already processed in ArangoDB:`, Array.from(alreadyProcessedDocs));
+          }
+        }
+      } catch (checkError) {
+        console.warn('⚠️ Could not check for already processed documents, continuing anyway:', checkError);
+      }
+
       // Process each document sequentially
       for (const doc of docsToProcess) {
+        // Skip if document is already processed in ArangoDB
+        if (alreadyProcessedDocs.has(doc.name)) {
+          console.log(`⏭️ Skipping document "${doc.name}" - already processed in ArangoDB`);
+          updateDocumentStatus(doc.id, "Processed", {
+            triples: doc.triples || [],
+            graph: doc.graph,
+            error: undefined
+          });
+          toast({
+            title: "Document Skipped",
+            description: `"${doc.name}" is already stored in ArangoDB`,
+            duration: 3000,
+          });
+          continue;
+        }
         // Update status to Processing before we begin
         updateDocumentStatus(doc.id, "Processing");
         

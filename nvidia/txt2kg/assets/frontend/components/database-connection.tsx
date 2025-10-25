@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Network, Database, Zap, AlertCircle, RefreshCw, ChevronDown, ChevronUp, InfoIcon, Trash2 } from "lucide-react"
+import { Network, Database, Zap, AlertCircle, RefreshCw, ChevronDown, ChevronUp, InfoIcon, Trash2, LogOut } from "lucide-react"
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Button } from "@/components/ui/button"
@@ -157,15 +157,20 @@ export function DatabaseConnection({ className }: DatabaseConnectionProps) {
     try {
       const response = await fetch('/api/pinecone-diag/stats');
       const data = await response.json();
-      
+
       if (response.ok) {
         setVectorStats({
           nodes: typeof data.totalVectorCount === 'number' ? data.totalVectorCount : 0,
           relationships: 0, // Vector DB doesn't store relationships
           source: data.source || 'unknown',
-          httpHealthy: data.httpHealthy
-        });
-        
+          httpHealthy: data.httpHealthy,
+          // Store additional Qdrant stats
+          ...(data.status && { status: data.status }),
+          ...(data.vectorSize && { vectorSize: data.vectorSize }),
+          ...(data.distance && { distance: data.distance }),
+          ...(data.url && { url: data.url }),
+        } as any);
+
         // If we have a healthy HTTP connection, we're connected
         if (data.httpHealthy) {
           setVectorConnectionStatus("connected");
@@ -364,39 +369,65 @@ export function DatabaseConnection({ className }: DatabaseConnectionProps) {
             )}
             
             <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={checkGraphConnection}
-                disabled={graphConnectionStatus === "checking"}
-                className="flex-1 text-xs h-7"
-              >
-                {graphConnectionStatus === "checking" ? "Checking..." : "Refresh"}
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={checkGraphConnection}
+                      disabled={graphConnectionStatus === "checking"}
+                      className="flex-1 text-xs h-7 px-2"
+                    >
+                      <RefreshCw className={`h-3 w-3 ${graphConnectionStatus === "checking" ? "animate-spin" : ""}`} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{graphConnectionStatus === "checking" ? "Checking..." : "Refresh connection"}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               
               {graphConnectionStatus === "connected" ? (
                 <>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={disconnectGraph}
-                    className="flex-1 text-xs h-7"
-                  >
-                    Disconnect
-                  </Button>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={disconnectGraph}
+                          className="flex-1 text-xs h-7 px-2"
+                        >
+                          <LogOut className="h-3 w-3" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Disconnect</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                   
                   <Dialog open={showClearDialog} onOpenChange={setShowClearDialog}>
-                    <DialogTrigger asChild>
-                      <Button 
-                        variant="destructive" 
-                        size="sm" 
-                        className="flex-1 text-xs h-7"
-                        disabled={isClearingDB}
-                      >
-                        <Trash2 className="h-3 w-3 mr-1" />
-                        Clear
-                      </Button>
-                    </DialogTrigger>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <DialogTrigger asChild>
+                            <Button 
+                              variant="destructive" 
+                              size="sm" 
+                              className="flex-1 text-xs h-7 px-2"
+                              disabled={isClearingDB}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </DialogTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Clear database</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                     <DialogContent>
                       <DialogHeader>
                         <DialogTitle className="text-destructive">Clear Database</DialogTitle>
@@ -487,21 +518,33 @@ export function DatabaseConnection({ className }: DatabaseConnectionProps) {
               <>
                 <div className="flex items-center gap-2 text-xs md:text-sm">
                   <span className="text-foreground font-medium">
-                    Pinecone
+                    Qdrant
                   </span>
                   <span className="text-foreground font-mono text-[11px] bg-secondary/50 px-2 py-0.5 rounded truncate max-w-full">
-                    direct-http
+                    {(vectorStats as any).url || 'http://qdrant:6333'}
                   </span>
                 </div>
-                
-                {vectorStats.nodes > 0 && (
-                  <div className="text-xs md:text-sm text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <Database className="h-3.5 w-3.5" />
-                      <span>{vectorStats.nodes.toLocaleString()} vectors</span>
-                    </div>
+
+                <div className="text-xs md:text-sm text-muted-foreground space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Database className="h-3.5 w-3.5" />
+                    <span>{vectorStats.nodes.toLocaleString()} vectors indexed</span>
                   </div>
-                )}
+
+                  {(vectorStats as any).status && (
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-3.5 w-3.5" />
+                      <span>Status: <span className="capitalize">{(vectorStats as any).status}</span></span>
+                    </div>
+                  )}
+
+                  {(vectorStats as any).vectorSize && (
+                    <div className="flex items-center gap-2">
+                      <InfoIcon className="h-3.5 w-3.5" />
+                      <span>{(vectorStats as any).vectorSize}d ({(vectorStats as any).distance})</span>
+                    </div>
+                  )}
+                </div>
               </>
             )}
             
@@ -520,59 +563,85 @@ export function DatabaseConnection({ className }: DatabaseConnectionProps) {
             )}
             
             <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={checkVectorConnection}
-                disabled={vectorConnectionStatus === "checking"}
-                className="flex-1 text-xs h-7"
-              >
-                {vectorConnectionStatus === "checking" ? "Checking..." : "Refresh"}
-              </Button>
-              
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={checkVectorConnection}
+                      disabled={vectorConnectionStatus === "checking"}
+                      className="flex-1 text-xs h-7 px-2"
+                    >
+                      <RefreshCw className={`h-3 w-3 ${vectorConnectionStatus === "checking" ? "animate-spin" : ""}`} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{vectorConnectionStatus === "checking" ? "Checking..." : "Refresh connection"}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
               {vectorConnectionStatus === "connected" ? (
                 <>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={disconnectVector}
-                    className="flex-1 text-xs h-7"
-                  >
-                    Disconnect
-                  </Button>
-                  
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={disconnectVector}
+                          className="flex-1 text-xs h-7 px-2"
+                        >
+                          <LogOut className="h-3 w-3" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Disconnect</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+
                   <Dialog open={showClearVectorDialog} onOpenChange={setShowClearVectorDialog}>
-                    <DialogTrigger asChild>
-                      <Button 
-                        variant="destructive" 
-                        size="sm" 
-                        className="flex-1 text-xs h-7"
-                        disabled={isClearingVectorDB}
-                      >
-                        <Trash2 className="h-3 w-3 mr-1" />
-                        Clear
-                      </Button>
-                    </DialogTrigger>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <DialogTrigger asChild>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              className="flex-1 text-xs h-7 px-2"
+                              disabled={isClearingVectorDB}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </DialogTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Clear database</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                     <DialogContent>
                       <DialogHeader>
-                        <DialogTitle className="text-destructive">Clear Pinecone Database</DialogTitle>
+                        <DialogTitle className="text-destructive">Clear Qdrant Database</DialogTitle>
                         <DialogDescription>
-                          Are you sure you want to clear all data from the Pinecone database? This action cannot be undone.
+                          Are you sure you want to clear all data from the Qdrant vector database? This action cannot be undone.
                         </DialogDescription>
                       </DialogHeader>
                       <Alert variant="destructive" className="mt-2">
                         <AlertCircle className="h-4 w-4" />
                         <AlertTitle>Warning</AlertTitle>
                         <AlertDescription>
-                          This will permanently delete all vectors from the Pinecone database.
+                          This will permanently delete all vectors from the Qdrant database.
                         </AlertDescription>
                       </Alert>
                       <DialogFooter className="gap-2 mt-4">
                         <DialogClose asChild>
                           <Button variant="outline" size="sm">Cancel</Button>
                         </DialogClose>
-                        <Button 
-                          variant="destructive" 
+                        <Button
+                          variant="destructive"
                           size="sm"
                           onClick={clearVectorDatabase}
                           disabled={isClearingVectorDB}
@@ -584,13 +653,13 @@ export function DatabaseConnection({ className }: DatabaseConnectionProps) {
                   </Dialog>
                 </>
               ) : (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => {
                     // Open Vector DB settings
-                    const event = new CustomEvent('open-settings', { 
-                      detail: { tab: 'vectordb' } 
+                    const event = new CustomEvent('open-settings', {
+                      detail: { tab: 'vectordb' }
                     });
                     window.dispatchEvent(event);
                   }}

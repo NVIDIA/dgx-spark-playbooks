@@ -29,7 +29,7 @@ export class LangChainService {
     temperature?: number;
     maxTokens?: number;
   }): Promise<ChatOpenAI> {
-    const modelId = "nvdev/nvidia/llama-3.1-nemotron-70b-instruct";
+    const modelId = "nvidia/llama-3.3-nemotron-super-49b-v1.5";
     const cacheKey = `nemotron-${options?.temperature || 0.7}-${options?.maxTokens || 8192}`;
     
     console.log(`Requesting Nemotron model (cacheKey: ${cacheKey})`);
@@ -73,15 +73,17 @@ export class LangChainService {
       // Create a new ChatOpenAI instance
       const model = new ChatOpenAI({
         modelName: modelId,
-        temperature: options?.temperature || 0.7,
+        temperature: options?.temperature || 0.6,
         maxTokens: options?.maxTokens || 8192,
         openAIApiKey: apiKey,
         configuration: {
           baseURL: "https://integrate.api.nvidia.com/v1",
-          timeout: 60000, // 60 second timeout
+          timeout: 120000, // 120 second timeout for larger model
         },
         modelKwargs: {
-          "response_format": { "type": "text" }
+          top_p: 0.95,
+          frequency_penalty: 0,
+          presence_penalty: 0
         }
       });
       

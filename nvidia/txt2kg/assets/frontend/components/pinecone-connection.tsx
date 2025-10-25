@@ -87,7 +87,7 @@ export function PineconeConnection({ className }: PineconeConnectionProps) {
               <InfoIcon className="h-5 w-5 text-muted-foreground" />
             </TooltipTrigger>
             <TooltipContent>
-              <p>Local Pinecone stores vector embeddings in memory for semantic search</p>
+              <p>Qdrant stores vector embeddings for semantic search</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -109,34 +109,34 @@ export function PineconeConnection({ className }: PineconeConnectionProps) {
           <p className="whitespace-normal break-words">Error: {error}</p>
           {error.includes('404') && (
             <p className="mt-1 text-xs">
-              The Pinecone server is running but the index doesn't exist yet. 
-              <button 
+              The Qdrant server is running but the collection doesn't exist yet.
+              <button
                 onClick={async () => {
                   setConnectionStatus("checking");
                   setError(null);
                   try {
                     const response = await fetch('/api/pinecone-diag/create-index', { method: 'POST' });
                     if (response.ok) {
-                      // Wait a bit for the index to be created
+                      // Wait a bit for the collection to be created
                       await new Promise(resolve => setTimeout(resolve, 2000));
                       checkConnection();
                     } else {
                       const data = await response.json();
-                      setError(data.error || 'Failed to create index');
+                      setError(data.error || 'Failed to create collection');
                       setConnectionStatus("disconnected");
                     }
                   } catch (err) {
-                    setError(err instanceof Error ? err.message : 'Error creating index');
+                    setError(err instanceof Error ? err.message : 'Error creating collection');
                     setConnectionStatus("disconnected");
                   }
                 }}
                 className="ml-1 text-blue-600 hover:text-blue-800 underline"
               >
-                Click here to create the index
+                Click here to create the collection
               </button>
               <br />
               <span className="text-xs text-gray-600">Or using Docker Compose: </span>
-              <code className="mx-1 px-1 bg-gray-100 rounded">docker-compose restart pinecone</code>
+              <code className="mx-1 px-1 bg-gray-100 rounded">docker compose restart qdrant</code>
             </p>
           )}
         </div>
@@ -144,13 +144,25 @@ export function PineconeConnection({ className }: PineconeConnectionProps) {
       
       <div className="text-sm space-y-1 w-full">
         <div className="flex justify-between">
-          <span className="text-muted-foreground">Vectors:</span>
-          <span>{stats.nodes}</span>
+          <span className="text-muted-foreground">Qdrant</span>
+          <span className="text-xs text-muted-foreground">{(stats as any).url || 'http://qdrant:6333'}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-muted-foreground">Source:</span>
-          <span>{stats.source} local</span>
+          <span className="text-muted-foreground">Vectors:</span>
+          <span>{stats.nodes} indexed</span>
         </div>
+        {(stats as any).status && (
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Status:</span>
+            <span className="capitalize">{(stats as any).status}</span>
+          </div>
+        )}
+        {(stats as any).vectorSize && (
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Dimensions:</span>
+            <span>{(stats as any).vectorSize}d ({(stats as any).distance})</span>
+          </div>
+        )}
       </div>
       
       <div className="flex space-x-2">
