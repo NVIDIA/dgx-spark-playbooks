@@ -4,13 +4,12 @@ Thank you for your interest in contributing to the DGX Spark Playbooks! This rep
 
 ## Table of Contents
 
-- [Getting Started](#getting-started)
 - [Types of Contributions](#types-of-contributions)
 - [Issue Tracking](#issue-tracking)
-- [Playbook Guidelines](#playbook-guidelines)
-- [License](#license)
   - [Pull Requests](#pull-requests)
   - [Signing Your Work](#signing-your-work)
+- [Playbook Guidelines](#playbook-guidelines)
+- [License](#license)
 - [Questions?](#questions)
 
 
@@ -23,6 +22,7 @@ We welcome the following types of contributions:
 - Optimization techniques for existing frameworks
 - Integration guides between multiple tools
 - Performance benchmarking tutorials
+Refer to [community/PLAYBOOK-GUIDELINES.md](community/PLAYBOOK-GUIDELINES.md) for publishing guidelines.
 
 ### 📝 Documentation Improvements
 - Corrections to existing playbooks
@@ -35,10 +35,8 @@ We welcome the following types of contributions:
 - Updates for deprecated software versions
 - Fixes to broken links or references
 
-### 🔧 Infrastructure Improvements
-- Templates for new playbooks
-- CI/CD improvements
-- Repository organization enhancements
+### 🔧 Other Ideas
+- Create a discussion topic!
 
 ## Issue Tracking
 
@@ -81,36 +79,6 @@ For new playbook requests or enhancements:
 **Additional Context**: [Links, examples, related work]
 ```
 
-### Issue Labels
-
-We use the following labels to categorize issues:
-
-- `bug`: Something isn't working correctly
-- `enhancement`: New feature or improvement request
-- `documentation`: Documentation improvements
-- `new-playbook`: Request for a new playbook
-- `help-wanted`: Community contributions welcome
-- `good-first-issue`: Suitable for newcomers
-- `duplicate`: Duplicate of existing issue
-- `invalid`: Issue is not valid or off-topic
-- `wontfix`: Issue will not be addressed
-
-
-## Playbook Guidelines
-
-For detailed information on creating high-quality playbooks, please refer to [PLAYBOOK-GUIDELINES.md](PLAYBOOK-GUIDELINES.md). This document covers:
-
-- Directory structure requirements
-- README.md templates and content standards
-- Code and script guidelines
-- Asset organization
-- Testing requirements
-- Maintenance guidelines
-
-## License
-
-By contributing to this project, you agree that your contributions will be licensed under the same license as the project. See [LICENSE](LICENSE) for details.
-
 #### Pull Requests
 Developer workflow for code contributions is as follows:
 
@@ -119,7 +87,7 @@ Developer workflow for code contributions is as follows:
 2. Git clone the forked repository and push changes to the personal fork.
 
   ```bash
-git clone https://github.com/YOUR_USERNAME/YOUR_FORK.git TensorRT
+git clone https://github.com/YOUR_USERNAME/YOUR_FORK.git dgx-spark-playbooks
 # Checkout the targeted branch and commit changes
 # Push the commits to a branch on the fork (remote).
 git push -u origin <local-branch>:<remote-branch>
@@ -127,12 +95,11 @@ git push -u origin <local-branch>:<remote-branch>
 
 3. Once the code changes are staged on the fork and ready for review, a [Pull Request](https://help.github.com/en/articles/about-pull-requests) (PR) can be [requested](https://help.github.com/en/articles/creating-a-pull-request) to merge the changes from a branch of the fork into a selected branch of upstream.
   * Exercise caution when selecting the source and target branches for the PR.
-    Note that versioned releases of TensorRT OSS are posted to `release/` branches of the upstream repo.
   * Creation of a PR creation kicks off the code review process.
-  * Atleast one TensorRT engineer will be assigned for the review.
+  * Atleast one repository owner will be assigned for the review.
   * While under review, mark your PRs as work-in-progress by prefixing the PR title with [WIP].
 
-4. Since there is no CI/CD process in place yet, the PR will be accepted and the corresponding issue closed only after adequate testing has been completed, manually, by the developer and/or TensorRT engineer reviewing the code.
+4. Since there is no CI/CD process in place yet, the PR will be accepted and the corresponding issue closed only after adequate testing has been completed, manually, by the developer and/or repository owner reviewing the change.
 
 
 #### Signing Your Work
@@ -177,6 +144,14 @@ git push -u origin <local-branch>:<remote-branch>
     
     (d) I understand and agree that this project and the contribution are public and that a record of the contribution (including all personal information I submit with it, including my sign-off) is maintained indefinitely and may be redistributed consistent with this project or the open source license(s) involved.
   ```
+
+## Playbook Guidelines
+
+For detailed information on creating high-quality playbooks, please refer to [community/PLAYBOOK-GUIDELINES.md](community/PLAYBOOK-GUIDELINES.md).
+
+## License
+
+By contributing to this project, you agree that your contributions will be licensed under the same license as the project. See [LICENSE](LICENSE) for details.
 
 ## Questions?
 
