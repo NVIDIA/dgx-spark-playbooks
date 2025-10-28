@@ -60,4 +60,3 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 
 See:
 - [LICENSE](LICENSE) for licensing information.
-- [LICENSE-3rd-party](LICENSE-3rd-party) for third-party licensing information.
