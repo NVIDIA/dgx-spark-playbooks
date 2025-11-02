@@ -137,6 +137,8 @@ per_device_train_batch_size = 4
 max_steps = 1000
 ```
 
+When you exit the container, the fine-tuned unsloth ouputs will be in the "ouputs" directory.
+
 Visit https://github.com/unslothai/unsloth/wiki
 for advanced usage instructions, including:
 - [Saving models in GGUF format for vLLM](https://github.com/unslothai/unsloth/wiki#saving-to-gguf)
