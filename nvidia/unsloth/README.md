@@ -99,7 +99,7 @@ pip install --no-deps bitsandbytes
 Curl the test script [here](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/unsloth/assets/test_unsloth.py) into the container.
 
 ```bash
-curl -O https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/unsloth/assets/test_unsloth.py
+curl -O https://raw.githubusercontent.com/NVIDIA/dgx-spark-playbooks/refs/heads/main/nvidia/unsloth/assets/test_unsloth.py
 ```
 
 We will use this test script to validate the installation with a simple fine-tuning task.
