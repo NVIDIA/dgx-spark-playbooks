@@ -89,9 +89,10 @@ pip install transformers peft datasets "trl==0.19.1"
 pip install --no-deps unsloth unsloth_zoo
 ```
 
-## Step 5. Build and install bitsandbytes inside Docker
+## Step 5. Build and install bitsandbytes and hf_transfer inside Docker
 ```bash
 pip install --no-deps bitsandbytes
+pip install hf_transfer
 ```
 
 ## Step 6. Create Python test script
