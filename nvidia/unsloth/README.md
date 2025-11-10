@@ -79,13 +79,16 @@ docker pull nvcr.io/nvidia/pytorch:25.09-py3
 
 ## Step 3. Launch Docker
 ```bash
-docker run --gpus all --ulimit memlock=-1 -it --ulimit stack=67108864 --entrypoint /usr/bin/bash --rm nvcr.io/nvidia/pytorch:25.09-py3
+mkdir -p ./outputs # directory to save the unsloth finetuned model results
+docker run --gpus all \
+  --ulimit memlock=-1 --ulimit stack=67108864 -it --entrypoint /usr/bin/bash --rm \
+  -v "$(pwd)/outputs:/workspace/outputs" nvcr.io/nvidia/pytorch:25.09-py3
 ```
 
 ## Step 4. Install dependencies inside Docker
 
 ```bash
-pip install transformers peft datasets "trl==0.19.1"
+pip install transformers peft datasets 'trl==0.23.1' hf_transfer
 pip install --no-deps unsloth unsloth_zoo
 pip install hf_transfer
 ```
@@ -97,7 +100,7 @@ pip install --no-deps bitsandbytes
 
 ## Step 6. Create Python test script
 
-Curl the test script [here](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/unsloth/assets/test_unsloth.py) into the container.
+Curl the test script [here](https://raw.githubusercontent.com/NVIDIA/dgx-spark-playbooks/refs/heads/main/nvidia/unsloth/assets/test_unsloth.py) into the container.
 
 ```bash
 curl -O https://raw.githubusercontent.com/NVIDIA/dgx-spark-playbooks/refs/heads/main/nvidia/unsloth/assets/test_unsloth.py
@@ -124,16 +127,18 @@ Expected output in the terminal window:
 Test with your own model and dataset by updating the `test_unsloth.py` file:
 
 ```python
-## Replace line 32 with your model choice
+## Replace line 49 with your model choice
 model_name = "unsloth/Meta-Llama-3.1-8B-bnb-4bit"
 
-## Load your custom dataset in line 8
+## Load your custom dataset in line 25
 dataset = load_dataset("your_dataset_name")
 
-## Adjust training parameter args at line 61
+## Adjust training parameter args at line 80, and max_steps at line 83
 per_device_train_batch_size = 4
 max_steps = 1000
 ```
+
+When you exit the container, the fine-tuned unsloth ouputs will be in the "ouputs" directory.
 
 Visit https://github.com/unslothai/unsloth/wiki
 for advanced usage instructions, including:
