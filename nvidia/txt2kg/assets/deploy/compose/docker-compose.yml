@@ -61,7 +61,9 @@ services:
       - OLLAMA_FLASH_ATTENTION=1          # Enable flash attention for better performance
       - OLLAMA_KEEP_ALIVE=30m             # Keep models loaded for 30 minutes
       - OLLAMA_CUDA=1                     # Enable CUDA acceleration
-      - OLLAMA_LLM_LIBRARY=cuda           # Use CUDA library for LLM operations
+      - OLLAMA_LLM_LIBRARY=cuda_v13       # The correct value for DGX Spark is cuda_v13.  "cuda" will fallback to 100% CPU.
+                                          # Valid vaules are [cuda_jetpack5, cuda_jetpack6, cuda_v12, cuda_v13].
+                                          # Can be found in /usr/lib/ollama
       - OLLAMA_NUM_PARALLEL=1             # Process one request at a time for 70B models
       - OLLAMA_MAX_LOADED_MODELS=1        # Load only one model at a time to avoid VRAM contention
       - OLLAMA_KV_CACHE_TYPE=q8_0         # Reduce KV cache VRAM usage with minimal performance impact
