@@ -1,0 +1,48 @@
+[Unit]
+Description=DGX Spark MCP Server
+Documentation=https://github.com/raibid-labs/dgx-spark-mcp
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dgx
+Group=dgx
+# Environment variables
+Environment="NODE_ENV=production"
+Environment="DGX_MCP_CONFIG_PATH=/etc/dgx-spark-mcp/config.json"
+
+# Start the service
+# Assumes installed globally via npm
+ExecStart=/usr/local/bin/dgx-spark-mcp
+
+# Restart policy
+Restart=on-failure
+RestartSec=10
+StartLimitInterval=600
+StartLimitBurst=5
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+# Allow write access to logs
+ReadWritePaths=/var/log/dgx-spark-mcp
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=dgx-spark-mcp
+
+# Process management
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
