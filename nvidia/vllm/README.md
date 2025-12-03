@@ -319,25 +319,7 @@ nvidia-smi
 docker exec node nvidia-smi --query-gpu=memory.used,memory.total --format=csv
 ```
 
-## Step 14. Cleanup and rollback
-
-Remove temporary configurations and containers when testing is complete.
-
-> [!WARNING]
-> This will stop all inference services and remove cluster configuration.
-
-```bash
-## Stop containers on both nodes
-docker stop node
-docker rm node
-
-## Remove network configuration on both nodes
-sudo ip addr del 192.168.100.10/24 dev enP2p1s0f1np1  # Node 1
-sudo ip addr del 192.168.100.11/24 dev enP2p1s0f1np1  # Node 2
-sudo ip link set enP2p1s0f1np1 down
-```
-
-## Step 15. Next steps
+## Step 14. Next steps
 
 Access the Ray dashboard for cluster monitoring and explore additional features:
 
