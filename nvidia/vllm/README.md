@@ -343,7 +343,7 @@ Access the Ray dashboard for cluster monitoring and explore additional features:
 
 ```bash
 ## Ray dashboard available at:
-http://192.168.100.10:8265
+http://<head-node-ip>:8265
 
 ## Consider implementing for production:
 ## - Health checks and automatic restarts
