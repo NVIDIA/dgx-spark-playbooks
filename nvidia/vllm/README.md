@@ -241,7 +241,8 @@ Start the vLLM inference server with tensor parallelism across both nodes.
 
 ```bash
 ## On Node 1, enter container and start server
-docker exec -it node /bin/bash
+export VLLM_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '^node-[0-9]+$')
+docker exec -it $VLLM_CONTAINER /bin/bash
 vllm serve meta-llama/Llama-3.3-70B-Instruct \
 --tensor-parallel-size 2 --max_model_len 2048
 ```
@@ -282,7 +283,8 @@ Start the server with memory-constrained parameters for the large model.
 
 ```bash
 ## On Node 1, launch with restricted parameters
-docker exec -it node /bin/bash
+export VLLM_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '^node-[0-9]+$')
+docker exec -it $VLLM_CONTAINER /bin/bash
 vllm serve hugging-quants/Meta-Llama-3.1-405B-Instruct-AWQ-INT4 \
 --tensor-parallel-size 2 --max-model-len 256 --gpu-memory-utilization 1.0 \
 --max-num-seqs 1 --max_num_batched_tokens 256
