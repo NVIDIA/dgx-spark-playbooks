@@ -55,6 +55,8 @@ support for ARM64.
 
 ## Instructions
 
+> **Important:** This guide uses `enp1s0f1np1` as the interface name. Your actual interface may differ depending on which QSFP port you connected. Run `ibdev2netdev` to identify which interface shows "(Up)"
+
 ## Step 1. Pull vLLM container image
 
 Find the latest container build from https://catalog.ngc.nvidia.com/orgs/nvidia/containers/vllm?version=25.11-py3
