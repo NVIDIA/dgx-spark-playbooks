@@ -55,11 +55,13 @@ support for ARM64.
 
 ## Instructions
 
+> **Important:** This guide uses `enp1s0f1np1` as the interface name. Your actual interface may differ depending on which QSFP port you connected. Run `ibdev2netdev` to identify which interface shows "(Up)"
+
 ## Step 1. Pull vLLM container image
 
-Find the latest container build from https://catalog.ngc.nvidia.com/orgs/nvidia/containers/vllm?version=25.09-py3
+Find the latest container build from https://catalog.ngc.nvidia.com/orgs/nvidia/containers/vllm?version=25.11-py3
 ```
-docker pull nvcr.io/nvidia/vllm:25.09-py3
+docker pull nvcr.io/nvidia/vllm:25.11-py3
 ```
 
 ## Step 2. Test vLLM in container
@@ -68,7 +70,7 @@ Launch the container and start vLLM server with a test model to verify basic fun
 
 ```bash
 docker run -it --gpus all -p 8000:8000 \
-nvcr.io/nvidia/vllm:25.09-py3 \
+nvcr.io/nvidia/vllm:25.11-py3 \
 vllm serve "Qwen/Qwen2.5-Math-1.5B-Instruct"
 ```
 
@@ -96,7 +98,7 @@ Expected response should contain `"content": "204"` or similar mathematical calc
 For container approach (non-destructive):
 
 ```bash
-docker rm $(docker ps -aq --filter ancestor=nvcr.io/nvidia/vllm:25.09-py3)
+docker rm $(docker ps -aq --filter ancestor=nvcr.io/nvidia/vllm:25.11-py3)
 docker rmi nvcr.io/nvidia/vllm
 ```
 
@@ -150,8 +152,8 @@ After this, you should be able to run docker commands without using `sudo`.
 
 
 ```bash
-docker pull nvcr.io/nvidia/vllm:25.09-py3
-export VLLM_IMAGE=nvcr.io/nvidia/vllm:25.09-py3
+docker pull nvcr.io/nvidia/vllm:25.11-py3
+export VLLM_IMAGE=nvcr.io/nvidia/vllm:25.11-py3
 ```
 
 
@@ -160,45 +162,67 @@ export VLLM_IMAGE=nvcr.io/nvidia/vllm:25.09-py3
 Launch the Ray cluster head node on Node 1. This node coordinates the distributed inference and serves the API endpoint.
 
 ```bash
-## On Node 1, start head node
-export MN_IF_NAME=enP2p1s0f1np1
-bash run_cluster.sh $VLLM_IMAGE 192.168.100.10 --head ~/.cache/huggingface \
--e VLLM_HOST_IP=192.168.100.10 \
--e UCX_NET_DEVICES=$MN_IF_NAME \
--e NCCL_SOCKET_IFNAME=$MN_IF_NAME \
--e OMPI_MCA_btl_tcp_if_include=$MN_IF_NAME \
--e GLOO_SOCKET_IFNAME=$MN_IF_NAME \
--e TP_SOCKET_IFNAME=$MN_IF_NAME \
--e RAY_memory_monitor_refresh_ms=0 \
--e MASTER_ADDR=192.168.100.10
+# On Node 1, start head node
+
+# Get the IP address of the high-speed interface
+# Use the interface that shows "(Up)" from ibdev2netdev (enp1s0f0np0 or enp1s0f1np1)
+export MN_IF_NAME=enp1s0f1np1
+export VLLM_HOST_IP=$(ip -4 addr show $MN_IF_NAME | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
+
+echo "Using interface $MN_IF_NAME with IP $VLLM_HOST_IP"
+
+bash run_cluster.sh $VLLM_IMAGE $VLLM_HOST_IP --head ~/.cache/huggingface \
+  -e VLLM_HOST_IP=$VLLM_HOST_IP \
+  -e UCX_NET_DEVICES=$MN_IF_NAME \
+  -e NCCL_SOCKET_IFNAME=$MN_IF_NAME \
+  -e OMPI_MCA_btl_tcp_if_include=$MN_IF_NAME \
+  -e GLOO_SOCKET_IFNAME=$MN_IF_NAME \
+  -e TP_SOCKET_IFNAME=$MN_IF_NAME \
+  -e RAY_memory_monitor_refresh_ms=0 \
+  -e MASTER_ADDR=$VLLM_HOST_IP
 ```
 
 
 ## Step 5. Start Ray worker node
 
 Connect Node 2 to the Ray cluster as a worker node. This provides additional GPU resources for tensor parallelism.
-
 ```bash
-## On Node 2, join as worker
-export MN_IF_NAME=enP2p1s0f1np1
-bash run_cluster.sh $VLLM_IMAGE 192.168.100.10 --worker ~/.cache/huggingface \
--e VLLM_HOST_IP=192.168.100.11 \
--e UCX_NET_DEVICES=$MN_IF_NAME \
--e NCCL_SOCKET_IFNAME=$MN_IF_NAME \
--e OMPI_MCA_btl_tcp_if_include=$MN_IF_NAME \
--e GLOO_SOCKET_IFNAME=$MN_IF_NAME \
--e TP_SOCKET_IFNAME=$MN_IF_NAME \
--e RAY_memory_monitor_refresh_ms=0 \
--e MASTER_ADDR=192.168.100.10
+# On Node 2, join as worker
+
+# Set the interface name (same as Node 1)
+export MN_IF_NAME=enp1s0f1np1
+
+# Get Node 2's own IP address
+export VLLM_HOST_IP=$(ip -4 addr show $MN_IF_NAME | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
+
+# IMPORTANT: Set HEAD_NODE_IP to Node 1's IP address
+# You must get this value from Node 1 (run: echo $VLLM_HOST_IP on Node 1)
+export HEAD_NODE_IP=<NODE_1_IP_ADDRESS>
+
+echo "Worker IP: $VLLM_HOST_IP, connecting to head node at: $HEAD_NODE_IP"
+
+bash run_cluster.sh $VLLM_IMAGE $HEAD_NODE_IP --worker ~/.cache/huggingface \
+  -e VLLM_HOST_IP=$VLLM_HOST_IP \
+  -e UCX_NET_DEVICES=$MN_IF_NAME \
+  -e NCCL_SOCKET_IFNAME=$MN_IF_NAME \
+  -e OMPI_MCA_btl_tcp_if_include=$MN_IF_NAME \
+  -e GLOO_SOCKET_IFNAME=$MN_IF_NAME \
+  -e TP_SOCKET_IFNAME=$MN_IF_NAME \
+  -e RAY_memory_monitor_refresh_ms=0 \
+  -e MASTER_ADDR=$HEAD_NODE_IP
 ```
 
+> **Note:** Replace `<NODE_1_IP_ADDRESS>` with the actual IP address from Node 1, specifically the QSFP interface enp1s0f1np1 configured in the [Connect two Sparks](https://build.nvidia.com/spark/connect-two-sparks) playbook. 
+
 ## Step 6. Verify cluster status
-
 Confirm both nodes are recognized and available in the Ray cluster.
-
 ```bash
-## On Node 1 (head node)
-docker exec node ray status
+# On Node 1 (head node)
+# Find the vLLM container name (it will be node-<random_number>)
+export VLLM_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '^node-[0-9]+$')
+echo "Found container: $VLLM_CONTAINER"
+
+docker exec $VLLM_CONTAINER ray status
 ```
 
 Expected output shows 2 nodes with available GPU resources.
@@ -219,7 +243,8 @@ Start the vLLM inference server with tensor parallelism across both nodes.
 
 ```bash
 ## On Node 1, enter container and start server
-docker exec -it node /bin/bash
+export VLLM_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '^node-[0-9]+$')
+docker exec -it $VLLM_CONTAINER /bin/bash
 vllm serve meta-llama/Llama-3.3-70B-Instruct \
 --tensor-parallel-size 2 --max_model_len 2048
 ```
@@ -260,7 +285,8 @@ Start the server with memory-constrained parameters for the large model.
 
 ```bash
 ## On Node 1, launch with restricted parameters
-docker exec -it node /bin/bash
+export VLLM_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '^node-[0-9]+$')
+docker exec -it $VLLM_CONTAINER /bin/bash
 vllm serve hugging-quants/Meta-Llama-3.1-405B-Instruct-AWQ-INT4 \
 --tensor-parallel-size 2 --max-model-len 256 --gpu-memory-utilization 1.0 \
 --max-num-seqs 1 --max_num_batched_tokens 256
@@ -297,31 +323,13 @@ nvidia-smi
 docker exec node nvidia-smi --query-gpu=memory.used,memory.total --format=csv
 ```
 
-## Step 14. Cleanup and rollback
-
-Remove temporary configurations and containers when testing is complete.
-
-> [!WARNING]
-> This will stop all inference services and remove cluster configuration.
-
-```bash
-## Stop containers on both nodes
-docker stop node
-docker rm node
-
-## Remove network configuration on both nodes
-sudo ip addr del 192.168.100.10/24 dev enP2p1s0f1np1  # Node 1
-sudo ip addr del 192.168.100.11/24 dev enP2p1s0f1np1  # Node 2
-sudo ip link set enP2p1s0f1np1 down
-```
-
-## Step 15. Next steps
+## Step 14. Next steps
 
 Access the Ray dashboard for cluster monitoring and explore additional features:
 
 ```bash
 ## Ray dashboard available at:
-http://192.168.100.10:8265
+http://<head-node-ip>:8265
 
 ## Consider implementing for production:
 ## - Health checks and automatic restarts
