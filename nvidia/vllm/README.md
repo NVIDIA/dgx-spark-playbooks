@@ -210,7 +210,7 @@ bash run_cluster.sh $VLLM_IMAGE $HEAD_NODE_IP --worker ~/.cache/huggingface \
   -e MASTER_ADDR=$HEAD_NODE_IP
 ```
 
-> **Note:** Replace `<NODE_1_IP_ADDRESS>` with the actual IP address from Node 1. If using automatic link-local addressing, this will be something like `169.254.x.x`. If using manual static IPs, it will be `192.168.100.10`.
+> **Note:** Replace `<NODE_1_IP_ADDRESS>` with the actual IP address from Node 1, specifically the QSFP interface enp1s0f1np1 configured in the [Connect two Sparks](https://build.nvidia.com/spark/connect-two-sparks) playbook. 
 
 ## Step 6. Verify cluster status
 Confirm both nodes are recognized and available in the Ray cluster.
