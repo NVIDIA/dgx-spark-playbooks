@@ -160,37 +160,57 @@ export VLLM_IMAGE=nvcr.io/nvidia/vllm:25.11-py3
 Launch the Ray cluster head node on Node 1. This node coordinates the distributed inference and serves the API endpoint.
 
 ```bash
-## On Node 1, start head node
-export MN_IF_NAME=enP2p1s0f1np1
-bash run_cluster.sh $VLLM_IMAGE 192.168.100.10 --head ~/.cache/huggingface \
--e VLLM_HOST_IP=192.168.100.10 \
--e UCX_NET_DEVICES=$MN_IF_NAME \
--e NCCL_SOCKET_IFNAME=$MN_IF_NAME \
--e OMPI_MCA_btl_tcp_if_include=$MN_IF_NAME \
--e GLOO_SOCKET_IFNAME=$MN_IF_NAME \
--e TP_SOCKET_IFNAME=$MN_IF_NAME \
--e RAY_memory_monitor_refresh_ms=0 \
--e MASTER_ADDR=192.168.100.10
+# On Node 1, start head node
+
+# Get the IP address of the high-speed interface
+# Use the interface that shows "(Up)" from ibdev2netdev (enp1s0f0np0 or enp1s0f1np1)
+export MN_IF_NAME=enp1s0f1np1
+export VLLM_HOST_IP=$(ip -4 addr show $MN_IF_NAME | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
+
+echo "Using interface $MN_IF_NAME with IP $VLLM_HOST_IP"
+
+bash run_cluster.sh $VLLM_IMAGE $VLLM_HOST_IP --head ~/.cache/huggingface \
+  -e VLLM_HOST_IP=$VLLM_HOST_IP \
+  -e UCX_NET_DEVICES=$MN_IF_NAME \
+  -e NCCL_SOCKET_IFNAME=$MN_IF_NAME \
+  -e OMPI_MCA_btl_tcp_if_include=$MN_IF_NAME \
+  -e GLOO_SOCKET_IFNAME=$MN_IF_NAME \
+  -e TP_SOCKET_IFNAME=$MN_IF_NAME \
+  -e RAY_memory_monitor_refresh_ms=0 \
+  -e MASTER_ADDR=$VLLM_HOST_IP
 ```
 
 
 ## Step 5. Start Ray worker node
 
 Connect Node 2 to the Ray cluster as a worker node. This provides additional GPU resources for tensor parallelism.
-
 ```bash
-## On Node 2, join as worker
-export MN_IF_NAME=enP2p1s0f1np1
-bash run_cluster.sh $VLLM_IMAGE 192.168.100.10 --worker ~/.cache/huggingface \
--e VLLM_HOST_IP=192.168.100.11 \
--e UCX_NET_DEVICES=$MN_IF_NAME \
--e NCCL_SOCKET_IFNAME=$MN_IF_NAME \
--e OMPI_MCA_btl_tcp_if_include=$MN_IF_NAME \
--e GLOO_SOCKET_IFNAME=$MN_IF_NAME \
--e TP_SOCKET_IFNAME=$MN_IF_NAME \
--e RAY_memory_monitor_refresh_ms=0 \
--e MASTER_ADDR=192.168.100.10
+# On Node 2, join as worker
+
+# Set the interface name (same as Node 1)
+export MN_IF_NAME=enp1s0f1np1
+
+# Get Node 2's own IP address
+export VLLM_HOST_IP=$(ip -4 addr show $MN_IF_NAME | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
+
+# IMPORTANT: Set HEAD_NODE_IP to Node 1's IP address
+# You must get this value from Node 1 (run: echo $VLLM_HOST_IP on Node 1)
+export HEAD_NODE_IP=<NODE_1_IP_ADDRESS>
+
+echo "Worker IP: $VLLM_HOST_IP, connecting to head node at: $HEAD_NODE_IP"
+
+bash run_cluster.sh $VLLM_IMAGE $HEAD_NODE_IP --worker ~/.cache/huggingface \
+  -e VLLM_HOST_IP=$VLLM_HOST_IP \
+  -e UCX_NET_DEVICES=$MN_IF_NAME \
+  -e NCCL_SOCKET_IFNAME=$MN_IF_NAME \
+  -e OMPI_MCA_btl_tcp_if_include=$MN_IF_NAME \
+  -e GLOO_SOCKET_IFNAME=$MN_IF_NAME \
+  -e TP_SOCKET_IFNAME=$MN_IF_NAME \
+  -e RAY_memory_monitor_refresh_ms=0 \
+  -e MASTER_ADDR=$HEAD_NODE_IP
 ```
+
+> **Note:** Replace `<NODE_1_IP_ADDRESS>` with the actual IP address from Node 1. If using automatic link-local addressing, this will be something like `169.254.x.x`. If using manual static IPs, it will be `192.168.100.10`.
 
 ## Step 6. Verify cluster status
 
