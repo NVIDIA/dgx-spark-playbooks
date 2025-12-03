@@ -213,12 +213,14 @@ bash run_cluster.sh $VLLM_IMAGE $HEAD_NODE_IP --worker ~/.cache/huggingface \
 > **Note:** Replace `<NODE_1_IP_ADDRESS>` with the actual IP address from Node 1. If using automatic link-local addressing, this will be something like `169.254.x.x`. If using manual static IPs, it will be `192.168.100.10`.
 
 ## Step 6. Verify cluster status
-
 Confirm both nodes are recognized and available in the Ray cluster.
-
 ```bash
-## On Node 1 (head node)
-docker exec node ray status
+# On Node 1 (head node)
+# Find the vLLM container name (it will be node-<random_number>)
+export VLLM_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '^node-[0-9]+$')
+echo "Found container: $VLLM_CONTAINER"
+
+docker exec $VLLM_CONTAINER ray status
 ```
 
 Expected output shows 2 nodes with available GPU resources.
