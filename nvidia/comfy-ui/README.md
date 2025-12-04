@@ -93,13 +93,13 @@ Verify the virtual environment is active by checking the command prompt shows `(
 
 ## Step 3. Install PyTorch with CUDA support
 
-Install PyTorch with CUDA 12.9 support.
+Install PyTorch with CUDA 13.0 support.
 
 ```bash
 pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu130
 ```
 
-This installation targets CUDA 12.9 compatibility with Blackwell architecture GPUs.
+This installation targets CUDA 13.0 compatibility with Blackwell architecture GPUs.
 
 ## Step 4. Clone ComfyUI repository
 
