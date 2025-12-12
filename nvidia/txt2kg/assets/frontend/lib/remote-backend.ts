@@ -60,14 +60,15 @@ export class RemoteBackendService {
 
   /**
    * Initialize the remote backend with all required services
-   * @param graphDbType - Type of graph database to use
+   * @param graphDbType - Type of graph database to use (defaults to GRAPH_DB_TYPE env var)
    */
-  public async initialize(graphDbType: GraphDBType = 'arangodb'): Promise<void> {
-    console.log('Initializing remote backend...');
+  public async initialize(graphDbType?: GraphDBType): Promise<void> {
+    const dbType = graphDbType || (process.env.GRAPH_DB_TYPE as GraphDBType) || 'arangodb';
+    console.log(`Initializing remote backend with ${dbType}...`);
     
     // Initialize Graph Database
-    await this.graphDBService.initialize(graphDbType);
-    console.log(`${graphDbType} service initialized`);
+    await this.graphDBService.initialize(dbType);
+    console.log(`${dbType} service initialized`);
     
     // Initialize Pinecone
     await this.pineconeService.initialize();

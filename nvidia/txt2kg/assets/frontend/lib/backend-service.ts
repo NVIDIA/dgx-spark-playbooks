@@ -37,7 +37,15 @@ export class BackendService {
   private modelName: string = 'all-MiniLM-L6-v2';
   private static instance: BackendService;
   private initialized: boolean = false;
-  private activeGraphDbType: GraphDBType = 'arangodb';
+  private activeGraphDbType: GraphDBType | null = null; // Set at runtime, not build time
+  
+  private getRuntimeGraphDbType(): GraphDBType {
+    if (this.activeGraphDbType === null) {
+      this.activeGraphDbType = (process.env.GRAPH_DB_TYPE as GraphDBType) || 'arangodb';
+      console.log(`[BackendService] Initialized activeGraphDbType at runtime: ${this.activeGraphDbType}`);
+    }
+    return this.activeGraphDbType;
+  }
   
   private constructor() {
     this.graphDBService = GraphDBService.getInstance();
@@ -64,16 +72,17 @@ export class BackendService {
   
   /**
    * Initialize the backend services
-   * @param graphDbType - Type of graph database to use (neo4j or arangodb)
+   * @param graphDbType - Type of graph database to use (defaults to GRAPH_DB_TYPE env var)
    */
-  public async initialize(graphDbType: GraphDBType = 'arangodb'): Promise<void> {
-    this.activeGraphDbType = graphDbType;
+  public async initialize(graphDbType?: GraphDBType): Promise<void> {
+    const dbType = graphDbType || (process.env.GRAPH_DB_TYPE as GraphDBType) || 'arangodb';
+    this.activeGraphDbType = dbType;
     
     // Initialize Graph Database
     if (!this.graphDBService.isInitialized()) {
       try {
         // Get the appropriate service based on type
-        const graphDbService = getGraphDbService(graphDbType);
+        const graphDbService = getGraphDbService(dbType);
         
         // Try to get settings from server settings API first
         let serverSettings: Record<string, string> = {};
@@ -88,7 +97,7 @@ export class BackendService {
           console.log('Failed to load settings from server API, falling back to environment variables:', error);
         }
         
-        if (graphDbType === 'neo4j') {
+        if (dbType === 'neo4j') {
           // Get Neo4j credentials from server settings first, then fallback to environment
           const uri = serverSettings.neo4j_url || process.env.NEO4J_URI;
           const username = serverSettings.neo4j_user || process.env.NEO4J_USER || process.env.NEO4J_USERNAME;
@@ -107,9 +116,9 @@ export class BackendService {
           console.log(`Using ArangoDB database: ${dbName}`);
           await this.graphDBService.initialize('arangodb', url, username, password);
         }
-        console.log(`${graphDbType} initialized successfully in backend service`);
+        console.log(`${dbType} initialized successfully in backend service`);
       } catch (error) {
-        console.error(`Failed to initialize ${graphDbType} in backend service:`, error);
+        console.error(`Failed to initialize ${dbType} in backend service:`, error);
         if (process.env.NODE_ENV === 'development') {
           console.log('Development mode: Continuing despite graph database initialization error');
         } else {
@@ -151,7 +160,7 @@ export class BackendService {
    * Get the active graph database type
    */
   public getGraphDbType(): GraphDBType {
-    return this.activeGraphDbType;
+    return this.getRuntimeGraphDbType();
   }
   
   /**
@@ -253,7 +262,7 @@ export class BackendService {
     const filteredKeywords = keywords.filter(kw => !this.isStopWord(kw));
 
     // If using ArangoDB, use its native graph traversal capabilities
-    if (this.activeGraphDbType === 'arangodb') {
+    if (this.getRuntimeGraphDbType() === 'arangodb') {
       console.log(`Using ArangoDB native graph traversal for keywords: ${filteredKeywords.join(', ')}`);
 
       try {
