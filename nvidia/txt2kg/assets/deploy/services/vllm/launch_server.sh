@@ -107,6 +107,39 @@ else
     CPU_OFFLOAD_GB="40"
 fi
 
+KV_CACHE_DTYPE="auto"
+
+# Allow environment variables to override defaults
+if [ -n "$VLLM_MODEL" ]; then
+    echo "Overriding model with environment variable VLLM_MODEL: $VLLM_MODEL"
+    MODEL_TO_USE="$VLLM_MODEL"
+fi
+
+if [ -n "$VLLM_MAX_MODEL_LEN" ]; then
+    echo "Overriding max model len with environment variable: $VLLM_MAX_MODEL_LEN"
+    MAX_MODEL_LEN="$VLLM_MAX_MODEL_LEN"
+fi
+
+if [ -n "$VLLM_GPU_MEMORY_UTILIZATION" ]; then
+    echo "Overriding GPU memory utilization with environment variable: $VLLM_GPU_MEMORY_UTILIZATION"
+    GPU_MEMORY_UTIL="$VLLM_GPU_MEMORY_UTILIZATION"
+fi
+
+if [ -n "$VLLM_CPU_OFFLOAD_GB" ]; then
+    echo "Overriding CPU offload GB with environment variable: $VLLM_CPU_OFFLOAD_GB"
+    CPU_OFFLOAD_GB="$VLLM_CPU_OFFLOAD_GB"
+fi
+
+if [ -n "$VLLM_QUANTIZATION" ]; then
+    echo "Overriding quantization with environment variable: $VLLM_QUANTIZATION"
+    QUANTIZATION_FLAG="--quantization $VLLM_QUANTIZATION"
+fi
+
+if [ -n "$VLLM_KV_CACHE_DTYPE" ]; then
+    echo "Overriding KV cache dtype with environment variable: $VLLM_KV_CACHE_DTYPE"
+    KV_CACHE_DTYPE="$VLLM_KV_CACHE_DTYPE"
+fi
+
 echo "Using model: $MODEL_TO_USE"
 echo "Quantization: ${QUANTIZATION_FLAG:-'disabled'}"
 echo "GPU memory utilization: $GPU_MEMORY_UTIL"
@@ -122,7 +155,7 @@ vllm serve "$MODEL_TO_USE" \
   --max-num-batched-tokens "$MAX_BATCHED_TOKENS" \
   --gpu-memory-utilization "$GPU_MEMORY_UTIL" \
   --cpu-offload-gb "$CPU_OFFLOAD_GB" \
-  --kv-cache-dtype auto \
+  --kv-cache-dtype "$KV_CACHE_DTYPE" \
   --trust-remote-code \
   --served-model-name "$MODEL_TO_USE" \
   --enable-chunked-prefill \
