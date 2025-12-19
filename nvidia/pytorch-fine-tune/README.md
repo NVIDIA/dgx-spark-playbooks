@@ -269,7 +269,7 @@ For multi-node runs, we provide 2 configuration files:
 
 These configuration files need to be adapted:
 - Set `machine_rank` on each of your nodes according to its rank. Your master node should have a rank `0`. The second node has a rank `1`.
-- Set `main_process_ip` using the IP address of your master node. Ensure that both configuration files have the same value. Use `ifconfig` on your main node to find the correct value for the CX-7 IP address on this node.
+- Set `main_process_ip` using the IP address of your master node. Ensure that both configuration files have the same value. Use `ifconfig` on your main node to find the correct value for the CX-7 IP address.
 - Set a port number that can be used on your main node.
 
 The fields that need to be filled in your YAML files:
@@ -284,7 +284,7 @@ All the scripts and configuration files are available in this [**repository**](h
 
 ### Step 10. Run finetuning scripts
 
-Once you successfully run the previous steps, you can use one of the `run-multi-llama_*` scripts for finetuning. Here is an example for Llama3 70B using LoRa for finetuning and FSDP2.
+Once you successfully run the previous steps, you can use one of the `run-multi-llama_*` scripts for finetuning available in this [**repository**](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/pytorch-fine-tune/assets). Here is an example for Llama3 70B using LoRa for finetuning and FSDP2.
 
 ```bash
 ## Need to specify huggingface token for model download.
@@ -318,6 +318,9 @@ rm -rf $HOME/.cache/huggingface/hub/models--meta-llama* $HOME/.cache/huggingface
 | Symptom | Cause | Fix |
 |---------|--------|-----|
 | Cannot access gated repo for URL | Certain HuggingFace models have restricted access | Regenerate your [HuggingFace token](https://huggingface.co/docs/hub/en/security-tokens); and request access to the [gated model](https://huggingface.co/docs/hub/en/models-gated#customize-requested-information) on your web browser |
+| Errors and time-outs in multi-Spark runs | Various reasons | We recommend to set the following variables to enable extra logging and runtime consistency checks <br> `ACCELERATE_DEBUG_MODE=1`<br> `ACCELERATE_LOG_LEVEL=DEBUG`<br> `TORCH_CPP_LOG_LEVEL=INFO`<br> `TORCH_DISTRIBUTED_DEBUG=DETAIL`|
+| task: non-zero exit (255) | Container exit with error code 255 | Check container logs with `docker ps -a --filter "name=finetuning-multinode"` to get container ID, then `docker logs <container_id>` to see detailed error messages |
+|Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running? | Docker daemon crash caused by Docker Swarm attempting to bind to a stale or unreachable link-local IP address | Stop Docker `sudo systemctl stop docker`<br> Remove Swarm state `sudo rm -rf /var/lib/docker/swarm`<br> Restart Docker `sudo systemctl start docker`<br> Re-initialize Swarm with a valid advertise address on an active interface|
 
 > [!NOTE]
 > DGX Spark uses a Unified Memory Architecture (UMA), which enables dynamic memory sharing between the GPU and CPU. 
