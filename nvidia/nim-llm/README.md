@@ -61,8 +61,9 @@ You'll launch a NIM container on your DGX Spark device to expose a GPU-accelerat
   * GPU memory requirements vary by model size
   * Container startup time depends on model loading
 * **Rollback:** Stop and remove containers with `docker stop <CONTAINER_NAME> && docker rm <CONTAINER_NAME>`. Remove cached models from `~/.cache/nim` if disk space recovery is needed.
-* **Last Updated:** 12/09/2025
+* **Last Updated:** 12/22/2025
   * Update docker container version to cuda:13.0.1-devel-ubuntu24.04
+  * Add docker container permission setup instructioins
 
 ## Instructions
 
@@ -74,6 +75,13 @@ Check that your system meets the basic requirements for running GPU-enabled cont
 nvidia-smi
 docker --version
 docker run --rm --gpus all nvcr.io/nvidia/cuda:13.0.1-devel-ubuntu24.04 nvidia-smi
+```
+
+If you see a permission denied error (something like permission denied while trying to connect to the Docker daemon socket), add your user to the docker group so that you don't need to run the command with sudo .
+
+```bash
+sudo usermod -aG docker $USER
+newgrp docker
 ```
 
 ### Step 2. Configure NGC authentication

@@ -47,8 +47,9 @@ All necessary files for the playbook can be found [here on GitHub](https://githu
 * **Duration:** 45-90 minutes for complete setup and initial model fine-tuning
 * **Risks:** Model downloads can be large (several GB), ARM64 package compatibility issues may require troubleshooting, distributed training setup complexity increases with multi-node configurations
 * **Rollback:** Virtual environments can be completely removed; no system-level changes are made to the host system beyond package installations.
-* **Last Updated:** 12/15/2025
+* **Last Updated:** 12/22/2025
   * Upgrade to latest pytorch container version nvcr.io/nvidia/pytorch:25.11-py3
+  * Add docker container permission setup instructioins
 
 ## Instructions
 
@@ -70,13 +71,37 @@ nvidia-smi
 free -h
 ```
 
-## Step 2. Get the container image
+## Step 2. Configure Docker permissions
+
+To easily manage containers without sudo, you must be in the `docker` group. If you choose to skip this step, you will need to run Docker commands with sudo.
+
+Open a new terminal and test Docker access. In the terminal, run:
+
+```bash
+docker ps
+```
+
+If you see a permission denied error (something like permission denied while trying to connect to the Docker daemon socket), add your user to the docker group so that you don't need to run the command with sudo .
+
+```bash
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+## Step 3. Get the container image
 
 ```bash
 docker pull nvcr.io/nvidia/pytorch:25.11-py3
 ```
 
-## Step 3. Launch Docker
+If you see a permission denied error (something like permission denied while trying to connect to the Docker daemon socket), add your user to the docker group so that you don't need to run the command with sudo .
+
+```bash
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+## Step 4. Launch Docker
 
 ```bash
 docker run \
@@ -87,7 +112,7 @@ docker run \
   --rm nvcr.io/nvidia/pytorch:25.11-py3
 ```
 
-## Step 4. Install package management tools
+## Step 5. Install package management tools
 
 Install `uv` for efficient package management and virtual environment isolation. NeMo AutoModel uses `uv` for dependency management and automatic environment handling.
 
@@ -109,7 +134,7 @@ pip3 install --user uv
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-## Step 5. Clone NeMo AutoModel repository
+## Step 6. Clone NeMo AutoModel repository
 
 Clone the official NeMo AutoModel repository to access recipes and examples. This provides ready-to-use training configurations for various model types and training scenarios.
 
@@ -121,7 +146,7 @@ git clone https://github.com/NVIDIA-NeMo/Automodel.git
 cd Automodel
 ```
 
-## Step 6. Install NeMo AutoModel
+## Step 7. Install NeMo AutoModel
 
 Set up the virtual environment and install NeMo AutoModel. Choose between wheel package installation for stability or source installation for latest features.
 
@@ -161,7 +186,7 @@ CMAKE_BUILD_PARALLEL_LEVEL=8 \
 uv pip install --no-deps git+https://github.com/bitsandbytes-foundation/bitsandbytes.git@50be19c39698e038a1604daf3e1b939c9ac1c342
 ```
 
-## Step 7. Verify installation
+## Step 8. Verify installation
 
 Confirm NeMo AutoModel is properly installed and accessible. This step validates the installation and checks for any missing dependencies.
 
@@ -186,7 +211,7 @@ ls -la examples/
 ## drwxr-xr-x  2 username domain-users 4096 Oct 14 09:27 vlm_generate
 ```
 
-## Step 8. Explore available examples
+## Step 9. Explore available examples
 
 Review the pre-configured training recipes available for different model types and training scenarios. These recipes provide optimized configurations for ARM64 and Blackwell architecture.
 
@@ -198,7 +223,7 @@ ls examples/llm_finetune/
 cat examples/llm_finetune/finetune.py | head -20
 ```
 
-## Step 9. Run sample fine-tuning
+## Step 10. Run sample fine-tuning
 The following commands show how to perform full fine-tuning (SFT), parameter-efficient fine-tuning (PEFT) with LoRA and QLoRA.
 
 First, export your HF_TOKEN so that gated models can be downloaded.
@@ -280,7 +305,7 @@ These overrides ensure the Qwen3-8B SFT run behaves as expected:
 - `--step_scheduler.local_batch_size`: sets the per-GPU micro-batch size to 1 to fit in memory; overall effective batch size is still driven by gradient accumulation and data/tensor parallel settings from the recipe.
 
 
-## Step 10. Validate successful training completion
+## Step 11. Validate successful training completion
 
 Validate the fine-tuned model by inspecting artifacts contained in the checkpoint directory.
 
@@ -303,7 +328,7 @@ ls -lah checkpoints/LATEST/
 ## -rw-r--r-- 1 username domain-users 1.3K Oct 16 22:33 step_scheduler.pt
 ```
 
-## Step 11. Cleanup and rollback (Optional)
+## Step 12. Cleanup and rollback (Optional)
 
 Remove the installation and restore the original environment if needed. These commands safely remove all installed components.
 
@@ -324,7 +349,7 @@ pip3 uninstall uv
 ## Clear Python cache
 rm -rf ~/.cache/pip
 ```
-## Step 12. Optional: Publish your fine-tuned model checkpoint on Hugging Face Hub
+## Step 13. Optional: Publish your fine-tuned model checkpoint on Hugging Face Hub
 
 Publish your fine-tuned model checkpoint on Hugging Face Hub.
 > [!NOTE]
@@ -359,7 +384,7 @@ hf upload my-cool-model checkpoints/LATEST/model
 > ```
 > To fix this, you need to create an access token with *write* permissions, please see the Hugging Face guide [here](https://huggingface.co/docs/hub/en/security-tokens) for instructions.
 
-## Step 12. Next steps
+## Step 14. Next steps
 
 Begin using NeMo AutoModel for your specific fine-tuning tasks. Start with provided recipes and customize based on your model requirements and dataset.
 

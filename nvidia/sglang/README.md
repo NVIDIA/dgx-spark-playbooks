@@ -76,6 +76,13 @@ docker run --rm --gpus all lmsysorg/sglang:spark nvidia-smi
 df -h /
 ```
 
+If you see a permission denied error (something like permission denied while trying to connect to the Docker daemon socket), add your user to the docker group so that you don't need to run the command with sudo .
+
+```bash
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
 ## Step 2. Pull the SGLang Container
 
 Download the latest SGLang container. This step runs on the host and may take

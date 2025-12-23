@@ -65,13 +65,31 @@ All necessary files can be found in the TensorRT repository [here on GitHub](htt
   - Remove downloaded models from HuggingFace cache
   - Then exit the container environment
 
-* **Last Updated:** 12/15/2025
+* **Last Updated:** 12/22/2025
   * Upgrade to latest pytorch container version nvcr.io/nvidia/pytorch:25.11-py3
   * Add HuggingFace token setup instructions for model access
+  * Add docker container permission setup instructioins
 
 ## Instructions
 
-## Step 1. Launch the TensorRT container environment
+## Step 1. Configure Docker permissions
+
+To easily manage containers without sudo, you must be in the `docker` group. If you choose to skip this step, you will need to run Docker commands with sudo.
+
+Open a new terminal and test Docker access. In the terminal, run:
+
+```bash
+docker ps
+```
+
+If you see a permission denied error (something like permission denied while trying to connect to the Docker daemon socket), add your user to the docker group so that you don't need to run the command with sudo .
+
+```bash
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+## Step 2. Launch the TensorRT container environment
 
 Start the NVIDIA PyTorch container with GPU access and HuggingFace cache mounting. This provides 
 the TensorRT development environment with all required dependencies pre-installed.
@@ -83,7 +101,7 @@ docker run --gpus all --ipc=host --ulimit memlock=-1 \
 nvcr.io/nvidia/pytorch:25.11-py3
 ```
 
-## Step 2. Clone and set up TensorRT repository
+## Step 3. Clone and set up TensorRT repository
 
 Download the TensorRT repository and configure the environment for diffusion model demos.
 
@@ -93,7 +111,7 @@ export TRT_OSSPATH=/workspace/TensorRT/
 cd $TRT_OSSPATH/demo/Diffusion
 ```
 
-## Step 3. Install required dependencies
+## Step 4. Install required dependencies
 
 Install NVIDIA ModelOpt and other dependencies for model quantization and optimization.
 
@@ -113,7 +131,7 @@ Set up your HuggingFace token to access open models.
 export HF_TOKEN = <YOUR_HUGGING_FACE_TOKEN>
 ```
 
-## Step 4. Run Flux.1 Dev model inference
+## Step 5. Run Flux.1 Dev model inference
 
 Test multi-modal inference using the Flux.1 Dev model with different precision formats.
 
@@ -138,7 +156,7 @@ python3 demo_txt2img_flux.py "a beautiful photograph of Mt. Fuji during cherry b
   --hf-token=$HF_TOKEN --fp4 --download-onnx-models
 ```
 
-## Step 5. Run Flux.1 Schnell model inference
+## Step 6. Run Flux.1 Schnell model inference
 
 Test the faster Flux.1 Schnell variant with different precision formats.
 
@@ -168,7 +186,7 @@ python3 demo_txt2img_flux.py "a beautiful photograph of Mt. Fuji during cherry b
   --fp4 --download-onnx-models
 ```
 
-## Step 6. Run SDXL model inference
+## Step 7. Run SDXL model inference
 
 Test the SDXL model for comparison with different precision formats.
 
@@ -186,7 +204,7 @@ python3 demo_txt2img_xl.py "a beautiful photograph of Mt. Fuji during cherry blo
   --hf-token=$HF_TOKEN --version xl-1.0 --download-onnx-models --fp8
 ```
 
-## Step 7. Validate inference outputs
+## Step 8. Validate inference outputs
 
 Check that the models generated images successfully and measure performance differences.
 
@@ -201,7 +219,7 @@ nvidia-smi
 python3 -c "import tensorrt as trt; print(f'TensorRT version: {trt.__version__}')"
 ```
 
-## Step 8. Cleanup and rollback
+## Step 9. Cleanup and rollback
 
 Remove downloaded models and exit container environment to free disk space.
 
@@ -216,7 +234,7 @@ exit
 rm -rf $HOME/.cache/huggingface/
 ```
 
-## Step 9. Next steps
+## Step 10. Next steps
 
 Use the validated setup to generate custom images or integrate multi-modal inference into your 
 applications. Try different prompts or explore model fine-tuning with the established TensorRT 

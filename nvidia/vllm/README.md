@@ -52,20 +52,38 @@ support for ARM64.
 * **Duration:** 30 minutes for Docker approach
 * **Risks:** Container registry access requires internal credentials
 * **Rollback:** Container approach is non-destructive.
-* **Last Updated:** 12/11/2025
+* **Last Updated:** 12/22/2025
   * Upgrade vLLM container to latest version nvcr.io/nvidia/vllm:25.11-py3
   * Improve cluster setup instructions for Run on two Sparks
+  * Add docker container permission setup instructioins
 
 ## Instructions
 
-## Step 1. Pull vLLM container image
+## Step 1. Configure Docker permissions
+
+To easily manage containers without sudo, you must be in the `docker` group. If you choose to skip this step, you will need to run Docker commands with sudo.
+
+Open a new terminal and test Docker access. In the terminal, run:
+
+```bash
+docker ps
+```
+
+If you see a permission denied error (something like permission denied while trying to connect to the Docker daemon socket), add your user to the docker group so that you don't need to run the command with sudo .
+
+```bash
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+## Step 2. Pull vLLM container image
 
 Find the latest container build from https://catalog.ngc.nvidia.com/orgs/nvidia/containers/vllm?version=25.11-py3
 ```
 docker pull nvcr.io/nvidia/vllm:25.11-py3
 ```
 
-## Step 2. Test vLLM in container
+## Step 3. Test vLLM in container
 
 Launch the container and start vLLM server with a test model to verify basic functionality.
 
@@ -94,7 +112,7 @@ curl http://localhost:8000/v1/chat/completions \
 
 Expected response should contain `"content": "204"` or similar mathematical calculation.
 
-## Step 3. Cleanup and rollback
+## Step 4. Cleanup and rollback
 
 For container approach (non-destructive):
 
@@ -110,7 +128,7 @@ To remove CUDA 12.9:
 sudo /usr/local/cuda-12.9/bin/cuda-uninstaller
 ```
 
-## Step 4. Next steps
+## Step 5. Next steps
 
 - **Production deployment:** Configure vLLM with your specific model requirements
 - **Performance tuning:** Adjust batch sizes and memory settings for your workload
