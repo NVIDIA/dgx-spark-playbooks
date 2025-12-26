@@ -57,24 +57,34 @@ export function DatabaseConnection({ className }: DatabaseConnectionProps) {
     setGraphError(null)
     
     try {
-      // Get database type from localStorage
-      const graphDbType = localStorage.getItem("graph_db_type") || "arangodb"
+      // Get database type from localStorage, fall back to fetching from server
+      let graphDbType = localStorage.getItem("graph_db_type")
+      if (!graphDbType) {
+        // Fetch server's default (from GRAPH_DB_TYPE env var)
+        try {
+          const settingsRes = await fetch('/api/settings')
+          const settingsData = await settingsRes.json()
+          graphDbType = settingsData.settings?.graph_db_type || 'neo4j'
+        } catch {
+          graphDbType = 'neo4j'
+        }
+      }
       setDbType(graphDbType === "arangodb" ? "ArangoDB" : "Neo4j")
       
       if (graphDbType === "neo4j") {
-        // Neo4j connection logic
+        // Neo4j connection logic - use the unified graph-db endpoint
         const dbUrl = localStorage.getItem("NEO4J_URL")
         const dbUsername = localStorage.getItem("NEO4J_USERNAME")
         const dbPassword = localStorage.getItem("NEO4J_PASSWORD")
         
-        // Add query parameters if credentials exist
+        // Add query parameters with type=neo4j
         const queryParams = new URLSearchParams()
+        queryParams.append("type", "neo4j")
         if (dbUrl) queryParams.append("url", dbUrl)
         if (dbUsername) queryParams.append("username", dbUsername)
         if (dbPassword) queryParams.append("password", dbPassword)
         
-        const queryString = queryParams.toString()
-        const endpoint = queryString ? `/api/neo4j?${queryString}` : '/api/neo4j'
+        const endpoint = `/api/graph-db?${queryParams.toString()}`
         
         const response = await fetch(endpoint)
         
@@ -98,21 +108,21 @@ export function DatabaseConnection({ className }: DatabaseConnectionProps) {
           setConnectionUrl(dbUrl)
         }
       } else {
-        // ArangoDB connection logic
+        // ArangoDB connection logic - use the unified graph-db endpoint with type=arangodb
         const arangoUrl = localStorage.getItem("arango_url") || "http://localhost:8529"
         const arangoDb = localStorage.getItem("arango_db") || "txt2kg"
         const arangoUser = localStorage.getItem("arango_user") || ""
         const arangoPassword = localStorage.getItem("arango_password") || ""
         
-        // Add query parameters if credentials exist
+        // Add query parameters with type=arangodb
         const queryParams = new URLSearchParams()
+        queryParams.append("type", "arangodb")
         if (arangoUrl) queryParams.append("url", arangoUrl)
         if (arangoDb) queryParams.append("dbName", arangoDb)
         if (arangoUser) queryParams.append("username", arangoUser)
         if (arangoPassword) queryParams.append("password", arangoPassword)
         
-        const queryString = queryParams.toString()
-        const endpoint = queryString ? `/api/graph-db?${queryString}` : '/api/graph-db'
+        const endpoint = `/api/graph-db?${queryParams.toString()}`
         
         const response = await fetch(endpoint)
         
@@ -144,7 +154,8 @@ export function DatabaseConnection({ className }: DatabaseConnectionProps) {
   // Disconnect from graph database
   const disconnectGraph = async () => {
     try {
-      const graphDbType = localStorage.getItem("graph_db_type") || "arangodb"
+      // Use current dbType state which was already determined from server/localStorage
+      const graphDbType = dbType === "Neo4j" ? "neo4j" : "arangodb"
       const endpoint = graphDbType === "neo4j" ? '/api/neo4j/disconnect' : '/api/graph-db/disconnect'
       
       const response = await fetch(endpoint, {

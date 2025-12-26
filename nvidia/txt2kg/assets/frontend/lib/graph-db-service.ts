@@ -26,12 +26,23 @@ export type GraphDBType = 'neo4j' | 'arangodb';
 export class GraphDBService {
   private neo4jService: Neo4jService;
   private arangoDBService: ArangoDBService;
-  private activeDBType: GraphDBType = 'arangodb'; // Default to ArangoDB
+  private activeDBType: GraphDBType | null = null; // Set at runtime, not build time
   private static instance: GraphDBService;
 
   private constructor() {
     this.neo4jService = Neo4jService.getInstance();
     this.arangoDBService = ArangoDBService.getInstance();
+  }
+
+  /**
+   * Get the active DB type, reading from env at runtime if not set
+   */
+  private getActiveDBType(): GraphDBType {
+    if (this.activeDBType === null) {
+      this.activeDBType = (process.env.GRAPH_DB_TYPE as GraphDBType) || 'arangodb';
+      console.log(`[GraphDBService] Initialized activeDBType at runtime: ${this.activeDBType}`);
+    }
+    return this.activeDBType;
   }
 
   /**
@@ -46,24 +57,25 @@ export class GraphDBService {
 
   /**
    * Initialize the graph database with the specified type
-   * @param dbType - Type of graph database to use
+   * @param dbType - Type of graph database to use (defaults to GRAPH_DB_TYPE env var)
    * @param uri - Connection URL
    * @param username - Database username
    * @param password - Database password
    */
-  public async initialize(dbType: GraphDBType = 'arangodb', uri?: string, username?: string, password?: string): Promise<void> {
-    this.activeDBType = dbType;
+  public async initialize(dbType?: GraphDBType, uri?: string, username?: string, password?: string): Promise<void> {
+    const graphDbType = dbType || (process.env.GRAPH_DB_TYPE as GraphDBType) || 'arangodb';
+    this.activeDBType = graphDbType;
     
     try {
-      if (dbType === 'neo4j') {
+      if (graphDbType === 'neo4j') {
         this.neo4jService.initialize(uri, username, password);
         console.log('Neo4j initialized successfully');
-      } else if (dbType === 'arangodb') {
+      } else if (graphDbType === 'arangodb') {
         await this.arangoDBService.initialize(uri, undefined, username, password);
         console.log('ArangoDB initialized successfully');
       }
     } catch (error) {
-      console.error(`Failed to initialize ${dbType}:`, error);
+      console.error(`Failed to initialize ${graphDbType}:`, error);
       throw error;
     }
   }
@@ -79,14 +91,14 @@ export class GraphDBService {
    * Get the active graph database type
    */
   public getDBType(): GraphDBType {
-    return this.activeDBType;
+    return this.getActiveDBType();
   }
 
   /**
    * Check if the active database is initialized
    */
   public isInitialized(): boolean {
-    if (this.activeDBType === 'neo4j') {
+    if (this.getActiveDBType() === 'neo4j') {
       return this.neo4jService.isInitialized();
     } else {
       return this.arangoDBService.isInitialized();
@@ -97,7 +109,7 @@ export class GraphDBService {
    * Import triples into the active graph database
    */
   public async importTriples(triples: { subject: string; predicate: string; object: string }[]): Promise<void> {
-    if (this.activeDBType === 'neo4j') {
+    if (this.getActiveDBType() === 'neo4j') {
       await this.neo4jService.importTriples(triples);
     } else {
       await this.arangoDBService.importTriples(triples);
@@ -121,7 +133,7 @@ export class GraphDBService {
       [key: string]: any 
     }>; 
   }> {
-    if (this.activeDBType === 'neo4j') {
+    if (this.getActiveDBType() === 'neo4j') {
       return await this.neo4jService.getGraphData();
     } else {
       return await this.arangoDBService.getGraphData();
@@ -142,7 +154,7 @@ export class GraphDBService {
       resultCount: number;
     }
   ): Promise<void> {
-    if (this.activeDBType === 'neo4j') {
+    if (this.getActiveDBType() === 'neo4j') {
       await this.neo4jService.logQuery(query, queryMode, metrics);
     } else {
       await this.arangoDBService.logQuery(query, queryMode, metrics);
@@ -153,7 +165,7 @@ export class GraphDBService {
    * Get query logs from the active graph database
    */
   public async getQueryLogs(limit: number = 100): Promise<any[]> {
-    if (this.activeDBType === 'neo4j') {
+    if (this.getActiveDBType() === 'neo4j') {
       return await this.neo4jService.getQueryLogs(limit);
     } else {
       return await this.arangoDBService.getQueryLogs(limit);
@@ -164,7 +176,7 @@ export class GraphDBService {
    * Close the connection to the active graph database
    */
   public async close(): Promise<void> {
-    if (this.activeDBType === 'neo4j') {
+    if (this.getActiveDBType() === 'neo4j') {
       this.neo4jService.close();
     } else {
       this.arangoDBService.close();
@@ -175,7 +187,7 @@ export class GraphDBService {
    * Get info about the active graph database driver
    */
   public getDriverInfo(): Record<string, any> {
-    if (this.activeDBType === 'neo4j') {
+    if (this.getActiveDBType() === 'neo4j') {
       return this.neo4jService.getDriverInfo();
     } else {
       return this.arangoDBService.getDriverInfo();
@@ -197,7 +209,7 @@ export class GraphDBService {
     confidence: number;
     depth?: number;
   }>> {
-    if (this.activeDBType === 'arangodb') {
+    if (this.getActiveDBType() === 'arangodb') {
       return await this.arangoDBService.graphTraversal(keywords, maxDepth, maxResults);
     } else {
       // Neo4j doesn't have this method yet, return empty array
@@ -210,7 +222,7 @@ export class GraphDBService {
    * Clear all data from the active graph database
    */
   public async clearDatabase(): Promise<void> {
-    if (this.activeDBType === 'neo4j') {
+    if (this.getActiveDBType() === 'neo4j') {
       // TODO: Implement Neo4j clear database functionality
       throw new Error('Clear database functionality not implemented for Neo4j');
     } else {

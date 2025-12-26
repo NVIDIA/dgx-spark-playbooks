@@ -171,9 +171,20 @@ export function SettingsModal() {
       setIsS3Connected(s3Connected)
     }
     
-    // Load graph DB type
-    const storedGraphDbType = localStorage.getItem("graph_db_type") || "arangodb"
-    setGraphDbType(storedGraphDbType as GraphDBType)
+    // Load graph DB type - fetch from server if not in localStorage
+    const storedGraphDbType = localStorage.getItem("graph_db_type")
+    if (storedGraphDbType) {
+      setGraphDbType(storedGraphDbType as GraphDBType)
+    } else {
+      // Fetch server's default (from GRAPH_DB_TYPE env var)
+      fetch('/api/settings')
+        .then(res => res.json())
+        .then(data => {
+          const serverDefault = data.settings?.graph_db_type || 'neo4j'
+          setGraphDbType(serverDefault as GraphDBType)
+        })
+        .catch(() => setGraphDbType('neo4j'))
+    }
     
     // Load Neo4j settings
     setNeo4jUrl(localStorage.getItem("neo4j_url") || "")
