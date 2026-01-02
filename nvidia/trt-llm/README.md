@@ -1,20 +1,11 @@
 # TRT LLM for Inference
 
-> Install and use TensorRT-LLM on DGX Spark Sparks
+> Install and use TensorRT-LLM on DGX Spark
 
 ## Table of Contents
 
 - [Overview](#overview)
 - [Single Spark](#single-spark)
-  - [Step 1. Configure Docker permissions](#step-1-configure-docker-permissions)
-  - [Step 2. Verify environment prerequisites](#step-2-verify-environment-prerequisites)
-  - [Step 3. Set environment variables](#step-3-set-environment-variables)
-  - [Step 4. Validate TensorRT-LLM installation](#step-4-validate-tensorrt-llm-installation)
-  - [Step 5. Create cache directory](#step-5-create-cache-directory)
-  - [Step 6. Validate setup with quickstart_advanced](#step-6-validate-setup-with-quickstartadvanced)
-  - [Step 7. Validate setup with quickstart_multimodal](#step-7-validate-setup-with-quickstartmultimodal)
-  - [Step 8. Serve LLM with OpenAI-compatible API](#step-8-serve-llm-with-openai-compatible-api)
-  - [Step 10. Cleanup and rollback](#step-10-cleanup-and-rollback)
 - [Run on two Sparks](#run-on-two-sparks)
   - [Step 1. Configure network connectivity](#step-1-configure-network-connectivity)
   - [Step 2. Configure Docker permissions](#step-2-configure-docker-permissions)
@@ -51,8 +42,7 @@ TRT-LLM integrates with frameworks like Hugging Face and PyTorch, making it easi
 
 ## What you'll accomplish
 
-You'll set up TensorRT-LLM to optimize and deploy large language models on NVIDIA Spark with
-Blackwell GPUs, achieving significantly higher throughput and lower latency than standard PyTorch
+You'll set up TensorRT-LLM to optimize and deploy large language models on your DGX Spark, achieving significantly higher throughput and lower latency than standard PyTorch
 inference through kernel-level optimizations, efficient memory layouts, and advanced quantization.
 
 ## What to know before starting
@@ -65,11 +55,11 @@ inference through kernel-level optimizations, efficient memory layouts, and adva
 
 ## Prerequisites
 
-- NVIDIA Spark device with Blackwell architecture GPUs
+- DGX Spark device
 - NVIDIA drivers compatible with CUDA 12.x: `nvidia-smi`
-- Docker installed and GPU support configured: `docker run --rm --gpus all nvcr.io/nvidia/tensorrt-llm/release:spark-single-gpu-dev nvidia-smi`
+- Docker installed and GPU support configured: `docker run --rm --gpus all nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6 nvidia-smi`
 - Hugging Face account with token for model access: `echo $HF_TOKEN`
-- Sufficient GPU VRAM (16GB+ recommended for 70B models)
+- Sufficient GPU VRAM (40GB+ recommended for 70B models)
 - Internet connectivity for downloading models and container images
 - Network: open TCP ports 8355 (LLM) and 8356 (VLM) on host for OpenAI-compatible serving
 
@@ -78,7 +68,6 @@ inference through kernel-level optimizations, efficient memory layouts, and adva
 All required assets can be found [here on GitHub](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main)
 
 - [**trtllm-mn-entrypoint.sh**](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/trt-llm/assets/trtllm-mn-entrypoint.sh) — container entrypoint script for multi-node setup
-- [**docker-compose.yml**](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/trt-llm/assets/docker-compose.yml) — Docker Compose configuration for multi-node deployment
 
 ## Model Support Matrix
 
@@ -100,10 +89,7 @@ The following models are supported with TensorRT-LLM on Spark. All listed models
 | **Phi-4-multimodal-instruct** | NVFP4 | ✅ | `nvidia/Phi-4-multimodal-instruct-FP4` |
 | **Phi-4-reasoning-plus** | FP8 | ✅ | `nvidia/Phi-4-reasoning-plus-FP8` |
 | **Phi-4-reasoning-plus** | NVFP4 | ✅ | `nvidia/Phi-4-reasoning-plus-FP4` |
-| **Llama-3_3-Nemotron-Super-49B-v1_5** | FP8 | ✅ | `nvidia/Llama-3_3-Nemotron-Super-49B-v1_5-FP8` |
 | **Qwen3-30B-A3B** | NVFP4 | ✅ | `nvidia/Qwen3-30B-A3B-FP4` |
-| **Qwen2.5-VL-7B-Instruct** | FP8 | ✅ | `nvidia/Qwen2.5-VL-7B-Instruct-FP8` |
-| **Qwen2.5-VL-7B-Instruct** | NVFP4 | ✅ | `nvidia/Qwen2.5-VL-7B-Instruct-FP4` |
 | **Llama-4-Scout-17B-16E-Instruct** | NVFP4 | ✅ | `nvidia/Llama-4-Scout-17B-16E-Instruct-FP4` |
 | **Qwen3-235B-A22B (two Sparks only)** | NVFP4 | ✅ | `nvidia/Qwen3-235B-A22B-FP4` |
 
@@ -117,12 +103,13 @@ Reminder: not all model architectures are supported for NVFP4 quantization.
 * **Duration**: 45-60 minutes for setup and API server deployment
 * **Risk level**: Medium - container pulls and model downloads may fail due to network issues
 * **Rollback**: Stop inference servers and remove downloaded models to free resources.
-* **Last Updated:** 12/11/2025
+* **Last Updated:** 01/02/2026
   * Improve TRT-LLM Run on Two Sparks workflow
+  * Upgrade to the latest TRT-LLM container v1.2.0rc6
 
 ## Single Spark
 
-### Step 1. Configure Docker permissions
+## Step 1. Configure Docker permissions
 
 To easily manage containers without sudo, you must be in the `docker` group. If you choose to skip this step, you will need to run Docker commands with sudo.
 
@@ -139,7 +126,7 @@ sudo usermod -aG docker $USER
 newgrp docker
 ```
 
-### Step 2. Verify environment prerequisites
+## Step 2. Verify environment prerequisites
 
 Confirm your Spark device has the required GPU access and network connectivity for downloading
 models and containers.
@@ -149,35 +136,36 @@ models and containers.
 nvidia-smi
 
 ## Verify Docker GPU support
-docker run --rm --gpus all nvcr.io/nvidia/tensorrt-llm/release:spark-single-gpu-dev nvidia-smi
+docker run --rm --gpus all nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6 nvidia-smi
 
 ```
 
-### Step 3. Set environment variables
-
-Set `HF_TOKEN` for model access.
+## Step 3. Set environment variables
 
 ```bash
+## Set `HF_TOKEN` for model access.
 export HF_TOKEN=<your-huggingface-token>
+
+export DOCKER_IMAGE="nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6"
 ```
 
-### Step 4. Validate TensorRT-LLM installation
+## Step 4. Validate TensorRT-LLM installation
 
 After confirming GPU access, verify that TensorRT-LLM can be imported inside the container.
 
 ```bash
 docker run --rm -it --gpus all \
-  nvcr.io/nvidia/tensorrt-llm/release:spark-single-gpu-dev \
+  $DOCKER_IMAGE \
   python -c "import tensorrt_llm; print(f'TensorRT-LLM version: {tensorrt_llm.__version__}')"
 ```
 
 Expected output:
 ```
-[TensorRT-LLM] TensorRT-LLM version: 1.1.0rc3
-TensorRT-LLM version: 1.1.0rc3
+[TensorRT-LLM] TensorRT-LLM version: 1.2.0rc6
+TensorRT-LLM version: 1.2.0rc6
 ```
 
-### Step 5. Create cache directory
+## Step 5. Create cache directory
 
 Set up local caching to avoid re-downloading models on subsequent runs.
 
@@ -186,7 +174,7 @@ Set up local caching to avoid re-downloading models on subsequent runs.
 mkdir -p $HOME/.cache/huggingface/
 ```
 
-### Step 6. Validate setup with quickstart_advanced
+## Step 6. Validate setup with quickstart_advanced
 
 This quickstart validates your TensorRT-LLM setup end-to-end by testing model loading, inference engine initialization, and GPU execution with real text generation. It's the fastest way to confirm everything works before starting the inference API server.
 
@@ -202,7 +190,7 @@ docker run \
   -v $HOME/.cache/huggingface/:/root/.cache/huggingface/ \
   --rm -it --ulimit memlock=-1 --ulimit stack=67108864 \
   --gpus=all --ipc=host --network host \
-  nvcr.io/nvidia/tensorrt-llm/release:spark-single-gpu-dev \
+  $DOCKER_IMAGE \
   bash -c '
     hf download $MODEL_HANDLE && \
     python examples/llm-api/quickstart_advanced.py \
@@ -222,7 +210,7 @@ docker run \
   -v $HOME/.cache/huggingface/:/root/.cache/huggingface/ \
   --rm -it --ulimit memlock=-1 --ulimit stack=67108864 \
   --gpus=all --ipc=host --network host \
-  nvcr.io/nvidia/tensorrt-llm/release:spark-single-gpu-dev \
+  $DOCKER_IMAGE \
   bash -c '
     export TIKTOKEN_ENCODINGS_BASE="/tmp/harmony-reqs" && \
     mkdir -p $TIKTOKEN_ENCODINGS_BASE && \
@@ -246,7 +234,7 @@ docker run \
   -v $HOME/.cache/huggingface/:/root/.cache/huggingface/ \
   --rm -it --ulimit memlock=-1 --ulimit stack=67108864 \
   --gpus=all --ipc=host --network host \
-  nvcr.io/nvidia/tensorrt-llm/release:spark-single-gpu-dev \
+  $DOCKER_IMAGE \
   bash -c '
     export TIKTOKEN_ENCODINGS_BASE="/tmp/harmony-reqs" && \
     mkdir -p $TIKTOKEN_ENCODINGS_BASE && \
@@ -259,32 +247,12 @@ docker run \
       --max_tokens 64
     '
 ```
-### Step 7. Validate setup with quickstart_multimodal
+
+## Step 7. Validate setup with quickstart_multimodal
 
 **VLM quickstart example**
 
 This demonstrates vision-language model capabilities by running inference with image understanding. The example uses multimodal inputs to validate both text and vision processing pipelines.
-
-#### Qwen2.5-VL-7B-Instruct
-
-```bash
-export MODEL_HANDLE="nvidia/Qwen2.5-VL-7B-Instruct-FP4"
-
-docker run \
-  -e MODEL_HANDLE=$MODEL_HANDLE \
-  -e HF_TOKEN=$HF_TOKEN \
-  -v $HOME/.cache/huggingface/:/root/.cache/huggingface/ \
-  --rm -it --ulimit memlock=-1 --ulimit stack=67108864 \
-  --gpus=all --ipc=host --network host \
-  nvcr.io/nvidia/tensorrt-llm/release:spark-single-gpu-dev \
-  bash -c '
-  python3 examples/llm-api/quickstart_multimodal.py \
-    --model_dir $MODEL_HANDLE \
-    --modality image \
-    --media "https://huggingface.co/datasets/YiYiXu/testing-images/resolve/main/seashore.png" \
-    --prompt "What is happening in this image?" \
-  '
-```
 
 #### Phi-4-multimodal-instruct
 
@@ -298,7 +266,7 @@ docker run \
   -v $HOME/.cache/huggingface/:/root/.cache/huggingface/ \
   --rm -it --ulimit memlock=-1 --ulimit stack=67108864 \
   --gpus=all --ipc=host --network host \
-  nvcr.io/nvidia/tensorrt-llm/release:spark-single-gpu-dev \
+  $DOCKER_IMAGE \
   bash -c '
   python3 examples/llm-api/quickstart_multimodal.py \
     --model_type phi4mm \
@@ -318,7 +286,7 @@ docker run \
 sudo sh -c 'sync; echo 3 > /proc/sys/vm/drop_caches'
 ```
 
-### Step 8. Serve LLM with OpenAI-compatible API
+## Step 8. Serve LLM with OpenAI-compatible API
 
 Serve with OpenAI-compatible API via trtllm-serve:
 
@@ -330,7 +298,7 @@ docker run --name trtllm_llm_server --rm -it --gpus all --ipc host --network hos
   -e HF_TOKEN=$HF_TOKEN \
   -e MODEL_HANDLE="$MODEL_HANDLE" \
   -v $HOME/.cache/huggingface/:/root/.cache/huggingface/ \
-  nvcr.io/nvidia/tensorrt-llm/release:spark-single-gpu-dev \
+  $DOCKER_IMAGE \
   bash -c '
     hf download $MODEL_HANDLE && \
     cat > /tmp/extra-llm-api-config.yml <<EOF
@@ -358,7 +326,7 @@ docker run --name trtllm_llm_server --rm -it --gpus all --ipc host --network hos
   -e HF_TOKEN=$HF_TOKEN \
   -e MODEL_HANDLE="$MODEL_HANDLE" \
   -v $HOME/.cache/huggingface/:/root/.cache/huggingface/ \
-  nvcr.io/nvidia/tensorrt-llm/release:spark-single-gpu-dev \
+  $DOCKER_IMAGE \
   bash -c '
     export TIKTOKEN_ENCODINGS_BASE="/tmp/harmony-reqs" && \
     mkdir -p $TIKTOKEN_ENCODINGS_BASE && \
@@ -394,7 +362,7 @@ curl -s http://localhost:8355/v1/chat/completions \
   }'
 ```
 
-### Step 10. Cleanup and rollback
+## Step 9. Cleanup and rollback
 
 Remove downloaded models and containers to free up space when testing is complete.
 
@@ -408,7 +376,7 @@ rm -rf $HOME/.cache/huggingface/
 
 ## Clean up Docker images
 docker image prune -f
-docker rmi nvcr.io/nvidia/tensorrt-llm/release:spark-single-gpu-dev
+docker rmi $DOCKER_IMAGE
 ```
 
 ## Run on two Sparks
@@ -490,7 +458,7 @@ docker run -d --rm \
   -e OMPI_ALLOW_RUN_AS_ROOT_CONFIRM="1" \
   -v ~/.cache/huggingface/:/root/.cache/huggingface/ \
   -v ~/.ssh:/tmp/.ssh:ro \
-  nvcr.io/nvidia/tensorrt-llm/release:1.0.0rc3 \
+  nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6 \
   sh -c "curl https://raw.githubusercontent.com/NVIDIA/dgx-spark-playbooks/refs/heads/main/nvidia/trt-llm/assets/trtllm-mn-entrypoint.sh | sh"
 ```
 
@@ -509,7 +477,7 @@ You should see output similar to:
 
 ```
 CONTAINER ID   IMAGE                                                 COMMAND                  CREATED          STATUS          PORTS     NAMES
-abc123def456   nvcr.io/nvidia/tensorrt-llm/release:1.0.0rc3         "sh -c 'curl https:…"    10 seconds ago   Up 8 seconds              trtllm-multinode
+abc123def456   nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6         "sh -c 'curl https:…"    10 seconds ago   Up 8 seconds              trtllm-multinode
 ```
 
 ### Step 6. Copy hostfile to primary container
@@ -554,7 +522,7 @@ export HF_TOKEN=<your-huggingface-token>
 docker exec \
   -e MODEL="nvidia/Qwen3-235B-A22B-FP4" \
   -e HF_TOKEN=$HF_TOKEN \
-  -it $TRTLLM_MN_CONTAINER bash -c 'mpirun -x HF_TOKEN bash -c "huggingface-cli download $MODEL"'
+  -it $TRTLLM_MN_CONTAINER bash -c 'mpirun -x HF_TOKEN bash -c "hf download $MODEL"'
 ```
 
 ### Step 10. Serve the model

@@ -47,15 +47,45 @@ support for ARM64.
 - Network access to download packages and container images
 
 
+## Model Support Matrix
+
+The following models are supported with vLLM on Spark. All listed models are available and ready to use:
+
+| Model | Quantization | Support Status | HF Handle |
+|-------|-------------|----------------|-----------|
+| **GPT-OSS-20B** | MXFP4 | ✅ | `openai/gpt-oss-20b` |
+| **GPT-OSS-120B** | MXFP4 | ✅ | `openai/gpt-oss-120b` |
+| **Llama-3.1-8B-Instruct** | FP8 | ✅ | `nvidia/Llama-3.1-8B-Instruct-FP8` |
+| **Llama-3.1-8B-Instruct** | NVFP4 | ✅ | `nvidia/Llama-3.1-8B-Instruct-FP4` |
+| **Llama-3.3-70B-Instruct** | NVFP4 | ✅ | `nvidia/Llama-3.3-70B-Instruct-FP4` |
+| **Qwen3-8B** | FP8 | ✅ | `nvidia/Qwen3-8B-FP8` |
+| **Qwen3-8B** | NVFP4 | ✅ | `nvidia/Qwen3-8B-FP4` |
+| **Qwen3-14B** | FP8 | ✅ | `nvidia/Qwen3-14B-FP8` |
+| **Qwen3-14B** | NVFP4 | ✅ | `nvidia/Qwen3-14B-FP4` |
+| **Qwen3-32B** | NVFP4 | ✅ | `nvidia/Qwen3-32B-FP4` |
+| **Qwen2.5-VL-7B-Instruct** | NVFP4 | ✅ | `nvidia/Qwen2.5-VL-7B-Instruct-FP4` |
+| **Phi-4-multimodal-instruct** | FP8 | ✅ | `nvidia/Phi-4-multimodal-instruct-FP8` |
+| **Phi-4-multimodal-instruct** | NVFP4 | ✅ | `nvidia/Phi-4-multimodal-instruct-FP4` |
+| **Phi-4-reasoning-plus** | FP8 | ✅ | `nvidia/Phi-4-reasoning-plus-FP8` |
+| **Phi-4-reasoning-plus** | NVFP4 | ✅ | `nvidia/Phi-4-reasoning-plus-FP4` |
+
+
+> [!NOTE]
+> The Phi-4-multimodal-instruct models require `--trust-remote-code` when launching vLLM.
+
+> [!NOTE]
+> You can use the NVFP4 Quantization documentation to generate your own NVFP4-quantized checkpoints for your favorite models. This enables you to take advantage of the performance and memory benefits of NVFP4 quantization even for models not already published by NVIDIA.
+
+Reminder: not all model architectures are supported for NVFP4 quantization.
+
 ## Time & risk
 
 * **Duration:** 30 minutes for Docker approach
 * **Risks:** Container registry access requires internal credentials
 * **Rollback:** Container approach is non-destructive.
-* **Last Updated:** 12/22/2025
-  * Upgrade vLLM container to latest version nvcr.io/nvidia/vllm:25.11-py3
-  * Improve cluster setup instructions for Run on two Sparks
-  * Add docker container permission setup instructioins
+* **Last Updated:** 01/02/2026
+  * Add supported Model Matrix (25.11-py3)
+  * Improve cluster setup instructions
 
 ## Instructions
 
@@ -64,7 +94,6 @@ support for ARM64.
 To easily manage containers without sudo, you must be in the `docker` group. If you choose to skip this step, you will need to run Docker commands with sudo.
 
 Open a new terminal and test Docker access. In the terminal, run:
-
 ```bash
 docker ps
 ```
@@ -78,9 +107,15 @@ newgrp docker
 
 ## Step 2. Pull vLLM container image
 
-Find the latest container build from https://catalog.ngc.nvidia.com/orgs/nvidia/containers/vllm?version=25.11-py3
-```
-docker pull nvcr.io/nvidia/vllm:25.11-py3
+Find the latest container build from https://catalog.ngc.nvidia.com/orgs/nvidia/containers/vllm
+
+```bash
+export LATEST_VLLM_VERSION=<latest_container_version>
+
+## example
+## export LATEST_VLLM_VERSION=25.11-py3
+
+docker pull nvcr.io/nvidia/vllm:${LATEST_VLLM_VERSION}
 ```
 
 ## Step 3. Test vLLM in container
@@ -89,7 +124,7 @@ Launch the container and start vLLM server with a test model to verify basic fun
 
 ```bash
 docker run -it --gpus all -p 8000:8000 \
-nvcr.io/nvidia/vllm:25.11-py3 \
+nvcr.io/nvidia/vllm:${LATEST_VLLM_VERSION} \
 vllm serve "Qwen/Qwen2.5-Math-1.5B-Instruct"
 ```
 
@@ -117,7 +152,7 @@ Expected response should contain `"content": "204"` or similar mathematical calc
 For container approach (non-destructive):
 
 ```bash
-docker rm $(docker ps -aq --filter ancestor=nvcr.io/nvidia/vllm:25.11-py3)
+docker rm $(docker ps -aq --filter ancestor=nvcr.io/nvidia/vllm:${LATEST_VLLM_VERSION})
 docker rmi nvcr.io/nvidia/vllm
 ```
 

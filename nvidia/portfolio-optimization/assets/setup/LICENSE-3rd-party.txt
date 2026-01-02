@@ -1,0 +1,117 @@
+Quantitative Portfolio Optimization developer example Licenses
+=================================
+
+This file contains third-party license information for software packages used in this project.
+The licenses below apply to one or more packages included in this project. For each license,
+we list the packages that are distributed under it and include the full license text.
+
+------------------------------------------------------------
+Apache License, Version 2.0
+------------------------------------------------------------
+The Apache License, Version 2.0 is a permissive license that also provides an express grant of patent rights. 
+
+Packages under the Apache License, Version 2.0:
+    - CVXPY - Copyright the CVXPY authors
+    - yfinance - Copyright 2017-2025 Ran Aroussi.
+
+
+Full Apache License, Version 2.0 Text:
+--------------------------------------------------
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+
+TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+1. Definitions.
+   "License" shall mean the terms and conditions for use, reproduction, and distribution as defined in this document.
+   "Licensor" shall mean the copyright owner or entity 
+   authorized by the copyright owner that is granting the License.
+   "Legal Entity" shall mean the union of the acting entity and all other entities that control, are controlled by, or are under common control with that entity.
+   "You" (or "Your") shall mean an individual or Legal Entity exercising permissions granted by this License.
+   "Source" form shall mean the preferred form for making modifications, including but not limited to software source code, documentation source, and configuration files.
+   "Object" form shall mean any form resulting from mechanical transformation or translation of a Source form, including but not limited to compiled object code, generated documentation, and conversions to other media types.
+   "Work" shall mean the work of authorship, whether in Source or Object form, made available under the License, as indicated by a copyright notice that is included in or attached to the work.
+   "Derivative Works" shall mean any work, whether in Source or Object form, that is based on (or derived from) the Work and for which the modifications represent, as a whole, an original work of authorship.
+   "Contribution" shall mean any work of authorship, including the original version of the Work and any modifications or additions to that Work or Derivative Works thereof, that is intentionally submitted to Licensor for inclusion in the Work.
+   "Contributor" shall mean Licensor and any individual or Legal Entity on behalf of whom a Contribution has been received by Licensor and subsequently incorporated within the Work.
+
+2. Grant of Copyright License.
+   Subject to the terms and conditions of this License, each Contributor hereby grants to You a perpetual, worldwide, non-exclusive, 
+   no-charge, royalty-free, irrevocable copyright license to reproduce, prepare Derivative Works of, 
+   publicly display, publicly perform, sublicense, and distribute the Work and such Derivative Works.
+
+3. Grant of Patent License.
+   Subject to the terms and conditions of this License, each Contributor hereby grants to You a perpetual, worldwide, non-exclusive, 
+   no-charge, royalty-free, irrevocable (except as stated in this section) patent license to make, have made, use, offer to sell, 
+   sell, import, and otherwise transfer the Work, where such license applies only to those patent claims licensable by such Contributor 
+   that are necessarily infringed by their Contribution(s) alone or by combination of their Contribution(s) with the Work.
+
+4. Redistribution.
+   You may reproduce and distribute copies of the Work or Derivative Works thereof in any medium, with or without modifications, 
+   and in Source or Object form, provided that You meet the following conditions:
+     (a) You must give any other recipients of the Work or Derivative Works a copy of this License; and
+     (b) You must cause any modified files to carry prominent notices stating that You changed the files; and
+     (c) You must retain, in the Source form of any Derivative Works that You distribute, all copyright, patent, trademark, 
+         and attribution notices from the Source form of the Work; and
+     (d) If the Work includes a "NOTICE" text file as part of its distribution, then any Derivative Works that You distribute 
+         must include a readable copy of the attribution notices contained within such NOTICE file.
+
+5. Submission of Contributions.
+   Unless You explicitly state otherwise, any Contribution submitted for inclusion in the Work shall be under the terms and conditions of this License.
+
+6. Trademarks.
+   This License does not grant permission to use the trade names, trademarks, service marks, or product names of the Licensor.
+
+7. Disclaimer of Warranty.
+   The Work is provided on an "AS IS" basis, without warranties or conditions of any kind, either express or implied.
+
+8. Limitation of Liability.
+   In no event shall any Contributor be liable for any damages arising from the use of the Work.
+
+END OF TERMS AND CONDITIONS
+--------------------------------------------------
+
+------------------------------------------------------------
+BSD License
+------------------------------------------------------------
+The BSD License is a permissive license
+
+Packages under BSD License
+   - numpy - Copyright (c) 2005-2025, NumPy Developers.
+   - pandas - Copyright (c) 2008-2011, AQR Capital Management, LLC, Lambda Foundry, Inc. and PyData Development Team.
+   - scikit-learn Copyright 2007 - 2025, scikit-learn developers 
+   - seaborn - Copyright 2012-2024, Michael Waskom.
+
+Full BSD License Text:
+--------------------------------------------------
+
+BSD 2- Clause
+Copyright <YEAR> <COPYRIGHT HOLDER>
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS IS” AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+BSD 3-Clause
+
+Copyright <YEAR> <COPYRIGHT HOLDER>
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS IS” AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+--------------------------------------------------
+
+END OF THIRD-PARTY LICENSES

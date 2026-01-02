@@ -6,11 +6,8 @@
 
 - [Overview](#overview)
 - [Instructions](#instructions)
-  - [Step 1. Configure Docker permissions](#step-1-configure-docker-permissions)
-  - [Step 2. Run draft-target speculative decoding](#step-2-run-draft-target-speculative-decoding)
-  - [Step 3. Test the draft-target setup](#step-3-test-the-draft-target-setup)
-  - [Step 5.  Cleanup](#step-5-cleanup)
-  - [Step 6. Next Steps](#step-6-next-steps)
+  - [Option 1: EAGLE-3](#option-1-eagle-3)
+  - [Option 2: Draft Target](#option-2-draft-target)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -24,7 +21,7 @@ This way, the big model doesn't need to predict every token step-by-step, reduci
 
 ## What you'll accomplish
 
-You'll explore speculative decoding using TensorRT-LLM on NVIDIA Spark using the traditional Draft-Target approach.
+You'll explore speculative decoding using TensorRT-LLM on NVIDIA Spark using two approaches: EAGLE-3 and Draft-Target.
 These examples demonstrate how to accelerate large language model inference while maintaining output quality.
 
 ## What to know before starting
@@ -40,13 +37,9 @@ These examples demonstrate how to accelerate large language model inference whil
 - Docker with GPU support enabled
 
   ```bash
-  docker run --gpus all nvcr.io/nvidia/tensorrt-llm/release:spark-single-gpu-dev nvidia-smi
+  docker run --gpus all nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6 nvidia-smi
   ```
-- HuggingFace authentication configured (if needed for model downloads)
-
-  ```bash
-  huggingface-cli login
-  ```
+- Active HuggingFace Token for model access
 - Network connectivity for model downloads
 
 
@@ -55,12 +48,13 @@ These examples demonstrate how to accelerate large language model inference whil
 * **Duration:** 10-20 minutes for setup, additional time for model downloads (varies by network speed)
 * **Risks:** GPU memory exhaustion with large models, container registry access issues, network timeouts during downloads
 * **Rollback:** Stop Docker containers and optionally clean up downloaded model cache.
-* **Last Updated:** 10/12/2025
-  * First publication
+* **Last Updated:** 01/02/2026
+  * Upgrade to latest container v1.2.0rc6
+  * Add EAGLE-3 Speculative Decoding example with GPT-OSS-120B
 
 ## Instructions
 
-### Step 1. Configure Docker permissions
+## Step 1. Configure Docker permissions
 
 To easily manage containers without sudo, you must be in the `docker` group. If you choose to skip this step, you will need to run Docker commands with sudo.
 
@@ -77,16 +71,88 @@ sudo usermod -aG docker $USER
 newgrp docker
 ```
 
+## Step 2. Set Environment Variables
 
-### Step 2. Run draft-target speculative decoding
+Set up the environment variables for downstream services:
 
-Execute the following command to set up and run traditional speculative decoding:
+ ```bash
+export HF_TOKEN=<your_huggingface_token>
+ ```
+
+## Step 3. Run Speculative Decoding Methods
+
+### Option 1: EAGLE-3
+
+Run EAGLE-3 Speculative Decoding by executing the following command:
 
 ```bash
 docker run \
+  -e HF_TOKEN=$HF_TOKEN \
   -v $HOME/.cache/huggingface/:/root/.cache/huggingface/ \
   --rm -it --ulimit memlock=-1 --ulimit stack=67108864 \
-  --gpus=all --ipc=host --network host nvcr.io/nvidia/tensorrt-llm/release:spark-single-gpu-dev \
+  --gpus=all --ipc=host --network host \
+  nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6 \
+  bash -c '
+    hf download openai/gpt-oss-120b && \
+    hf download nvidia/gpt-oss-120b-Eagle3-long-context \
+        --local-dir /opt/gpt-oss-120b-Eagle3/ && \
+    cat > /tmp/extra-llm-api-config.yml <<EOF
+enable_attention_dp: false
+disable_overlap_scheduler: false
+enable_autotuner: false
+cuda_graph_config:
+    max_batch_size: 1
+speculative_config:
+    decoding_type: Eagle
+    max_draft_len: 5
+    speculative_model_dir: /opt/gpt-oss-120b-Eagle3/
+
+kv_cache_config:
+    free_gpu_memory_fraction: 0.9
+    enable_block_reuse: false
+EOF
+    export TIKTOKEN_ENCODINGS_BASE="/tmp/harmony-reqs" && \
+    mkdir -p $TIKTOKEN_ENCODINGS_BASE && \
+    wget -P $TIKTOKEN_ENCODINGS_BASE https://openaipublic.blob.core.windows.net/encodings/o200k_base.tiktoken && \
+    wget -P $TIKTOKEN_ENCODINGS_BASE https://openaipublic.blob.core.windows.net/encodings/cl100k_base.tiktoken
+    trtllm-serve openai/gpt-oss-120b \
+      --backend pytorch --tp_size 1 \
+      --max_batch_size 1 \
+      --extra_llm_api_options /tmp/extra-llm-api-config.yml'
+```
+
+Once the server is running, test it by making an API call from another terminal:
+
+```bash
+## Test completion endpoint
+curl -X POST http://localhost:8000/v1/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openai/gpt-oss-120b",
+    "prompt": "Solve the following problem step by step. If a train travels 180 km in 3 hours, and then slows down by 20% for the next 2 hours, what is the total distance traveled? Show all intermediate calculations and provide a final numeric answer.",
+    "max_tokens": 300,
+    "temperature": 0.7
+  }'
+```
+
+**Key Features of EAGLE-3 Speculative Decoding**
+
+- **Simpler deployment** — Instead of managing a separate draft model, EAGLE-3 uses a built-in drafting head that generates speculative tokens internally.
+
+- **Better accuracy** — By fusing features from multiple layers of the model, draft tokens are more likely to be accepted, reducing wasted computation.
+
+- **Faster generation** — Multiple tokens are verified in parallel per forward pass, cutting down the latency of autoregressive inference.
+
+### Option 2: Draft Target
+
+Execute the following command to set up and run draft target speculative decoding:
+
+```bash
+docker run \
+  -e HF_TOKEN=$HF_TOKEN \
+  -v $HOME/.cache/huggingface/:/root/.cache/huggingface/ \
+  --rm -it --ulimit memlock=-1 --ulimit stack=67108864 \
+  --gpus=all --ipc=host --network host nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6 \
   bash -c "
 #    # Download models
     hf download nvidia/Llama-3.3-70B-Instruct-FP4 && \
@@ -114,8 +180,6 @@ EOF
   "
 ```
 
-### Step 3. Test the draft-target setup
-
 Once the server is running, test it by making an API call from another terminal:
 
 ```bash
@@ -137,7 +201,7 @@ curl -X POST http://localhost:8000/v1/completions \
 - **Memory efficient**: Uses FP4 quantized models for reduced memory footprint
 - **Compatible models**: Uses Llama family models with consistent tokenization
 
-### Step 5.  Cleanup
+## Step 4.  Cleanup
 
 Stop the Docker container when finished:
 
@@ -150,7 +214,7 @@ docker stop <container_id>
 ## rm -rf $HOME/.cache/huggingface/hub/models--*gpt-oss*
 ```
 
-### Step 6. Next Steps
+## Step 5. Next Steps
 
 - Experiment with different `max_draft_len` values (1, 2, 3, 4, 8)
 - Monitor token acceptance rates and throughput improvements
