@@ -79,7 +79,7 @@ The package will be installed directly via pip, so no additional files are requi
   * Port 8090 must be accessible for web interface functionality
   * Self-signed SSL certificate requires browser security exception
 * **Rollback:** Uninstall the Python package with `pip uninstall live-vlm-webui`. Ollama can be uninstalled with standard package removal. No persistent changes to DGX Spark configuration.
-* **Last Updated:** December 2025
+* **Last Updated:** 01/02/2026
   * First Publication
 
 ## Instructions

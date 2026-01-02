@@ -81,7 +81,7 @@ All required assets can be found [in the Portfolio Optimization repository](http
 
 * **Rollback:** Stop the Docker container and remove the cloned repository to fully remove the installation.
 
-* **Last Updated:** 1/05/2026
+* **Last Updated:** 01/02/2026
   * First Publication
 
 ## Instructions

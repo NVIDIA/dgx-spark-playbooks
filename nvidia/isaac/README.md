@@ -57,7 +57,7 @@ All required assets can be found in the Isaac Sim and Isaac Lab repositories on 
   * Build process requires significant compilation time and may encounter dependency issues
   * Build artifacts consume substantial disk space
 * **Rollback:** Isaac Sim build directory can be removed to free space. Git repositories can be deleted and re-cloned if needed.
-* **Last Updated:** 1/06/2024
+* **Last Updated:** 01/02/2026
   * First Publication
 
 ## Run Isaac Sim
@@ -146,7 +146,7 @@ ln -sfn "${ISAACSIM_PATH}" "${PWD}/_isaac_sim"
 ls -l "${PWD}/_isaac_sim/python.sh"
 ```
 
-## Step 4. Install Isaac Lab.
+## Step 4. Install Isaac Lab
 
 ```bash
 ./isaaclab.sh --install
@@ -176,11 +176,11 @@ export LD_PRELOAD="$LD_PRELOAD:/lib/aarch64-linux-gnu/libgomp.so.1"
 
 ## Troubleshooting
 
-## Common issues for Isaac Sim
+## Common Issues for Isaac Sim
 
 | Symptom                     | Cause                    | Fix                               |
 |-----------------------------|--------------------------|-----------------------------------|
-| Isaac Sim error compilation | gcc+11 is not by default | Be sure that gcc+11 is by default |
+| Isaac Sim error compilation | gcc/g++ 11 is not by default | Be sure that gcc/g++ 11 is by default |
 | Isaac Sim not executes      | Error libgomp.so.1       | Add export LD_PRELOAD             |
 | Error in build              | old installation         | Remove .cache folder              |
 

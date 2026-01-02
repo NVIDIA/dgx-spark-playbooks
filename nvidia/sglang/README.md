@@ -73,8 +73,8 @@ The following models are supported with SGLang on Spark. All listed models are a
 * **Estimated time:** 30 minutes for initial setup and validation
 * **Risk level:** Low - Uses pre-built, validated SGLang container with minimal configuration
 * **Rollback:** Stop and remove containers with `docker stop` and `docker rm` commands
-* **Last Updated:** 11/25/2025
-    * First Publication
+* **Last Updated:** 01/02/2026
+    * Add Model Support Matrix
 
 ## Instructions
 

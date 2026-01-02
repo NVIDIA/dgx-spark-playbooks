@@ -51,10 +51,8 @@ ALl files required for fine-tuning are included in the folder in [the GitHub rep
 
 * **Time estimate:** 30-45 mins for setup and runing fine-tuning. Fine-tuning run time varies depending on model size 
 * **Risks:** Model downloads can be large (several GB), ARM64 package compatibility issues may require troubleshooting.
-* **Last Updated:** 12/16/2025
-  * Fix broken commands to access files from GitHub
-  * Upgrade to latest pytorch container version nvcr.io/nvidia/pytorch:25.11-py3
-  * Temporarily remove Llama3_70B_qLoRA_finetuning command to investigate slowness.
+* **Last Updated:** 01/02/2025
+  * Add two-Spark distributed finetuning example
 
 ## Instructions
 

@@ -54,7 +54,7 @@ You will have a fully functional Nemotron-3-Nano-30B-A3B inference server runnin
 * **Risk level:** Low
   * Build process compiles from source but doesn't modify system files
   * Model downloads can be resumed if interrupted
-* **Rollback:** Delete the cloned llama.cpp directory and downloaded model files to fully remove the installation
+* **Rollback:** Delete the cloned `llama.cpp` directory and downloaded model files to fully remove the installation
 * **Last Updated:** 12/17/2025
   * First Publication
 
