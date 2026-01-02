@@ -47,6 +47,27 @@ vision-language tasks using models like DeepSeek-V2-Lite.
 
 - An offline inference python script [found here on GitHub](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/sglang/assets/offline-inference.py)
 
+## Model Support Matrix
+
+The following models are supported with SGLang on Spark. All listed models are available and ready to use:
+
+| Model | Quantization | Support Status | HF Handle |
+|-------|-------------|----------------|-----------|
+| **GPT-OSS-20B** | MXFP4 | ✅ | `openai/gpt-oss-20b` |
+| **GPT-OSS-120B** | MXFP4 | ✅ | `openai/gpt-oss-120b` |
+| **Llama-3.1-8B-Instruct** | FP8 | ✅ | `nvidia/Llama-3.1-8B-Instruct-FP8` |
+| **Llama-3.1-8B-Instruct** | NVFP4 | ✅ | `nvidia/Llama-3.1-8B-Instruct-FP4` |
+| **Llama-3.3-70B-Instruct** | NVFP4 | ✅ | `nvidia/Llama-3.3-70B-Instruct-FP4` |
+| **Qwen3-8B** | FP8 | ✅ | `nvidia/Qwen3-8B-FP8` |
+| **Qwen3-8B** | NVFP4 | ✅ | `nvidia/Qwen3-8B-FP4` |
+| **Qwen3-14B** | FP8 | ✅ | `nvidia/Qwen3-14B-FP8` |
+| **Qwen3-14B** | NVFP4 | ✅ | `nvidia/Qwen3-14B-FP4` |
+| **Qwen3-32B** | NVFP4 | ✅ | `nvidia/Qwen3-32B-FP4` |
+| **Phi-4-multimodal-instruct** | FP8 | ✅ | `nvidia/Phi-4-multimodal-instruct-FP8` |
+| **Phi-4-multimodal-instruct** | NVFP4 | ✅ | `nvidia/Phi-4-multimodal-instruct-FP4` |
+| **Phi-4-reasoning-plus** | FP8 | ✅ | `nvidia/Phi-4-reasoning-plus-FP8` |
+| **Phi-4-reasoning-plus** | NVFP4 | ✅ | `nvidia/Phi-4-reasoning-plus-FP4` |
+
 ### Time & risk
 
 * **Estimated time:** 30 minutes for initial setup and validation
