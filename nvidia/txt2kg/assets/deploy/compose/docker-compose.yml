@@ -75,6 +75,7 @@ services:
       - OLLAMA_NUM_PARALLEL=4             # Process 4 requests in parallel - DGX Spark has unified memory
       - OLLAMA_MAX_LOADED_MODELS=1        # Load only one model at a time to avoid VRAM contention
       - OLLAMA_KV_CACHE_TYPE=q8_0         # Reduce KV cache VRAM usage with minimal performance impact
+      - OLLAMA_LLM_LIBRARY=cuda_v13       # Force usage of CUDA v13 library
     networks:
       - default
     restart: unless-stopped
