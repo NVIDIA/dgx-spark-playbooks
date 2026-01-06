@@ -168,7 +168,7 @@ live-vlm-webui --port 8091
 live-vlm-webui --ssl-cert /path/to/cert.pem --ssl-key /path/to/key.pem
 
 ## Change default API endpoint
-live-vlm-webui --default-api-base http://localhost:8000/v1
+live-vlm-webui --api-base http://localhost:8000/v1
 
 ## Run in background (optional)
 nohup live-vlm-webui > live-vlm.log 2>&1 &

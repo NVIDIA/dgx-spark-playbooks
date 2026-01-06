@@ -185,7 +185,6 @@ Once you're comfortable with this foundational workflow, please explore these ad
 
 For questions or issues, please visit:
 - [GitHub Issues](https://github.com/NVIDIA-AI-Blueprints/quantitative-portfolio-optimization/issues)
-- [GitHub Discussions](https://github.com/NVIDIA-AI-Blueprints/quantitative-portfolio-optimization/discussions)
 
 ## Troubleshooting
 
