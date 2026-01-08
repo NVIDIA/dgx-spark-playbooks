@@ -1,0 +1,33 @@
+{
+  "server": {
+    "port": 3000,
+    "host": "localhost",
+    "nodeEnv": "production"
+  },
+  "logging": {
+    "level": "info",
+    "format": "json",
+    "dir": "/var/log/dgx-spark-mcp",
+    "maxFiles": 10,
+    "maxSize": "10m"
+  },
+  "mcp": {
+    "serverName": "dgx-spark-mcp",
+    "serverVersion": "0.1.0",
+    "transport": "stdio"
+  },
+  "hardware": {
+    "nvidiaSmiPath": "/usr/bin/nvidia-smi",
+    "cacheTTL": 30000,
+    "enableGpuMonitoring": true
+  },
+  "spark": {},
+  "performance": {
+    "enableMetrics": true,
+    "metricsInterval": 60000,
+    "healthCheckInterval": 30000
+  },
+  "security": {
+    "enableAuth": false
+  }
+}
