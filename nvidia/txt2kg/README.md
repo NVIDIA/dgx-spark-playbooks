@@ -66,7 +66,7 @@ In a terminal, clone the txt2kg repository and navigate to the project directory
 
 ```bash
 git clone https://github.com/NVIDIA/dgx-spark-playbooks
-cd dgx-spark-playbook/nvidia/txt2kg/assets
+cd dgx-spark-playbooks/nvidia/txt2kg/assets
 ```
 
 ## Step 2. Start the txt2kg services
