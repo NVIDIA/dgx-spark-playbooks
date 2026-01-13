@@ -51,8 +51,11 @@ ALl files required for fine-tuning are included in the folder in [the GitHub rep
 
 * **Time estimate:** 30-45 mins for setup and runing fine-tuning. Fine-tuning run time varies depending on model size 
 * **Risks:** Model downloads can be large (several GB), ARM64 package compatibility issues may require troubleshooting.
-* **Last Updated:** 01/02/2025
-  * Add two-Spark distributed finetuning example
+* **Last Updated:** 12/16/2025
+  * Bug fix to ensure torch.compile does not break with LoRA. 
+  * Fix broken commands to access files from GitHub
+  * Upgrade to latest pytorch container version nvcr.io/nvidia/pytorch:25.11-py3
+  * Temporarily remove Llama3_70B_qLoRA_finetuning command to investigate slowness.
 
 ## Instructions
 
@@ -111,14 +114,74 @@ cd dgx-spark-playbooks/nvidia/pytorch-fine-tune/assets
 
 ## Step7: Run the fine-tuning recipes
 
-To run LoRA on Llama3-8B use the following command:
+### Available Fine-Tuning Scripts
+
+The following fine-tuning scripts are provided, each optimized for different model sizes and training approaches:
+
+| Script | Model | Fine-Tuning Type | Description |
+|--------|-------|------------------|-------------|
+| `Llama3_3B_full_finetuning.py` | Llama 3.2 3B | Full SFT | Full supervised fine-tuning (all parameters trainable) |
+| `Llama3_8B_LoRA_finetuning.py` | Llama 3.1 8B | LoRA | Low-Rank Adaptation (parameter-efficient) |
+| `Llama3_70B_LoRA_finetuning.py` | Llama 3.1 70B | LoRA | Low-Rank Adaptation with FSDP support |
+| `Llama3_70B_qLoRA_finetuning.py` | Llama 3.1 70B | QLoRA | Quantized LoRA (4-bit quantization for memory efficiency) |
+
+### Basic Usage
+
+Run any script with default settings:
+
 ```bash
+# Full fine-tuning on Llama 3.2 3B
+python Llama3_3B_full_finetuning.py
+
+# LoRA fine-tuning on Llama 3.1 8B
 python Llama3_8B_LoRA_finetuning.py
+
+# LoRA fine-tuning on Llama 3.1 70B
+python Llama3_70B_LoRA_finetuning.py
 ```
 
-To run full fine-tuning on llama3-3B use the following command:
+### Common Command-Line Arguments
+
+All scripts support the following command-line arguments for customization:
+
+#### Model Configuration
+- `--model_name`: Model name or path (default: varies by script)
+- `--dtype`: Model precision - `float32`, `float16`, or `bfloat16` (default: `bfloat16`)
+
+#### Training Configuration
+- `--batch_size`: Per-device training batch size (default: varies by script)
+- `--seq_length`: Maximum sequence length (default: `2048`)
+- `--num_epochs`: Number of training epochs (default: `1`)
+- `--gradient_accumulation_steps`: Gradient accumulation steps (default: `1`)
+- `--learning_rate`: Learning rate (default: varies by script)
+- `--gradient_checkpointing`: Enable gradient checkpointing to save memory (flag)
+
+#### LoRA Configuration (LoRA and QLoRA scripts only)
+- `--lora_rank`: LoRA rank - higher values = more trainable parameters (default: `8`)
+
+#### Dataset Configuration
+- `--dataset_size`: Number of samples to use from the Alpaca dataset (default: `500`)
+
+#### Logging Configuration
+- `--logging_steps`: Log metrics every N steps (default: `1`)
+- `--log_dir`: Directory for TensorBoard logs (default: `logs`)
+
+#### Model Saving
+- `--output_dir`: Directory to save the fine-tuned model (default: `None` - model not saved)
+
+#### Performance Optimization
+- `--use_torch_compile`: Enable `torch.compile()` for faster training (flag)
+
+> [!WARNING]
+> **Important:** The `--use_torch_compile` flag is **not compatible with QLoRA** (`Llama3_70B_qLoRA_finetuning.py`). 
+> Only use this flag with full fine-tuning and standard LoRA scripts.
+
+### Usage Examples
 ```bash
-python Llama3_3B_full_finetuning.py
+python Llama3_8B_LoRA_finetuning.py \
+  --dataset_size 100 \
+  --num_epochs 1 \
+  --batch_size 2
 ```
 
 ## Run on two Sparks
@@ -267,7 +330,7 @@ For multi-node runs, we provide 2 configuration files:
 
 These configuration files need to be adapted:
 - Set `machine_rank` on each of your nodes according to its rank. Your master node should have a rank `0`. The second node has a rank `1`.
-- Set `main_process_ip` using the IP address of your master node. Ensure that both configuration files have the same value. Use `ifconfig` on your main node to find the correct value for the CX-7 IP address.
+- Set `main_process_ip` using the IP address of your master node. Ensure that both configuration files have the same value. Use `ifconfig` on your main node to find the correct value for the CX-7 IP address on this node.
 - Set a port number that can be used on your main node.
 
 The fields that need to be filled in your YAML files:
@@ -282,7 +345,7 @@ All the scripts and configuration files are available in this [**repository**](h
 
 ### Step 10. Run finetuning scripts
 
-Once you successfully run the previous steps, you can use one of the `run-multi-llama_*` scripts for finetuning available in this [**repository**](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/pytorch-fine-tune/assets). Here is an example for Llama3 70B using LoRa for finetuning and FSDP2.
+Once you successfully run the previous steps, you can use one of the `run-multi-llama_*` scripts for finetuning. Here is an example for Llama3 70B using LoRa for finetuning and FSDP2.
 
 ```bash
 ## Need to specify huggingface token for model download.
@@ -316,9 +379,6 @@ rm -rf $HOME/.cache/huggingface/hub/models--meta-llama* $HOME/.cache/huggingface
 | Symptom | Cause | Fix |
 |---------|--------|-----|
 | Cannot access gated repo for URL | Certain HuggingFace models have restricted access | Regenerate your [HuggingFace token](https://huggingface.co/docs/hub/en/security-tokens); and request access to the [gated model](https://huggingface.co/docs/hub/en/models-gated#customize-requested-information) on your web browser |
-| Errors and time-outs in multi-Spark runs | Various reasons | We recommend to set the following variables to enable extra logging and runtime consistency checks <br> `ACCELERATE_DEBUG_MODE=1`<br> `ACCELERATE_LOG_LEVEL=DEBUG`<br> `TORCH_CPP_LOG_LEVEL=INFO`<br> `TORCH_DISTRIBUTED_DEBUG=DETAIL`|
-| task: non-zero exit (255) | Container exit with error code 255 | Check container logs with `docker ps -a --filter "name=finetuning-multinode"` to get container ID, then `docker logs <container_id>` to see detailed error messages |
-|Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running? | Docker daemon crash caused by Docker Swarm attempting to bind to a stale or unreachable link-local IP address | Stop Docker `sudo systemctl stop docker`<br> Remove Swarm state `sudo rm -rf /var/lib/docker/swarm`<br> Restart Docker `sudo systemctl start docker`<br> Re-initialize Swarm with a valid advertise address on an active interface|
 
 > [!NOTE]
 > DGX Spark uses a Unified Memory Architecture (UMA), which enables dynamic memory sharing between the GPU and CPU. 
