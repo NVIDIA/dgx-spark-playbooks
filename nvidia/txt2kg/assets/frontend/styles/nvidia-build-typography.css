@@ -162,6 +162,26 @@
   @apply w-5 h-5 rounded-md bg-nvidia-green/15 flex items-center justify-center transition-transform duration-200;
 }
 
+/* Tab content wrapper for max-width */
+.nvidia-build-tab-content {
+  @apply w-full max-w-7xl mx-auto;
+}
+
+/* Responsive tab layout */
+@media (max-width: 768px) {
+  .nvidia-build-tabs {
+    @apply flex-col w-full p-1.5 gap-1;
+  }
+  
+  .nvidia-build-tab {
+    @apply w-full justify-start px-4 py-2.5;
+  }
+  
+  .nvidia-build-tab-icon {
+    @apply w-5 h-5;
+  }
+}
+
 /* Dark Mode Optimizations */
 @media (prefers-color-scheme: dark) {
   .nvidia-build-card {

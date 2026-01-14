@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     // Optionally store in vector database
     if (sentenceEmbeddings.length > 0) {
       try {
-        // Map the embeddings to a format suitable for Pinecone
+        // Map the embeddings to a format suitable for Qdrant
         const embeddingsMap = new Map<string, number[]>();
         const textContentMap = new Map<string, string>();
         const metadataMap = new Map<string, any>();
@@ -64,9 +64,9 @@ export async function POST(req: NextRequest) {
           metadataMap.set(key, item.metadata);
         });
         
-        // Store in Pinecone
-        const pineconeService = QdrantService.getInstance();
-        await pineconeService.storeEmbeddingsWithMetadata(
+        // Store in Qdrant
+        const qdrantService = QdrantService.getInstance();
+        await qdrantService.storeEmbeddingsWithMetadata(
           embeddingsMap,
           textContentMap, 
           metadataMap

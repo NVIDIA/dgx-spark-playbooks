@@ -43,7 +43,7 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 - [Portfolio Optimization](nvidia/portfolio-optimization/)
 - [Fine-tune with Pytorch](nvidia/pytorch-fine-tune/)
 - [RAG Application in AI Workbench](nvidia/rag-ai-workbench/)
-- [SGLang Inference Server](nvidia/sglang/)
+- [SGLang for Inference](nvidia/sglang/)
 - [Single-cell RNA Sequencing](nvidia/single-cell/)
 - [Speculative Decoding](nvidia/speculative-decoding/)
 - [Set up Tailscale on Your Spark](nvidia/tailscale/)

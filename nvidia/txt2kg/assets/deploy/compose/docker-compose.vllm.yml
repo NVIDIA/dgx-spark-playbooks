@@ -1,6 +1,10 @@
-# This is a legacy file - use --with-optional flag instead
-# The vLLM service is now included in docker-compose.optional.yml
-# This file is kept for backwards compatibility
+# txt2kg Docker Compose - Neo4j + vLLM (GPU-accelerated)
+#
+# Optional stack optimized for DGX Spark/GB300 with unified memory support
+#
+# Usage:
+#   ./start.sh --vllm                 # Use this compose file
+#   ./start.sh --vllm --vector-search # Add Qdrant + Sentence Transformers
 
 services:
   app:
@@ -10,105 +14,100 @@ services:
     ports:
       - '3001:3000'
     environment:
-      - ARANGODB_URL=http://arangodb:8529
+      # Neo4j configuration
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=password123
+      - GRAPH_DB_TYPE=neo4j
+      # Disable ArangoDB
+      - ARANGODB_URL=http://localhost:8529
       - ARANGODB_DB=txt2kg
-      - PINECONE_HOST=entity-embeddings
-      - PINECONE_PORT=5081
-      - PINECONE_API_KEY=pclocal
-      - PINECONE_ENVIRONMENT=local
+      # vLLM configuration (GPU-accelerated)
+      - VLLM_BASE_URL=http://vllm:8001/v1
+      - VLLM_MODEL=nvidia/Llama-3_3-Nemotron-Super-49B-v1_5-FP8
+      # Disable Ollama
+      - OLLAMA_BASE_URL=http://localhost:11434/v1
+      - OLLAMA_MODEL=disabled
+      # Vector DB configuration
+      - QDRANT_URL=http://qdrant:6333
+      - VECTOR_DB_TYPE=qdrant
+      # Embeddings configuration
       - LANGCHAIN_TRACING_V2=true
       - SENTENCE_TRANSFORMER_URL=http://sentence-transformers:80
       - MODEL_NAME=all-MiniLM-L6-v2
+      - EMBEDDINGS_API_URL=http://sentence-transformers:80
+      # Other settings
       - GRPC_SSL_CIPHER_SUITES=HIGH+ECDSA:HIGH+aRSA
       - NODE_TLS_REJECT_UNAUTHORIZED=0
-      - OLLAMA_BASE_URL=http://ollama:11434/v1
-      - OLLAMA_MODEL=qwen3:1.7b
-      - VLLM_BASE_URL=http://vllm:8001/v1
-      - VLLM_MODEL=meta-llama/Llama-3.2-3B-Instruct
-      - REMOTE_WEBGPU_SERVICE_URL=http://txt2kg-remote-webgpu:8083
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
+      - NODE_OPTIONS=--max-http-header-size=80000
+      - UV_THREADPOOL_SIZE=128
+      - HTTP_TIMEOUT=1800000
+      - REQUEST_TIMEOUT=1800000
     networks:
-      - pinecone-net
       - default
       - txt2kg-network
+      - qdrant-net
     depends_on:
-      - arangodb
-      - entity-embeddings
-      - sentence-transformers
-      - vllm
-  arangodb:
-    image: arangodb:latest
-    ports:
-      - '8529:8529'
-    environment:
-      - ARANGO_NO_AUTH=1
-    volumes:
-      - arangodb_data:/var/lib/arangodb3
-      - arangodb_apps_data:/var/lib/arangodb3-apps
-  arangodb-init:
-    image: arangodb:latest
-    depends_on:
-      arangodb:
+      neo4j:
+        condition: service_healthy
+      vllm:
         condition: service_started
-    restart: on-failure
-    entrypoint: >
-      sh -c "
-        echo 'Waiting for ArangoDB to start...' &&
-        sleep 10 &&
-        echo 'Creating txt2kg database...' &&
-        arangosh --server.endpoint tcp://arangodb:8529 --server.authentication false --javascript.execute-string 'try { db._createDatabase(\"txt2kg\"); console.log(\"Database txt2kg created successfully!\"); } catch(e) { if(e.message.includes(\"duplicate\")) { console.log(\"Database txt2kg already exists\"); } else { throw e; } }'
-      "
-  entity-embeddings:
-    image: ghcr.io/pinecone-io/pinecone-index:latest
-    container_name: entity-embeddings
-    environment:
-      PORT: 5081
-      INDEX_TYPE: serverless
-      VECTOR_TYPE: dense
-      DIMENSION: 384
-      METRIC: cosine
-      INDEX_NAME: entity-embeddings
+
+  # Neo4j - Graph database
+  neo4j:
+    image: neo4j:5-community
     ports:
-      - "5081:5081"
-    platform: linux/amd64
-    networks:
-      - pinecone-net
-    restart: unless-stopped
-  sentence-transformers:
-    build:
-      context: ../../deploy/services/sentence-transformers
-      dockerfile: Dockerfile
-    ports:
-      - '8000:80'
+      - '7474:7474'
+      - '7687:7687'
     environment:
-      - MODEL_NAME=all-MiniLM-L6-v2
+      - NEO4J_AUTH=neo4j/password123
+      - NEO4J_server_memory_heap_initial__size=512m
+      - NEO4J_server_memory_heap_max__size=2G
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
     networks:
       - default
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  # vLLM - GPU-accelerated LLM with unified memory support
   vllm:
     build:
-      context: ../../deploy/services/vllm
+      context: ../services/vllm
       dockerfile: Dockerfile
     container_name: vllm-service
     ports:
       - '8001:8001'
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    shm_size: '16gb'
     environment:
-      # Model configuration
-      - VLLM_MODEL=meta-llama/Llama-3.2-3B-Instruct
+      - VLLM_MODEL=nvidia/Llama-3_3-Nemotron-Super-49B-v1_5-FP8
       - VLLM_TENSOR_PARALLEL_SIZE=1
-      - VLLM_MAX_MODEL_LEN=4096
+      - VLLM_MAX_MODEL_LEN=32768
       - VLLM_GPU_MEMORY_UTILIZATION=0.9
-      # NVfp4 quantization settings
-      - VLLM_QUANTIZATION=fp8
-      - VLLM_KV_CACHE_DTYPE=fp8
-      # Service configuration
+      - VLLM_MAX_NUM_SEQS=32
+      - VLLM_MAX_NUM_BATCHED_TOKENS=32768
+      - VLLM_KV_CACHE_DTYPE=auto
       - VLLM_PORT=8001
       - VLLM_HOST=0.0.0.0
-      # Performance tuning
       - CUDA_VISIBLE_DEVICES=0
       - NCCL_DEBUG=INFO
+      - CUDA_MANAGED_FORCE_DEVICE_ALLOC=1
+      - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+      - VLLM_CPU_OFFLOAD_GB=0
     volumes:
       - vllm_models:/app/models
       - /tmp:/tmp
-      # Mount model cache for faster startup
       - ~/.cache/huggingface:/root/.cache/huggingface
     networks:
       - default
@@ -121,21 +120,75 @@ services:
               count: 1
               capabilities: [gpu]
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/v1/models"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 120s  # Longer start period for model loading
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 60s
+      timeout: 30s
+      retries: 30
+      start_period: 1800s
+
+  # Optional: Vector search services
+  sentence-transformers:
+    build:
+      context: ../services/sentence-transformers
+      dockerfile: Dockerfile
+    ports:
+      - '8000:80'
+    environment:
+      - MODEL_NAME=all-MiniLM-L6-v2
+    networks:
+      - default
+    restart: unless-stopped
+    profiles:
+      - vector-search
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - qdrant-net
+    restart: unless-stopped
+    profiles:
+      - vector-search
+
+  qdrant-init:
+    image: curlimages/curl:latest
+    depends_on:
+      - qdrant
+    restart: "no"
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        echo 'Waiting for Qdrant to start...'
+        sleep 5
+        curl -X PUT http://qdrant:6333/collections/entity-embeddings \
+          -H 'Content-Type: application/json' \
+          -d '{"vectors":{"size":384,"distance":"Cosine"}}' || true
+        curl -X PUT http://qdrant:6333/collections/document-embeddings \
+          -H 'Content-Type: application/json' \
+          -d '{"vectors":{"size":384,"distance":"Cosine"}}' || true
+        echo 'Collections created'
+    networks:
+      - qdrant-net
+    profiles:
+      - vector-search
 
 volumes:
-  arangodb_data:
-  arangodb_apps_data:
+  neo4j_data:
+  neo4j_logs:
   vllm_models:
+  qdrant_data:
 
 networks:
-  pinecone-net:
-    name: pinecone
   default:
     driver: bridge
   txt2kg-network:
     driver: bridge
+  qdrant-net:
+    name: qdrant-network
+

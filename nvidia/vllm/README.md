@@ -68,7 +68,8 @@ The following models are supported with vLLM on Spark. All listed models are ava
 | **Phi-4-multimodal-instruct** | NVFP4 | ✅ | `nvidia/Phi-4-multimodal-instruct-FP4` |
 | **Phi-4-reasoning-plus** | FP8 | ✅ | `nvidia/Phi-4-reasoning-plus-FP8` |
 | **Phi-4-reasoning-plus** | NVFP4 | ✅ | `nvidia/Phi-4-reasoning-plus-FP4` |
-
+| **Nemotron3-Nano** | BF16 | ✅ | `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16` |
+| **Nemotron3-Nano** | FP8 | ✅ | `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8` |
 
 > [!NOTE]
 > The Phi-4-multimodal-instruct models require `--trust-remote-code` when launching vLLM.
@@ -116,6 +117,12 @@ export LATEST_VLLM_VERSION=<latest_container_version>
 ## export LATEST_VLLM_VERSION=25.11-py3
 
 docker pull nvcr.io/nvidia/vllm:${LATEST_VLLM_VERSION}
+```
+
+For Nemotron3-Nano model support, please use release version 25.12.post1-py3
+
+```bash
+docker pull nvcr.io/nvidia/vllm:25.12.post1-py3
 ```
 
 ## Step 3. Test vLLM in container

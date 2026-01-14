@@ -393,6 +393,11 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
           requestBody.llmProvider = "ollama";
           requestBody.ollamaModel = model.model || "llama3.1:8b";
           console.log(`🦙 Using Ollama model: ${requestBody.ollamaModel}`);
+        } else if (model.provider === "vllm") {
+          requestBody.llmProvider = "vllm";
+          requestBody.vllmModel = model.model;
+          requestBody.vllmBaseUrl = model.baseURL || "http://localhost:8001/v1";
+          console.log(`🚀 Using vLLM model: ${requestBody.vllmModel}`);
         } else if (model.id === "nvidia-nemotron" || model.id === "nvidia-nemotron-nano") {
           requestBody.llmProvider = "nvidia";
           requestBody.nvidiaModel = model.model; // Pass the actual model name

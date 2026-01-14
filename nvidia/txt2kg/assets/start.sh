@@ -20,7 +20,8 @@
 
 # Parse command line arguments
 DEV_FRONTEND=false
-USE_COMPLETE=false
+USE_VLLM=false
+USE_VECTOR_SEARCH=false
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -28,8 +29,12 @@ while [[ $# -gt 0 ]]; do
       DEV_FRONTEND=true
       shift
       ;;
-    --complete)
-      USE_COMPLETE=true
+    --vllm)
+      USE_VLLM=true
+      shift
+      ;;
+    --vector-search)
+      USE_VECTOR_SEARCH=true
       shift
       ;;
     --help|-h)
@@ -37,14 +42,17 @@ while [[ $# -gt 0 ]]; do
       echo ""
       echo "Options:"
       echo "  --dev-frontend    Run frontend in development mode (without Docker)"
-      echo "  --complete        Use complete stack (vLLM, Pinecone, Sentence Transformers)"
+      echo "  --vllm            Use Neo4j + vLLM (GPU-accelerated, for DGX Spark/GB300)"
+      echo "  --vector-search   Enable vector search services (Qdrant + Sentence Transformers)"
       echo "  --help, -h        Show this help message"
       echo ""
-      echo "Default: Starts minimal stack with Ollama, ArangoDB, and Next.js frontend"
+      echo "Default: Starts ArangoDB + Ollama"
       echo ""
       echo "Examples:"
-      echo "  ./start.sh                # Start minimal demo (recommended)"
-      echo "  ./start.sh --complete     # Start with all optional services"
+      echo "  ./start.sh                       # Default: ArangoDB + Ollama"
+      echo "  ./start.sh --vllm                # Use Neo4j + vLLM (GPU)"
+      echo "  ./start.sh --vector-search       # Add Qdrant + Sentence Transformers"
+      echo "  ./start.sh --vllm --vector-search  # vLLM + vector search"
       exit 0
       ;;
     *)
@@ -120,21 +128,32 @@ if ! docker info &> /dev/null; then
 fi
 echo "✓ Docker permissions OK"
 
-# Build the docker-compose command
-if [ "$USE_COMPLETE" = true ]; then
-  CMD="$DOCKER_COMPOSE_CMD -f $(pwd)/deploy/compose/docker-compose.complete.yml"
-  echo "Using complete stack (Ollama, vLLM, Pinecone, Sentence Transformers)..."
+# Select compose file and build command
+COMPOSE_DIR="$(pwd)/deploy/compose"
+PROFILES=""
+
+if [ "$USE_VLLM" = true ]; then
+  COMPOSE_FILE="$COMPOSE_DIR/docker-compose.vllm.yml"
+  echo "Using Neo4j + vLLM (GPU-accelerated)..."
+  echo "  ⚡ Optimized for DGX Spark/GB300 with unified memory support"
 else
-  CMD="$DOCKER_COMPOSE_CMD -f $(pwd)/deploy/compose/docker-compose.yml"
-  echo "Using minimal configuration (Ollama + ArangoDB only)..."
+  COMPOSE_FILE="$COMPOSE_DIR/docker-compose.yml"
+  echo "Using ArangoDB + Ollama configuration..."
+fi
+
+CMD="$DOCKER_COMPOSE_CMD -f $COMPOSE_FILE"
+
+if [ "$USE_VECTOR_SEARCH" = true ]; then
+  PROFILES="--profile vector-search"
+  echo "Enabling vector search (Qdrant + Sentence Transformers)..."
 fi
 
 # Execute the command
 echo ""
 echo "Starting services..."
-echo "Running: $CMD up -d"
+echo "Running: $CMD $PROFILES up -d"
 cd $(dirname "$0")
-eval "$CMD up -d"
+eval "$CMD $PROFILES up -d"
 
 echo ""
 echo "=========================================="
@@ -143,28 +162,44 @@ echo "=========================================="
 echo ""
 echo "Core Services:"
 echo "  • Web UI: http://localhost:3001"
-echo "  • ArangoDB: http://localhost:8529"
-echo "  • Ollama API: http://localhost:11434"
+if [ "$USE_VLLM" = true ]; then
+  echo "  • Neo4j Browser: http://localhost:7474"
+  echo "  • vLLM API: http://localhost:8001 (GPU-accelerated)"
+else
+  echo "  • ArangoDB: http://localhost:8529"
+  echo "  • Ollama API: http://localhost:11434"
+fi
 echo ""
 
-if [ "$USE_COMPLETE" = true ]; then
-  echo "Additional Services (Complete Stack):"
-  echo "  • Local Pinecone: http://localhost:5081"
+if [ "$USE_VECTOR_SEARCH" = true ]; then
+  echo "Vector Search Services:"
+  echo "  • Qdrant: http://localhost:6333"
   echo "  • Sentence Transformers: http://localhost:8000"
-  echo "  • vLLM API: http://localhost:8001"
   echo ""
 fi
 
 echo "Next steps:"
-echo "  1. Pull an Ollama model (if not already done):"
-echo "     docker exec ollama-compose ollama pull llama3.1:8b"
-echo ""
-echo "  2. Open http://localhost:3001 in your browser"
+if [ "$USE_VLLM" = true ]; then
+  echo "  1. Wait for vLLM to load the model (check logs with: docker logs vllm-service -f)"
+  echo "     Note: First startup may take several minutes to download the model"
+  echo ""
+  echo "  2. Open http://localhost:3001 in your browser"
+else
+  echo "  1. Pull an Ollama model (if not already done):"
+  echo "     docker exec ollama-compose ollama pull llama3.1:8b"
+  echo ""
+  echo "  2. Open http://localhost:3001 in your browser"
+fi
 echo "  3. Upload documents and start building your knowledge graph!"
 echo ""
 echo "Other options:"
 echo "  • Stop services: ./stop.sh"
 echo "  • Run frontend in dev mode: ./start.sh --dev-frontend"
-echo "  • Use complete stack: ./start.sh --complete"
+if [ "$USE_VLLM" = true ]; then
+  echo "  • Use Ollama: ./start.sh (without --vllm)"
+else
+  echo "  • Use vLLM (GPU): ./start.sh --vllm"
+fi
+echo "  • Add vector search: ./start.sh --vector-search"
 echo "  • View logs: docker compose logs -f"
-echo "" 
+echo ""

@@ -156,15 +156,20 @@ export function RagQuery({
                   : 'border-border/30 opacity-50 cursor-not-allowed'
             }`}
           >
-            <div className="w-5 h-5 rounded-md bg-nvidia-green/15 flex items-center justify-center mb-1.5">
-              <Zap className="h-2.5 w-2.5 text-nvidia-green" />
+            <div className={`w-5 h-5 rounded-md flex items-center justify-center mb-1.5 ${vectorEnabled ? 'bg-nvidia-green/15' : 'bg-muted/15'}`}>
+              <Zap className={`h-2.5 w-2.5 ${vectorEnabled ? 'text-nvidia-green' : 'text-muted-foreground'}`} />
             </div>
-            <span className="text-sm font-semibold">Pure RAG</span>
+            <span className={`text-sm font-semibold ${!vectorEnabled ? 'text-muted-foreground' : ''}`}>Pure RAG</span>
             <span className="text-[10px] mt-0.5 text-center text-muted-foreground leading-tight">
               Vector DB + LLM
             </span>
             {queryMode === 'pure-rag' && (
               <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-nvidia-green rounded-full"></div>
+            )}
+            {!vectorEnabled && (
+              <div className="text-[9px] px-1.5 py-0.5 bg-blue-500/20 text-blue-700 dark:text-blue-400 rounded mt-1 font-medium">
+                NEEDS EMBEDDINGS
+              </div>
             )}
           </button>
 

@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     // Initialize services with the correct graph database type
     const graphDbType = getGraphDbType();
     const graphDbService = getGraphDbService(graphDbType);
-    const pineconeService = QdrantService.getInstance();
+    const qdrantService = QdrantService.getInstance();
     
     // Initialize graph database if needed
     if (!graphDbService.isInitialized()) {
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
     // Get total triples (relationships)
     const totalTriples = graphData.relationships.length;
     
-    // Get vector stats from Pinecone if available
+    // Get vector stats from Qdrant if available
     let vectorStats = {
       totalVectors: 0,
       avgQueryTime: 0,
@@ -68,8 +68,8 @@ export async function GET(request: NextRequest) {
     };
     
     try {
-      await pineconeService.initialize();
-      const stats = await pineconeService.getStats();
+      await qdrantService.initialize();
+      const stats = await qdrantService.getStats();
       
       vectorStats = {
         totalVectors: stats.totalVectorCount || 0,
@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
         avgRelevanceScore: stats.averageRelevanceScore || 0
       };
     } catch (error) {
-      console.warn('Could not fetch Pinecone stats:', error);
+      console.warn('Could not fetch Qdrant stats:', error);
     }
 
     // Get real query logs instead of mock data

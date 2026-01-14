@@ -91,11 +91,16 @@ export function TripleEditor({ triple, index, onSave, onCancel }: TripleEditorPr
         <button
           type="button"
           onClick={onCancel}
+          aria-label="Cancel editing triple"
           className="p-2 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted/50 transition-colors"
         >
           <X className="h-4 w-4" />
         </button>
-        <button type="submit" className="p-2 text-primary hover:text-primary/80 rounded-full hover:bg-primary/10 transition-colors">
+        <button 
+          type="submit" 
+          aria-label="Save triple"
+          className="p-2 text-primary hover:text-primary/80 rounded-full hover:bg-primary/10 transition-colors"
+        >
           <Check className="h-4 w-4" />
         </button>
       </div>

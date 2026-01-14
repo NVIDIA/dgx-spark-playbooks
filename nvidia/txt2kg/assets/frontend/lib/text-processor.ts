@@ -376,7 +376,7 @@ ${formatInstructions}`;
               }
             ],
             temperature: 0.1,
-            max_tokens: 8192,
+            max_tokens: 4096,  // Reduced to leave room for input tokens in context
             top_p: 0.95
           })
         });

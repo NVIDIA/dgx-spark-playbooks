@@ -18,27 +18,40 @@
 
 # Stop script for txt2kg project
 
+# Check which Docker Compose version is available
+DOCKER_COMPOSE_CMD=""
+if docker compose version &> /dev/null; then
+  DOCKER_COMPOSE_CMD="docker compose"
+elif command -v docker-compose &> /dev/null; then
+  DOCKER_COMPOSE_CMD="docker-compose"
+else
+  echo "Error: Neither 'docker compose' nor 'docker-compose' is available"
+  exit 1
+fi
+
 # Parse command line arguments
-USE_COMPLETE=false
+USE_VLLM=false
+USE_VECTOR_SEARCH=false
 
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --complete)
-      USE_COMPLETE=true
+    --vllm)
+      USE_VLLM=true
+      shift
+      ;;
+    --vector-search)
+      USE_VECTOR_SEARCH=true
       shift
       ;;
     --help|-h)
       echo "Usage: ./stop.sh [OPTIONS]"
       echo ""
       echo "Options:"
-      echo "  --complete        Stop complete stack (vLLM, Pinecone, Sentence Transformers)"
+      echo "  --vllm            Stop vLLM stack (use if you started with --vllm)"
+      echo "  --vector-search   Include vector search services"
       echo "  --help, -h        Show this help message"
       echo ""
-      echo "Default: Stops minimal stack with Ollama, ArangoDB, and Next.js frontend"
-      echo ""
-      echo "Examples:"
-      echo "  ./stop.sh                # Stop minimal demo"
-      echo "  ./stop.sh --complete     # Stop complete stack"
+      echo "Note: Use the same flags you used with ./start.sh"
       exit 0
       ;;
     *)
@@ -49,52 +62,26 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Check which Docker Compose version is available
-DOCKER_COMPOSE_CMD=""
-if docker compose version &> /dev/null; then
-  DOCKER_COMPOSE_CMD="docker compose"
-elif command -v docker-compose &> /dev/null; then
-  DOCKER_COMPOSE_CMD="docker-compose"
+# Select compose file
+COMPOSE_DIR="$(pwd)/deploy/compose"
+PROFILES=""
+
+if [ "$USE_VLLM" = true ]; then
+  COMPOSE_FILE="$COMPOSE_DIR/docker-compose.vllm.yml"
 else
-  echo "Error: Neither 'docker compose' nor 'docker-compose' is available"
-  echo "Please install Docker Compose: https://docs.docker.com/compose/install/"
-  exit 1
+  COMPOSE_FILE="$COMPOSE_DIR/docker-compose.yml"
 fi
 
-# Check Docker daemon permissions
-if ! docker info &> /dev/null; then
-  echo ""
-  echo "=========================================="
-  echo "ERROR: Docker Permission Denied"
-  echo "=========================================="
-  echo ""
-  echo "You don't have permission to connect to the Docker daemon."
-  echo ""
-  echo "To fix this, add your user to the docker group:"
-  echo "  sudo usermod -aG docker \$USER"
-  echo "  newgrp docker"
-  echo ""
-  exit 1
+CMD="$DOCKER_COMPOSE_CMD -f $COMPOSE_FILE"
+
+if [ "$USE_VECTOR_SEARCH" = true ]; then
+  PROFILES="--profile vector-search"
 fi
 
-# Build the docker-compose command
-if [ "$USE_COMPLETE" = true ]; then
-  CMD="$DOCKER_COMPOSE_CMD -f $(pwd)/deploy/compose/docker-compose.complete.yml"
-  echo "Stopping complete stack..."
-else
-  CMD="$DOCKER_COMPOSE_CMD -f $(pwd)/deploy/compose/docker-compose.yml"
-  echo "Stopping minimal configuration..."
-fi
-
-# Execute the command
-echo "Running: $CMD down"
+echo "Stopping txt2kg services..."
 cd $(dirname "$0")
-eval "$CMD down"
+eval "$CMD $PROFILES down"
 
 echo ""
-echo "=========================================="
-echo "txt2kg has been stopped"
-echo "=========================================="
-echo ""
+echo "All services stopped."
 echo "To start again, run: ./start.sh"
-echo ""

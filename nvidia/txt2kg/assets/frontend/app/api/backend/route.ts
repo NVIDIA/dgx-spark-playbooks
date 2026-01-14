@@ -21,7 +21,7 @@ import { getGraphDbType } from '../settings/route';
 
 /**
  * Remote backend API that provides endpoints for creating and querying a knowledge graph
- * using the selected graph database, Pinecone, and SentenceTransformer
+ * using the selected graph database, Qdrant, and SentenceTransformer
  */
 
 /**

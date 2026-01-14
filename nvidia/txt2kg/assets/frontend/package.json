@@ -3,13 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "predev": "npm run setup-pinecone",
     "dev": "next dev",
-    "prebuild": "npm run setup-pinecone",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "setup-pinecone": "node ../scripts/setup-pinecone.js"
+    "lint": "next lint"
   },
   "dependencies": {
     "3d-force-graph": "^1.77.0",

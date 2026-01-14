@@ -19,6 +19,7 @@
 import { Network, Zap } from "lucide-react"
 import { useDocuments } from "@/contexts/document-context"
 import { Loader2 } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 export function GraphActions() {
   const { documents, processDocuments, isProcessing, openGraphVisualization } = useDocuments()
@@ -50,34 +51,67 @@ export function GraphActions() {
     }
   }
 
+  // Helper to get tooltip content for disabled Process button
+  const getProcessTooltip = () => {
+    if (isProcessing) return "Processing in progress..."
+    if (!hasNewDocuments && documents.length === 0) return "Upload documents first to extract knowledge triples"
+    if (!hasNewDocuments) return "All documents have been processed"
+    return "Extract knowledge triples from uploaded documents"
+  }
+
+  // Helper to get tooltip content for disabled View Graph button
+  const getViewGraphTooltip = () => {
+    if (isProcessing) return "Wait for processing to complete"
+    if (!hasProcessedDocuments && documents.length === 0) return "Upload and process documents first"
+    if (!hasProcessedDocuments) return "Process documents first to generate knowledge triples"
+    return "Visualize the knowledge graph from extracted triples"
+  }
+
   return (
-    <div className="flex gap-3 items-center">
-      <button
-        className={`btn-primary ${!hasNewDocuments || isProcessing ? "opacity-60 cursor-not-allowed" : ""}`}
-        disabled={!hasNewDocuments || isProcessing}
-        onClick={handleProcessDocuments}
-      >
-        {isProcessing ? (
-          <>
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Processing...
-          </>
-        ) : (
-          <>
-            <Zap className="h-4 w-4" />
-            Process Documents
-          </>
-        )}
-      </button>
-      <button
-        className={`btn-primary ${!hasProcessedDocuments || isProcessing ? "opacity-60 cursor-not-allowed" : ""}`}
-        disabled={!hasProcessedDocuments || isProcessing}
-        onClick={() => openGraphVisualization()}
-      >
-        <Network className="h-4 w-4" />
-        View Knowledge Graph
-      </button>
-    </div>
+    <TooltipProvider>
+      <div className="flex gap-3 items-center">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              className={`btn-primary ${!hasNewDocuments || isProcessing ? "opacity-60 cursor-not-allowed" : ""}`}
+              disabled={!hasNewDocuments || isProcessing}
+              onClick={handleProcessDocuments}
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Zap className="h-4 w-4" />
+                  Process Documents
+                </>
+              )}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{getProcessTooltip()}</p>
+          </TooltipContent>
+        </Tooltip>
+        
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              className={`btn-primary ${!hasProcessedDocuments || isProcessing ? "opacity-60 cursor-not-allowed" : ""}`}
+              disabled={!hasProcessedDocuments || isProcessing}
+              onClick={() => openGraphVisualization()}
+            >
+              <Network className="h-4 w-4" />
+              View Knowledge Graph
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{getViewGraphTooltip()}</p>
+          </TooltipContent>
+        </Tooltip>
+      </div>
+    </TooltipProvider>
   )
 }
 

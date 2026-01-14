@@ -1,4 +1,4 @@
-# SGLang Inference Server
+# SGLang for Inference
 
 > Install and use SGLang on DGX Spark
 
@@ -67,6 +67,8 @@ The following models are supported with SGLang on Spark. All listed models are a
 | **Phi-4-multimodal-instruct** | NVFP4 | ✅ | `nvidia/Phi-4-multimodal-instruct-FP4` |
 | **Phi-4-reasoning-plus** | FP8 | ✅ | `nvidia/Phi-4-reasoning-plus-FP8` |
 | **Phi-4-reasoning-plus** | NVFP4 | ✅ | `nvidia/Phi-4-reasoning-plus-FP4` |
+
+Note: for NVFP4 models, add the `--quantization modelopt_fp4` flag.
 
 ### Time & risk
 

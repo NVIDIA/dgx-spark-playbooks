@@ -76,10 +76,8 @@ export function SettingsModal() {
   const [arangoUser, setArangoUser] = useState("")
   const [arangoPassword, setArangoPassword] = useState("")
   
-  // Vector DB settings - changed from Milvus to Pinecone
-  const [pineconeApiKey, setPineconeApiKey] = useState("")
-  const [pineconeEnvironment, setPineconeEnvironment] = useState("")
-  const [pineconeIndex, setPineconeIndex] = useState("")
+  // Vector DB settings - Qdrant
+  const [qdrantUrl, setQdrantUrl] = useState("")
   
   // S3 Storage settings
   const [s3Endpoint, setS3Endpoint] = useState("")
@@ -171,9 +169,20 @@ export function SettingsModal() {
       setIsS3Connected(s3Connected)
     }
     
-    // Load graph DB type
-    const storedGraphDbType = localStorage.getItem("graph_db_type") || "arangodb"
-    setGraphDbType(storedGraphDbType as GraphDBType)
+    // Load graph DB type - fetch from server if not in localStorage
+    const storedGraphDbType = localStorage.getItem("graph_db_type")
+    if (storedGraphDbType) {
+      setGraphDbType(storedGraphDbType as GraphDBType)
+    } else {
+      // Fetch server's default (from GRAPH_DB_TYPE env var)
+      fetch('/api/settings')
+        .then(res => res.json())
+        .then(data => {
+          const serverDefault = data.settings?.graph_db_type || 'neo4j'
+          setGraphDbType(serverDefault as GraphDBType)
+        })
+        .catch(() => setGraphDbType('neo4j'))
+    }
     
     // Load Neo4j settings
     setNeo4jUrl(localStorage.getItem("neo4j_url") || "")
@@ -186,9 +195,7 @@ export function SettingsModal() {
     setArangoUser(localStorage.getItem("arango_user") || "")
     setArangoPassword(localStorage.getItem("arango_password") || "")
     
-    setPineconeApiKey(localStorage.getItem("pinecone_api_key") || "")
-    setPineconeEnvironment(localStorage.getItem("pinecone_environment") || "")
-    setPineconeIndex(localStorage.getItem("pinecone_index") || "")
+    setQdrantUrl(localStorage.getItem("qdrant_url") || "http://localhost:6333")
   }, [isOpen])
   
   // Save database settings
@@ -249,9 +256,7 @@ export function SettingsModal() {
   const saveVectorDbSettings = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    localStorage.setItem("pinecone_api_key", pineconeApiKey)
-    localStorage.setItem("pinecone_environment", pineconeEnvironment)
-    localStorage.setItem("pinecone_index", pineconeIndex)
+    localStorage.setItem("qdrant_url", qdrantUrl)
     
     // Sync settings with server
     try {
@@ -262,9 +267,7 @@ export function SettingsModal() {
         },
         body: JSON.stringify({
           settings: {
-            pinecone_api_key: pineconeApiKey,
-            pinecone_environment: pineconeEnvironment,
-            pinecone_index: pineconeIndex,
+            qdrant_url: qdrantUrl,
           }
         }),
       });
@@ -452,7 +455,11 @@ export function SettingsModal() {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <button className="flex items-center justify-center gap-2 p-2 hover:bg-primary/10 rounded-full transition-colors" title="Settings">
+        <button 
+          className="flex items-center justify-center gap-2 p-2 hover:bg-primary/10 rounded-full transition-colors" 
+          aria-label="Open settings"
+          title="Settings"
+        >
           <Settings className="h-5 w-5 text-muted-foreground hover:text-primary transition-colors" />
         </button>
       </DialogTrigger>
@@ -668,43 +675,21 @@ export function SettingsModal() {
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-foreground flex items-center gap-2">
                     <SearchIcon className="h-4 w-4 text-nvidia-green" />
-                    Pinecone Configuration
+                    Qdrant Configuration
                   </label>
                 </div>
                 
                 <div className="bg-background/50 rounded-lg p-3 space-y-3">
                   <div className="grid grid-cols-1 gap-3">
                     <div>
-                      <label className="text-xs font-medium text-muted-foreground mb-1 block">API Key</label>
+                      <label className="text-xs font-medium text-muted-foreground mb-1 block">Qdrant URL</label>
                       <input
-                        type="password"
-                        value={pineconeApiKey}
-                        onChange={(e) => setPineconeApiKey(e.target.value)}
-                        placeholder="Enter your Pinecone API key"
+                        type="text"
+                        value={qdrantUrl}
+                        onChange={(e) => setQdrantUrl(e.target.value)}
+                        placeholder="http://localhost:6333"
                         className="w-full bg-background border border-border/60 rounded-md p-2 text-sm text-foreground focus:ring-1 focus:ring-primary/50 focus:border-primary transition-colors"
                       />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground mb-1 block">Environment</label>
-                        <input
-                          type="text"
-                          value={pineconeEnvironment}
-                          onChange={(e) => setPineconeEnvironment(e.target.value)}
-                          placeholder="us-west1-gcp"
-                          className="w-full bg-background border border-border/60 rounded-md p-2 text-sm text-foreground focus:ring-1 focus:ring-primary/50 focus:border-primary transition-colors"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground mb-1 block">Index Name</label>
-                        <input
-                          type="text"
-                          value={pineconeIndex}
-                          onChange={(e) => setPineconeIndex(e.target.value)}
-                          placeholder="knowledge-graph"
-                          className="w-full bg-background border border-border/60 rounded-md p-2 text-sm text-foreground focus:ring-1 focus:ring-primary/50 focus:border-primary transition-colors"
-                        />
-                      </div>
                     </div>
                   </div>
                 </div>

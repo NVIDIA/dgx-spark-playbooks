@@ -19,7 +19,7 @@ This playbook serves as a reference solution for knowledge graph extraction and 
 
 </details>
 
-By default, this playbook leverages **Ollama** for local LLM inference, providing a fully self-contained solution that runs entirely on your own hardware. You can optionally use NVIDIA-hosted models available in the [NVIDIA API Catalog](https://build.nvidia.com) for advanced capabilities.
+By default, this playbook leverages **Ollama** for local LLM inference, providing a fully self-contained solution that runs entirely on your own hardware. You can optionally use **vLLM** for GPU-accelerated inference on DGX Spark/GB300, or NVIDIA-hosted models available in the [NVIDIA API Catalog](https://build.nvidia.com) for advanced capabilities.
 
 ## Key Features
 
@@ -33,7 +33,7 @@ By default, this playbook leverages **Ollama** for local LLM inference, providin
 - GPU-accelerated LLM inference with Ollama
 - Fully containerized deployment with Docker Compose
 - Optional NVIDIA API integration for cloud-based models
-- Optional vector search and advanced inference capabilities
+- Optional vector search with Qdrant for semantic similarity
 - Optional graph-based RAG for contextual answers
 
 ## Software Components
@@ -55,9 +55,13 @@ By default, this playbook leverages **Ollama** for local LLM inference, providin
 
 ### Optional Components
 
-* **Vector Database & Embedding** (with `--complete` flag)
+* **vLLM Stack** (with `--vllm` flag)
+  * **vLLM**: GPU-accelerated LLM inference optimized for DGX Spark/GB300
+    * Default model: `nvidia/Llama-3_3-Nemotron-Super-49B-v1_5-FP8`
+  * **Neo4j**: Alternative graph database
+* **Vector Database & Embedding** (with `--vector-search` flag)
   * **SentenceTransformer**: Local embedding generation (model: `all-MiniLM-L6-v2`)
-  * **Pinecone**: Self-hosted vector storage and similarity search
+  * **Qdrant**: Self-hosted vector storage and similarity search
 * **Cloud Models** (configure separately)
   * **NVIDIA API**: Cloud-based models via NVIDIA API Catalog
 
@@ -76,7 +80,7 @@ The core workflow for knowledge graph building and visualization:
 ### Future Enhancements
 
 Additional capabilities can be added:
-- **Vector search**: Add semantic similarity search with local Pinecone and SentenceTransformer embeddings
+- **Vector search**: Add semantic similarity search with Qdrant and SentenceTransformer embeddings
 - **S3 storage**: MinIO for scalable document storage
 - **GNN-based GraphRAG**: Graph Neural Networks for enhanced retrieval
 
@@ -84,7 +88,7 @@ Additional capabilities can be added:
 
 This playbook includes **GPU-accelerated LLM inference** with Ollama:
 
-### Ollama Features
+### Ollama Features (Default)
 - **Fully local inference**: No cloud dependencies or API keys required
 - **GPU acceleration**: Automatic CUDA support with NVIDIA GPUs
 - **Multiple model support**: Use any Ollama-compatible model
@@ -92,7 +96,13 @@ This playbook includes **GPU-accelerated LLM inference** with Ollama:
 - **Easy model management**: Pull and switch models with simple commands
 - **Privacy-first**: All data processing happens on your hardware
 
-### Default Configuration
+### vLLM Alternative (via `--vllm` flag)
+- **High-performance inference**: Optimized for DGX Spark/GB300 unified memory
+- **FP8 quantization**: Efficient memory usage with minimal quality loss
+- **Large context support**: Up to 32K tokens context length
+- **Continuous batching**: High throughput for multiple requests
+
+### Default Ollama Configuration
 - Model: `llama3.1:8b`
 - GPU memory fraction: 0.9 (90% of available VRAM)
 - Flash attention enabled
@@ -152,8 +162,39 @@ docker exec ollama-compose ollama pull llama3.1:8b
 - **ArangoDB**: http://localhost:8529 (no authentication required)
 - **Ollama API**: http://localhost:11434
 
+### Alternative: Using vLLM (for DGX Spark/GB300)
+
+For GPU-accelerated inference with vLLM:
+
+```bash
+./start.sh --vllm
+```
+
+Then wait for vLLM to load the model:
+```bash
+docker logs vllm-service -f
+```
+
+Services:
+- **Web UI**: http://localhost:3001
+- **Neo4j Browser**: http://localhost:7474 (user: `neo4j`, password: `password123`)
+- **vLLM API**: http://localhost:8001
+
+### Adding Vector Search
+
+Enable semantic similarity search:
+```bash
+./start.sh --vector-search
+```
+
+This adds:
+- **Qdrant**: http://localhost:6333
+- **Sentence Transformers**: http://localhost:8000
+
 ## Available Customizations
 
+- **Switch LLM backend**: Use `--vllm` flag for vLLM or default for Ollama
+- **Add vector search**: Use `--vector-search` flag for Qdrant + embeddings
 - **Switch Ollama models**: Use any model from Ollama's library (Llama, Mistral, Qwen, etc.)
 - **Modify extraction prompts**: Customize how triples are extracted from text
 - **Add domain-specific knowledge sources**: Integrate external ontologies or taxonomies

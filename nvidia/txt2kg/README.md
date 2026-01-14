@@ -54,9 +54,13 @@ The setup includes:
   - Document processing time scales with document size and complexity
 
 - **Rollback**: Stop and remove Docker containers, delete downloaded models if needed
-- **Last Updated**: 12/02/2025
-  - Knowledge graph search with multi-hop graph traversal
-  - Improved UI/UX
+- **Last Updated**: 01/08/2025
+  - Migrated from Pinecone to Qdrant for ARM64 compatibility
+  - Added vLLM support with Neo4j
+  - Added Palette UI components with accessibility improvements
+  - Added CPU-only mode for development (`./start.sh --cpu`)
+  - Optimized ArangoDB with deterministic keys and BM25 search
+  - Added GNN preprocessing scripts for knowledge graph training
 
 ## Instructions
 

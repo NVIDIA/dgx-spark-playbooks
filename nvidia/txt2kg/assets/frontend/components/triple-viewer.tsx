@@ -19,8 +19,18 @@
 import { useState, useEffect, useRef } from "react"
 import { useDocuments } from "@/contexts/document-context"
 import type { Triple } from "@/utils/text-processing"
-import { Pencil, Trash2, Plus, Download, ChevronDown, FileJson, FileText, List, Network, Check, X, Database } from "lucide-react"
+import { Pencil, Trash2, Plus, Download, ChevronDown, FileJson, FileText, List, Network, Check, X, Database, AlertCircle } from "lucide-react"
 import { TripleEditor } from "./triple-editor"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 // Add this new EntityEditor component before the TripleViewer component
 interface EntityEditorProps {
@@ -59,11 +69,16 @@ function EntityEditor({ entity, onSave, onCancel }: EntityEditorProps) {
         <button
           type="button"
           onClick={onCancel}
+          aria-label="Cancel editing entity"
           className="p-2 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted/30"
         >
           <X className="h-4 w-4" />
         </button>
-        <button type="submit" className="p-2 text-primary hover:text-primary/80 rounded-full hover:bg-primary/10">
+        <button 
+          type="submit" 
+          aria-label="Save entity changes"
+          className="p-2 text-primary hover:text-primary/80 rounded-full hover:bg-primary/10"
+        >
           <Check className="h-4 w-4" />
         </button>
       </div>
@@ -87,6 +102,12 @@ export function TripleViewer() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const dropdownRef = useRef<HTMLDivElement>(null)
+  
+  // Delete confirmation dialog state
+  const [showDeleteTripleDialog, setShowDeleteTripleDialog] = useState(false)
+  const [tripleToDelete, setTripleToDelete] = useState<{ index: number, triple: Triple } | null>(null)
+  const [showDeleteEntityDialog, setShowDeleteEntityDialog] = useState(false)
+  const [entityToDelete, setEntityToDelete] = useState<string | null>(null)
 
   // Handle click outside to close dropdown
   useEffect(() => {
@@ -167,11 +188,18 @@ export function TripleViewer() {
   }
 
   const handleDeleteTriple = (index: number) => {
-    if (selectedDoc) {
-      if (confirm("Are you sure you want to delete this triple?")) {
-        deleteTriple(selectedDoc.id, index)
-      }
+    if (selectedDoc && selectedDoc.triples) {
+      setTripleToDelete({ index, triple: selectedDoc.triples[index] })
+      setShowDeleteTripleDialog(true)
     }
+  }
+  
+  const confirmDeleteTriple = () => {
+    if (selectedDoc && tripleToDelete !== null) {
+      deleteTriple(selectedDoc.id, tripleToDelete.index)
+    }
+    setShowDeleteTripleDialog(false)
+    setTripleToDelete(null)
   }
 
   const exportTriplesCSV = () => {
@@ -281,16 +309,22 @@ export function TripleViewer() {
 
   const handleDeleteEntity = (entity: string) => {
     if (!selectedDoc || !selectedDoc.triples) return;
-    
-    if (confirm(`Are you sure you want to delete the entity "${entity}"? This will remove all triples containing this entity.`)) {
+    setEntityToDelete(entity)
+    setShowDeleteEntityDialog(true)
+  };
+  
+  const confirmDeleteEntity = () => {
+    if (selectedDoc && selectedDoc.triples && entityToDelete) {
       // Filter out all triples that contain the entity
       const filteredTriples = selectedDoc.triples.filter(triple => 
-        triple.subject !== entity && triple.object !== entity
+        triple.subject !== entityToDelete && triple.object !== entityToDelete
       );
       
       // Update the document with the filtered triples
       updateTriples(selectedDoc.id, filteredTriples);
     }
+    setShowDeleteEntityDialog(false)
+    setEntityToDelete(null)
   };
 
   // Function to store triples in the Neo4j database
@@ -383,8 +417,11 @@ export function TripleViewer() {
           <label className="text-sm font-semibold text-foreground whitespace-nowrap">Select Document</label>
           <div className="relative w-64">
             <button
-              className="w-full flex items-center justify-between bg-card border border-border rounded-lg p-3 text-foreground text-sm hover:bg-muted/30 transition-colors"
+              className="w-full flex items-center justify-between bg-card border border-border rounded-lg p-3 text-foreground text-sm hover:bg-muted/30 transition-colors focus-visible:ring-2 focus-visible:ring-nvidia-green focus-visible:ring-offset-2"
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              aria-haspopup="listbox"
+              aria-expanded={isDropdownOpen}
+              aria-label={`Select document. Currently selected: ${selectedDoc?.name || 'None'}`}
             >
               <span className="truncate">
                 {selectedDoc?.name || "Select document"}
@@ -400,13 +437,18 @@ export function TripleViewer() {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 className={`transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`}
+                aria-hidden="true"
               >
                 <polyline points="6 9 12 15 18 9"></polyline>
               </svg>
             </button>
             
             {isDropdownOpen && (
-              <div className="absolute z-10 mt-1 w-full bg-card border border-border rounded-lg shadow-lg max-h-64 overflow-y-auto">
+              <div 
+                className="absolute z-10 mt-1 w-full bg-card border border-border rounded-lg shadow-lg max-h-64 overflow-y-auto"
+                role="listbox"
+                aria-label="Processed documents"
+              >
                 <div className="p-2 sticky top-0 bg-card border-b border-border">
                   <input
                     type="text"
@@ -425,6 +467,8 @@ export function TripleViewer() {
                   filteredDocs.map((doc) => (
                     <button
                       key={doc.id}
+                      role="option"
+                      aria-selected={doc.id === selectedDoc?.id}
                       className={`w-full text-left p-2 hover:bg-muted/30 text-sm ${
                         doc.id === selectedDoc?.id ? 'bg-primary/10 text-primary' : ''
                       }`}
@@ -657,6 +701,7 @@ export function TripleViewer() {
                               <button
                                 onClick={() => setEditingIndex(index)}
                                 className="p-1.5 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted/50 transition-colors"
+                                aria-label={`Edit triple: ${normalizeText(triple.subject)} ${normalizeText(triple.predicate)} ${normalizeText(triple.object)}`}
                                 title="Edit Triple"
                               >
                                 <Pencil className="h-3.5 w-3.5" />
@@ -664,6 +709,7 @@ export function TripleViewer() {
                               <button
                                 onClick={() => handleDeleteTriple(index)}
                                 className="p-1.5 text-muted-foreground hover:text-destructive rounded-full hover:bg-destructive/10 transition-colors"
+                                aria-label={`Delete triple: ${normalizeText(triple.subject)} ${normalizeText(triple.predicate)} ${normalizeText(triple.object)}`}
                                 title="Delete Triple"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -805,6 +851,7 @@ export function TripleViewer() {
                               <button
                                 onClick={() => setEditingEntityIndex(index)}
                                 className="p-1.5 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted/30"
+                                aria-label={`Edit entity: ${normalizeText(entity)}`}
                                 title="Edit Entity"
                               >
                                 <Pencil className="h-3.5 w-3.5" />
@@ -812,6 +859,7 @@ export function TripleViewer() {
                               <button
                                 onClick={() => handleDeleteEntity(entity)}
                                 className="p-1.5 text-muted-foreground hover:text-destructive rounded-full hover:bg-destructive/10"
+                                aria-label={`Delete entity: ${normalizeText(entity)}`}
                                 title="Delete Entity"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -837,6 +885,66 @@ export function TripleViewer() {
           )}
         </>
       )}
+      
+      {/* Delete Triple Confirmation Dialog */}
+      <AlertDialog open={showDeleteTripleDialog} onOpenChange={setShowDeleteTripleDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-destructive" />
+              Delete Triple
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this triple?
+              {tripleToDelete && (
+                <div className="mt-3 p-3 bg-muted/50 rounded-lg text-sm font-mono">
+                  <span className="text-foreground">{normalizeText(tripleToDelete.triple.subject)}</span>
+                  <span className="text-muted-foreground mx-2">→</span>
+                  <span className="text-primary">{normalizeText(tripleToDelete.triple.predicate)}</span>
+                  <span className="text-muted-foreground mx-2">→</span>
+                  <span className="text-foreground">{normalizeText(tripleToDelete.triple.object)}</span>
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setTripleToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDeleteTriple}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete Triple
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      {/* Delete Entity Confirmation Dialog */}
+      <AlertDialog open={showDeleteEntityDialog} onOpenChange={setShowDeleteEntityDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              Delete Entity
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the entity <strong>"{entityToDelete}"</strong>?
+              <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-lg text-amber-800 dark:text-amber-300 text-sm">
+                <strong>Warning:</strong> This will remove all triples containing this entity from the knowledge graph.
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setEntityToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDeleteEntity}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete Entity
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

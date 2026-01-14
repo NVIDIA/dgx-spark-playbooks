@@ -46,7 +46,6 @@ export default function Home() {
     { value: "edit", label: "Edit Knowledge Graph", Icon: Edit },
     { value: "visualize", label: "Visualize Graph", Icon: Network },
   ] as const;
-  const activeIndex = Math.max(0, steps.findIndex(s => s.value === activeTab));
   
   // Updated to use callback reference
   const handleTabChange = React.useCallback((tab: string) => {
@@ -84,8 +83,8 @@ export default function Home() {
       
       <main className="container mx-auto px-6 py-12 border-b border-border/10">
         
-        <Tabs defaultValue="upload" className="w-full mb-12" onValueChange={setActiveTab}>
-          <TabsList className="nvidia-build-tabs mb-12" aria-label="Workflow steps">
+        <Tabs defaultValue="upload" className="w-full" onValueChange={setActiveTab}>
+          <TabsList className="nvidia-build-tabs mb-10" aria-label="Workflow steps">
             {steps.map(({ value, label, Icon }) => (
               <TabsTrigger
                 key={value}
@@ -106,22 +105,22 @@ export default function Home() {
           </TabsList>
           
           {/* Step 1: Document Upload */}
-          <TabsContent value="upload" className="space-y-8">
+          <TabsContent value="upload" className="nvidia-build-tab-content">
             <UploadTab onTabChange={handleTabChange} />
           </TabsContent>
           
           {/* Step 2: Configure & Process */}
-          <TabsContent value="configure" className="space-y-8">
+          <TabsContent value="configure" className="nvidia-build-tab-content">
             <ConfigureTab />
           </TabsContent>
           
           {/* Step 3: Edit Knowledge */}
-          <TabsContent value="edit" className="space-y-8">
+          <TabsContent value="edit" className="nvidia-build-tab-content">
             <EditTab />
           </TabsContent>
           
           {/* Step 4: Visualize Knowledge Graph */}
-          <TabsContent value="visualize" className="space-y-8">
+          <TabsContent value="visualize" className="nvidia-build-tab-content">
             <VisualizeTab />
           </TabsContent>
         </Tabs>

@@ -16,7 +16,6 @@
 //
 /**
  * Qdrant service for vector embeddings
- * Drop-in replacement for PineconeService
  */
 import { Document } from "@langchain/core/documents";
 import { randomUUID } from "crypto";
@@ -477,7 +476,7 @@ export class QdrantService {
     }
 
     try {
-      // Qdrant doesn't have a direct "get all" like Pinecone
+      // Use scroll API to get points
       // We'll use scroll API to get points
       const response = await this.makeRequest(`/collections/${this.collectionName}/points/scroll`, 'POST', {
         limit: limit,

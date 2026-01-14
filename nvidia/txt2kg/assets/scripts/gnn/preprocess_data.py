@@ -90,92 +90,57 @@ def parse_args():
     
     return parser.parse_args()
 
-def load_triples_from_arangodb(arango_url, arango_db, arango_user, arango_password):
+def load_triples_from_arangodb(arango_url: str, arango_db: str, arango_user: str, arango_password: str) -> list[str]:
     """
-    Load triples from ArangoDB for use with the TXT2KG dataset
-    
-    Args:
-        arango_url: ArangoDB connection URL
-        arango_db: ArangoDB database name
-        arango_user: ArangoDB username
-        arango_password: ArangoDB password
-        
-    Returns:
-        Array of triples in the format expected by create_remote_backend_from_triplets
-    """
+     Load triples from ArangoDB for use with the TXT2KG dataset
+
+     Args:
+         arango_url: ArangoDB connection URL
+         arango_db: ArangoDB database name
+         arango_user: ArangoDB username
+         arango_password: ArangoDB password
+
+     Returns:
+         List of triples in the format "subject predicate object"
+     """
     try:
         # Connect to ArangoDB
         client = ArangoClient(hosts=arango_url)
-        
+
         # Get database (no auth in our docker setup)
         if arango_user and arango_password:
             db = client.db(arango_db, username=arango_user, password=arango_password)
         else:
             db = client.db(arango_db)
-        
-        # Query to get all triples from ArangoDB as structured objects
-        # Handle case sensitivity and trim whitespace
+
+        # Query to get all triples from ArangoDB
+        # Handle case sensitivity, trim whitespace, and deduplication
         aql_query = """
         FOR e IN relationships
-        LET subject = TRIM(DOCUMENT(e._from).name)
-        LET object = TRIM(DOCUMENT(e._to).name)
-        LET predicate = TRIM(e.type)
-        FILTER subject != "" AND predicate != "" AND object != ""
-        RETURN {
-            subject: subject,
-            predicate: predicate,
-            object: object
-        }
+            LET subject = TRIM(DOCUMENT(e._from).name)
+            LET object = TRIM(DOCUMENT(e._to).name)
+            LET predicate = TRIM(e.type)
+            FILTER subject != "" AND predicate != "" AND object != ""
+            COLLECT s = subject, p = predicate, o = object
+            RETURN CONCAT_SEPARATOR(" ", s, p, o)
         """
-        
-        # Execute the query
-        cursor = db.aql.execute(aql_query)
-        triple_dicts = list(cursor)
-        
-        # Format triples as strings in the format expected by PyTorch Geometric
-        # The expected format is a list of strings in the form "subject predicate object"
-        triples = format_triples_for_pytorch_geometric(triple_dicts)
-        
+
+        # Execute the query with streaming for large datasets
+        cursor = db.aql.execute(aql_query, stream=True, batch_size=1000)
+        triples = list(cursor)
+
         print(f"Loaded {len(triples)} triples from ArangoDB")
         # Print sample triples for debugging
         if len(triples) > 0:
             print("Sample triples:")
             for i in range(min(3, len(triples))):
                 print(f"  {triples[i]}")
-        
+
         return triples
     except Exception as error:
         print(f"Error loading triples from ArangoDB: {error}")
         raise error
 
-def format_triples_for_pytorch_geometric(triple_dicts):
-    """
-    Format triples from ArangoDB into the format expected by PyTorch Geometric
-    
-    Args:
-        triple_dicts: List of dictionaries with subject, predicate, object keys
-        
-    Returns:
-        List of strings in the format "subject predicate object"
-    """
-    triples = []
-    # Create a set to avoid duplicates
-    unique_triples = set()
-    
-    for triple_dict in triple_dicts:
-        # Skip any triple with empty values
-        if not triple_dict['subject'] or not triple_dict['predicate'] or not triple_dict['object']:
-            continue
-            
-        # Create a space-separated string in the format that preprocess_triplet expects
-        triple_str = f"{triple_dict['subject']} {triple_dict['predicate']} {triple_dict['object']}"
-        
-        # Only add if not already in the set
-        if triple_str not in unique_triples:
-            unique_triples.add(triple_str)
-            triples.append(triple_str)
-    
-    return triples
 
 def get_data(args):
     # need a JSON dict of Questions and answers, see below for how its used
@@ -189,48 +154,6 @@ def get_data(args):
             text_contexts.append(f.read())
     
     return json_obj, text_contexts
-
-def validate_triple_format(triples):
-    """
-    Validate and fix triple format if needed to ensure compatibility with preprocess_triplet
-    
-    Args:
-        triples: List of triples to validate
-        
-    Returns:
-        Fixed list of triples in the format expected by preprocess_triplet
-    """
-    validated_triples = []
-    
-    print(f"Validating {len(triples)} triples...")
-    for i, triple in enumerate(triples):
-        # If triple is already a proper string with subject, predicate, object
-        if isinstance(triple, str):
-            parts = triple.split()
-            # Ensure there are at least 3 parts (subject, predicate, object)
-            if len(parts) >= 3:
-                # For strings with more than 3 parts, use first as subject, second as predicate, 
-                # and join the rest as object
-                subject = parts[0]
-                predicate = parts[1]
-                obj = ' '.join(parts[2:])
-                validated_triple = f"{subject} {predicate} {obj}"
-                validated_triples.append(validated_triple)
-            else:
-                print(f"Warning: Triple at index {i} has fewer than 3 parts: {triple}")
-        # If triple is a dictionary with subject, predicate, object keys
-        elif isinstance(triple, dict) and 'subject' in triple and 'predicate' in triple and 'object' in triple:
-            validated_triple = f"{triple['subject']} {triple['predicate']} {triple['object']}"
-            validated_triples.append(validated_triple)
-        # If triple is a tuple or list of length 3
-        elif (isinstance(triple, tuple) or isinstance(triple, list)) and len(triple) == 3:
-            validated_triple = f"{triple[0]} {triple[1]} {triple[2]}"
-            validated_triples.append(validated_triple)
-        else:
-            print(f"Warning: Skipping triple at index {i} with invalid format: {triple}")
-    
-    print(f"Validation complete. {len(validated_triples)} valid triples out of {len(triples)}")
-    return validated_triples
 
 def make_dataset(args):
     """Modified make_dataset function that can use ArangoDB as a data source"""
@@ -257,13 +180,11 @@ def make_dataset(args):
                 # Load triples from ArangoDB instead of generating with TXT2KG
                 print("Loading triples from ArangoDB...")
                 triples = load_triples_from_arangodb(
-                    args.arango_url, 
-                    args.arango_db, 
-                    args.arango_user, 
+                    args.arango_url,
+                    args.arango_db,
+                    args.arango_user,
                     args.arango_password
                 )
-                # Validate and fix triples format if needed
-                triples = validate_triple_format(triples)
                 # Save triples for future use
                 torch.save(triples, triples_path)
             else:

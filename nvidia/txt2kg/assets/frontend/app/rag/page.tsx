@@ -68,7 +68,7 @@ export default function RagPage() {
         }
         
         // Check if vector search is available
-        const vectorResponse = await fetch('/api/pinecone-diag/stats');
+        const vectorResponse = await fetch('/api/vector-db/stats');
         if (vectorResponse.ok) {
           const data = await vectorResponse.json();
           setVectorEnabled(data.totalVectorCount > 0);
@@ -112,7 +112,7 @@ export default function RagPage() {
     });
     
     try {
-      // If using pure RAG (Pinecone + LangChain) without graph search
+      // If using pure RAG (Qdrant + LangChain) without graph search
       if (params.usePureRag) {
         queryMode = 'pure-rag';
         try {

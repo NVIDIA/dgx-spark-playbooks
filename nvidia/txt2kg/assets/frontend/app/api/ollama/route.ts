@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
   console.log(`[${new Date().toISOString()}] /api/ollama: POST request received`);
   
   try {
-    const { text, model = 'qwen3:1.7b', temperature = 0.1, maxTokens = 8192 } = await req.json();
+    const { text, model = 'qwen3:1.7b', temperature = 0.1, maxTokens = 4096 } = await req.json();
     console.log(`[${new Date().toISOString()}] /api/ollama: Parsed body - model: ${model}, text length: ${text?.length || 0}, maxTokens: ${maxTokens}`);
 
     if (!text || typeof text !== 'string') {

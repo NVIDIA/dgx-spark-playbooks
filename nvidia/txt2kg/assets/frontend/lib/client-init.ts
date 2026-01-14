@@ -22,24 +22,28 @@
 /**
  * Initialize default database settings if not already set
  * Called before syncing with server to ensure defaults are available
+ * NOTE: Don't set graph_db_type here - let server's GRAPH_DB_TYPE env var control it
  */
 export function initializeDefaultSettings() {
   if (typeof window === 'undefined') {
     return; // Only run on client side
   }
 
-  // Set default graph DB type to ArangoDB if not set
-  if (!localStorage.getItem('graph_db_type')) {
-    localStorage.setItem('graph_db_type', 'arangodb');
-  }
-
-  // Set default ArangoDB settings if not set
+  // Don't set graph_db_type default - let it be controlled by server's GRAPH_DB_TYPE env var
+  // The server will use its environment variable if no client setting is provided
+  
+  // Set default connection settings only (not the database type selection)
   if (!localStorage.getItem('arango_url')) {
     localStorage.setItem('arango_url', 'http://localhost:8529');
   }
 
   if (!localStorage.getItem('arango_db')) {
     localStorage.setItem('arango_db', 'txt2kg');
+  }
+  
+  // Set default Neo4j settings
+  if (!localStorage.getItem('neo4j_url')) {
+    localStorage.setItem('neo4j_url', 'bolt://localhost:7687');
   }
 }
 
@@ -124,21 +128,6 @@ export async function syncSettingsWithServer() {
     settings.NVIDIA_API_KEY = nvidiaApiKey;
   }
   
-  // Pinecone settings
-  const pineconeApiKey = localStorage.getItem('pinecone_api_key');
-  if (pineconeApiKey) {
-    settings.pinecone_api_key = pineconeApiKey;
-  }
-  
-  const pineconeEnvironment = localStorage.getItem('pinecone_environment');
-  if (pineconeEnvironment) {
-    settings.pinecone_environment = pineconeEnvironment;
-  }
-  
-  const pineconeIndex = localStorage.getItem('pinecone_index');
-  if (pineconeIndex) {
-    settings.pinecone_index = pineconeIndex;
-  }
   
   // Skip the API call if there are no settings to sync
   if (Object.keys(settings).length === 0) {

@@ -132,9 +132,9 @@ export async function POST(req: NextRequest) {
         },
         body: JSON.stringify({
           text,
-          model: vllmModel || 'meta-llama/Llama-3.2-3B-Instruct',
+          model: vllmModel || process.env.VLLM_MODEL || 'nvidia/Llama-3_3-Nemotron-Super-49B-v1_5-FP8',
           temperature: 0.1,
-          maxTokens: 8192
+          maxTokens: 4096  // Reduced to leave room for input tokens in context
         })
       });
 

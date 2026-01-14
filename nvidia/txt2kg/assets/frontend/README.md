@@ -18,7 +18,7 @@ This directory contains the Next.js frontend application for the txt2kg project.
 - **lib/**: Utility functions and shared logic
   - LLM service (Ollama, vLLM, NVIDIA API integration)
   - Graph database services (ArangoDB, Neo4j)
-  - Pinecone vector database integration
+  - Qdrant vector database integration
   - RAG service for knowledge graph querying
 - **public/**: Static assets
 - **types/**: TypeScript type definitions for graph data structures
@@ -76,7 +76,7 @@ Required environment variables are configured in docker-compose files:
 - `OLLAMA_BASE_URL`: Ollama API endpoint
 - `VLLM_BASE_URL`: vLLM API endpoint (optional)
 - `NVIDIA_API_KEY`: NVIDIA API key (optional)
-- `PINECONE_HOST`: Local Pinecone host (optional)
+- `QDRANT_URL`: Qdrant vector database URL (optional)
 - `SENTENCE_TRANSFORMER_URL`: Embeddings service URL (optional)
 
 ## Features
@@ -86,4 +86,4 @@ Required environment variables are configured in docker-compose files:
 - **RAG Queries**: Query knowledge graphs with retrieval-augmented generation
 - **Multiple LLM Providers**: Support for Ollama, vLLM, and NVIDIA API
 - **GPU-Accelerated Rendering**: Optional PyGraphistry integration for large graphs
-- **Vector Search**: Pinecone integration for semantic search 
+- **Vector Search**: Qdrant integration for semantic search 

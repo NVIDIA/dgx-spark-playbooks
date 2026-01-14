@@ -8,10 +8,6 @@ RUN npm install -g pnpm --force --yes
 
 # Copy dependency files
 COPY ./frontend/package.json ./frontend/pnpm-lock.yaml* ./
-COPY ./scripts/ /scripts/
-
-# Update the setup-pinecone.js path
-RUN sed -i 's|"setup-pinecone": "node ../scripts/setup-pinecone.js"|"setup-pinecone": "node /scripts/setup-pinecone.js"|g' package.json
 
 # Install dependencies with cache mount for faster rebuilds
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
@@ -32,7 +28,6 @@ RUN npm install -g pnpm --force --yes
 # Copy node_modules from deps stage
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/package.json ./package.json
-COPY --from=deps /scripts /scripts
 
 # Copy source code
 COPY ./frontend/ ./

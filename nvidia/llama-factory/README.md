@@ -67,8 +67,8 @@ model adaptation for specialized domains while leveraging hardware-specific opti
 * **Duration:** 30-60 minutes for initial setup, 1-7 hours for training depending on model size and dataset.
 * **Risks:** Model downloads require significant bandwidth and storage. Training may consume substantial GPU memory and require parameter tuning for hardware constraints.
 * **Rollback:** Remove Docker containers and cloned repositories. Training checkpoints are saved locally and can be deleted to reclaim storage space.
-* **Last Updated:** 12/15/2025
-  * Upgrade to latest pytorch container version nvcr.io/nvidia/pytorch:25.11-py3
+* **Last Updated:** 01/08/2025
+  * Update  to Qwen3 LoRA fine-tuning workflow based on LLaMA Factory updates
 
 ## Instructions
 
@@ -105,10 +105,15 @@ cd LLaMA-Factory
 
 ### Step 4. Install LLaMA Factory with dependencies
 
-Install the package in editable mode with metrics support for training evaluation.
+Remove the torchaudio dependency (not needed for LLM fine-tuning) to avoid conflicts with the container's optimized PyTorch, then install.
 
 ```bash
+## Remove torchaudio dependency that conflicts with NVIDIA's PyTorch build
+sed -i 's/"torchaudio[^"]*",\?//' pyproject.toml
+
+## Install LLaMA Factory with metrics support
 pip install -e ".[metrics]"
+pip install --no-deps torchaudio
 ```
 
 ## Step 5. Verify Pytorch CUDA support. 
@@ -126,7 +131,7 @@ python -c "import torch; print(f'PyTorch: {torch.__version__}, CUDA: {torch.cuda
 Examine the provided LoRA fine-tuning configuration for Llama-3.
 
 ```bash
-cat examples/train_lora/llama3_lora_sft.yaml
+cat examples/train_lora/qwen3_lora_sft.yaml
 ```
 
 ## Step 7. Launch fine-tuning training
@@ -137,20 +142,20 @@ cat examples/train_lora/llama3_lora_sft.yaml
 Execute the training process using the pre-configured LoRA setup.
 
 ```bash
-huggingface-cli login # if the model is gated
-llamafactory-cli train examples/train_lora/llama3_lora_sft.yaml
+hf auth login # if the model is gated
+llamafactory-cli train examples/train_lora/qwen3_lora_sft.yaml
 ```
 
 Example output:
-```bash
+```
 ***** train metrics *****
   epoch                    =        3.0
-  total_flos               = 22851591GF
-  train_loss               =     0.9113
-  train_runtime            = 0:22:21.99
-  train_samples_per_second =      2.437
-  train_steps_per_second   =      0.306
-Figure saved at: saves/llama3-8b/lora/sft/training_loss.png
+  total_flos               = 11076559GF
+  train_loss               =     0.9993
+  train_runtime            = 0:14:32.12
+  train_samples_per_second =      3.749
+  train_steps_per_second   =      0.471
+Figure saved at: saves/qwen3-4b/lora/sft/training_loss.png
 ```
 
 ## Step 8. Validate training completion
@@ -158,13 +163,12 @@ Figure saved at: saves/llama3-8b/lora/sft/training_loss.png
 Verify that training completed successfully and checkpoints were saved.
 
 ```bash
-ls -la saves/llama3-8b/lora/sft/
+ls -la saves/qwen3-4b/lora/sft/
 ```
 
-
 Expected output should show:
-- Final checkpoint directory (`checkpoint-21` or similar)
-- Model configuration files (`config.json`, `adapter_config.json`) 
+- Final checkpoint directory (`checkpoint-411` or similar)
+- Model configuration files (`adapter_config.json`) 
 - Training metrics showing decreasing loss values
 - Training loss plot saved as PNG file
 
@@ -173,14 +177,14 @@ Expected output should show:
 Test your fine-tuned model with custom prompts:
 
 ```bash
-llamafactory-cli chat examples/inference/llama3_lora_sft.yaml
+llamafactory-cli chat examples/inference/qwen3_lora_sft.yaml
 ## Type: "Hello, how can you help me today?"
 ## Expect: Response showing fine-tuned behavior
 ```
 
 ## Step 10. For production deployment, export your model
 ```bash
-llamafactory-cli export examples/merge_lora/llama3_lora_sft.yaml
+llamafactory-cli export examples/merge_lora/qwen3_lora_sft.yaml
 ```
 
 ## Step 11. Cleanup and rollback

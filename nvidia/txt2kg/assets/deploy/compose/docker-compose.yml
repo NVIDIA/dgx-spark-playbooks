@@ -1,3 +1,12 @@
+# txt2kg Docker Compose - ArangoDB + Ollama (Default)
+#
+# Default stack tested and working on DGX Spark
+#
+# Usage:
+#   ./start.sh                    # Default: ArangoDB + Ollama
+#   ./start.sh --vector-search    # Add Qdrant + Sentence Transformers
+#
+# For Neo4j + vLLM, use: ./start.sh --vllm
 
 services:
   app:
@@ -7,21 +16,32 @@ services:
     ports:
       - '3001:3000'
     environment:
+      # ArangoDB configuration
       - ARANGODB_URL=http://arangodb:8529
       - ARANGODB_DB=txt2kg
+      - GRAPH_DB_TYPE=arangodb
+      # Disable Neo4j
+      - NEO4J_URI=bolt://localhost:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=password123
+      # Ollama configuration
+      - OLLAMA_BASE_URL=http://ollama:11434/v1
+      - OLLAMA_MODEL=llama3.1:8b
+      # Disable vLLM
+      - VLLM_BASE_URL=http://localhost:8001/v1
+      - VLLM_MODEL=disabled
+      # Vector DB configuration
       - QDRANT_URL=http://qdrant:6333
       - VECTOR_DB_TYPE=qdrant
+      # Embeddings configuration
       - LANGCHAIN_TRACING_V2=true
       - SENTENCE_TRANSFORMER_URL=http://sentence-transformers:80
       - MODEL_NAME=all-MiniLM-L6-v2
       - EMBEDDINGS_API_URL=http://sentence-transformers:80
+      # Other settings
       - GRPC_SSL_CIPHER_SUITES=HIGH+ECDSA:HIGH+aRSA
       - NODE_TLS_REJECT_UNAUTHORIZED=0
-      - OLLAMA_BASE_URL=http://ollama:11434/v1
-      - OLLAMA_MODEL=llama3.1:8b
-      - REMOTE_WEBGPU_SERVICE_URL=http://txt2kg-remote-webgpu:8083
       - NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
-      # Node.js timeout configurations for large model processing
       - NODE_OPTIONS=--max-http-header-size=80000
       - UV_THREADPOOL_SIZE=128
       - HTTP_TIMEOUT=1800000
@@ -29,12 +49,14 @@ services:
     networks:
       - default
       - txt2kg-network
-      - pinecone-net
+      - qdrant-net
     depends_on:
-      - arangodb
-      - ollama
-      # Optional: sentence-transformers and entity-embeddings are only needed for vector search
-      # Traditional graph search works without these services
+      arangodb:
+        condition: service_started
+      ollama:
+        condition: service_started
+
+  # ArangoDB - Graph database
   arangodb:
     image: arangodb:latest
     ports:
@@ -44,6 +66,11 @@ services:
     volumes:
       - arangodb_data:/var/lib/arangodb3
       - arangodb_apps_data:/var/lib/arangodb3-apps
+    networks:
+      - default
+    restart: unless-stopped
+
+  # ArangoDB initialization - create database
   arangodb-init:
     image: arangodb:latest
     depends_on:
@@ -57,6 +84,10 @@ services:
         echo 'Creating txt2kg database...' &&
         arangosh --server.endpoint tcp://arangodb:8529 --server.authentication false --javascript.execute-string 'try { db._createDatabase(\"txt2kg\"); console.log(\"Database txt2kg created successfully!\"); } catch(e) { if(e.message.includes(\"duplicate\")) { console.log(\"Database txt2kg already exists\"); } else { throw e; } }'
       "
+    networks:
+      - default
+
+  # Ollama - Local LLM inference
   ollama:
     build:
       context: ../services/ollama
@@ -68,13 +99,16 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     environment:
-      - NVIDIA_VISIBLE_DEVICES=all        # Make all GPUs visible to the container
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility  # Required capabilities for CUDA
-      - OLLAMA_FLASH_ATTENTION=1          # Enable flash attention for better performance
-      - OLLAMA_KEEP_ALIVE=30m             # Keep models loaded for 30 minutes
-      - OLLAMA_NUM_PARALLEL=4             # Process 4 requests in parallel - DGX Spark has unified memory
-      - OLLAMA_MAX_LOADED_MODELS=1        # Load only one model at a time to avoid VRAM contention
-      - OLLAMA_KV_CACHE_TYPE=q8_0         # Reduce KV cache VRAM usage with minimal performance impact
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - CUDA_VISIBLE_DEVICES=0
+      - OLLAMA_FLASH_ATTENTION=1
+      - OLLAMA_KEEP_ALIVE=30m
+      - OLLAMA_NUM_PARALLEL=4
+      - OLLAMA_MAX_LOADED_MODELS=1
+      - OLLAMA_KV_CACHE_TYPE=q8_0
+      - OLLAMA_GPU_LAYERS=-1
+      - OLLAMA_LLM_LIBRARY=cuda_v13
     networks:
       - default
     restart: unless-stopped
@@ -91,9 +125,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
-  
-  # Optional services for vector search (NOT required for traditional graph search)
-  # Traditional graph search works with just: app, arangodb, and ollama
+
+  # Optional: Vector search services
   sentence-transformers:
     build:
       context: ../services/sentence-transformers
@@ -106,7 +139,8 @@ services:
       - default
     restart: unless-stopped
     profiles:
-      - vector-search  # Only start with: docker compose --profile vector-search up
+      - vector-search
+
   qdrant:
     image: qdrant/qdrant:latest
     container_name: qdrant
@@ -116,10 +150,11 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
     networks:
-      - pinecone-net
+      - qdrant-net
     restart: unless-stopped
     profiles:
-      - vector-search  # Only start with: docker compose --profile vector-search up
+      - vector-search
+
   qdrant-init:
     image: curlimages/curl:latest
     depends_on:
@@ -131,32 +166,15 @@ services:
       - |
         echo 'Waiting for Qdrant to start...'
         sleep 5
-        echo 'Checking if entity-embeddings collection exists...'
-        RESPONSE=$(curl -s http://qdrant:6333/collections/entity-embeddings)
-        if echo "$RESPONSE" | grep -q '"status":"ok"'; then
-          echo 'entity-embeddings collection already exists'
-        else
-          echo 'Creating collection entity-embeddings...'
-          curl -X PUT http://qdrant:6333/collections/entity-embeddings \
-            -H 'Content-Type: application/json' \
-            -d '{"vectors":{"size":384,"distance":"Cosine"}}'
-          echo ''
-          echo 'entity-embeddings collection created successfully'
-        fi
-        echo 'Checking if document-embeddings collection exists...'
-        RESPONSE=$(curl -s http://qdrant:6333/collections/document-embeddings)
-        if echo "$RESPONSE" | grep -q '"status":"ok"'; then
-          echo 'document-embeddings collection already exists'
-        else
-          echo 'Creating collection document-embeddings...'
-          curl -X PUT http://qdrant:6333/collections/document-embeddings \
-            -H 'Content-Type: application/json' \
-            -d '{"vectors":{"size":384,"distance":"Cosine"}}'
-          echo ''
-          echo 'document-embeddings collection created successfully'
-        fi
+        curl -X PUT http://qdrant:6333/collections/entity-embeddings \
+          -H 'Content-Type: application/json' \
+          -d '{"vectors":{"size":384,"distance":"Cosine"}}' || true
+        curl -X PUT http://qdrant:6333/collections/document-embeddings \
+          -H 'Content-Type: application/json' \
+          -d '{"vectors":{"size":384,"distance":"Cosine"}}' || true
+        echo 'Collections created'
     networks:
-      - pinecone-net
+      - qdrant-net
     profiles:
       - vector-search
 
@@ -171,5 +189,5 @@ networks:
     driver: bridge
   txt2kg-network:
     driver: bridge
-  pinecone-net:
-    name: pinecone
+  qdrant-net:
+    name: qdrant-network

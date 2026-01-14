@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const { text, model = 'meta-llama/Llama-3.2-3B-Instruct', temperature = 0.1, maxTokens = 1024 } = await req.json();
+    const { text, model = process.env.VLLM_MODEL || 'nvidia/Llama-3_3-Nemotron-Super-49B-v1_5-FP8', temperature = 0.1, maxTokens = 1024 } = await req.json();
 
     if (!text || typeof text !== 'string') {
       return NextResponse.json({ error: 'Text is required' }, { status: 400 });
