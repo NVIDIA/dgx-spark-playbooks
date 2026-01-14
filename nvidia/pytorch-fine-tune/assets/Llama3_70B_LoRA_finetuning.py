@@ -77,6 +77,7 @@ def main(args):
         lora_dropout=0,
         task_type=TaskType.CAUSAL_LM
     )
+    model = get_peft_model(model, peft_config)
     
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     total_params = sum(p.numel() for p in model.parameters())
@@ -130,7 +131,6 @@ def main(args):
         processing_class=tokenizer,
         train_dataset=dataset,
         args=SFTConfig(**config),
-        peft_config=peft_config,
     )
     
     trainer_stats = trainer.train()
