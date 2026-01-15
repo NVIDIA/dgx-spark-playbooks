@@ -47,9 +47,8 @@ All necessary files for the playbook can be found [here on GitHub](https://githu
 * **Duration:** 45-90 minutes for complete setup and initial model fine-tuning
 * **Risks:** Model downloads can be large (several GB), ARM64 package compatibility issues may require troubleshooting, distributed training setup complexity increases with multi-node configurations
 * **Rollback:** Virtual environments can be completely removed; no system-level changes are made to the host system beyond package installations.
-* **Last Updated:** 12/22/2025
-  * Upgrade to latest pytorch container version nvcr.io/nvidia/pytorch:25.11-py3
-  * Add docker container permission setup instructioins
+* **Last Updated:** 01/15/2026
+  * Fix qLoRA fine-tuning workflow
 
 ## Instructions
 
@@ -69,6 +68,13 @@ nvidia-smi
 
 ## Check available system memory
 free -h
+
+## Docker permission:
+docker ps
+
+## if there is permission issue, (e.g., permission denied while trying to connect to the Docker daemon socket), then do:
+sudo usermod -aG docker $USER
+newgrp docker
 ```
 
 ## Step 2. Configure Docker permissions
@@ -92,13 +98,6 @@ newgrp docker
 
 ```bash
 docker pull nvcr.io/nvidia/pytorch:25.11-py3
-```
-
-If you see a permission denied error (something like permission denied while trying to connect to the Docker daemon socket), add your user to the docker group so that you don't need to run the command with sudo .
-
-```bash
-sudo usermod -aG docker $USER
-newgrp docker
 ```
 
 ## Step 4. Launch Docker
@@ -239,7 +238,7 @@ export HF_TOKEN=<your_huggingface_token>
 > - Request and receive access on each model's page (and accept license/terms) before attempting downloads.
 >   - Llama-3.1-8B: [meta-llama/Llama-3.1-8B](https://huggingface.co/meta-llama/Llama-3.1-8B)
 >   - Qwen3-8B: [Qwen/Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B)
->   - Mixtral-8x7B: [mistralai/Mixtral-8x7B](https://huggingface.co/mistralai/Mixtral-8x7B)
+>   - Meta-Llama-3-70B: [meta-llama/Meta-Llama-3-70B](https://huggingface.co/meta-llama/Meta-Llama-3-70B)
 >
 > The same steps apply for any other gated model you use: visit its model card on Hugging Face, request access, accept the license, and wait for approval.
 
@@ -255,13 +254,13 @@ examples/llm_finetune/finetune.py \
 -c examples/llm_finetune/llama3_2/llama3_2_1b_squad_peft.yaml \
 --model.pretrained_model_name_or_path meta-llama/Llama-3.1-8B \
 --packed_sequence.packed_sequence_size 1024 \
---step_scheduler.max_steps 100
+--step_scheduler.max_steps 20
 ```
 
 These overrides ensure the Llama-3.1-8B LoRA run behaves as expected:
 - `--model.pretrained_model_name_or_path`: selects the Llama-3.1-8B model to fine-tune from the Hugging Face model hub (weights fetched via your Hugging Face token).
 - `--packed_sequence.packed_sequence_size`: sets the packed sequence size to 1024 to enable packed sequence training.
-- `--step_scheduler.max_steps`: sets the maximum number of training steps. We set it to 100 for demonstation purposes, please adjust this based on your needs.
+- `--step_scheduler.max_steps`: sets the maximum number of training steps. We set it to 20 for demonstation purposes, please adjust this based on your needs.
 
 
 **QLoRA fine-tuning example:**
@@ -276,14 +275,14 @@ examples/llm_finetune/finetune.py \
 --loss_fn._target_ nemo_automodel.components.loss.te_parallel_ce.TEParallelCrossEntropy \
 --step_scheduler.local_batch_size 1 \
 --packed_sequence.packed_sequence_size 1024 \
---step_scheduler.max_steps 100
+--step_scheduler.max_steps 20
 ```
 
 These overrides ensure the 70B QLoRA run behaves as expected:
 - `--model.pretrained_model_name_or_path`: selects the 70B base model to fine-tune (weights fetched via your Hugging Face token).
 - `--loss_fn._target_`: uses the TransformerEngine-parallel cross-entropy loss variant compatible with tensor-parallel training for large LLMs.
 - `--step_scheduler.local_batch_size`: sets the per-GPU micro-batch size to 1 to fit 70B in memory; overall effective batch size is still driven by gradient accumulation and data/tensor parallel settings from the recipe. 
-- `--step_scheduler.max_steps`: sets the maximum number of training steps. We set it to 100 for demonstation purposes, please adjust this based on your needs.
+- `--step_scheduler.max_steps`: sets the maximum number of training steps. We set it to 20 for demonstation purposes, please adjust this based on your needs.
 - `--packed_sequence.packed_sequence_size`: sets the packed sequence size to 1024 to enable packed sequence training.
 
 **Full Fine-tuning example:**
@@ -296,12 +295,12 @@ examples/llm_finetune/finetune.py \
 -c examples/llm_finetune/qwen/qwen3_8b_squad_spark.yaml \
 --model.pretrained_model_name_or_path Qwen/Qwen3-8B \
 --step_scheduler.local_batch_size 1 \
---step_scheduler.max_steps 100 \
+--step_scheduler.max_steps 20 \
 --packed_sequence.packed_sequence_size 1024
 ```
 These overrides ensure the Qwen3-8B SFT run behaves as expected:
 - `--model.pretrained_model_name_or_path`: selects the Qwen/Qwen3-8B model to fine-tune from the Hugging Face model hub (weights fetched via your Hugging Face token). Adjust this if you want to fine-tune a different model.
-- `--step_scheduler.max_steps`: sets the maximum number of training steps. We set it to 100 for demonstation purposes, please adjust this based on your needs.
+- `--step_scheduler.max_steps`: sets the maximum number of training steps. We set it to 20 for demonstation purposes, please adjust this based on your needs.
 - `--step_scheduler.local_batch_size`: sets the per-GPU micro-batch size to 1 to fit in memory; overall effective batch size is still driven by gradient accumulation and data/tensor parallel settings from the recipe.
 
 

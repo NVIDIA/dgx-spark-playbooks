@@ -62,6 +62,8 @@ def main(args):
         lora_alpha=16,
         lora_dropout=0,
         task_type=TaskType.CAUSAL_LM)
+    model = get_peft_model(model, peft_config)
+
     print(f"Trainable parameters = {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
 
     # Load and preprocess the dataset
@@ -110,7 +112,6 @@ def main(args):
         processing_class=tokenizer,
         train_dataset=dataset,
         args=SFTConfig(**config),
-        peft_config=peft_config,
     )
     
     trainer_stats = trainer.train()
