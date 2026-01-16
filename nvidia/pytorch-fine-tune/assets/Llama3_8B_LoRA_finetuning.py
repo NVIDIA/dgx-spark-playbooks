@@ -73,7 +73,7 @@ def main(args):
     # Configure the SFT config
     config = {
         "per_device_train_batch_size": args.batch_size,
-        "num_train_epochs": 0.01,
+        "num_train_epochs": 0.05,
         "gradient_accumulation_steps": args.gradient_accumulation_steps,
         "learning_rate": args.learning_rate,
         "optim": "adamw_torch",
