@@ -122,7 +122,7 @@ ${ISAACSIM_PATH}/isaac-sim.sh
 ## Run Isaac Lab
 
 ## Step 1. Install Isaac Sim
-If you haven't already done so, install [Isaac Sim](build.nvidia.com/spark/isaac/isaac-sim) first.
+If you haven't already done so, install [Isaac Sim](https://build.nvidia.com/spark/isaac/isaac-sim) first.
 
 ## Step 2. Clone the Isaac Lab repository into your workspace
 
@@ -135,7 +135,7 @@ cd IsaacLab
 
 ## Step 3. Create a symbolic link to the Isaac Sim installation
 
-Be sure that you have already installed Isaac Sim from [Isaac Sim](build.nvidia.com/spark/isaac/isaac-sim) before running the following command.
+Be sure that you have already installed Isaac Sim from [Isaac Sim](https://build.nvidia.com/spark/isaac/isaac-sim) before running the following command.
 
 ```bash
 echo "ISAACSIM_PATH=$ISAACSIM_PATH"
