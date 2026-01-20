@@ -47,7 +47,7 @@ You will accelerate popular machine learning algorithms and data analytics opera
 ## Step 2. Installing Data Science libraries
 Use the following command to install the CUDA-X libraries (this will create a new conda environment)
   ```bash
-    conda create -n rapids-test -c rapidsai-nightly -c conda-forge -c nvidia  \
+    conda create -n rapids-test -c rapidsai -c conda-forge -c nvidia  \
     rapids=25.10 python=3.12 'cuda-version=13.0' \
     jupyter hdbscan umap-learn
   ```
