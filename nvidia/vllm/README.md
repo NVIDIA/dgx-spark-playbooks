@@ -84,9 +84,8 @@ Reminder: not all model architectures are supported for NVFP4 quantization.
 * **Duration:** 30 minutes for Docker approach
 * **Risks:** Container registry access requires internal credentials
 * **Rollback:** Container approach is non-destructive.
-* **Last Updated:** 01/02/2026
-  * Add supported Model Matrix (25.11-py3)
-  * Improve cluster setup instructions
+* **Last Updated:** 01/21/2026
+  * Update Llama-3.1-405B inference server command to avoid Out-of-Memory errors.
 
 ## Instructions
 
@@ -351,8 +350,8 @@ Start the server with memory-constrained parameters for the large model.
 export VLLM_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '^node-[0-9]+$')
 docker exec -it $VLLM_CONTAINER /bin/bash -c '
   vllm serve hugging-quants/Meta-Llama-3.1-405B-Instruct-AWQ-INT4 \
-    --tensor-parallel-size 2 --max-model-len 256 --gpu-memory-utilization 1.0 \
-    --max-num-seqs 1 --max_num_batched_tokens 256'
+    --tensor-parallel-size 2 --max-model-len 64 --gpu-memory-utilization 0.9 \
+    --max-num-seqs 1 --max_num_batched_tokens 64'
 ```
 
 ## Step 12. (Optional) Test 405B model inference

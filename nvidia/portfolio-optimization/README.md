@@ -81,8 +81,8 @@ All required assets can be found [in the Portfolio Optimization repository](http
 
 * **Rollback:** Stop the Docker container and remove the cloned repository to fully remove the installation.
 
-* **Last Updated:** 01/02/2026
-  * First Publication
+* **Last Updated:** 01/21/2026
+  * Update `git clone` command with the correct project path.
 
 ## Instructions
 
@@ -104,7 +104,7 @@ docker --version
 Open up Terminal, then copy and paste in the below commands:
 
 ```bash
-git clone https://github.com/NVIDIA/dgx-spark-playbooks/nvidia/portfolio-optimization
+git clone https://github.com/NVIDIA/dgx-spark-playbooks
 cd dgx-spark-playbooks/nvidia/portfolio-optimization/assets
 bash ./setup/start_playbook.sh
 ```
