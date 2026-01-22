@@ -30,11 +30,12 @@ You will deploy NVIDIA's VSS AI Blueprint on NVIDIA Spark hardware with Blackwel
 ## Prerequisites
 
 - NVIDIA Spark device with ARM64 architecture and Blackwell GPU
-- NVIDIA DGX OS 7.2.3 or higher
-- Driver version 580.95.05 or higher installed: `nvidia-smi | grep "Driver Version"`
+- DGX OS (suggested: 7.4.0 or higher)
+- Driver version 580.126.09 or higher installed: `nvidia-smi | grep "Driver Version"`
 - CUDA version 13.0 installed: `nvcc --version`
 - Docker installed and running: `docker --version && docker compose version`
 - Access to NVIDIA Container Registry with [NGC API Key](https://org.ngc.nvidia.com/setup/api-keys)
+- NVIDIA Container Toolkit
 - [Optional] NVIDIA API Key for remote model endpoints (hybrid deployment only)
 - Sufficient storage space for video processing (>10GB recommended in `/tmp/`)
 
@@ -52,9 +53,9 @@ You will deploy NVIDIA's VSS AI Blueprint on NVIDIA Spark hardware with Blackwel
   * Network configuration conflicts if shared network already exists
   * Remote API endpoints may have rate limits or connectivity issues (hybrid deployment)
 * **Rollback:** Stop all containers with `docker compose down`, remove shared network with `docker network rm vss-shared-network`, and clean up temporary media directories.
-* **Last Updated:** 10/18/2025
+* **Last Updated:** 1/21/2026
   * Update required OS and Driver versions
-  * Add instructions to fully local VSS deployment
+  * Support for VSS 2.4.1 with Cosmos Reason 2 VLM
 
 ## Instructions
 
@@ -65,7 +66,7 @@ Check that your system meets the hardware and software prerequisites.
 ```bash
 ## Verify driver version
 nvidia-smi | grep "Driver Version"
-## Expected output: Driver Version: 580.82.09 or higher
+## Expected output: Driver Version: 580.126.09 or higher
 
 ## Verify CUDA version
 nvcc --version
@@ -152,10 +153,10 @@ docker login nvcr.io
 
 Choose between two deployment options based on your requirements:
 
-| Deployment Scenario  | VLM (Cosmos-Reason1-7B) | LLM (Llama 3.1 70B) | Embedding/Reranker | CV Pipeline |
-|----------------------|--------------------------|---------------------|--------------------|-------------|
-| VSS Event Reviewer   | Local                    | Not Used            | Not Used           | Local       |
-| Standard VSS (Hybrid)| Local                   | Remote              | Remote             | Optional    |
+| Deployment Scenario   | VLM (Cosmos-Reason2-8B)| LLM (Llama 3.1)               | Embedding / Reranker | CV Pipeline  |
+|---------------------- |------------------------|-------------------------------|----------------------|--------------|
+| VSS Event Reviewer    | Local                  | Not Used                      | Not Used             | Local        |
+| Standard VSS          | Local                  | Remote (70B) or Local (8B)    | Remote / Local       | Optional     |
 
 Proceed with **Option A** for Event Reviewer or **Option B** for Standard VSS.
 
@@ -171,22 +172,25 @@ Change to the directory containing the Event Reviewer Docker Compose configurati
 cd deploy/docker/event_reviewer/
 ```
 
-**8.2 Configure NGC API Key**
+**8.2 Configure NGC API Key and HF Token**
 
-Update the environment file with your NGC API Key. You can do this by editing the `.env` file directly, or by running the following command:
+Update the environment file with your NGC API Key and HF Token. You can do this by editing the `.env` file directly, or by running the following commands:
+
+> [!NOTE]
+> To deploy the default VLM (**Cosmos-Reason2 8B**) from Hugging Face, you must accept the model’s terms and conditions on the Hugging Face model page before downloads will work.
 
 ```bash
 ## Edit the .env file and update NGC_API_KEY
 echo "NGC_API_KEY=<YOUR_NGC_API_KEY>" >> .env
+echo "HF_TOKEN=<YOUR_HF_TOKEN>" >> .env  # To download Cosmos-Reason2-8B VLM
 ```
 
-**8.3 Update the VSS Image path**
+**8.3 (Optional) Remove the VST volume data**
 
-Update `VSS_IMAGE` to `nvcr.io/nvidia/blueprint/vss-engine-sbsa:2.4.0` in `.env`.
+When upgrading from older versions of VSS, remove the VST volume data
 
 ```bash
-## Edit the .env file and update VSS_IMAGE
-echo "VSS_IMAGE=nvcr.io/nvidia/blueprint/vss-engine-sbsa:2.4.0" >> .env
+rm -rf vst/vst_volume/*
 ```
 
 **8.4 Start VSS Event Reviewer services**
@@ -194,8 +198,11 @@ echo "VSS_IMAGE=nvcr.io/nvidia/blueprint/vss-engine-sbsa:2.4.0" >> .env
 Launch the complete VSS Event Reviewer stack including Alert Bridge, VLM Pipeline, Alert Inspector UI, and Video Storage Toolkit.
 
 ```bash
+## DGX Spark tuning: improves Q&A responsiveness/behavior for the Event Reviewer workflow
+export VLM_DEFAULT_NUM_FRAMES_PER_CHUNK=8
+
 ## Start VSS Event Reviewer with ARM64 and SBSA optimizations
-IS_SBSA=1 IS_AARCH64=1 ALERT_REVIEW_MEDIA_BASE_DIR=/tmp/alert-media-dir docker compose up
+IS_SBSA=1 ALERT_REVIEW_MEDIA_BASE_DIR=/tmp/alert-media-dir docker compose up
 ```
 
 > [!NOTE]
@@ -209,44 +216,35 @@ In a new terminal session, navigate to the computer vision event detector config
 cd video-search-and-summarization/examples/cv-event-detector
 ```
 
-**8.6 Update the NV_CV_EVENT_DETECTOR_IMAGE Image path**
-
-Update `NV_CV_EVENT_DETECTOR_IMAGE` to `nvcr.io/nvidia/blueprint/nv-cv-event-detector-sbsa:2.4.0` in `.env`.
-
-```bash
-## Edit the .env file and update NV_CV_EVENT_DETECTOR_IMAGE
-echo "NV_CV_EVENT_DETECTOR_IMAGE=nvcr.io/nvidia/blueprint/nv-cv-event-detector-sbsa:2.4.0" >> .env
-```
-
-**8.7 Start DeepStream CV pipeline**
+**8.6 Start DeepStream CV pipeline**
 
 Launch the DeepStream computer vision pipeline and CV UI services.
 
 ```bash
 ## Start CV pipeline with ARM64 and SBSA optimizations
-IS_SBSA=1 IS_AARCH64=1 ALERT_REVIEW_MEDIA_BASE_DIR=/tmp/alert-media-dir docker compose up
+IS_SBSA=1 ALERT_REVIEW_MEDIA_BASE_DIR=/tmp/alert-media-dir docker compose up
 ```
 
-**8.8 Wait for service initialization**
+**8.7 Wait for service initialization**
 
 Allow time for all containers to fully initialize before accessing the user interfaces.
 
 ```bash
 ## Monitor container status
 docker ps
-## Verify all containers show "Up" status and VSS backend logs (vss-engine-sbsa:2.4.0) show ready state "Uvicorn running on http://0.0.0.0:7860"
+## Verify all containers show "Up" status and VSS backend logs (vss-engine:2.4.1-sbsa) show ready state "Uvicorn running on http://0.0.0.0:7860"
 ## In total, there should be 8 containers:
-## nvcr.io/nvidia/blueprint/nv-cv-event-detector-ui:2.4.0
-## nvcr.io/nvidia/blueprint/nv-cv-event-detector-sbsa:2.4.0
+## nvcr.io/nvidia/blueprint/nv-cv-event-detector-ui:2.4.1
+## nvcr.io/nvidia/blueprint/nv-cv-event-detector:2.4.0-sbsa
 ## nginx:alpine
-## nvcr.io/nvidia/blueprint/vss-alert-inspector-ui:2.4.0
+## nvcr.io/nvidia/blueprint/vss-alert-inspector-ui:2.4.1
 ## nvcr.io/nvidia/blueprint/alert-bridge:0.19.0-multiarch
-## nvcr.io/nvidia/blueprint/vss-engine-sbsa:2.4.0
-## nvcr.io/nvidia/blueprint/vst-storage:2.1.0-25.07.1
+## nvcr.io/nvidia/blueprint/vss-engine:2.4.1-sbsa
+## nvcr.io/nvidia/blueprint/vst-storage:2.1.0-25.11.1.1
 ## redis/redis-stack-server:7.2.0-v9
 ```
 
-**8.9 Validate Event Reviewer deployment**
+**8.8 Validate Event Reviewer deployment**
 
 Access the web interfaces to confirm successful deployment and functionality.
 
@@ -300,24 +298,19 @@ cd deploy/docker/remote_llm_deployment/
 
 Update the environment file with your API keys and deployment preferences. You can do this by editing the `.env` file directly, or by running the following commands:
 
+> [!NOTE]
+> To deploy the default VLM (**Cosmos-Reason2 8B**) from Hugging Face, you must accept the model’s terms and conditions on the Hugging Face model page before downloads will work.
+
 ```bash
 ## Edit .env file with required keys
 echo "NVIDIA_API_KEY=<YOUR_NVIDIA_API_KEY>" >> .env
 echo "NGC_API_KEY=<YOUR_NGC_API_KEY>" >> .env
+echo "HF_TOKEN=<YOUR_HF_TOKEN>" >> .env  # To download Cosmos-Reason2-8B VLM
 echo "DISABLE_CV_PIPELINE=true" >> .env  # Set to false to enable CV
 echo "INSTALL_PROPRIETARY_CODECS=false" >> .env  # Set to true to enable CV
 ```
 
-**9.4 Update the VSS Image path**
-
-Update `VIA_IMAGE` to `nvcr.io/nvidia/blueprint/vss-engine-sbsa:2.4.0` in `.env`.
-
-```bash
-## Edit the .env file and update VIA_IMAGE
-echo "VIA_IMAGE=nvcr.io/nvidia/blueprint/vss-engine-sbsa:2.4.0" >> .env
-```
-
-**9.5 Review model configuration**
+**9.4 Review model configuration**
 
 Verify that the config.yaml file contains the correct remote endpoints. For NIMs, it should be set to `https://integrate.api.nvidia.com/v1 `.
 
@@ -326,11 +319,11 @@ Verify that the config.yaml file contains the correct remote endpoints. For NIMs
 cat config.yaml | grep -A 10 "model"
 ```
 
-**9.6 Launch Standard VSS deployment**
+**9.5 Launch Standard VSS deployment**
 
 ```bash
 ## Start Standard VSS with hybrid deployment
-docker compose up
+IS_SBSA=1 docker compose up
 ```
 
 > [!NOTE]
@@ -383,13 +376,13 @@ To completely remove the VSS deployment and free up system resources:
 ```bash
 ## For Event Reviewer deployment
 cd deploy/docker/event_reviewer/
-IS_SBSA=1 IS_AARCH64=1 ALERT_REVIEW_MEDIA_BASE_DIR=/tmp/alert-media-dir docker compose down
+IS_SBSA=1 ALERT_REVIEW_MEDIA_BASE_DIR=/tmp/alert-media-dir docker compose down
 cd ../../examples/cv-event-detector/
-IS_SBSA=1 IS_AARCH64=1 ALERT_REVIEW_MEDIA_BASE_DIR=/tmp/alert-media-dir docker compose down
+IS_SBSA=1 ALERT_REVIEW_MEDIA_BASE_DIR=/tmp/alert-media-dir docker compose down
 
 ## For Standard VSS deployment
 cd deploy/docker/remote_llm_deployment/
-docker compose down
+IS_SBSA=1 docker compose down
 
 ## Remove shared network (if using Event Reviewer)
 docker network rm vss-shared-network
@@ -421,7 +414,7 @@ With VSS deployed, you can now:
 |---------|--------|-----|
 | Container fails to start with "pull access denied" | Missing or incorrect nvcr.io credentials | Re-run `docker login nvcr.io` with valid credentials |
 | Network creation fails | Existing network with same name | Run `docker network rm vss-shared-network` then recreate |
-| Services fail to communicate | Incorrect environment variables | Verify `IS_SBSA=1 IS_AARCH64=1` are set correctly |
+| Services fail to communicate | Incorrect environment variables | Verify `IS_SBSA=1` are set correctly |
 | Web interfaces not accessible | Services still starting or port conflicts | Wait 2-3 minutes, check `docker ps` for container status |
 
 > [!NOTE]
