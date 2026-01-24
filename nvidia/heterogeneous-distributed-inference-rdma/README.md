@@ -62,6 +62,9 @@ GPU memory → PCIe → NIC (mlx5) → wire → NIC → PCIe → GPU memory
 - Direct connection or dedicated switch
 
 > [!NOTE]
+> **About the hardware used in this tutorial:** We used a ConnectX-5 (MCX516A-CDAT, 100GbE dual-port) on the workstation because that's what we had available. This limits the link speed to 100 Gbps. If you use a ConnectX-7 NIC on the workstation side (matching the DGX Spark), you can achieve up to 200 Gbps. The setup process is the same or very similar - just with higher bandwidth.
+
+> [!NOTE]
 > Interface names (e.g., `enp1s0f0np0`, `rocep1s0f0`) are system-specific and will differ on your hardware. Use these commands to identify your interfaces:
 > ```bash
 > ## Find RDMA device to network interface mapping
