@@ -384,7 +384,17 @@ python -m vllm.entrypoints.openai.api_server \
 
 ---
 
-## Step 8. Run Production Model (72B)
+## Step 8. Run Large Model (72B)
+
+This step demonstrates the real power of distributed inference: running a model that **exceeds the memory capacity of any single GPU**.
+
+| Component | Available VRAM | Sufficient for 72B? |
+|-----------|---------------|---------------------|
+| DGX Spark | 128 GB | No (~136GB needed) |
+| RTX 6000 Pro | 96 GB | No (~136GB needed) |
+| **Combined Cluster** | **224 GB** | **Yes** |
+
+The Qwen2.5-72B-Instruct model requires ~136GB in BF16 precision - impossible to run on either GPU alone. This is where our RDMA cluster shines, aggregating memory across both systems.
 
 Memory-optimized configuration for 136GB model:
 
@@ -524,5 +534,3 @@ This playbook was contributed by **Csaba Kecskemeti** | [DevQuasar](https://devq
 
 For a detailed walkthrough and additional context, see the original article:
 [Distributed Inference Cluster: DGX Spark + RTX 6000 Pro](https://devquasar.com/ai/edge-ai/distributed-inference-cluster-dgx-spark-rtx-6000-pro/)
-
-![DevQuasar](assets/devquasar-logo.png)

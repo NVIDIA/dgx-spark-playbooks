@@ -27,8 +27,8 @@ GPU memory → PCIe → NIC (mlx5) → wire → NIC → PCIe → GPU memory
 **Key properties:**
 - **No CPU copies:** Data bypasses system memory
 - **No kernel networking stack:** Direct hardware-to-hardware communication
-- **Ultra-low latency:** ~750 nanoseconds end-to-end
-- **High message rate:** Up to 200M messages/second
+- **Ultra-low latency:** Microsecond-level communication
+- **High throughput:** 93+ Gbps validated over 100 Gbps link
 
 ## What you'll accomplish
 
@@ -135,7 +135,7 @@ Both planes use the same 100 Gbps ConnectX network in this configuration.
 
 1. Install the ConnectX card in a PCIe Gen3/4 x16 slot (CPU-direct, not via chipset)
 
-2. **Cooling Requirements:** ConnectX-5 100GbE cards generate significant heat under load. Ensure adequate case airflow and monitor temperatures with `sensors | grep mlx`
+2. **Cooling Requirements:** ConnectX-5/7 100GbE cards are primarily designed for server environments with active cooling. In a workstation, ensure adequate case airflow directed at the card, and consider adding a PCIe slot fan for sustained high-bandwidth workloads.
 
 3. **BIOS settings:**
    ```
@@ -416,7 +416,7 @@ sudo ip link set enp1s0f0np0 up
 sudo ip link set enp1s0f0np0 mtu 9000
 ```
 
-**Option 2: Permanent Configuration (Production)**
+**Option 2: Permanent Configuration**
 
 First, identify your active internet interface on both systems:
 
@@ -549,7 +549,7 @@ Example successful output:
 - Link type: Ethernet confirms RoCE v2 is working
 
 **Performance expectations:**
-- **>90 Gbps:** Excellent - Ready for production AI workloads
+- **>90 Gbps:** Excellent - Ready for distributed AI workloads
 - **80-90 Gbps:** Good - Sufficient for most multi-node training
 - **<80 Gbps:** Check MTU (should be 9000), cable quality, or PCIe slot
 
@@ -643,5 +643,3 @@ This playbook was contributed by **Csaba Kecskemeti** | [DevQuasar](https://devq
 
 For a detailed walkthrough and additional context, see the original article:
 [Distributed Inference Cluster: DGX Spark + RTX 6000 Pro](https://devquasar.com/ai/edge-ai/distributed-inference-cluster-dgx-spark-rtx-6000-pro/)
-
-![DevQuasar](assets/devquasar-logo.png)
