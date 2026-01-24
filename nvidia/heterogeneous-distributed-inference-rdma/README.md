@@ -349,9 +349,7 @@ This shows how GPUs and NICs are interconnected via PCIe.
 
 ## Step 9. Connect the QSFP Cable
 
-**Hot-plug vs Cold-plug:**
-- Hot-plugging QSFP cables is safe with ConnectX-5/7 hardware
-- Cold-plug recommended for first-time setup
+**Cable type:** QSFP56 or QSFP28 cable (they are cross-compatible at 100 Gbps)
 
 **Connection procedure:**
 1. Identify ports: DGX Spark has 2 physical QSFP ports with 4 logical interfaces
