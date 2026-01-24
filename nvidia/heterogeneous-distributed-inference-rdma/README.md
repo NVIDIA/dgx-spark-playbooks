@@ -128,7 +128,6 @@ Both planes use the same 100 Gbps ConnectX network in this configuration.
 | `infiniband-diags` | Diagnostics (`ibstat`) | Package: infiniband-diags |
 | `mstflint` | Firmware inspection | Package: mstflint |
 | `NCCL` | Multi-GPU collectives | Built into PyTorch/frameworks |
-| `GPUDirect RDMA` | GPU↔NIC zero-copy | Requires nvidia-peermem |
 
 ---
 
@@ -546,13 +545,8 @@ Example successful output:
 
 **Performance Analysis:**
 - 11,664 MB/sec = ~93.3 Gbps
-- Achieves >93% of 100 Gbps line rate - Excellent!
+- Achieves >93% of 100 Gbps line rate
 - Link type: Ethernet confirms RoCE v2 is working
-
-**Performance expectations:**
-- **>90 Gbps:** Excellent - Ready for distributed AI workloads
-- **80-90 Gbps:** Good - Sufficient for most multi-node training
-- **<80 Gbps:** Check MTU (should be 9000), cable quality, or PCIe slot
 
 ---
 
@@ -581,23 +575,7 @@ echo $NCCL_SOCKET_IFNAME
 
 ---
 
-## Step 14. (Optional) Configure GPUDirect RDMA
-
-**When needed:**
-- High-frequency GPU-to-GPU transfers
-- Zero-copy GPU memory access
-- Maximum performance training workloads
-
-**Configuration:**
-```bash
-## Install nvidia-peermem module
-sudo apt install nvidia-peer-memory-dkms
-sudo modprobe nvidia-peermem
-```
-
----
-
-## Step 15. Final Validation
+## Step 14. Final Validation
 
 At this point, you should have achieved:
 

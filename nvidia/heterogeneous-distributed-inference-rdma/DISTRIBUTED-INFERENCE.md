@@ -62,6 +62,13 @@ This guide walks you through deploying distributed inference across your heterog
 - NVIDIA Container Toolkit installed
 - Hugging Face account for model access (some models require authentication)
 
+> [!NOTE]
+> **Why we use the `nvcr.io/nvidia/vllm` container:** This tutorial uses the official NVIDIA vLLM container image (`nvcr.io/nvidia/vllm:25.09-py3`) on both nodes. This is important because:
+> - **Version consistency:** Ray cluster is very sensitive to Python and Ray version mismatches between nodes. The container guarantees identical versions on both DGX Spark (ARM64) and Workstation (AMD64).
+> - **Pre-installed dependencies:** NCCL, RDMA libraries, and all required packages are already configured.
+> - **Multi-architecture support:** The same image tag works on both ARM64 (DGX Spark) and AMD64 (Workstation) architectures.
+> - **vLLM ready:** No additional installation needed - just pull and run.
+
 ## Time & risk
 
 - **Duration:** 1-2 hours including testing
@@ -310,15 +317,18 @@ On Workstation container (worker node):
 ray start \
   --address=192.168.200.1:6379 \
   --node-ip-address=192.168.200.2 \
-  --num-gpus=2
+  --num-gpus=1
 ```
+
+> [!NOTE]
+> Adjust `--num-gpus` based on your workstation configuration. In our case, we had 2 GPUs (RTX 6000 Pro + RTX 5090) but only used 1 for this tutorial.
 
 Verify cluster formation:
 ```bash
 ray status
 ```
 
-Expected output (should show 3 total GPUs):
+Expected output (should show 2+ total GPUs depending on your setup):
 ```
 ======== Autoscaler status: 2026-01-10 19:46:26.274139 ========
 Node status
@@ -330,7 +340,7 @@ Resources
 ---------------------------------------------------------------
 Total Usage:
  0.0/68.0 CPU
- 0.0/3.0 GPU
+ 0.0/2.0 GPU
 ```
 
 ---
@@ -480,23 +490,9 @@ vllm bench serve --host 192.168.200.1 --port 8000 --random-input-len 256 --rando
 | **DGX Spark (Single)** | 213.12s | 105.10 tok/s | 132.00 tok/s |
 | **Distributed RDMA** | 191.09s | 205.83 tok/s | 259.41 tok/s |
 
-### Key Insights
+### What This Demonstrates
 
-**RTX 6000 Pro: Clear Single-Node Winner**
-- 5.8x faster than DGX Spark for latency-critical workloads
-- 6.5x higher output token throughput
-- Best for: Interactive inference, real-time applications
-
-**Distributed RDMA: Aggregated Capacity**
-- 259.41 tok/s total throughput - faster than DGX alone
-- Combined 224GB GPU memory (128GB DGX + 96GB RTX)
-- Enables models too large for any single GPU
-- TTFT: 139.94ms mean vs single DGX 213,120ms
-
-**DGX Spark: Memory Advantage**
-- 128GB unified memory enables larger models
-- Slower inference but handles 100B+ models
-- Best for: Extremely large models, memory-constrained scenarios
+The key achievement of this tutorial is successfully running distributed inference across heterogeneous hardware (DGX Spark ARM64 + Linux Workstation AMD64) over RDMA. The distributed setup aggregates GPU memory from both systems, enabling models that wouldn't fit on either device alone.
 
 ### FP8 30B Model Results
 
