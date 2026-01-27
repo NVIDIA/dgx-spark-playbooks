@@ -83,7 +83,9 @@ Note: for NVFP4 models, add the `--quantization modelopt_fp4` flag.
 ## Step 1. Verify system prerequisites
 
 Check that your NVIDIA Spark device meets all requirements before proceeding. This step runs on
-your host system and ensures Docker, GPU drivers, and container toolkit are properly configured.
+your host system and ensures Docker, GPU drivers, and container toolkit are properly configured. 
+
+> Note: If you experience timeouts or "connection refused" errors while pulling the container image, you may need to use a VPN or a proxy, as some registries may be restricted by your local network or ISP.
 
 ```bash
 ## Verify Docker installation
