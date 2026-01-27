@@ -72,7 +72,7 @@ The following models are supported with vLLM on Spark. All listed models are ava
 | **Nemotron3-Nano** | FP8 | ✅ | `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8` |
 
 > [!NOTE]
-> The Phi-4-multimodal-instruct models require `--trust-remote-code` when launching vLLM.
+> The Phi-4-multimodal-instruct and Nemotron3-Nano models require `--trust-remote-code` when launching vLLM.
 
 > [!NOTE]
 > You can use the NVFP4 Quantization documentation to generate your own NVFP4-quantized checkpoints for your favorite models. This enables you to take advantage of the performance and memory benefits of NVFP4 quantization even for models not already published by NVIDIA.
