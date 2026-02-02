@@ -64,6 +64,9 @@ The following models are supported with vLLM on Spark. All listed models are ava
 | **Qwen3-14B** | NVFP4 | ✅ | `nvidia/Qwen3-14B-FP4` |
 | **Qwen3-32B** | NVFP4 | ✅ | `nvidia/Qwen3-32B-FP4` |
 | **Qwen2.5-VL-7B-Instruct** | NVFP4 | ✅ | `nvidia/Qwen2.5-VL-7B-Instruct-FP4` |
+| **Qwen3-VL-Reranker-2B** | Base | ✅ | `Qwen/Qwen3-VL-Reranker-2B` |
+| **Qwen3-VL-Reranker-8B** | Base | ✅ | `Qwen/Qwen3-VL-Reranker-8B` |
+| **Qwen3-VL-Embedding-2B** | Base | ✅ | `Qwen/Qwen3-VL-Embedding-2B` |
 | **Phi-4-multimodal-instruct** | FP8 | ✅ | `nvidia/Phi-4-multimodal-instruct-FP8` |
 | **Phi-4-multimodal-instruct** | NVFP4 | ✅ | `nvidia/Phi-4-multimodal-instruct-FP4` |
 | **Phi-4-reasoning-plus** | FP8 | ✅ | `nvidia/Phi-4-reasoning-plus-FP8` |
@@ -84,8 +87,9 @@ Reminder: not all model architectures are supported for NVFP4 quantization.
 * **Duration:** 30 minutes for Docker approach
 * **Risks:** Container registry access requires internal credentials
 * **Rollback:** Container approach is non-destructive.
-* **Last Updated:** 01/21/2026
-  * Update Llama-3.1-405B inference server command to avoid Out-of-Memory errors.
+* **Last Updated:** 01/22/2026
+  * Added support for Qwen3-VL-Reranker-2B, Qwen3-VL-Reranker-8B, and Qwen3-VL-Embedding-2B models
+  * Updated container to January 2026 release (26.01-py3)
 
 ## Instructions
 
@@ -113,15 +117,13 @@ Find the latest container build from https://catalog.ngc.nvidia.com/orgs/nvidia/
 export LATEST_VLLM_VERSION=<latest_container_version>
 
 ## example
-## export LATEST_VLLM_VERSION=25.11-py3
+## export LATEST_VLLM_VERSION=26.01-py3
 
 docker pull nvcr.io/nvidia/vllm:${LATEST_VLLM_VERSION}
 ```
 
-For Nemotron3-Nano model support, please use release version 25.12.post1-py3
-
 ```bash
-docker pull nvcr.io/nvidia/vllm:25.12.post1-py3
+docker pull nvcr.io/nvidia/vllm:26.01-py3
 ```
 
 ## Step 3. Test vLLM in container
