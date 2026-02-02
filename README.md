@@ -21,7 +21,6 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 
 ### NVIDIA
 
-- [CLI Coding Agent](nvidia/cli-coding-agent/)
 - [Comfy UI](nvidia/comfy-ui/)
 - [Set Up Local Network Access](nvidia/connect-to-your-spark/)
 - [Connect Two Sparks](nvidia/connect-two-sparks/)
