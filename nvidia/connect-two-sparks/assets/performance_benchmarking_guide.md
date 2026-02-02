@@ -238,6 +238,7 @@ docker run \
   --ipc host \
   --ulimit memlock=-1 \
   --ulimit stack=67108864 \
+  -e HF_TOKEN="$HF_TOKEN" \
   -e MODEL_HANDLE="$MODEL_HANDLE" \
   -e ISL="$ISL" \
   -e OSL="$OSL" \
