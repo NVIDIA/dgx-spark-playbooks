@@ -164,13 +164,6 @@ docker rm $(docker ps -aq --filter ancestor=nvcr.io/nvidia/vllm:${LATEST_VLLM_VE
 docker rmi nvcr.io/nvidia/vllm
 ```
 
-
-To remove CUDA 12.9:
-
-```bash
-sudo /usr/local/cuda-12.9/bin/cuda-uninstaller
-```
-
 ## Step 5. Next steps
 
 - **Production deployment:** Configure vLLM with your specific model requirements

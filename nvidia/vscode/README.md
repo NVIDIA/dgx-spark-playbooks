@@ -174,7 +174,7 @@ rm -rf ~/.vscode
 
 ## Step 1. Install and configure NVIDIA Sync
 
-Follow the [NVIDIA Sync setup guide](/spark/connect-to-your-spark/sync) to:
+Follow the [NVIDIA Sync setup guide](https://build.nvidia.com/spark/connect-to-your-spark/sync) to:
 - Install NVIDIA Sync for your operating system
 - Configure which development tools you want to use (VS Code, Cursor, Terminal, etc.)
 - Add your DGX Spark device by providing its hostname/IP and credentials
