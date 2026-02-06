@@ -20,7 +20,7 @@
 
 ## Basic idea
 
-![Teaser](images/teaser.jpg)
+![Teaser](assets/teaser.jpg)
 
 Spark & Reachy Photo Booth is an interactive and event-driven photo booth demo that combines the **DGX Spark™** with the **Reachy Mini** robot to create an engaging multimodal AI experience. The system showcases:
 
@@ -33,7 +33,7 @@ Spark & Reachy Photo Booth is an interactive and event-driven photo booth demo t
 
 The demo is based on a several services that communicate through a message bus.
 
-![Architecture diagram](images/architecture-diagram.png)
+![Architecture diagram](assets/architecture-diagram.png)
 
 > [!NOTE]
 > This playbook applies to both the Reachy Mini and Reachy Mini Lite robots. For simplicity, we’ll refer to the robot as Reachy throughout this playbook.
@@ -149,7 +149,7 @@ Run the following command to make sure the Reachy speaker can reach the maximum 
 ./robot-controller-service/scripts/speaker_setup.sh
 ```
 
-![Setup](images/setup.jpg)
+![Setup](assets/setup.jpg)
 
 ## Step 4. Start the stack
 
