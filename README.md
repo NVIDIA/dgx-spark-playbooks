@@ -31,6 +31,7 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 - [Optimized JAX](nvidia/jax/)
 - [Live VLM WebUI](nvidia/live-vlm-webui/)
 - [LLaMA Factory](nvidia/llama-factory/)
+- [LM Studio on DGX Spark](nvidia/lm-studio/)
 - [Build and Deploy a Multi-Agent Chatbot](nvidia/multi-agent-chatbot/)
 - [Multi-modal Inference](nvidia/multi-modal-inference/)
 - [NCCL for Two Sparks](nvidia/nccl/)
