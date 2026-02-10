@@ -53,26 +53,26 @@ The following models are supported with vLLM on Spark. All listed models are ava
 
 | Model | Quantization | Support Status | HF Handle |
 |-------|-------------|----------------|-----------|
-| **GPT-OSS-20B** | MXFP4 | ✅ | `openai/gpt-oss-20b` |
-| **GPT-OSS-120B** | MXFP4 | ✅ | `openai/gpt-oss-120b` |
-| **Llama-3.1-8B-Instruct** | FP8 | ✅ | `nvidia/Llama-3.1-8B-Instruct-FP8` |
-| **Llama-3.1-8B-Instruct** | NVFP4 | ✅ | `nvidia/Llama-3.1-8B-Instruct-FP4` |
-| **Llama-3.3-70B-Instruct** | NVFP4 | ✅ | `nvidia/Llama-3.3-70B-Instruct-FP4` |
-| **Qwen3-8B** | FP8 | ✅ | `nvidia/Qwen3-8B-FP8` |
-| **Qwen3-8B** | NVFP4 | ✅ | `nvidia/Qwen3-8B-FP4` |
-| **Qwen3-14B** | FP8 | ✅ | `nvidia/Qwen3-14B-FP8` |
-| **Qwen3-14B** | NVFP4 | ✅ | `nvidia/Qwen3-14B-FP4` |
-| **Qwen3-32B** | NVFP4 | ✅ | `nvidia/Qwen3-32B-FP4` |
-| **Qwen2.5-VL-7B-Instruct** | NVFP4 | ✅ | `nvidia/Qwen2.5-VL-7B-Instruct-FP4` |
-| **Qwen3-VL-Reranker-2B** | Base | ✅ | `Qwen/Qwen3-VL-Reranker-2B` |
-| **Qwen3-VL-Reranker-8B** | Base | ✅ | `Qwen/Qwen3-VL-Reranker-8B` |
-| **Qwen3-VL-Embedding-2B** | Base | ✅ | `Qwen/Qwen3-VL-Embedding-2B` |
-| **Phi-4-multimodal-instruct** | FP8 | ✅ | `nvidia/Phi-4-multimodal-instruct-FP8` |
-| **Phi-4-multimodal-instruct** | NVFP4 | ✅ | `nvidia/Phi-4-multimodal-instruct-FP4` |
-| **Phi-4-reasoning-plus** | FP8 | ✅ | `nvidia/Phi-4-reasoning-plus-FP8` |
-| **Phi-4-reasoning-plus** | NVFP4 | ✅ | `nvidia/Phi-4-reasoning-plus-FP4` |
-| **Nemotron3-Nano** | BF16 | ✅ | `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16` |
-| **Nemotron3-Nano** | FP8 | ✅ | `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8` |
+| **GPT-OSS-20B** | MXFP4 | ✅ | [`openai/gpt-oss-20b`](https://huggingface.co/openai/gpt-oss-20b) |
+| **GPT-OSS-120B** | MXFP4 | ✅ | [`openai/gpt-oss-120b`](https://huggingface.co/openai/gpt-oss-120b) |
+| **Llama-3.1-8B-Instruct** | FP8 | ✅ | [`nvidia/Llama-3.1-8B-Instruct-FP8`](https://huggingface.co/nvidia/Llama-3.1-8B-Instruct-FP8) |
+| **Llama-3.1-8B-Instruct** | NVFP4 | ✅ | [`nvidia/Llama-3.1-8B-Instruct-NVFP4`](https://huggingface.co/nvidia/Llama-3.1-8B-Instruct-NVFP4) |
+| **Llama-3.3-70B-Instruct** | NVFP4 | ✅ | [`nvidia/Llama-3.3-70B-Instruct-NVFP4`](https://huggingface.co/nvidia/Llama-3.3-70B-Instruct-NVFP4) |
+| **Qwen3-8B** | FP8 | ✅ | [`nvidia/Qwen3-8B-FP8`](https://huggingface.co/nvidia/Qwen3-8B-FP8) |
+| **Qwen3-8B** | NVFP4 | ✅ | [`nvidia/Qwen3-8B-NVFP4`](https://huggingface.co/nvidia/Qwen3-8B-NVFP4) |
+| **Qwen3-14B** | FP8 | ✅ | [`nvidia/Qwen3-14B-FP8`](https://huggingface.co/nvidia/Qwen3-14B-FP8) |
+| **Qwen3-14B** | NVFP4 | ✅ | [`nvidia/Qwen3-14B-NVFP4`](https://huggingface.co/nvidia/Qwen3-14B-NVFP4) |
+| **Qwen3-32B** | NVFP4 | ✅ | [`nvidia/Qwen3-32B-NVFP4`](https://huggingface.co/nvidia/Qwen3-32B-NVFP4) |
+| **Qwen2.5-VL-7B-Instruct** | NVFP4 | ✅ | [`nvidia/Qwen2.5-VL-7B-Instruct-NVFP4`](https://huggingface.co/nvidia/Qwen2.5-VL-7B-Instruct-NVFP4) |
+| **Qwen3-VL-Reranker-2B** | Base | ✅ | [`Qwen/Qwen3-VL-Reranker-2B`](https://huggingface.co/Qwen/Qwen3-VL-Reranker-2B) |
+| **Qwen3-VL-Reranker-8B** | Base | ✅ | [`Qwen/Qwen3-VL-Reranker-8B`](https://huggingface.co/Qwen/Qwen3-VL-Reranker-8B) |
+| **Qwen3-VL-Embedding-2B** | Base | ✅ | [`Qwen/Qwen3-VL-Embedding-2B`](https://huggingface.co/Qwen/Qwen3-VL-Embedding-2B) |
+| **Phi-4-multimodal-instruct** | FP8 | ✅ | [`nvidia/Phi-4-multimodal-instruct-FP8`](https://huggingface.co/nvidia/Phi-4-multimodal-instruct-FP8) |
+| **Phi-4-multimodal-instruct** | NVFP4 | ✅ | [`nvidia/Phi-4-multimodal-instruct-NVFP4`](https://huggingface.co/nvidia/Phi-4-multimodal-instruct-NVFP4) |
+| **Phi-4-reasoning-plus** | FP8 | ✅ | [`nvidia/Phi-4-reasoning-plus-FP8`](https://huggingface.co/nvidia/Phi-4-reasoning-plus-FP8) |
+| **Phi-4-reasoning-plus** | NVFP4 | ✅ | [`nvidia/Phi-4-reasoning-plus-NVFP4`](https://huggingface.co/nvidia/Phi-4-reasoning-plus-NVFP4) |
+| **Nemotron3-Nano** | BF16 | ✅ | [`nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16`](https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16) |
+| **Nemotron3-Nano** | FP8 | ✅ | [`nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8`](https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8) |
 
 > [!NOTE]
 > The Phi-4-multimodal-instruct models require `--trust-remote-code` when launching vLLM.
