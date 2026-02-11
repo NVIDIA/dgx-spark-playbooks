@@ -27,6 +27,7 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 - [CUDA-X Data Science](nvidia/cuda-x-data-science/)
 - [DGX Dashboard](nvidia/dgx-dashboard/)
 - [FLUX.1 Dreambooth LoRA Fine-tuning](nvidia/flux-finetuning/)
+- [Heterogeneous Distributed Inference over RDMA](nvidia/heterogeneous-distributed-inference-rdma/)
 - [Install and Use Isaac Sim and Isaac Lab](nvidia/isaac/)
 - [Optimized JAX](nvidia/jax/)
 - [Live VLM WebUI](nvidia/live-vlm-webui/)
