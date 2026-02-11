@@ -31,7 +31,7 @@ ALPACA_PROMPT_TEMPLATE = """Below is an instruction that describes a task, paire
 
 ### Response: {}"""
 
-def get_alpaca_dataset(eos_token, dataset_size=500):
+def get_alpaca_dataset(eos_token, dataset_size=512):
     # Preprocess the dataset
     def preprocess(x):
         texts = [
@@ -69,7 +69,7 @@ def main(args):
     # Configure the SFT config
     config = {
         "per_device_train_batch_size": args.batch_size,
-        "num_train_epochs": 0.01,  # Warmup epoch
+        "num_train_epochs": 0.05,  # Warmup epoch
         "gradient_accumulation_steps": args.gradient_accumulation_steps,
         "learning_rate": args.learning_rate,
         "optim": "adamw_torch",
@@ -79,26 +79,24 @@ def main(args):
         "dataset_text_field": "text",
         "packing": False,
         "max_length": args.seq_length,
-        "torch_compile": False,
         "report_to": "none",
         "logging_dir": args.log_dir,
         "logging_steps": args.logging_steps,
         "gradient_checkpointing": args.gradient_checkpointing,  # Save memory
     }
 
-    # Compile model if requested
-    if args.use_torch_compile:
-        print("Compiling model with torch.compile()...")
-        model = torch.compile(model)
+    # Compile model for faster training
+    print("Compiling model with torch.compile()...")
+    model = torch.compile(model)
 
-        # Warmup for torch compile
-        print("Running warmup for torch.compile()...")
-        SFTTrainer(
-            model=model,
-            processing_class=tokenizer,
-            train_dataset=dataset,
-            args=SFTConfig(**config),
-        ).train()
+    # Warmup for torch compile
+    print("Running warmup for torch.compile()...")
+    SFTTrainer(
+        model=model,
+        processing_class=tokenizer,
+        train_dataset=dataset,
+        args=SFTConfig(**config),
+    ).train()
 
     # Train the model
     print(f"\nStarting full fine-tuning for {args.num_epochs} epoch(s)...")
@@ -123,13 +121,6 @@ def main(args):
     print(f"Steps per second: {trainer_stats.metrics['train_steps_per_second']:.2f}")
     print(f"Train loss: {trainer_stats.metrics['train_loss']:.4f}")
     print(f"{'='*60}\n")
-
-    # Save model if requested
-    if args.output_dir:
-        print(f"Saving model to {args.output_dir}...")
-        trainer.save_model(args.output_dir)
-        tokenizer.save_pretrained(args.output_dir)
-        print("Model saved successfully!")
 
 
 def parse_arguments():
@@ -157,7 +148,7 @@ def parse_arguments():
                         help="Enable gradient checkpointing to save memory")
 
     # Dataset configuration
-    parser.add_argument("--dataset_size", type=int, default=500,
+    parser.add_argument("--dataset_size", type=int, default=512,
                         help="Number of samples to use from dataset")
 
     # Logging configuration
@@ -165,12 +156,6 @@ def parse_arguments():
                         help="Log every N steps")
     parser.add_argument("--log_dir", type=str, default="logs",
                         help="Directory for logs")
-
-    # Compilation and saving
-    parser.add_argument("--use_torch_compile", action="store_true",
-                        help="Use torch.compile() for faster training")
-    parser.add_argument("--output_dir", type=str, default=None,
-                        help="Directory to save the fine-tuned model")
 
     return parser.parse_args()
 
@@ -190,7 +175,6 @@ if __name__ == "__main__":
     print(f"Learning rate: {args.learning_rate}")
     print(f"Dataset size: {args.dataset_size}")
     print(f"Gradient checkpointing: {args.gradient_checkpointing}")
-    print(f"Torch compile: {args.use_torch_compile}")
     print(f"{'='*60}\n")
 
     main(args)

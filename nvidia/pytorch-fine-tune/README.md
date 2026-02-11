@@ -134,8 +134,8 @@ python Llama3_3B_full_finetuning.py
 ## LoRA fine-tuning on Llama 3.1 8B
 python Llama3_8B_LoRA_finetuning.py
 
-## LoRA fine-tuning on Llama 3.1 70B
-python Llama3_70B_LoRA_finetuning.py
+## qLoRA fine-tuning on Llama 3.1 70B
+python Llama3_70B_qLoRA_finetuning.py
 ```
 
 #### Common Command-Line Arguments
@@ -158,7 +158,7 @@ All scripts support the following command-line arguments for customization:
 - `--lora_rank`: LoRA rank - higher values = more trainable parameters (default: `8`)
 
 ##### Dataset Configuration
-- `--dataset_size`: Number of samples to use from the Alpaca dataset (default: `500`)
+- `--dataset_size`: Number of samples to use from the Alpaca dataset (default: `512`)
 
 ##### Logging Configuration
 - `--logging_steps`: Log metrics every N steps (default: `1`)
@@ -166,13 +166,6 @@ All scripts support the following command-line arguments for customization:
 
 ##### Model Saving
 - `--output_dir`: Directory to save the fine-tuned model (default: `None` - model not saved)
-
-##### Performance Optimization
-- `--use_torch_compile`: Enable `torch.compile()` for faster training (flag)
-
-> [!WARNING]
-> **Important:** The `--use_torch_compile` flag is **not compatible with QLoRA** (`Llama3_70B_qLoRA_finetuning.py`). 
-> Only use this flag with full fine-tuning and standard LoRA scripts.
 
 #### Usage Examples
 ```bash

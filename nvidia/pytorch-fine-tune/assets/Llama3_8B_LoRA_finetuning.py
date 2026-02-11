@@ -31,7 +31,7 @@ ALPACA_PROMPT_TEMPLATE = """Below is an instruction that describes a task, paire
 
 ### Response: {}"""
 
-def get_alpaca_dataset(eos_token, dataset_size=500):
+def get_alpaca_dataset(eos_token, dataset_size=512):
     # Preprocess the dataset
     def preprocess(x):
         texts = [
@@ -83,25 +83,23 @@ def main(args):
         "dataset_text_field": "text",
         "packing": False,
         "max_length": args.seq_length,
-        "torch_compile": False,
         "report_to": "none",
         "logging_dir": args.log_dir,
         "logging_steps": args.logging_steps
     }
 
-    # Compile model if requested
-    if args.use_torch_compile:
-        print("Compiling model with torch.compile()...")
-        model = torch.compile(model)
-        
-        # Warmup for torch compile
-        print("Running warmup for torch.compile()...")
-        SFTTrainer(
-            model=model,
-            processing_class=tokenizer,
-            train_dataset=dataset,
-            args=SFTConfig(**config),
-        ).train()
+    # Compile model for faster training
+    print("Compiling model with torch.compile()...")
+    model = torch.compile(model)
+    
+    # Warmup for torch compile
+    print("Running warmup for torch.compile()...")
+    SFTTrainer(
+        model=model,
+        processing_class=tokenizer,
+        train_dataset=dataset,
+        args=SFTConfig(**config),
+    ).train()
 
     # Train the model
     print(f"\nStarting LoRA fine-tuning for {args.num_epochs} epoch(s)...")
@@ -138,7 +136,7 @@ def parse_arguments():
                         help="Model dtype")
     
     # Training configuration
-    parser.add_argument("--batch_size", type=int, default=4,
+    parser.add_argument("--batch_size", type=int, default=8,
                         help="Per device training batch size")
     parser.add_argument("--seq_length", type=int, default=2048,
                         help="Maximum sequence length")
@@ -154,7 +152,7 @@ def parse_arguments():
                         help="LoRA rank")
     
     # Dataset configuration
-    parser.add_argument("--dataset_size", type=int, default=500,
+    parser.add_argument("--dataset_size", type=int, default=512,
                         help="Number of samples to use from dataset")
     
     # Logging configuration
@@ -162,9 +160,6 @@ def parse_arguments():
                         help="Log every N steps")
     parser.add_argument("--log_dir", type=str, default="logs",
                         help="Directory for logs")
-    # Compilation
-    parser.add_argument("--use_torch_compile", action="store_true",
-                        help="Use torch.compile() for faster training")
     
     return parser.parse_args()
 
@@ -181,7 +176,6 @@ if __name__ == "__main__":
     print(f"Learning rate: {args.learning_rate}")
     print(f"LoRA rank: {args.lora_rank}")
     print(f"Dataset size: {args.dataset_size}")
-    print(f"Torch compile: {args.use_torch_compile}")
     print(f"{'='*60}\n")
     
     main(args)

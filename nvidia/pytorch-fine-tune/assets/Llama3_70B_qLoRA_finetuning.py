@@ -32,7 +32,7 @@ ALPACA_PROMPT_TEMPLATE = """Below is an instruction that describes a task, paire
 
 ### Response: {}"""
 
-def get_alpaca_dataset(eos_token, dataset_size=500):
+def get_alpaca_dataset(eos_token, dataset_size=512):
     # Preprocess the dataset
     def preprocess(x):
         texts = [
@@ -67,15 +67,14 @@ def main(args):
         args.model_name,
         quantization_config=quantization_config,
         dtype=args.dtype,
-        device_map=device_map_config,
-        trust_remote_code=True
+        device_map="cuda",
     )
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     tokenizer.pad_token = tokenizer.eos_token
 
     # Prepare model for QLoRA training
     print(f"Preparing model for QLoRA (4-bit) with rank {args.lora_rank}...")
-    # model = prepare_model_for_kbit_training(model)
+    model = prepare_model_for_kbit_training(model)
     
     peft_config = LoraConfig(
         r=args.lora_rank,
@@ -96,7 +95,7 @@ def main(args):
     # Configure the SFT config
     config = {
         "per_device_train_batch_size": args.batch_size,
-        "num_train_epochs": 0.01,  # Warmup epoch
+        "num_train_epochs": args.num_epochs,
         "gradient_accumulation_steps": args.gradient_accumulation_steps,
         "learning_rate": args.learning_rate,
         "optim": "adamw_torch",
@@ -106,30 +105,14 @@ def main(args):
         "dataset_text_field": "text",
         "packing": False,
         "max_length": args.seq_length,
-        "torch_compile": False,
         "report_to": "none",
         "logging_dir": args.log_dir,
         "logging_steps": args.logging_steps,
         "gradient_checkpointing": args.gradient_checkpointing
     }
 
-    # Compile model if requested
-    if args.use_torch_compile:
-        print("Compiling model with torch.compile()...")
-        model = torch.compile(model)
-        
-        # Warmup for torch compile
-        print("Running warmup for torch.compile()...")
-        SFTTrainer(
-            model=model,
-            processing_class=tokenizer,
-            train_dataset=dataset,
-            args=SFTConfig(**config),
-        ).train()
-
     # Train the model
     print(f"\nStarting QLoRA fine-tuning for {args.num_epochs} epoch(s)...")
-    config["num_train_epochs"] = args.num_epochs
     config["report_to"] = "tensorboard"
     
     trainer = SFTTrainer(
@@ -164,7 +147,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="Llama 3.1 70B Fine-tuning with QLoRA")
     
     # Model configuration
-    parser.add_argument("--model_name", type=str, default="meta-llama/Llama-3.1-70B-Instruct",
+    parser.add_argument("--model_name", type=str, default="unsloth/Meta-Llama-3.1-70B-bnb-4bit",
                         help="Model name or path")
     parser.add_argument("--dtype", type=str, default="bfloat16",
                         help="Model dtype (e.g., float32, float16, bfloat16)")
@@ -190,7 +173,7 @@ def parse_arguments():
                         help="LoRA rank")
     
     # Dataset configuration
-    parser.add_argument("--dataset_size", type=int, default=500,
+    parser.add_argument("--dataset_size", type=int, default=512,
                         help="Number of samples to use from dataset")
     
     # Logging configuration
@@ -198,12 +181,6 @@ def parse_arguments():
                         help="Log every N steps")
     parser.add_argument("--log_dir", type=str, default="logs",
                         help="Directory for logs")
-    
-    # Compilation and saving
-    parser.add_argument("--use_torch_compile", action="store_true",
-                        help="Use torch.compile() for faster training")
-    parser.add_argument("--output_dir", type=str, default=None,
-                        help="Directory to save the fine-tuned model")
     
     return parser.parse_args()
 
@@ -224,7 +201,6 @@ if __name__ == "__main__":
     print(f"LoRA rank: {args.lora_rank}")
     print(f"Dataset size: {args.dataset_size}")
     print(f"Gradient checkpointing: {args.gradient_checkpointing}")
-    print(f"Torch compile: {args.use_torch_compile}")
     print(f"{'='*60}\n")
     
     main(args)
