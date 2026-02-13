@@ -6,6 +6,7 @@
 
 - [Overview](#overview)
 - [Instructions](#instructions)
+- [Run on two Sparks](#run-on-two-sparks)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -397,7 +398,295 @@ cp recipes/llm_finetune/finetune.py my_custom_training.py
 
 Explore the [NeMo AutoModel GitHub repository](https://github.com/NVIDIA-NeMo/Automodel) for more recipes, documentation, and community examples. Consider setting up custom datasets, experimenting with different model architectures, and scaling to multi-node distributed training for larger models.
 
+## Run on two Sparks
+
+## Step 1. Configure network connectivity
+
+Follow the network setup instructions from the [Connect two Sparks](https://build.nvidia.com/spark/connect-two-sparks/stacked-sparks) playbook to establish connectivity between your DGX Spark nodes.
+
+This includes:
+- Physical QSFP cable connection
+- Network interface configuration (automatic or manual IP assignment)
+- Passwordless SSH setup
+- Network connectivity verification
+
+> [!NOTE]
+> Steps 2 to 8 must be conducted on each node.
+
+## Step 2. Configure Docker permissions
+
+To easily manage containers without sudo, you must be in the `docker` group. If you choose to skip this step, you will need to run Docker commands with sudo.
+
+Open a new terminal and test Docker access. In the terminal, run:
+
+```bash
+docker ps
+```
+
+If you see a permission denied error (something like permission denied while trying to connect to the Docker daemon socket), add your user to the docker group so that you don't need to run the command with sudo .
+
+```bash
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+## Step 3. Install NVIDIA Container Toolkit & setup Docker environment
+
+Ensure the NVIDIA drivers and the NVIDIA Container Toolkit are installed on each node (both manager and workers) that will provide GPU resources. This package enables Docker containers to access the host's GPU hardware. Ensure you complete the [installation steps](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html), including the [Docker configuration](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html#configuring-docker) for NVIDIA Container Toolkit.
+
+## Step 4. Deploy Docker Containers
+
+Download the [**pytorch-ft-entrypoint.sh**](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/pytorch-fine-tune/assets/pytorch-ft-entrypoint.sh) script into your home directory and run the following command to make it executable:
+
+```bash
+chmod +x $HOME/pytorch-ft-entrypoint.sh
+```
+
+Deploy the docker container by running the following command:
+```bash
+docker run -d \
+  --name automodel-node \
+  --gpus all \
+  --network host \
+  --ulimit memlock=-1 \
+  --ulimit stack=67108864 \
+  --device=/dev/infiniband \
+  -v "$PWD"/pytorch-ft-entrypoint.sh:/opt/pytorch-ft-entrypoint.sh \
+  -v "$HOME/.cache/huggingface/":/root/.cache/huggingface/ \
+  -v "$HOME/.ssh":/tmp/.ssh:ro \
+  -e UCX_NET_DEVICES=enp1s0f0np0,enp1s0f1np1 \
+  -e NCCL_SOCKET_IFNAME=enp1s0f0np0,enp1s0f1np1 \
+  -e GLOO_SOCKET_IFNAME=enp1s0f0np0,enp1s0f1np1 \
+  -e NCCL_DEBUG=INFO \
+  -e TORCH_NCCL_ASYNC_ERROR_HANDLING=1 \
+  -e TORCH_DISTRIBUTED_DEBUG=INFO \
+  -e CUDA_DEVICE_MAX_CONNECTIONS=1 \
+  -e CUDA_VISIBLE_DEVICES=0 \
+  nvcr.io/nvidia/pytorch:25.10-py3 \
+  /opt/pytorch-ft-entrypoint.sh
+```
+
+## Step 5. Install package management tools
+
+Launch a terminal into your docker container on the node.
+
+```bash
+docker exec -it automodel-node bash
+```
+
+> [!NOTE]
+> All subsequent steps and commands, other than "Cleanup and rollback", should be run from within the docker container terminal.
+
+Install `uv` for efficient package management and virtual environment isolation. NeMo AutoModel uses `uv` for dependency management and automatic environment handling.
+
+```bash
+## Install uv package manager
+pip3 install uv
+
+## Verify installation
+uv --version
+```
+
+## Step 6. Clone NeMo AutoModel repository
+
+Clone the official NeMo AutoModel repository to access recipes and examples. This provides ready-to-use training configurations for various model types and training scenarios.
+
+```bash
+## Clone the repository
+git clone https://github.com/NVIDIA-NeMo/Automodel.git
+
+## Navigate to the repository
+cd Automodel
+```
+
+## Step 7. Install NeMo AutoModel
+
+Set up the virtual environment and install NeMo AutoModel. Choose between wheel package installation for stability or source installation for latest features.
+
+**Install from wheel package (recommended):**
+
+```bash
+## Initialize virtual environment
+uv venv --system-site-packages
+
+## Install packages with uv
+uv sync --inexact --frozen --all-extras \
+  --no-install-package torch \
+  --no-install-package torchvision \
+  --no-install-package triton \
+  --no-install-package nvidia-cublas-cu12 \
+  --no-install-package nvidia-cuda-cupti-cu12 \
+  --no-install-package nvidia-cuda-nvrtc-cu12 \
+  --no-install-package nvidia-cuda-runtime-cu12 \
+  --no-install-package nvidia-cudnn-cu12 \
+  --no-install-package nvidia-cufft-cu12 \
+  --no-install-package nvidia-cufile-cu12 \
+  --no-install-package nvidia-curand-cu12 \
+  --no-install-package nvidia-cusolver-cu12 \
+  --no-install-package nvidia-cusparse-cu12 \
+  --no-install-package nvidia-cusparselt-cu12 \
+  --no-install-package nvidia-nccl-cu12 \
+  --no-install-package transformer-engine \
+  --no-install-package nvidia-modelopt \
+  --no-install-package nvidia-modelopt-core \
+  --no-install-package flash-attn \
+  --no-install-package transformer-engine-cu12 \
+  --no-install-package transformer-engine-torch
+
+## Install bitsandbytes
+CMAKE_ARGS="-DCOMPUTE_BACKEND=cuda -DCOMPUTE_CAPABILITY=80;86;87;89;90" \
+CMAKE_BUILD_PARALLEL_LEVEL=8 \
+uv pip install --no-deps git+https://github.com/bitsandbytes-foundation/bitsandbytes.git@50be19c39698e038a1604daf3e1b939c9ac1c342
+```
+
+## Step 8. Verify installation
+
+Confirm NeMo AutoModel is properly installed and accessible. This step validates the installation and checks for any missing dependencies.
+
+```bash
+## Test NeMo AutoModel import
+uv run --frozen --no-sync python -c "import nemo_automodel; print('✅ NeMo AutoModel ready')"
+```
+> [!NOTE]
+> You might see a warning stating `grouped_gemm is not available`. You can ignore this warning if you see '✅ NeMo AutoModel ready'.
+
+> [!NOTE]
+> Ensure steps 2 to 8 were conducted on all nodes for correct setup.
+
+## Step 9. Run sample multi-node fine-tuning
+The following commands show how to perform full fine-tuning (SFT) and parameter-efficient fine-tuning (PEFT) with LoRA across both Spark devices using `torch.distributed.run`.
+
+First, export your HF_TOKEN on both nodes so that gated models can be downloaded.
+
+```bash
+export HF_TOKEN=<your_huggingface_token>
+```
+> [!NOTE]
+> Replace `<your_huggingface_token>` with your personal Hugging Face access token. A valid token is required to download any gated model.
+>
+> - Generate a token: [Hugging Face tokens](https://huggingface.co/settings/tokens), guide available [here](https://huggingface.co/docs/hub/en/security-tokens).
+> - Request and receive access on each model's page (and accept license/terms) before attempting downloads.
+>   - Llama-3.1-8B: [meta-llama/Llama-3.1-8B](https://huggingface.co/meta-llama/Llama-3.1-8B)
+>   - Qwen3-8B: [Qwen/Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B)
+>   - Mixtral-8x7B: [mistralai/Mixtral-8x7B](https://huggingface.co/mistralai/Mixtral-8x7B)
+>
+> The same steps apply for any other gated model you use: visit its model card on Hugging Face, request access, accept the license, and wait for approval.
+
+Next, export a few multi-node PyTorch configuration environment variables.
+- `MASTER_ADDR`: IP address of your master node as set in [Connect two Sparks](https://build.nvidia.com/spark/connect-two-sparks/stacked-sparks). \(ex: 192.168.100.10\)
+- `MASTER_PORT`: Set a port number that can be used on your master node. \(ex: 12345\)
+- `NODE_RANK`: Master rank is set to 0 and Worker rank is set to 1
+
+Run this on the Master node
+```bash
+export MASTER_ADDR=<TODO: specify IP>
+export MASTER_PORT=<TODO: specify port>
+export NODE_RANK=0
+```
+
+Run this on the Worker node
+```bash
+export MASTER_ADDR=<TODO: specify IP>
+export MASTER_PORT=<TODO: specify port>
+export NODE_RANK=1
+```
+
+**LoRA fine-tuning example:**
+
+Execute a basic fine-tuning example to validate the complete setup. This demonstrates parameter-efficient fine-tuning using a small model suitable for testing.
+For the examples below, we are using YAML for configuration, and parameter overrides are passed as command line arguments.
+
+Run this on the all nodes:
+```bash
+uv run --frozen --no-sync python -m torch.distributed.run \
+  --nnodes=2 \
+  --nproc_per_node=1 \
+  --node_rank=${NODE_RANK} \
+  --rdzv_backend=static \
+  --rdzv_endpoint=${MASTER_ADDR}:${MASTER_PORT} \
+  examples/llm_finetune/finetune.py \
+  -c examples/llm_finetune/llama3_2/llama3_2_1b_squad_peft.yaml \
+  --model.pretrained_model_name_or_path meta-llama/Llama-3.1-8B \
+  --packed_sequence.packed_sequence_size 1024 \
+  --step_scheduler.max_steps 100
+```
+The following `torch.distributed.run` parameters configure our dual-node distributed PyTorch workload and communication:
+- `--nnodes`: sets the total number of nodes participating in the distributed training. This is 2 for our dual-node case.
+- `--nproc_per_node`: sets the number of processes to be executed on each node. 1 fine-tuning process will occur on each node in our example.
+- `--node_rank`: sets the rank of the current node. Again, Master rank is set to 0 and Worker rank is set to 1.
+- `--rdzv_backend`: sets the backend used for the rendezvous mechanism. The rendezvous mechanism allows nodes to discover each other and establish communication channels before beginning the distributed workload. We use `fixed` for a pre-configured rendezvous setup.
+- `--rdzv_endpoint`: sets the endpoint on which the rendezvous is expected to occur. This will be the Master node IP address and port specified earlier.
+
+These config overrides ensure the Llama-3.1-8B LoRA run behaves as expected:
+- `--model.pretrained_model_name_or_path`: selects the Llama-3.1-8B model to fine-tune from the Hugging Face model hub (weights fetched via your Hugging Face token).
+- `--packed_sequence.packed_sequence_size`: sets the packed sequence size to 1024 to enable packed sequence training.
+- `--step_scheduler.max_steps`: sets the maximum number of training steps. We set it to 100 for demonstation purposes, please adjust this based on your needs.
+
+> [!NOTE]
+> `NCCL WARN NET/IB : roceP2p1s0f1:1 unknown event type (18)` logs during multi-node workloads can be ignored and are a sign that RoCE is functional.
+
+**Full Fine-tuning example:**
+
+Run this on the all nodes:
+```bash
+uv run --frozen --no-sync python -m torch.distributed.run \
+  --nnodes=2 \
+  --nproc_per_node=1 \
+  --node_rank=${NODE_RANK} \
+  --rdzv_backend=static \
+  --rdzv_endpoint=${MASTER_ADDR}:${MASTER_PORT} \
+  examples/llm_finetune/finetune.py \
+  -c examples/llm_finetune/qwen/qwen3_8b_squad_spark.yaml \
+  --model.pretrained_model_name_or_path Qwen/Qwen3-8B \
+  --step_scheduler.local_batch_size 1 \
+  --step_scheduler.max_steps 100 \
+  --packed_sequence.packed_sequence_size 1024
+```
+These config overrides ensure the Qwen3-8B SFT run behaves as expected:
+- `--model.pretrained_model_name_or_path`: selects the Qwen/Qwen3-8B model to fine-tune from the Hugging Face model hub (weights fetched via your Hugging Face token). Adjust this if you want to fine-tune a different model.
+- `--step_scheduler.max_steps`: sets the maximum number of training steps. We set it to 100 for demonstation purposes, please adjust this based on your needs.
+- `--step_scheduler.local_batch_size`: sets the per-GPU micro-batch size to 1 to fit in memory; overall effective batch size is still driven by gradient accumulation and data/tensor parallel settings from the recipe.
+
+
+## Step 10. Validate successful training completion
+
+Validate the fine-tuned model by inspecting artifacts contained in the checkpoint directory on your Master node.
+
+```bash
+## Inspect logs and checkpoint output.
+## The LATEST is a symlink pointing to the latest checkpoint.
+## The checkpoint is the one that was saved during training.
+## below is an example of the expected output (username and domain-users are placeholders).
+ls -lah checkpoints/LATEST/
+
+## root@gx10-f154:/workspace/Automodel# ls -lah checkpoints/LATEST/
+## total 36K
+## drwxr-xr-x 6 username domain-users 4.0K Dec  8 20:16 .
+## drwxr-xr-x 3 username domain-users 4.0K Dec  8 20:16 ..
+## -rw-r--r-- 1 username domain-users 1.6K Dec  8 20:16 config.yaml
+## drwxr-xr-x 2 username domain-users 4.0K Dec  8 20:16 dataloader
+## -rw-r--r-- 1 username domain-users   66 Dec  8 20:16 losses.json
+## drwxr-xr-x 3 username domain-users 4.0K Dec  8 20:16 model
+## drwxr-xr-x 2 username domain-users 4.0K Dec  8 20:16 optim
+## drwxr-xr-x 2 username domain-users 4.0K Dec  8 20:16 rng
+## -rw-r--r-- 1 username domain-users 1.3K Dec  8 20:16 step_scheduler.pt
+```
+
+## Step 11. Cleanup and rollback
+
+Stop and remove containers by using the following command on all nodes:
+
+```bash
+docker stop automodel-node
+docker rm automodel-node
+```
+
+> [!WARNING]
+> This removes all training data and performance reports. Copy `checkpoints/` out of the container in advance if you want to keep it.
+
 ## Troubleshooting
+
+## Common issues for running on a single Spark
 
 | Symptom | Cause | Fix |
 |---------|--------|-----|
@@ -407,6 +696,19 @@ Explore the [NeMo AutoModel GitHub repository](https://github.com/NVIDIA-NeMo/Au
 | Out of memory during training | Model too large for available GPU memory | Reduce batch size, enable gradient checkpointing, or use model parallelism |
 | ARM64 package compatibility issues | Package not available for ARM architecture | Use source installation or build from source with ARM64 flags |
 | Cannot access gated repo for URL | Certain HuggingFace models have restricted access | Regenerate your [HuggingFace token](https://huggingface.co/docs/hub/en/security-tokens); and request access to the [gated model](https://huggingface.co/docs/hub/en/models-gated#customize-requested-information) on your web browser |
+
+## Common Issues for running on two Starks
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `nvcc: command not found` | CUDA toolkit not in PATH | Add CUDA toolkit to PATH: `export PATH=/usr/local/cuda/bin:$PATH` |
+| Container exits immediately | Missing entrypoint script | Ensure `pytorch-ft-entrypoint.sh` download succeeded and has executable permissions |
+| `The container name "/automodel-node" is already in use` | Another docker container of the same name is in use on the node (likely forgotten during clean up) | Remove (or rename) the old container or rename the new one |
+| GPU not detected in training | CUDA driver/runtime mismatch | Verify driver compatibility: `nvidia-smi` and reinstall CUDA if needed |
+| Out of memory during training | Model too large for available GPU memory | Reduce batch size, enable gradient checkpointing, or use model parallelism |
+| Cannot access gated repo for URL | Certain HuggingFace models have restricted access | Regenerate your [HuggingFace token](https://huggingface.co/docs/hub/en/security-tokens); and request access to the [gated model](https://huggingface.co/docs/hub/en/models-gated#customize-requested-information) on your web browser |
+| Checkpoint loading failure when running fine-tuning examples consecutively: `No such file or directory: 'checkpoints/epoch_0_step_*/*'` | Fine-tuning script attempts to load old checkpoints unsuccessfully | Remove the `checkpoints/` directory before running again |
+| `Unable to find address for: enp1s0f0np0` when attempting single node fine-tuning run on multi-node container | `enp1s0f0np0` is not configured with an IP | Verify network configuration or, if you configured the devices on `enp1s0f1np1`, set `NCCL_SOCKET_IFNAME` and `GLOO_SOCKET_IFNAME` to only `enp1s0f1np1` |
 
 > [!NOTE]
 > DGX Spark uses a Unified Memory Architecture (UMA), which enables dynamic memory sharing between the GPU and CPU.
