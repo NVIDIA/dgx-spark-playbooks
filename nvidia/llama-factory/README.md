@@ -115,7 +115,9 @@ sed -i 's/"torchaudio[^"]*",\?//' pyproject.toml
 pip install -e ".[metrics]"
 pip install --no-deps torchaudio
 ```
-
+```
+edit LLaMA-Factory/src/llamafactory/data/mm_plugin.py and comment import torchaudio so that import won't fail.
+```
 ## Step 5. Verify Pytorch CUDA support. 
 
 PyTorch is pre-installed with CUDA support.
