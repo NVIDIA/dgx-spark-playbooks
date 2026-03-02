@@ -128,6 +128,11 @@ If you haven't already done so, install [Isaac Sim](build.nvidia.com/spark/isaac
 
 Clone Isaac Lab from the NVIDIA GitHub repository.
 
+> **Note:** For Isaac Lab Early Developer Release, use:
+> ```bash
+> git clone --recursive --branch=develop https://github.com/isaac-sim/IsaacLab
+> ```
+
 ```bash
 git clone --recursive https://github.com/isaac-sim/IsaacLab
 cd IsaacLab
@@ -147,6 +152,15 @@ ls -l "${PWD}/_isaac_sim/python.sh"
 ```
 
 ## Step 4. Install Isaac Lab
+
+Install dependencies for Newton, requires X11 development libraries to build imgui_bundle from source.
+
+```bash
+sudo apt update
+sudo apt install -y libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libgl1-mesa-dev
+```
+
+Then install Isaac Lab.
 
 ```bash
 ./isaaclab.sh --install

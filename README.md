@@ -50,7 +50,7 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 - [Speculative Decoding](nvidia/speculative-decoding/)
 - [Set up Tailscale on Your Spark](nvidia/tailscale/)
 - [TRT LLM for Inference](nvidia/trt-llm/)
-- [Text to Knowledge Graph](nvidia/txt2kg/)
+- [Text to Knowledge Graph on DGX Spark](nvidia/txt2kg/)
 - [Unsloth on DGX Spark](nvidia/unsloth/)
 - [Vibe Coding in VS Code](nvidia/vibe-coding/)
 - [vLLM for Inference](nvidia/vllm/)

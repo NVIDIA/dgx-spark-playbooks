@@ -9,12 +9,11 @@ This directory contains optional GPU-accelerated graph visualization services th
 ## 📦 Available Services
 
 ### 1. Unified GPU Service (`unified_gpu_service.py`)
-Combines **PyGraphistry Cloud** and **Local GPU (cuGraph)** processing into a single FastAPI service.
+Provides **Local GPU (cuGraph)** processing with **Local CPU** fallback in a single FastAPI service.
 
 **Processing Modes:**
 | Mode | Description | Requirements |
 |------|-------------|--------------|
-| **PyGraphistry Cloud** | Interactive GPU embeds in browser | API credentials |
 | **Local GPU (cuGraph)** | Full GPU processing on your hardware | NVIDIA GPU + cuGraph |
 | **Local CPU** | NetworkX fallback processing | None |
 
@@ -29,7 +28,6 @@ Local GPU processing service with WebSocket support for real-time updates.
 ### Prerequisites
 - NVIDIA GPU with CUDA support (for GPU modes)
 - RAPIDS cuGraph (for local GPU processing)
-- PyGraphistry account (for cloud mode)
 
 ### Installation
 
@@ -94,7 +92,6 @@ Response:
 ```json
 {
   "processing_modes": {
-    "pygraphistry_cloud": {"available": true, "description": "..."},
     "local_gpu": {"available": true, "description": "..."},
     "local_cpu": {"available": true, "description": "..."}
   },
@@ -108,13 +105,11 @@ Response:
 The txt2kg frontend includes built-in components for GPU visualization:
 
 - `UnifiedGPUViewer`: Connects to unified GPU service
-- `PyGraphistryViewer`: Direct PyGraphistry cloud integration
 - `ForceGraphWrapper`: Three.js WebGPU visualization (default)
 
 ### Using GPU Services in Frontend
 
 The frontend has API routes that can connect to these services:
-- `/api/pygraphistry/*`: PyGraphistry integration
 - `/api/unified-gpu/*`: Unified GPU service integration
 
 To use these services, ensure they are running separately and configure the frontend environment variables accordingly.
@@ -122,20 +117,7 @@ To use these services, ensure they are running separately and configure the fron
 ### Mode-Specific Processing
 
 ```javascript
-// PyGraphistry Cloud mode
-const response = await fetch('/api/unified-gpu/visualize', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    graph_data: { nodes, links },
-    processing_mode: 'pygraphistry_cloud',
-    layout_type: 'force',
-    clustering: true,
-    gpu_acceleration: true
-  })
-})
-
-// Local GPU mode  
+// Local GPU mode
 const response = await fetch('/api/unified-gpu/visualize', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
@@ -150,11 +132,6 @@ const response = await fetch('/api/unified-gpu/visualize', {
 ```
 
 ## 🔧 Configuration Options
-
-### PyGraphistry Cloud Mode
-- `layout_type`: "force", "circular", "hierarchical"
-- `gpu_acceleration`: true/false
-- `clustering`: true/false
 
 ### Local GPU Mode  
 - `layout_algorithm`: "force_atlas2", "spectral", "fruchterman_reingold"
@@ -172,7 +149,6 @@ const response = await fetch('/api/unified-gpu/visualize', {
   "processed_nodes": [...],
   "processed_edges": [...],
   "processing_mode": "local_gpu",
-  "embed_url": "https://hub.graphistry.com/...", // Only for cloud mode
   "layout_positions": {...}, // Only for local GPU mode
   "clusters": {...},
   "centrality": {...},
@@ -197,7 +173,6 @@ const response = await fetch('/api/unified-gpu/visualize', {
 - **Better testing** - Easy comparison between modes
 
 ### 🎯 Use Cases
-- **PyGraphistry Cloud**: Sharing visualizations, demos, production embeds
 - **Local GPU**: Private data, large-scale processing, custom algorithms
 - **Local CPU**: Development, testing, small graphs
 
@@ -212,16 +187,6 @@ nvidia-smi
 python -c "import cudf, cugraph; print('RAPIDS OK')"
 ```
 
-### PyGraphistry Credentials
-```bash
-# Verify credentials are set
-echo $GRAPHISTRY_PERSONAL_KEY
-echo $GRAPHISTRY_SECRET_KEY
-
-# Test connection
-python -c "import graphistry; graphistry.register(personal_key_id='$GRAPHISTRY_PERSONAL_KEY', personal_key_secret='$GRAPHISTRY_SECRET_KEY'); print('PyGraphistry OK')"
-```
-
 ### Service Health
 ```bash
 curl http://localhost:8080/api/health
@@ -230,6 +195,5 @@ curl http://localhost:8080/api/health
 ## 📈 Performance Tips
 
 1. **Large graphs (>100k nodes)**: Use `local_gpu` mode
-2. **Sharing/demos**: Use `pygraphistry_cloud` mode  
-3. **Development**: Use `local_cpu` mode for speed
-4. **Mixed workloads**: Switch modes dynamically based on graph size 
+2. **Development**: Use `local_cpu` mode for speed
+3. **Mixed workloads**: Switch modes dynamically based on graph size 

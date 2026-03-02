@@ -1,5 +1,5 @@
 sentence-transformers==2.3.1
-transformers==4.46.3
+transformers==4.57.6
 torch==2.6.0
 flask==2.3.3
 gunicorn==23.0.0

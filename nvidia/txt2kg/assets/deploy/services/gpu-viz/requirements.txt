@@ -1,4 +1,3 @@
-graphistry>=0.32.0
 pandas>=2.0.0
 numpy>=1.24.0
 fastapi>=0.104.0
@@ -7,7 +6,6 @@ pydantic>=2.0.0
 networkx>=3.0  # For efficient graph generation algorithms
 # cudf, cuml, cugraph are already included in PyG container
 # cupy>=12.0.0  # Already included in PyG container
-igraph>=0.10.0  # For additional graph algorithms
 scikit-learn>=1.3.0  # For additional ML features
 requests>=2.31.0
 aiofiles>=23.0.0

@@ -94,13 +94,17 @@ sudo usermod -aG docker $USER
 newgrp docker
 ```
 
-## Step 3. Get the container image
+## Step 3. Get the container image and clone the repository for mounting
 
 ```bash
-docker pull nvcr.io/nvidia/pytorch:25.11-py3
+docker pull nvcr.io/nvidia/nemo-automodel:26.02
+
+git clone https://github.com/NVIDIA-NeMo/Automodel.git
 ```
 
 ## Step 4. Launch Docker
+
+Replace `<local-path-to-Automodel>` with the absolute path to the Automodel directory you cloned in Step 3.
 
 ```bash
 docker run \
@@ -108,84 +112,25 @@ docker run \
   --ulimit memlock=-1 \
   -it --ulimit stack=67108864 \
   --entrypoint /usr/bin/bash \
-  --rm nvcr.io/nvidia/pytorch:25.11-py3
+  -v <local-path-to-Automodel>:/opt/Automodel \
+  --rm nvcr.io/nvidia/nemo-automodel:26.02
 ```
 
-## Step 5. Install package management tools
+## Step 5. Install NeMo Automodel with latest features
 
-Install `uv` for efficient package management and virtual environment isolation. NeMo AutoModel uses `uv` for dependency management and automatic environment handling.
-
+First `cd` into the NeMo Automodel directory
 ```bash
-## Install uv package manager
-pip3 install uv
-
-## Verify installation
-uv --version
+cd /opt/Automodel
 ```
 
-**If system installation fails:**
-
+Next, run the following two commands to sync the environment packages
 ```bash
-## Install for current user only
-pip3 install --user uv
+bash docker/common/update_pyproject_pytorch.sh /opt/Automodel
 
-## Add to PATH if needed
-export PATH="$HOME/.local/bin:$PATH"
+uv sync --locked --extra all --all-groups
 ```
 
-## Step 6. Clone NeMo AutoModel repository
-
-Clone the official NeMo AutoModel repository to access recipes and examples. This provides ready-to-use training configurations for various model types and training scenarios.
-
-```bash
-## Clone the repository
-git clone https://github.com/NVIDIA-NeMo/Automodel.git
-
-## Navigate to the repository
-cd Automodel
-```
-
-## Step 7. Install NeMo AutoModel
-
-Set up the virtual environment and install NeMo AutoModel. Choose between wheel package installation for stability or source installation for latest features.
-
-**Install from wheel package (recommended):**
-
-```bash
-## Initialize virtual environment
-uv venv --system-site-packages
-
-## Install packages with uv
-uv sync --inexact --frozen --all-extras \
-  --no-install-package torch \
-  --no-install-package torchvision \
-  --no-install-package triton \
-  --no-install-package nvidia-cublas-cu12 \
-  --no-install-package nvidia-cuda-cupti-cu12 \
-  --no-install-package nvidia-cuda-nvrtc-cu12 \
-  --no-install-package nvidia-cuda-runtime-cu12 \
-  --no-install-package nvidia-cudnn-cu12 \
-  --no-install-package nvidia-cufft-cu12 \
-  --no-install-package nvidia-cufile-cu12 \
-  --no-install-package nvidia-curand-cu12 \
-  --no-install-package nvidia-cusolver-cu12 \
-  --no-install-package nvidia-cusparse-cu12 \
-  --no-install-package nvidia-cusparselt-cu12 \
-  --no-install-package nvidia-nccl-cu12 \
-  --no-install-package transformer-engine \
-  --no-install-package nvidia-modelopt \
-  --no-install-package nvidia-modelopt-core \
-  --no-install-package flash-attn \
-  --no-install-package transformer-engine-cu12 \
-  --no-install-package transformer-engine-torch
-
-## Install bitsandbytes
-CMAKE_ARGS="-DCOMPUTE_BACKEND=cuda -DCOMPUTE_CAPABILITY=80;86;87;89;90" \
-CMAKE_BUILD_PARALLEL_LEVEL=8 \
-uv pip install --no-deps git+https://github.com/bitsandbytes-foundation/bitsandbytes.git@50be19c39698e038a1604daf3e1b939c9ac1c342
-```
-
-## Step 8. Verify installation
+## Step 6. Verify installation
 
 Confirm NeMo AutoModel is properly installed and accessible. This step validates the installation and checks for any missing dependencies.
 
@@ -210,7 +155,7 @@ ls -la examples/
 ## drwxr-xr-x  2 username domain-users 4096 Oct 14 09:27 vlm_generate
 ```
 
-## Step 9. Explore available examples
+## Step 7. Explore available examples
 
 Review the pre-configured training recipes available for different model types and training scenarios. These recipes provide optimized configurations for ARM64 and Blackwell architecture.
 
@@ -222,7 +167,7 @@ ls examples/llm_finetune/
 cat examples/llm_finetune/finetune.py | head -20
 ```
 
-## Step 10. Run sample fine-tuning
+## Step 8. Run sample fine-tuning
 The following commands show how to perform full fine-tuning (SFT), parameter-efficient fine-tuning (PEFT) with LoRA and QLoRA.
 
 First, export your HF_TOKEN so that gated models can be downloaded.
@@ -304,7 +249,7 @@ These overrides ensure the Qwen3-8B SFT run behaves as expected:
 - `--step_scheduler.local_batch_size`: sets the per-GPU micro-batch size to 1 to fit in memory; overall effective batch size is still driven by gradient accumulation and data/tensor parallel settings from the recipe.
 
 
-## Step 11. Validate successful training completion
+## Step 9. Validate successful training completion
 
 Validate the fine-tuned model by inspecting artifacts contained in the checkpoint directory.
 
@@ -327,7 +272,7 @@ ls -lah checkpoints/LATEST/
 ## -rw-r--r-- 1 username domain-users 1.3K Oct 16 22:33 step_scheduler.pt
 ```
 
-## Step 12. Cleanup and rollback (Optional)
+## Step 10. Cleanup and rollback (Optional)
 
 Remove the installation and restore the original environment if needed. These commands safely remove all installed components.
 
@@ -348,7 +293,7 @@ pip3 uninstall uv
 ## Clear Python cache
 rm -rf ~/.cache/pip
 ```
-## Step 13. Optional: Publish your fine-tuned model checkpoint on Hugging Face Hub
+## Step 11. Optional: Publish your fine-tuned model checkpoint on Hugging Face Hub
 
 Publish your fine-tuned model checkpoint on Hugging Face Hub.
 > [!NOTE]
@@ -383,7 +328,7 @@ hf upload my-cool-model checkpoints/LATEST/model
 > ```
 > To fix this, you need to create an access token with *write* permissions, please see the Hugging Face guide [here](https://huggingface.co/docs/hub/en/security-tokens) for instructions.
 
-## Step 14. Next steps
+## Step 12. Next steps
 
 Begin using NeMo AutoModel for your specific fine-tuning tasks. Start with provided recipes and customize based on your model requirements and dataset.
 

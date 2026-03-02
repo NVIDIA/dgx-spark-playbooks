@@ -1,4 +1,4 @@
-# Text to Knowledge Graph
+# Text to Knowledge Graph on DGX Spark
 
 > Transform unstructured text into interactive knowledge graphs with LLM inference and graph visualization
 
