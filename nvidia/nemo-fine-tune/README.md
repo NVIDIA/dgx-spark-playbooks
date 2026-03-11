@@ -94,17 +94,15 @@ sudo usermod -aG docker $USER
 newgrp docker
 ```
 
-## Step 3. Get the container image and clone the repository for mounting
+## Step 3. Get the container image with NeMo AutoModel
 
 ```bash
 docker pull nvcr.io/nvidia/nemo-automodel:26.02
-
-git clone https://github.com/NVIDIA-NeMo/Automodel.git
 ```
 
 ## Step 4. Launch Docker
 
-Replace `<local-path-to-Automodel>` with the absolute path to the Automodel directory you cloned in Step 3.
+Launch an interactive container with GPU access. The `--rm` flag ensures the container is removed when you exit.
 
 ```bash
 docker run \
@@ -112,54 +110,17 @@ docker run \
   --ulimit memlock=-1 \
   -it --ulimit stack=67108864 \
   --entrypoint /usr/bin/bash \
-  -v <local-path-to-Automodel>:/opt/Automodel \
   --rm nvcr.io/nvidia/nemo-automodel:26.02
 ```
 
-## Step 5. Install NeMo Automodel with latest features
-
-First `cd` into the NeMo Automodel directory
-```bash
-cd /opt/Automodel
-```
-
-Next, run the following two commands to sync the environment packages
-```bash
-bash docker/common/update_pyproject_pytorch.sh /opt/Automodel
-
-uv sync --locked --extra all --all-groups
-```
-
-## Step 6. Verify installation
-
-Confirm NeMo AutoModel is properly installed and accessible. This step validates the installation and checks for any missing dependencies.
-
-```bash
-## Test NeMo AutoModel import
-uv run --frozen --no-sync python -c "import nemo_automodel; print('✅ NeMo AutoModel ready')"
-
-## Check available examples
-ls -la examples/
-
-## Below is an example of the expected output (username and domain-users are placeholders).
-## $ ls -la examples/
-## total 36
-## drwxr-xr-x  9 username domain-users 4096 Oct 16 14:52 .
-## drwxr-xr-x 16 username domain-users 4096 Oct 16 14:52 ..
-## drwxr-xr-x  3 username domain-users 4096 Oct 16 14:52 benchmark
-## drwxr-xr-x  3 username domain-users 4096 Oct 16 14:52 diffusion
-## drwxr-xr-x 20 username domain-users 4096 Oct 16 14:52 llm_finetune
-## drwxr-xr-x  3 username domain-users 4096 Oct 14 09:27 llm_kd
-## drwxr-xr-x  2 username domain-users 4096 Oct 16 14:52 llm_pretrain
-## drwxr-xr-x  6 username domain-users 4096 Oct 14 09:27 vlm_finetune
-## drwxr-xr-x  2 username domain-users 4096 Oct 14 09:27 vlm_generate
-```
-
-## Step 7. Explore available examples
+## Step 5. Explore available examples
 
 Review the pre-configured training recipes available for different model types and training scenarios. These recipes provide optimized configurations for ARM64 and Blackwell architecture.
 
 ```bash
+## Navigate to /opt/Automodel
+cd /opt/Automodel
+
 ## List LLM fine-tuning examples
 ls examples/llm_finetune/
 
@@ -167,7 +128,7 @@ ls examples/llm_finetune/
 cat examples/llm_finetune/finetune.py | head -20
 ```
 
-## Step 8. Run sample fine-tuning
+## Step 6. Run sample fine-tuning
 The following commands show how to perform full fine-tuning (SFT), parameter-efficient fine-tuning (PEFT) with LoRA and QLoRA.
 
 First, export your HF_TOKEN so that gated models can be downloaded.
@@ -194,8 +155,8 @@ For the examples below, we are using YAML for configuration, and parameter overr
 
 ```bash
 ## Run basic LLM fine-tuning example
-uv run --frozen --no-sync \
-examples/llm_finetune/finetune.py \
+cd /opt/Automodel
+python3 examples/llm_finetune/finetune.py \
 -c examples/llm_finetune/llama3_2/llama3_2_1b_squad_peft.yaml \
 --model.pretrained_model_name_or_path meta-llama/Llama-3.1-8B \
 --packed_sequence.packed_sequence_size 1024 \
@@ -205,16 +166,18 @@ examples/llm_finetune/finetune.py \
 These overrides ensure the Llama-3.1-8B LoRA run behaves as expected:
 - `--model.pretrained_model_name_or_path`: selects the Llama-3.1-8B model to fine-tune from the Hugging Face model hub (weights fetched via your Hugging Face token).
 - `--packed_sequence.packed_sequence_size`: sets the packed sequence size to 1024 to enable packed sequence training.
-- `--step_scheduler.max_steps`: sets the maximum number of training steps. We set it to 20 for demonstation purposes, please adjust this based on your needs.
+- `--step_scheduler.max_steps`: sets the maximum number of training steps. We set it to 20 for demonstration purposes, please adjust this based on your needs.
 
+> [!NOTE]
+> The recipe YAML `llama3_2_1b_squad_peft.yaml` defines training hyperparameters (LoRA rank, learning rate, etc.) that are reusable across Llama model sizes. The `--model.pretrained_model_name_or_path` override determines which model weights are actually loaded.
 
 **QLoRA fine-tuning example:**
 
 We can use QLoRA to fine-tune large models in a memory-efficient manner.
 
 ```bash
-uv run --frozen --no-sync \
-examples/llm_finetune/finetune.py \
+cd /opt/Automodel
+python3 examples/llm_finetune/finetune.py \
 -c examples/llm_finetune/llama3_1/llama3_1_8b_squad_qlora.yaml \
 --model.pretrained_model_name_or_path meta-llama/Meta-Llama-3-70B \
 --loss_fn._target_ nemo_automodel.components.loss.te_parallel_ce.TEParallelCrossEntropy \
@@ -226,30 +189,32 @@ examples/llm_finetune/finetune.py \
 These overrides ensure the 70B QLoRA run behaves as expected:
 - `--model.pretrained_model_name_or_path`: selects the 70B base model to fine-tune (weights fetched via your Hugging Face token).
 - `--loss_fn._target_`: uses the TransformerEngine-parallel cross-entropy loss variant compatible with tensor-parallel training for large LLMs.
-- `--step_scheduler.local_batch_size`: sets the per-GPU micro-batch size to 1 to fit 70B in memory; overall effective batch size is still driven by gradient accumulation and data/tensor parallel settings from the recipe. 
-- `--step_scheduler.max_steps`: sets the maximum number of training steps. We set it to 20 for demonstation purposes, please adjust this based on your needs.
+- `--step_scheduler.local_batch_size`: sets the per-GPU micro-batch size to 1 to fit 70B in memory; overall effective batch size is still driven by gradient accumulation and data/tensor parallel settings from the recipe.
+- `--step_scheduler.max_steps`: sets the maximum number of training steps. We set it to 20 for demonstration purposes, please adjust this based on your needs.
 - `--packed_sequence.packed_sequence_size`: sets the packed sequence size to 1024 to enable packed sequence training.
 
 **Full Fine-tuning example:**
 
-Once inside the `Automodel` directory you cloned from GitHub, run:
+Run the following command to perform full (SFT) fine-tuning:
 
 ```bash
-uv run --frozen --no-sync \
-examples/llm_finetune/finetune.py \
+cd /opt/Automodel
+python3 examples/llm_finetune/finetune.py \
 -c examples/llm_finetune/qwen/qwen3_8b_squad_spark.yaml \
 --model.pretrained_model_name_or_path Qwen/Qwen3-8B \
 --step_scheduler.local_batch_size 1 \
 --step_scheduler.max_steps 20 \
 --packed_sequence.packed_sequence_size 1024
 ```
+
 These overrides ensure the Qwen3-8B SFT run behaves as expected:
 - `--model.pretrained_model_name_or_path`: selects the Qwen/Qwen3-8B model to fine-tune from the Hugging Face model hub (weights fetched via your Hugging Face token). Adjust this if you want to fine-tune a different model.
-- `--step_scheduler.max_steps`: sets the maximum number of training steps. We set it to 20 for demonstation purposes, please adjust this based on your needs.
+- `--step_scheduler.max_steps`: sets the maximum number of training steps. We set it to 20 for demonstration purposes, please adjust this based on your needs.
 - `--step_scheduler.local_batch_size`: sets the per-GPU micro-batch size to 1 to fit in memory; overall effective batch size is still driven by gradient accumulation and data/tensor parallel settings from the recipe.
+- `--packed_sequence.packed_sequence_size`: sets the packed sequence size to 1024 to enable packed sequence training.
 
 
-## Step 9. Validate successful training completion
+## Step 7. Validate successful training completion
 
 Validate the fine-tuned model by inspecting artifacts contained in the checkpoint directory.
 
@@ -272,28 +237,17 @@ ls -lah checkpoints/LATEST/
 ## -rw-r--r-- 1 username domain-users 1.3K Oct 16 22:33 step_scheduler.pt
 ```
 
-## Step 10. Cleanup and rollback (Optional)
+## Step 8. Cleanup (Optional)
 
-Remove the installation and restore the original environment if needed. These commands safely remove all installed components.
+The container was launched with the `--rm` flag, so it is automatically removed when you exit. To reclaim disk space used by the Docker image, run:
 
 > [!WARNING]
-> This will delete all virtual environments and downloaded models. Ensure you have backed up any important training checkpoints.
+> This will remove the NeMo AutoModel image. You will need to pull it again if you want to use it later.
 
 ```bash
-## Remove virtual environment
-rm -rf .venv
-
-## Remove cloned repository
-cd ..
-rm -rf Automodel
-
-## Remove uv (if installed with --user)
-pip3 uninstall uv
-
-## Clear Python cache
-rm -rf ~/.cache/pip
+docker rmi nvcr.io/nvidia/nemo-automodel:26.02
 ```
-## Step 11. Optional: Publish your fine-tuned model checkpoint on Hugging Face Hub
+## Step 9. Optional: Publish your fine-tuned model checkpoint on Hugging Face Hub
 
 Publish your fine-tuned model checkpoint on Hugging Face Hub.
 > [!NOTE]
@@ -301,7 +255,7 @@ Publish your fine-tuned model checkpoint on Hugging Face Hub.
 > It is useful if you want to share your fine-tuned model with others or use it in other projects.
 > You can also use the fine-tuned model in other projects by cloning the repository and using the checkpoint.
 > To use the fine-tuned model in other projects, you need to have the Hugging Face CLI installed.
-> You can install the Hugging Face CLI by running `pip install huggingface-cli`.
+> You can install the Hugging Face CLI by running `pip install huggingface_hub`.
 > For more information, please refer to the [Hugging Face CLI documentation](https://huggingface.co/docs/huggingface_hub/en/guides/cli).
 
 > [!TIP]
@@ -318,26 +272,26 @@ hf upload my-cool-model checkpoints/LATEST/model
 > The above command can fail if you don't have write permissions to the Hugging Face Hub, with the HF_TOKEN you used.
 > Sample error message:
 > ```bash
-> akoumparouli@1604ab7-lcedt:/mnt/4tb/auto/Automodel8$ hf upload my-cool-model checkpoints/LATEST/model
+> user@host:/opt/Automodel$ hf upload my-cool-model checkpoints/LATEST/model
 > Traceback (most recent call last):
->   File "/home/akoumparouli/.local/lib/python3.10/site-packages/huggingface_hub/utils/_http.py", line 409, in hf_raise_for_status
+>   File "/home/user/.local/lib/python3.10/site-packages/huggingface_hub/utils/_http.py", line 409, in hf_raise_for_status
 >     response.raise_for_status()
->   File "/home/akoumparouli/.local/lib/python3.10/site-packages/requests/models.py", line 1024, in raise_for_status
+>   File "/home/user/.local/lib/python3.10/site-packages/requests/models.py", line 1024, in raise_for_status
 >     raise HTTPError(http_error_msg, response=self)
 > requests.exceptions.HTTPError: 403 Client Error: Forbidden for url: https://huggingface.co/api/repos/create
 > ```
 > To fix this, you need to create an access token with *write* permissions, please see the Hugging Face guide [here](https://huggingface.co/docs/hub/en/security-tokens) for instructions.
 
-## Step 12. Next steps
+## Step 10. Next steps
 
 Begin using NeMo AutoModel for your specific fine-tuning tasks. Start with provided recipes and customize based on your model requirements and dataset.
 
 ```bash
 ## Copy a recipe for customization
-cp recipes/llm_finetune/finetune.py my_custom_training.py
+cp examples/llm_finetune/finetune.py my_custom_training.py
 
-## Edit configuration for your specific model and data
-## Then run: uv run my_custom_training.py
+## Edit configuration for your specific model and data, then run:
+python3 my_custom_training.py
 ```
 
 Explore the [NeMo AutoModel GitHub repository](https://github.com/NVIDIA-NeMo/Automodel) for more recipes, documentation, and community examples. Consider setting up custom datasets, experimenting with different model architectures, and scaling to multi-node distributed training for larger models.
