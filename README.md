@@ -41,7 +41,7 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 - [NVFP4 Quantization](nvidia/nvfp4-quantization/)
 - [Ollama](nvidia/ollama/)
 - [Open WebUI with Ollama](nvidia/open-webui/)
-- [OpenClaw](nvidia/openclaw/)
+- [OpenClaw 🦞](nvidia/openclaw/)
 - [Portfolio Optimization](nvidia/portfolio-optimization/)
 - [Fine-tune with Pytorch](nvidia/pytorch-fine-tune/)
 - [RAG Application in AI Workbench](nvidia/rag-ai-workbench/)

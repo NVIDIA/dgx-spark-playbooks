@@ -1,4 +1,4 @@
-# OpenClaw
+# OpenClaw 🦞
 
 > Run OpenClaw locally on DGX Spark with LM Studio or Ollama
 
