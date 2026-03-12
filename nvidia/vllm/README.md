@@ -53,6 +53,7 @@ The following models are supported with vLLM on Spark. All listed models are ava
 
 | Model | Quantization | Support Status | HF Handle |
 |-------|-------------|----------------|-----------|
+| **Nemotron-3-Super-120B** | FP8 | ✅ | []`nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8`](https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8) |
 | **GPT-OSS-20B** | MXFP4 | ✅ | [`openai/gpt-oss-20b`](https://huggingface.co/openai/gpt-oss-20b) |
 | **GPT-OSS-120B** | MXFP4 | ✅ | [`openai/gpt-oss-120b`](https://huggingface.co/openai/gpt-oss-120b) |
 | **Llama-3.1-8B-Instruct** | FP8 | ✅ | [`nvidia/Llama-3.1-8B-Instruct-FP8`](https://huggingface.co/nvidia/Llama-3.1-8B-Instruct-FP8) |
@@ -87,9 +88,9 @@ Reminder: not all model architectures are supported for NVFP4 quantization.
 * **Duration:** 30 minutes for Docker approach
 * **Risks:** Container registry access requires internal credentials
 * **Rollback:** Container approach is non-destructive.
-* **Last Updated:** 01/22/2026
-  * Added support for Qwen3-VL-Reranker-2B, Qwen3-VL-Reranker-8B, and Qwen3-VL-Embedding-2B models
-  * Updated container to January 2026 release (26.01-py3)
+* **Last Updated:** 03/12/2026
+  * Added support for Nemotron-3-Super-120B model
+  * Updated container to Feb 2026 release (26.02-py3)
 
 ## Instructions
 
@@ -117,13 +118,9 @@ Find the latest container build from https://catalog.ngc.nvidia.com/orgs/nvidia/
 export LATEST_VLLM_VERSION=<latest_container_version>
 
 ## example
-## export LATEST_VLLM_VERSION=26.01-py3
+## export LATEST_VLLM_VERSION=26.02-py3
 
 docker pull nvcr.io/nvidia/vllm:${LATEST_VLLM_VERSION}
-```
-
-```bash
-docker pull nvcr.io/nvidia/vllm:26.01-py3
 ```
 
 ## Step 3. Test vLLM in container

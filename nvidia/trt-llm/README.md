@@ -75,6 +75,7 @@ The following models are supported with TensorRT-LLM on Spark. All listed models
 
 | Model | Quantization | Support Status | HF Handle |
 |-------|-------------|----------------|-----------|
+| **Nemotron-3-Super-120B** | FP8 | ✅ | `nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8` |
 | **GPT-OSS-20B** | MXFP4 | ✅ | `openai/gpt-oss-20b` |
 | **GPT-OSS-120B** | MXFP4 | ✅ | `openai/gpt-oss-120b` |
 | **Llama-3.1-8B-Instruct** | FP8 | ✅ | `nvidia/Llama-3.1-8B-Instruct-FP8` |
@@ -103,9 +104,8 @@ Reminder: not all model architectures are supported for NVFP4 quantization.
 * **Duration**: 45-60 minutes for setup and API server deployment
 * **Risk level**: Medium - container pulls and model downloads may fail due to network issues
 * **Rollback**: Stop inference servers and remove downloaded models to free resources.
-* **Last Updated:** 01/02/2026
-  * Improve TRT-LLM Run on Two Sparks workflow
-  * Upgrade to the latest TRT-LLM container v1.2.0rc6
+* **Last Updated:** 03/12/2026
+  * Introduce Nemotron-3-Super-120B support on TRT-LLM
 
 ## Single Spark
 
