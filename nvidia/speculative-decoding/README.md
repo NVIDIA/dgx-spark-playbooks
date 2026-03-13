@@ -8,6 +8,16 @@
 - [Instructions](#instructions)
   - [Option 1: EAGLE-3](#option-1-eagle-3)
   - [Option 2: Draft Target](#option-2-draft-target)
+- [Run on Two Sparks](#run-on-two-sparks)
+  - [Step 1. Configure Docker Permissions](#step-1-configure-docker-permissions)
+  - [Step 2. Network Setup](#step-2-network-setup)
+  - [Step 3. Set Container Name Variable](#step-3-set-container-name-variable)
+  - [Step 4. Start the TRT-LLM Multi-Node Container](#step-4-start-the-trt-llm-multi-node-container)
+  - [Step 5. Configure OpenMPI Hostfile](#step-5-configure-openmpi-hostfile)
+  - [Step 6. Launch Eagle3 Speculative Decoding](#step-6-launch-eagle3-speculative-decoding)
+  - [Step 7. Validate the API](#step-7-validate-the-api)
+  - [Step 8. Cleanup](#step-8-cleanup)
+  - [Step 9. Next Steps](#step-9-next-steps)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -23,6 +33,16 @@ This way, the big model doesn't need to predict every token step-by-step, reduci
 
 You'll explore speculative decoding using TensorRT-LLM on NVIDIA Spark using two approaches: EAGLE-3 and Draft-Target.
 These examples demonstrate how to accelerate large language model inference while maintaining output quality.
+
+## Why two Sparks?
+
+A single DGX Spark has 128 GB of unified memory shared between the CPU and GPU. This is sufficient to run models like GPT-OSS-120B with EAGLE-3 or Llama-3.3-70B with Draft-Target, as shown in the **Instructions** tab.
+
+Larger models like **Qwen3-235B-A22B** exceed what a single Spark can hold in memory — even with FP4 quantization, the model weights, KV cache, and Eagle3 draft head together require more than 128 GB. By connecting two Sparks, you double the available memory to 256 GB, making it possible to serve these larger models.
+
+The **Run on Two Sparks** tab walks through this setup. The two Sparks are connected via QSFP cable and use **tensor parallelism (TP=2)** to split the model — each Spark holds half of every layer's weight matrices and computes its portion of each forward pass. The nodes communicate intermediate results over the high-bandwidth link using NCCL and OpenMPI, so the model operates as a single logical instance across both devices.
+
+In short: two Sparks let you run models that are too large for one, while speculative decoding (Eagle3) on top further accelerates inference by drafting and verifying multiple tokens in parallel.
 
 ## What to know before starting
 
@@ -221,6 +241,263 @@ docker stop <container_id>
 - Test with different prompt lengths and generation parameters
 - Read more on Speculative Decoding [here](https://nvidia.github.io/TensorRT-LLM/advanced/speculative-decoding.html).
 
+## Run on Two Sparks
+
+### Step 1. Configure Docker Permissions
+
+**Run on both Spark A and Spark B:**
+
+```bash
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+### Step 2. Network Setup
+
+Follow the network setup instructions from the **[Connect Two Sparks](https://build.nvidia.com/spark/connect-two-sparks/stacked-sparks)** playbook.
+
+> [!NOTE]
+> Complete Steps 1-3 from the Connect Two Sparks playbook before proceeding:
+>
+> - **Step 1**: Ensure same username on both systems
+> - **Step 2**: Physical hardware connection (QSFP cable)
+> - **Step 3**: Network interface configuration
+>   - Use **Option 2: Manual IP Assignment with the netplan configure file**
+>   - Each Spark has two pairs of network ports. When you physically connect a cable between two Sparks, the connected ports will show as **Up**. You can use whichever pair is Up — either **`enp1s0f0np0`** and **`enP2p1s0f0np0`**, or **`enp1s0f1np1`** and **`enP2p1s0f1np1`**
+>   - This playbook assumes you are using **`enp1s0f1np1`** and **`enP2p1s0f1np1`**. If your Up interfaces are different, substitute your interface names in the commands below
+
+**For this playbook, we will use the following IP addresses:**
+
+**Spark A (Node 1):**
+- `enp1s0f1np1`: 192.168.200.12/24
+- `enP2p1s0f1np1`: 192.168.200.14/24
+
+**Spark B (Node 2):**
+- `enp1s0f1np1`: 192.168.200.13/24
+- `enP2p1s0f1np1`: 192.168.200.15/24
+
+After completing the Connect Two Sparks setup, return here to continue with the TRT-LLM container setup.
+
+### Step 3. Set Container Name Variable
+
+**Run on both Spark A and Spark B:**
+
+```bash
+export TRTLLM_MN_CONTAINER=trtllm-multinode
+```
+
+### Step 4. Start the TRT-LLM Multi-Node Container
+
+**Run on both Spark A and Spark B:**
+
+```bash
+docker run -d --rm \
+  --name $TRTLLM_MN_CONTAINER \
+  --gpus '"device=all"' \
+  --network host \
+  --ulimit memlock=-1 \
+  --ulimit stack=67108864 \
+  --device /dev/infiniband:/dev/infiniband \
+  -e UCX_NET_DEVICES="enp1s0f1np1,enP2p1s0f1np1" \
+  -e NCCL_SOCKET_IFNAME="enp1s0f1np1,enP2p1s0f1np1" \
+  -e OMPI_MCA_btl_tcp_if_include="enp1s0f1np1,enP2p1s0f1np1" \
+  -e OMPI_MCA_orte_default_hostfile="/etc/openmpi-hostfile" \
+  -e OMPI_MCA_rmaps_ppr_n_pernode="1" \
+  -e OMPI_ALLOW_RUN_AS_ROOT="1" \
+  -e OMPI_ALLOW_RUN_AS_ROOT_CONFIRM="1" \
+  -e CPATH="/usr/local/cuda/include" \
+  -e TRITON_PTXAS_PATH="/usr/local/cuda/bin/ptxas" \
+  -v ~/.cache/huggingface/:/root/.cache/huggingface/ \
+  -v ~/.ssh:/tmp/.ssh:ro \
+  nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6 \
+  bash -c "curl https://raw.githubusercontent.com/NVIDIA/dgx-spark-playbooks/refs/heads/main/nvidia/trt-llm/assets/trtllm-mn-entrypoint.sh | bash"
+```
+
+Verify:
+
+```bash
+docker logs -f $TRTLLM_MN_CONTAINER
+```
+
+Expected output at the end:
+
+```
+total 56K
+drwx------ 2 root root 4.0K Jan 13 05:13 .
+drwx------ 1 root root 4.0K Jan 13 05:12 ..
+-rw------- 1 root root  100 Jan 13 05:13 authorized_keys
+-rw------- 1 root root   45 Jan 13 05:13 config
+-rw------- 1 root root  411 Jan 13 05:13 id_ed25519
+-rw-r--r-- 1 root root  102 Jan 13 05:13 id_ed25519.pub
+-rw------- 1 root root  411 Jan 13 05:13 id_ed25519_shared
+-rw-r--r-- 1 root root  100 Jan 13 05:13 id_ed25519_shared.pub
+-rw------- 1 root root 3.4K Jan 13 05:13 id_rsa
+-rw-r--r-- 1 root root  743 Jan 13 05:13 id_rsa.pub
+-rw------- 1 root root 5.0K Jan 13 05:13 known_hosts
+-rw------- 1 root root 3.2K Jan 13 05:13 known_hosts.old
+Starting SSH
+```
+
+### Step 5. Configure OpenMPI Hostfile
+
+The hostfile tells MPI which nodes participate in distributed execution. Use the IPs from the `enp1s0f1np1` interface configured in Step 2.
+
+**On both Spark A and Spark B**, create the hostfile:
+
+```bash
+cat > ~/openmpi-hostfile <<EOF
+192.168.200.12
+192.168.200.13
+EOF
+```
+
+**Run on both Spark A and Spark B** to copy the hostfile into each container:
+
+```bash
+docker cp ~/openmpi-hostfile $TRTLLM_MN_CONTAINER:/etc/openmpi-hostfile
+```
+
+Verify connectivity:
+
+```bash
+docker exec -it $TRTLLM_MN_CONTAINER bash -c "mpirun -np 2 hostname"
+```
+
+Expected output:
+
+```
+nvidia@spark-afe0:~$ docker exec -it $TRTLLM_MN_CONTAINER bash -c "mpirun -np 2 hostname"
+Warning: Permanently added '[192.168.200.13]:2233' (ED25519) to the list of known hosts.
+spark-afe0
+spark-ae11
+nvidia@spark-afe0:~$
+```
+
+### Step 6. Launch Eagle3 Speculative Decoding
+
+Eagle3 speculative decoding accelerates inference by predicting multiple tokens ahead, then validating them in parallel. This can provide significant speedup compared to standard autoregressive generation.
+
+#### Set your Hugging Face token
+
+```bash
+export HF_TOKEN=your_huggingface_token_here
+```
+
+#### Download the Eagle3 speculative model on both nodes
+
+```bash
+docker exec \
+  -e HF_TOKEN=$HF_TOKEN \
+  -it $TRTLLM_MN_CONTAINER bash -c "
+    mpirun -x HF_TOKEN -np 2 bash -c 'hf download nvidia/Qwen3-235B-A22B-Eagle3 --local-dir /opt/Qwen3-235B-A22B-Eagle3/'
+"
+```
+
+#### Create the Eagle3 speculative decoding configuration
+
+This configuration enables Eagle speculative decoding with 3 draft tokens and conservative memory settings.
+
+```bash
+docker exec -it $TRTLLM_MN_CONTAINER bash -c "cat > /tmp/extra-llm-api-config.yml <<EOF
+enable_attention_dp: false
+disable_overlap_scheduler: false
+enable_autotuner: false
+enable_chunked_prefill: false
+cuda_graph_config:
+    max_batch_size: 1
+speculative_config:
+    decoding_type: Eagle
+    max_draft_len: 3
+    speculative_model_dir: /opt/Qwen3-235B-A22B-Eagle3/
+kv_cache_config:
+    free_gpu_memory_fraction: 0.9
+    enable_block_reuse: false
+EOF
+"
+```
+
+#### Launch the server with Eagle3 speculative decoding
+
+**Run on Spark A only.** This starts the TensorRT-LLM API server using the FP4 base model with Eagle3 speculative decoding enabled. The `mpirun` command coordinates execution across both nodes, so it only needs to be launched from Spark A. The maximum token length is set to 1024 (adjust as needed).
+
+```bash
+docker exec \
+  -e MODEL="nvidia/Qwen3-235B-A22B-FP4" \
+  -e HF_TOKEN=$HF_TOKEN \
+  -it $TRTLLM_MN_CONTAINER bash -c '
+    mpirun -x CPATH=/usr/local/cuda/include \
+           -x TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas \
+           -x HF_TOKEN \
+           trtllm-llmapi-launch \
+           trtllm-serve \
+           $MODEL \
+           --backend pytorch \
+           --tp_size 2 \
+           --max_num_tokens 1024 \
+           --extra_llm_api_options /tmp/extra-llm-api-config.yml \
+           --port 8355 --host 0.0.0.0
+'
+```
+
+Expected output when the endpoint is ready:
+
+```
+[01/13/2026-06:16:56] [TRT-LLM] [I] get signal from executor worker
+INFO:     Started server process [2011]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+```
+
+### Step 7. Validate the API
+
+**Run on Spark A only.** The server is listening on Spark A, so test the endpoint from there:
+
+```bash
+curl -s http://localhost:8355/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "nvidia/Qwen3-235B-A22B-FP4",
+    "messages": [{"role": "user", "content": "Paris is great because"}],
+    "max_tokens": 64
+  }'
+```
+
+Expected: A JSON response with generated text. This confirms the multi-node TensorRT-LLM server with Eagle3 speculative decoding is working correctly.
+
+### Step 8. Cleanup
+
+#### Stop the containers
+
+**Run on both Spark A & B:**
+
+```bash
+docker stop $TRTLLM_MN_CONTAINER
+```
+
+The containers will be automatically removed due to the `--rm` flag.
+
+#### (Optional) Remove downloaded models
+
+If you need to free up disk space:
+
+**Run on both Spark A & B:**
+
+```bash
+rm -rf $HOME/.cache/huggingface/hub/models--nvidia--Qwen3*
+```
+
+This removes the model files (~hundreds of GB). Skip this if you plan to run the setup again.
+
+### Step 9. Next Steps
+
+Now that you have Eagle3 speculative decoding running, consider these optimizations and experiments:
+
+- **Adjust draft length:** Modify `max_draft_len` in the configuration (try values between 2-5) to balance speculation speed vs. accuracy
+- **Try different models:** Experiment with other model pairs that support Eagle speculative decoding
+- **Optimize batch size:** Adjust `max_batch_size` in `cuda_graph_config` for throughput-latency tradeoffs
+- **Learn more:** Review the [TensorRT-LLM Speculative Decoding documentation](https://nvidia.github.io/TensorRT-LLM/advanced/speculative-decoding.html) for advanced tuning options
+- **Benchmark performance:** Compare inference speeds with and without speculative decoding to measure speedup gains
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
@@ -230,10 +507,15 @@ docker stop <container_id>
 | Model download fails | Network or authentication issues | Check HuggingFace authentication and network connectivity |
 | Cannot access gated repo for URL | Certain HuggingFace models have restricted access | Regenerate your [HuggingFace token](https://huggingface.co/docs/hub/en/security-tokens); and request access to the [gated model](https://huggingface.co/docs/hub/en/models-gated#customize-requested-information) on your web browser |
 | Server doesn't respond | Port conflicts or firewall | Check if port 8000 is available and not blocked |
+| `mpirun` fails with SSH connection refused | SSH not configured between containers or nodes | Complete SSH setup from Connect Two Sparks playbook; verify `ssh <node_ip>` works without password from both nodes |
+| `mpirun` hangs or times out connecting to remote node | Hostfile IPs don't match actual node IPs | Verify IPs in `/etc/openmpi-hostfile` match the IPs assigned to network interfaces with `ip addr show` |
+| NCCL error: "Socket operation on non-socket" | Wrong network interface specified | Check `ibdev2netdev` output and ensure `NCCL_SOCKET_IFNAME` and `UCX_NET_DEVICES` match the active interfaces `enp1s0f1np1,enP2p1s0f1np1` |
+| `Permission denied (publickey)` during mpirun | SSH keys not exchanged between containers | Re-run SSH setup from Connect Two Sparks playbook or manually verify `/root/.ssh/authorized_keys` contains public keys from both nodes |
+| Model download fails silently in multi-node setup | HF_TOKEN not propagated to mpirun | Add `-e HF_TOKEN=$HF_TOKEN` to `docker exec` command and `-x HF_TOKEN` to `mpirun` command |
 
 > [!NOTE]
-> DGX Spark uses a Unified Memory Architecture (UMA), which enables dynamic memory sharing between the GPU and CPU. 
-> With many applications still updating to take advantage of UMA, you may encounter memory issues even when within 
+> DGX Spark uses a Unified Memory Architecture (UMA), which enables dynamic memory sharing between the GPU and CPU.
+> With many applications still updating to take advantage of UMA, you may encounter memory issues even when within
 > the memory capacity of DGX Spark. If that happens, manually flush the buffer cache with:
 ```bash
 sudo sh -c 'sync; echo 3 > /proc/sys/vm/drop_caches'
