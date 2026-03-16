@@ -75,7 +75,7 @@ The following models are supported with TensorRT-LLM on Spark. All listed models
 
 | Model | Quantization | Support Status | HF Handle |
 |-------|-------------|----------------|-----------|
-| **Nemotron-3-Super-120B** | FP8 | ✅ | `nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8` |
+| **Nemotron-3-Super-120B** | NVFP4 | ✅ | `nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4` |
 | **GPT-OSS-20B** | MXFP4 | ✅ | `openai/gpt-oss-20b` |
 | **GPT-OSS-120B** | MXFP4 | ✅ | `openai/gpt-oss-120b` |
 | **Llama-3.1-8B-Instruct** | FP8 | ✅ | `nvidia/Llama-3.1-8B-Instruct-FP8` |

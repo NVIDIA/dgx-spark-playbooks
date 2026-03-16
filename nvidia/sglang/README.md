@@ -39,7 +39,7 @@ vision-language tasks using models like DeepSeek-V2-Lite.
 - NVIDIA Spark device with Blackwell architecture
 - Docker Engine installed and running: `docker --version`
 - NVIDIA GPU drivers installed: `nvidia-smi`
-- NVIDIA Container Toolkit configured: `docker run --rm --gpus all lmsysorg/sglang:spark nvidia-smi`
+- NVIDIA Container Toolkit configured: `docker run --rm --gpus all nvcr.io/nvidia/sglang:26.02-py3 nvidia-smi`
 - Sufficient disk space (>20GB available): `df -h`
 - Network connectivity for pulling NGC containers: `ping nvcr.io`
 
@@ -75,8 +75,8 @@ Note: for NVFP4 models, add the `--quantization modelopt_fp4` flag.
 * **Estimated time:** 30 minutes for initial setup and validation
 * **Risk level:** Low - Uses pre-built, validated SGLang container with minimal configuration
 * **Rollback:** Stop and remove containers with `docker stop` and `docker rm` commands
-* **Last Updated:** 01/02/2026
-    * Add Model Support Matrix
+* **Last Updated:** 03/15/2026
+    * Use latest NGC SGLang container: nvcr.io/nvidia/sglang:26.02-py3
 
 ## Instructions
 
@@ -95,7 +95,7 @@ docker --version
 nvidia-smi
 
 ## Verify Docker GPU support
-docker run --rm --gpus all lmsysorg/sglang:spark nvidia-smi
+docker run --rm --gpus all nvcr.io/nvidia/sglang:26.02-py3 nvidia-smi
 
 ## Check available disk space
 df -h /
@@ -116,7 +116,7 @@ several minutes depending on your network connection.
 
 ```bash
 ## Pull the SGLang container
-docker pull lmsysorg/sglang:spark
+docker pull nvcr.io/nvidia/sglang:26.02-py3
 
 ## Verify the image was downloaded
 docker images | grep sglang
@@ -132,7 +132,7 @@ server inside the container, exposing it on port 30000 for client connections.
 docker run --gpus all -it --rm \
   -p 30000:30000 \
   -v /tmp:/tmp \
-  lmsysorg/sglang:spark \
+  nvcr.io/nvidia/sglang:26.02-py3 \
   bash
 ```
 
@@ -229,7 +229,7 @@ docker ps | grep sglang | awk '{print $1}' | xargs docker stop
 docker container prune -f
 
 ## Remove SGLang images (optional)
-docker rmi lmsysorg/sglang:spark
+docker rmi nvcr.io/nvidia/sglang:26.02-py3
 ```
 
 ## Step 9. Next steps
