@@ -31,7 +31,7 @@ You will deploy NVIDIA's VSS AI Blueprint on NVIDIA Spark hardware with Blackwel
 
 - NVIDIA Spark device with ARM64 architecture and Blackwell GPU
 - DGX OS (suggested: 7.4.0 or higher)
-- Driver version 580.126.09 or higher installed: `nvidia-smi | grep "Driver Version"`
+- Driver version 580.95.05 or higher installed: `nvidia-smi | grep "Driver Version"`
 - CUDA version 13.0 installed: `nvcc --version`
 - Docker installed and running: `docker --version && docker compose version`
 - Access to NVIDIA Container Registry with [NGC API Key](https://org.ngc.nvidia.com/setup/api-keys)
@@ -53,9 +53,9 @@ You will deploy NVIDIA's VSS AI Blueprint on NVIDIA Spark hardware with Blackwel
   * Network configuration conflicts if shared network already exists
   * Remote API endpoints may have rate limits or connectivity issues (hybrid deployment)
 * **Rollback:** Stop all containers with `docker compose down`, remove shared network with `docker network rm vss-shared-network`, and clean up temporary media directories.
-* **Last Updated:** 1/21/2026
+* **Last Updated:** 3/16/2026
   * Update required OS and Driver versions
-  * Support for VSS 2.4.1 with Cosmos Reason 2 VLM
+  * Support for VSS 3.1.0 with Cosmos Reason 2 VLM
 
 ## Instructions
 
