@@ -69,8 +69,6 @@ You cannot eliminate all risk; proceed at your own risk. **Critical security mea
 
 ## Instructions
 
-## Important: Read security warnings first
-
 > [!CAUTION]
 > **Before proceeding, review the security risks in the Overview tab.** OpenClaw is an AI agent that can access your files, execute commands, and connect to external services. Data exposure and malicious code execution are real risks. **Strongly recommended:** Run OpenClaw on an isolated system or VM, use dedicated accounts (not your main accounts), and never expose the dashboard to the public internet without authentication.
 
@@ -173,10 +171,10 @@ lms load openai/gpt-oss-120b --context-length 32768
 ollama run gpt-oss:120b
 ```
 
-Once the interactive prompt appears, set the context window:
+Once the interactive prompt appears, set the context window (type the following at the Ollama prompt; do not include any `>>>` prefix):
 
 ```
->>> /set parameter num_ctx 32768
+/set parameter num_ctx 32768
 ```
 
 Keep this terminal (or process) running so the model stays loaded. You can now chat with the model or press Ctrl+D to exit the interactive mode while keeping the model server running.
@@ -232,6 +230,9 @@ For **gpt-oss-20b** or another model, use the same structure but set `id` and `n
 
 **If you use Ollama:**
 
+> [!NOTE]
+> `ollama launch openclaw` requires **Ollama v0.15 or later**. If you see an "unknown command" error, upgrade Ollama (`ollama --version`) and retry.
+
 Run:
 
 ```bash
@@ -261,7 +262,7 @@ You can also ask OpenClaw which model it’s using. In the gateway chat UI you c
 
 | Symptom | Cause | Fix |
 |---------|--------|-----|
-| OpenClaw dashboard URL not loading | Gateway not running or wrong host/port | **Restart the OpenClaw gateway:** For Ollama, run `ollama launch openclaw` to restart an already-configured gateway. For LM Studio, restart the OpenClaw gateway via the LM Studio UI or restart the OpenClaw service/container. **Verify:** Check that the gateway process is running with `pgrep -f openclaw` or `ps aux | grep openclaw`. **Find URL/token:** Check the original installer output (scroll up in your terminal) or look in gateway logs (typically `~/.openclaw/logs/`) for the dashboard URL and access token |
+| OpenClaw dashboard URL not loading | Gateway not running or wrong host/port | **Restart the OpenClaw gateway:** For Ollama, run `ollama launch openclaw` to restart an already-configured gateway. For LM Studio, restart the OpenClaw gateway via the LM Studio UI or restart the OpenClaw service/container. **Verify:** Check that the gateway process is running with `pgrep -f openclaw` or `ps aux \| grep openclaw`. **Find URL/token:** Check the original installer output (scroll up in your terminal) or look in gateway logs (typically `~/.openclaw/logs/`) for the dashboard URL and access token |
 | "Connection refused" to model (e.g. localhost:1234 or Ollama port) | LM Studio or Ollama not running, or wrong port | Start the model in a separate terminal (`lms load ...` or `ollama run ...`) and ensure the port in `openclaw.json` matches (1234 for LM Studio, 11434 for Ollama) |
 | OpenClaw says no model available | Model provider not configured or model not loaded | Add the `models` section to `~/.openclaw/openclaw.json` for LM Studio, or run `ollama launch openclaw` for Ollama; ensure the model is loaded/running |
 | Out-of-memory or very slow inference on DGX Spark | Model too large for available GPU memory or other GPU workloads | Free GPU memory (close other apps), choose a smaller model, or check usage with `nvidia-smi` |

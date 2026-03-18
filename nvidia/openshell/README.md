@@ -1,6 +1,6 @@
-# OpenClaw with OpenShell
+# Secure Long Running AI Agents with OpenShell on DGX Spark
 
-> Run OpenClaw in an NVIDIA OpenShell sandbox on DGX Spark
+> Run OpenClaw with local models in an NVIDIA OpenShell sandbox on DGX Spark
 
 ## Table of Contents
 
@@ -146,8 +146,11 @@ Now that we have verified the user's Docker permission, we must configure Docker
 ``` bash
 sudo nvidia-ctk runtime configure --runtime=docker
 sudo systemctl restart docker
+```
 
-## Run a sample workload to verify the setup
+Run a sample workload to verify the setup:
+
+``` bash
 docker run --rm --runtime=nvidia --gpus all ubuntu nvidia-smi
 ```
 
@@ -180,7 +183,7 @@ openshell gateway start
 openshell status
 ```
 
-`openshell status` should report the gateway as **healthy**. The first run may take a minute while Docker pulls the required images.
+`openshell status` should report the gateway as **Connected**. The first run may take a few minutes while Docker pulls the required images and the internal k3s cluster bootstraps.
 
 > [!NOTE]
 > Remote gateway deployment requires passwordless SSH access. Ensure your SSH public key is added to `~/.ssh/authorized_keys` on the DGX Spark before using the `--remote` flag.
@@ -199,11 +202,11 @@ ollama --version
 
 DGX Spark's 128GB memory can run large models:
 
-| GPU memory available | Suggested model        | Model size | Notes |
-|---------------------|-------------------------|-----------|-------|
-| 25–48 GB            | gpt-oss:20b             | ~12GB     | Lower latency, good for interactive use |
-| 48–80 GB            | Nemotron-3-Nano-30B-A3B | ~20GB     | Good balance of quality and speed |
-| 128 GB              | gpt-oss:120b            | ~65GB     | Best quality on DGX Spark |
+| GPU memory available | Suggested model          | Model size | Notes |
+|---------------------|---------------------------|-----------|-------|
+| 25–48 GB            | nemotron-3-nano           | ~24GB     | Lower latency, good for interactive use |
+| 48–80 GB            | gpt-oss:120b              | ~65GB     | Good balance of quality and speed |
+| 128 GB              | nemotron-3-super:120b     | ~86GB     | Best quality on DGX Spark |
 
 Verify Ollama is running (it auto-starts as a service after installation). If not, start it manually:
 
@@ -211,10 +214,39 @@ Verify Ollama is running (it auto-starts as a service after installation). If no
 ollama serve &
 ```
 
-Next, run a model from Ollama (adjust the model name to match your choice from [the Ollama model library](https://ollama.com/library)). The `ollama run` command will pull the model automatically if it is not already present. Running the model here ensures it is loaded and ready when you use it with OpenClaw, reducing the chance of timeouts later. Example for GPT-OSS 120b:
+Configure Ollama to listen on all interfaces so the OpenShell gateway container can reach it. Create a systemd override:
 
 ```bash
-ollama run gpt-oss:120b
+mkdir -p /etc/systemd/system/ollama.service.d/
+sudo nano /etc/systemd/system/ollama.service.d/override.conf
+```
+
+Add these lines to the file (create the file if it does not exist):
+
+```ini
+[Service]
+Environment="OLLAMA_HOST=0.0.0.0"
+```
+
+Save and exit, then reload and restart Ollama:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart ollama
+```
+
+Verify Ollama is listening on all interfaces:
+
+```bash
+ss -tlnp | grep 11434
+```
+
+You should see `*:11434` in the output. If it only shows `127.0.0.1:11434`, confirm the override file contents and that you ran `systemctl daemon-reload` before restarting.
+
+Next, run a model from Ollama (adjust the model name to match your choice from [the Ollama model library](https://ollama.com/library)). The `ollama run` command will pull the model automatically if it is not already present. Running the model here ensures it is loaded and ready when you use it with OpenClaw, reducing the chance of timeouts later. Example for nemotron-3-super:
+
+```bash
+ollama run nemotron-3-super:120b
 ```
 
 Verify the model is available:
@@ -225,7 +257,15 @@ ollama list
 
 ## Step 6. Create an inference provider
 
-We are going to create an OpenShell provider that points to your local Ollama server. This lets OpenShell route inference requests to your Spark-hosted model. To create a provider for the cluster, please replace `{Machine_IP}` with the IP Address of your DGX Spark.
+We are going to create an OpenShell provider that points to your local Ollama server. This lets OpenShell route inference requests to your Spark-hosted model.
+
+First, find the IP address of your DGX Spark:
+
+```bash
+hostname -I | awk '{print $1}'
+```
+
+Then create the provider, replacing `{Machine_IP}` with the IP address from the command above (e.g. `10.110.106.169`):
 
 ```bash
 openshell provider create \
@@ -235,18 +275,29 @@ openshell provider create \
     --config OPENAI_BASE_URL=http://{Machine_IP}:11434/v1
 ```
 
-> [!NOTE]
-> `host.docker.internal` resolves to the host machine from inside Docker containers. If your Ollama listens on a different port or host, adjust the URL accordingly.
+> [!IMPORTANT]
+> Do **not** use `localhost` or `127.0.0.1` here. The OpenShell gateway runs inside a Docker container, so it cannot reach the host via `localhost`. Use the machine's actual IP address.
+
+Verify the provider was created:
+
+```bash
+openshell provider list
+```
 
 ## Step 7. Configure inference routing
 
-Point the `inference.local` endpoint (available inside every sandbox) at your Ollama model:
+Point the `inference.local` endpoint (available inside every sandbox) at your Ollama model. Replace the model name with your choice from Step 5:
 
 ```bash
 openshell inference set \
     --provider local-ollama \
-    --model gpt-oss:120b
+    --model nemotron-3-super:120b
 ```
+
+The output should confirm the route and show a validated endpoint URL, for example: `http://10.110.106.169:11434/v1/chat/completions (openai_chat_completions)`.
+
+> [!NOTE]
+> If you see `failed to verify inference endpoint` or `failed to connect` (for example because the gateway cannot reach the host IP from inside its container), add `--no-verify` to skip endpoint verification: `openshell inference set --provider local-ollama --model nemotron-3-super:120b --no-verify`. Ensure Ollama is running and listening on all interfaces (see Step 5).
 
 Verify the configuration:
 
@@ -254,7 +305,7 @@ Verify the configuration:
 openshell inference get
 ```
 
-Expected output should show `provider: local-ollama` and `model: gpt-oss:120b` (or whichever model you chose).
+Expected output should show `provider: local-ollama` and `model: nemotron-3-super:120b` (or whichever model you chose).
 
 ## Step 8. Deploy OpenShell Sandbox
 
@@ -274,24 +325,23 @@ openshell sandbox create \
 
 The `--keep` flag keeps the sandbox running after the initial process exits, so you can reconnect later. This is the default behavior. To terminate the sandbox when the initial process exits, use the `--no-keep` flag instead.
 
-> [!NOTE]
-> The sandbox name is displayed in the creation output. You can also set it explicitly with `--name <your-name>`. To find it later, run `openshell sandbox list`.
-
 The CLI will:
 1. Resolve `openclaw` against the community catalog
 2. Pull and build the container image
 3. Apply the bundled sandbox policy
 4. Launch OpenClaw inside the sandbox
 
-In order to verify the default policy enabled for your sandbox, please run the following command:
-
-```bash
-openshell sandbox get <sandbox_name>
-```
-
 ## Step 9. Configure OpenClaw within OpenShell Sandbox
 
-The sandbox container will spin up and you will be guided through the OpenClaw installation process. Work through the prompts as follows.
+The sandbox container will spin up and the OpenClaw onboarding wizard will launch automatically in your terminal.
+
+> [!IMPORTANT]
+> The onboarding wizard is **fully interactive** — it requires arrow-key navigation and Enter to select options. It cannot be completed from a non-interactive session (e.g. a script or automation tool). You must run `openshell sandbox create` from a terminal with full TTY support.
+>
+> If the wizard did not complete during sandbox creation, reconnect to the sandbox to re-run it:
+> ```bash
+> openshell sandbox connect dgx-demo
+> ```
 
 Use the arrow keys and Enter key to interact with the installation.
 - If you understand and agree, use the arrow key of your keyboard to select 'Yes' and press the Enter key.
@@ -301,10 +351,10 @@ Use the arrow keys and Enter key to interact with the installation.
 - How do you want to provide this API key?: Paste API key for now.
 - API key: please enter "ollama".
 - Endpoint compatibility: select **OpenAI-compatible** and press Enter.
-- Model ID: gpt-oss:120b
+- Model ID: enter the model name you chose in Step 5 (e.g. `nemotron-3-super:120b`).
 	- This may take 1-2 minutes as the Ollama model is spun up in the background.
 - Endpoint ID: leave the default value.
-- Alias: gpt-oss:120b (this is optional).
+- Alias: enter the same model name (this is optional).
 - Channel: Select **Skip for now**.
 - Skills: Select **No** for now.
 - Enable hooks: Select **No** for now and press Enter.
@@ -317,6 +367,19 @@ OpenClaw gateway starting in background.
   Logs: /tmp/gateway.log
   UI:   http://127.0.0.1:18789/?token=9b4c9a9c9f6905131327ce55b6d044bd53e0ec423dd6189e
 ```
+
+Now that we have configured OpenClaw within the OpenShell sandbox, let's set the name of our openshell sandbox as an environment variable. This will make future commands easier to run. Note that the name of the sandbox was set in the `openshell sandbox create` command in Step 8 using the `--name` flag.
+
+```bash
+export SANDBOX_NAME=dgx-demo
+```
+
+In order to verify the default policy enabled for your sandbox, please run the following command:
+
+```bash
+openshell sandbox get $SANDBOX_NAME
+```
+
 If you are using the Spark as the primary device, right-click on the URL in the UI section and select Open Link.
 
 **Accessing the dashboard from the host or a remote system:** The dashboard URL (e.g. `http://127.0.0.1:18789/?token=...`) is inside the sandbox, so the host does not forward port 18789 by default. To reach it from your host or another machine, use SSH local port forwarding. From a machine that can reach the OpenShell gateway, run (replace gateway URL, sandbox-id, token, and gateway-name with values from your environment):
@@ -337,7 +400,7 @@ From this page, you can now **Chat** with your OpenClaw agent within the protect
 Now that OpenClaw has been configured within the OpenShell protected runtime, you can connect directly into the sandbox environment via:
 
 ```bash
-openshell sandbox connect dgx-demo
+openshell sandbox connect $SANDBOX_NAME
 ```
 
 Once loaded into the sandbox terminal, you can test connectivity to the Ollama model with this command:
@@ -373,14 +436,17 @@ Verify that the OpenClaw agent can reach `inference.local` for model requests an
 If you exit the sandbox session, reconnect at any time:
 
 ```bash
-openshell sandbox connect
+openshell sandbox connect $SANDBOX_NAME
 ```
 
-To transfer files in or out (replace `<sandbox-name>` with your sandbox name from the creation output or from `openshell sandbox list`):
+> [!NOTE]
+> `openshell sandbox connect` is interactive-only — it opens a terminal session inside the sandbox. There is no way to pass a command for non-interactive execution. Use `openshell sandbox upload`/`download` for file transfers, or use the SSH proxy for scripted access (see Step 9).
+
+To transfer files in or out out of the sandbox, please use the following:
 
 ```bash
-openshell sandbox upload <sandbox-name> ./local-file /sandbox/destination
-openshell sandbox download <sandbox-name> /sandbox/file ./local-destination
+openshell sandbox upload $SANDBOX_NAME ./local-file /sandbox/destination
+openshell sandbox download $SANDBOX_NAME /sandbox/file ./local-destination
 ```
 
 ## Step 13. Cleanup
@@ -388,7 +454,13 @@ openshell sandbox download <sandbox-name> /sandbox/file ./local-destination
 Stop and remove the sandbox:
 
 ```bash
-openshell sandbox delete <sandbox-name>
+openshell sandbox delete $SANDBOX_NAME
+```
+
+Remove the inference provider you created in Step 6:
+
+```bash
+openshell provider delete local-ollama
 ```
 
 Stop the gateway (preserves state for later):
@@ -407,7 +479,7 @@ openshell gateway destroy
 To also remove the Ollama model:
 
 ```bash
-ollama rm gpt-oss:120b
+ollama rm nemotron-3-super:120b
 ```
 
 ## Step 14. Next steps
