@@ -356,8 +356,9 @@ Use the arrow keys and Enter key to interact with the installation.
 - Endpoint ID: leave the default value.
 - Alias: enter the same model name (this is optional).
 - Channel: Select **Skip for now**.
+- Search provider: Select **Skip for now**.
 - Skills: Select **No** for now.
-- Enable hooks: Select **No** for now and press Enter.
+- Enable hooks: Press spacebar to select **Skip for now** and press Enter.
 
 It might take 1-2 minutes to get through the final stages. Afterwards, you should see a URL with a token you can use to connect to the gateway. 
 
@@ -379,18 +380,78 @@ In order to verify the default policy enabled for your sandbox, please run the f
 ```bash
 openshell sandbox get $SANDBOX_NAME
 ```
+> [!NOTE]
+> Step 8’s `--forward 18789` already sets up port forwarding from the OpenShell gateway to the sandbox. You do **not** need a manual `ssh` command with `openshell ssh-proxy` for the usual case.
 
-If you are using the Spark as the primary device, right-click on the URL in the UI section and select Open Link.
-
-**Accessing the dashboard from the host or a remote system:** The dashboard URL (e.g. `http://127.0.0.1:18789/?token=...`) is inside the sandbox, so the host does not forward port 18789 by default. To reach it from your host or another machine, use SSH local port forwarding. From a machine that can reach the OpenShell gateway, run (replace gateway URL, sandbox-id, token, and gateway-name with values from your environment):
+To verify the forward is active, use the following command:
 
 ```bash
-ssh -o ProxyCommand='/usr/local/bin/openshell ssh-proxy --gateway https://127.0.0.1:8080/connect/ssh --sandbox-id <sandbox-id> --token <token> --gateway-name openshell' -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -N -L 18789:127.0.0.1:18789 sandbox
+openshell forward list
 ```
 
-Then open `http://127.0.0.1:18789/?token=<your-token>` in your local browser.
+You should see your sandbox name (e.g. `dgx-demo`) with port `18789`. If it is missing or `dead`, start it:
 
-Otherwise, if you are using NVIDIA Sync, right-click on the URL listed in the UI and select Copy Link. Next, connect to your Spark and select the OpenClaw entry. When your web browser opens the tab for OpenClaw, paste the URL in the navigation bar and press the Enter key.
+```bash
+openshell forward start --background 18789 $SANDBOX_NAME
+```
+
+Path A: If you are using the Spark as the primary device, right-click on the URL in the UI section and select Open Link.
+
+Path B: If you are using a laptop or workstation that is *not* on the Spark (e.g. you SSH into the Spark only): Install the OpenShell CLI on **that** machine.
+
+> [!IMPORTANT]
+> **SSH must work from this machine to the Spark before `gateway add`.** Run `ssh nvidia@<spark-ip>` (or your user/host) and confirm you get a shell without `Permission denied (publickey)`. If that fails, add your public key to the Spark: `ssh-copy-id nvidia@<spark-ip>` (from the same machine), or paste your `~/.ssh/id_ed25519.pub` (or `id_rsa.pub`) into `~/.ssh/authorized_keys` on the Spark. OpenShell uses this SSH session to reach the remote Docker API and extract gateway TLS certificates. If you use a non-default key, pass `--ssh-key ~/.ssh/your_key` to `gateway add` (same as Step 4’s remote gateway note).
+
+Register the Spark’s **already-running** gateway. Do **not** use `openshell gateway add user@ip` alone—that is parsed as a cloud URL and will not write `mtls/ca.crt`.
+
+Per the [OpenShell gateway docs](https://docs.nvidia.com/openshell/latest/sandboxes/manage-gateways.html), register using **hostname `openshell`**, not the raw Spark IP, for HTTPS.
+
+> [!WARNING]
+> The gateway TLS certificate is valid for `openshell`, `localhost`, and `127.0.0.1` — **not** for your Spark’s LAN IP. If you use `https://10.x.x.x:8080` or `ssh://user@10.x.x.x:8080`, `openshell status` may fail with **certificate not valid for name "10.x.x.x"**.
+
+**On your laptop/WSL**, map `openshell` to the Spark (once per machine):
+
+```bash
+## Replace with your Spark’s IP. Requires sudo on Linux/WSL.
+echo "<spark-ip> openshell" | sudo tee -a /etc/hosts
+## Example: echo "10.110.17.10 openshell" | sudo tee -a /etc/hosts
+```
+
+Then add the gateway (SSH target stays the real IP or hostname; HTTPS URL uses `openshell`):
+
+```bash
+openshell gateway add https://openshell:8080 --remote <user>@<spark-ip>
+```
+
+Example:
+
+```bash
+openshell gateway add https://openshell:8080 --remote nvidia@10.110.17.10
+```
+
+If you already registered with the IP and see the cert error, remove that entry and re-add:
+
+```bash
+openshell gateway destroy 
+openshell gateway add https://openshell:8080 --remote nvidia@10.110.17.10
+```
+
+(Use `openshell gateway select` if the destroy name differs.)
+
+Complete any browser or CLI prompts until the command finishes (do not Ctrl+C early). Then:
+
+```bash
+openshell status   # should show Connected, not TLS CA errors
+openshell forward start --background 18789 dgx-demo
+```
+
+Then on the **laptop** browser open (use `#token=` so the UI receives the gateway token):
+
+`http://127.0.0.1:18789/#token=<your-token>`
+
+Use the token value from the OpenClaw wizard output on the Spark. Path B requires SSH from the laptop to the Spark so the CLI can reach the gateway on `:8080`.
+
+**NVIDIA Sync:** Right-click the URL in the UI and select Copy Link. Connect to your Spark in Sync, open the OpenClaw entry, and paste the URL in the browser address bar.
 
 From this page, you can now **Chat** with your OpenClaw agent within the protected confines of the runtime OpenShell provides.
 ## Step 10. Conduct Inference within Sandbox
@@ -440,7 +501,7 @@ openshell sandbox connect $SANDBOX_NAME
 ```
 
 > [!NOTE]
-> `openshell sandbox connect` is interactive-only — it opens a terminal session inside the sandbox. There is no way to pass a command for non-interactive execution. Use `openshell sandbox upload`/`download` for file transfers, or use the SSH proxy for scripted access (see Step 9).
+> `openshell sandbox connect` is interactive-only — it opens a terminal session inside the sandbox. There is no way to pass a command for non-interactive execution. Use `openshell sandbox upload`/`download` for file transfers, or `openshell sandbox ssh-config` for scripted SSH (see Step 14).
 
 To transfer files in or out out of the sandbox, please use the following:
 
