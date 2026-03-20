@@ -9,7 +9,7 @@ Clone the dgx-spark-playbooks repo from GitHub
 ### Step 2. Switch to the multi spark cluster setup scripts directory
 
 ```bash
-cd dgx-spark-playbooks/nvidia/multi-sparks-through-switch/assets/spark_cluster_setup-1.0.0
+cd dgx-spark-playbooks/nvidia/multi-sparks-through-switch/assets/spark_cluster_setup
 ```
 
 ### Step 3. Create or edit a JSON config file with your cluster information
@@ -38,13 +38,27 @@ cd dgx-spark-playbooks/nvidia/multi-sparks-through-switch/assets/spark_cluster_s
 
 ### Step 4. Run the cluster setup script with your json config file
 
-```bash
-bash spark_cluster_setup.sh config/spark_config_b2b.json
+The script can be run with different options as mentioned below
 
-# This will do the following
-# 1. Create a python virtual env and install required packages
-# 2. Validate the environment and cluster config
-# 3. Detect the topology and configure the IP addresses
-# 4. Configure password-less ssh between the cluster nodes
-# 5. Run NCCL BW test
+```bash
+# To run validation, cluster setup and NCCL bandwidth test (all steps)
+
+bash spark_cluster_setup.sh -c <JSON config file> --run-setup
+
+# To only run pre-setup validation steps
+
+bash spark_cluster_setup.sh -c <JSON config file> --pre-validate-only
+
+# To run NCCL test and skip cluster setup (use this after cluster is already set up)
+
+bash spark_cluster_setup.sh -c <JSON config file> --run-nccl-test
+
 ```
+
+> [!NOTE]
+> The full cluster setup (first command above) will do the following
+> 1. Create a python virtual env and install required packages
+> 2. Validate the environment and cluster config
+> 3. Detect the topology and configure the IP addresses
+> 4. Configure password-less ssh between the cluster nodes
+> 5. Run NCCL BW test

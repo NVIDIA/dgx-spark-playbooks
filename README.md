@@ -34,7 +34,7 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 - [LM Studio on DGX Spark](nvidia/lm-studio/)
 - [Build and Deploy a Multi-Agent Chatbot](nvidia/multi-agent-chatbot/)
 - [Multi-modal Inference](nvidia/multi-modal-inference/)
-- [Connect Multiple Sparks through a Switch](nvidia/multi-sparks-through-switch/)
+- [Connect Multiple DGX Spark through a Switch](nvidia/multi-sparks-through-switch/)
 - [NCCL for Two Sparks](nvidia/nccl/)
 - [Fine-tune with NeMo](nvidia/nemo-fine-tune/)
 - [NemoClaw with Nemotron-3-Super on DGX Spark](nvidia/nemoclaw/)

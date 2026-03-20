@@ -652,33 +652,49 @@ def configure_ssh_keys_on_nodes(nodes_info) -> bool:
 
     return True
 
-def handle_cluster_setup(config) -> tuple[bool, bool]:
-    """Handles the cluster network setup."""
+def pre_validate_cluster(config) -> tuple[bool, bool, list[str]]:
+    """Pre-validates the cluster."""
     try:
         nodes_info = config.get("nodes_info", None)
         if not nodes_info:
             print("ERROR: Nodes information not found.")
-            return False, False
+            return False, False, []
 
         print(f"Checking UP CX7 interfaces...")
         up_interfaces = check_and_get_up_cx7_interfaces(nodes_info)
         if not up_interfaces:
             print("ERROR: Failed to check UP CX7 interfaces. Check the QSFP cable connection and try again.")
-            return False, False
+            return False, False, []
 
         print(f"Checking CX7 interface link speed...")
         if not check_interface_link_speed(nodes_info, up_interfaces):
-            return False, False
+            return False, False, []
+
+        ring_topology = (len(nodes_info) == 3 and len(up_interfaces) == 4)
+
+    except Exception as e:
+        print(f"ERROR: An error occurred when pre-validating the cluster:\n{e}")
+        return False, False, []
+
+    return True, ring_topology, up_interfaces
+
+def handle_cluster_setup(config, up_interfaces) -> bool:
+    """Handles the cluster network setup."""
+    try:
+        nodes_info = config.get("nodes_info", None)
+        if not nodes_info:
+            print("ERROR: Nodes information not found.")
+            return False
 
         print(f"Copying network setup scripts on nodes...")
         # Copy the detect_and_configure_cluster_networking.py script to the nodes and run it in threads
         if not copy_network_setup_script_to_nodes(nodes_info):
-            return False, False
+            return False
 
         print(f"Running network setup scripts on nodes...")
         if not run_network_setup_scripts_on_nodes(nodes_info):
             print("ERROR: Failed to run network setup scripts on nodes. Check the QSFP cable connections and the nodes config in the json file and try again.")
-            return False, False
+            return False
 
         # Verify that the IP addresses are assigned to the interfaces
         max_retries = 5
@@ -695,20 +711,18 @@ def handle_cluster_setup(config) -> tuple[bool, bool]:
 
         if retries == 0:
             print("ERROR: Failed to verify IP addresses on nodes. Check the QSFP cable connections and the nodes config in the json file and try again.")
-            return False, False
+            return False
 
         # Configure ssh keys across nodes
         if not configure_ssh_keys_on_nodes(nodes_info):
             print("ERROR: Failed to configure ssh keys on nodes. Please check the configuration and try again.")
-            return False, False
-
-        ring_topology = (len(nodes_info) == 3 and len(up_interfaces) == 4)
+            return False
 
     except Exception as e:
         print(f"ERROR: An error occurred when handling cluster setup:\n{e}")
-        return False, False
+        return False
 
-    return True, ring_topology
+    return True
 
 def validate_config(config):
     """Validates the configuration."""
@@ -810,14 +824,35 @@ def validate_environment():
     return True
 
 
+class _HelpHintParser(argparse.ArgumentParser):
+    """ArgumentParser that appends a --help hint to every error."""
+
+    def error(self, message):
+        self.exit(2, f"{self.prog}: error: {message}\nRun with --help for usage.\n")
+
+
 def main():
     """Main function to setup the Spark cluster."""
-    parser = argparse.ArgumentParser(description="Setup the Spark cluster.")
+    parser = _HelpHintParser(
+        description="Setup the Spark cluster.",
+        epilog="One of --pre-validate-only, --run-setup, or --run-nccl-test is required.",
+    )
     parser.add_argument("-c", "--config", type=str, required=True, help="Path to the configuration file.")
+    parser.add_argument("-v", "--pre-validate-only", action="store_true", help="Only run pre-setup validations.")
+    parser.add_argument("-s", "--run-setup", action="store_true", help="Run the cluster setup and run NCCL bandwidth test.")
+    parser.add_argument("-n", "--run-nccl-test", action="store_true", help="Run the NCCL bandwidth test.")
 
     args = parser.parse_args()
-    config = args.config
-    with open(config, "r") as f:
+
+    if not (args.pre_validate_only or args.run_setup or args.run_nccl_test):
+        parser.error("One of -v/--pre-validate-only, -s/--run-setup, or -n/--run-nccl-test is required.")
+
+    config_path = args.config
+    if not os.path.exists(config_path):
+        print(f"ERROR: Configuration file not found: {config_path}")
+        return
+
+    with open(config_path, "r") as f:
         config = json.load(f)
 
     if not config:
@@ -835,17 +870,29 @@ def main():
         if not validate_config(config):
             return
 
-        print("Setting up Spark cluster...")
-        ret, ring_topology = handle_cluster_setup(config)
+        print(f"Pre-validating cluster setup...")
+        ret, ring_topology, up_interfaces = pre_validate_cluster(config)
         if not ret:
             return
 
-        print("Spark cluster setup completed successfully.")
-
-        print("Running NCCL test...")
-        if not run_nccl_test(config.get("nodes_info", []), ring_topology):
+        if args.pre_validate_only:
+            print("Pre-setup validations completed successfully.")
             return
-        print("NCCL test completed.")
+
+        if args.run_setup:
+            print("Setting up Spark cluster...")
+            if not handle_cluster_setup(config, up_interfaces):
+                return
+
+            print("Spark cluster setup completed successfully.")
+
+        if args.run_nccl_test or args.run_setup:
+            print("Running NCCL test...")
+            if ring_topology:
+                print("Detected ring topology...")
+            if not run_nccl_test(config.get("nodes_info", []), ring_topology):
+                return
+            print("NCCL test completed.")
 
     except Exception as e:
         print(f"ERROR: An error occurred when running Spark cluster setup:\n{e}")

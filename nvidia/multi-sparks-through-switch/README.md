@@ -1,7 +1,6 @@
-# Connect Multiple Sparks through a Switch
+# Connect Multiple DGX Spark through a Switch
 
-> Connect multiple Spark devices in a cluster and set them up for distributed inference and fine-tuning
-
+> Set up a cluster of DGX Spark devices that are connected through Switch
 
 ## Table of Contents
 
@@ -20,7 +19,7 @@
 
 ## Basic idea
 
-Configure four DGX Spark systems for high-speed inter-node communication using 200Gbps QSFP connections through a QSFP switch. This setup enables distributed workloads across multiple DGX Spark nodes by establishing network connectivity and configuring SSH authentication.
+Configure multiple DGX Spark systems for high-speed inter-node communication using 200Gbps QSFP connections through a QSFP switch. This setup enables distributed workloads across multiple DGX Spark nodes by establishing network connectivity and configuring SSH authentication.
 
 ## What you will accomplish
 
@@ -31,12 +30,16 @@ You will physically connect four DGX Spark devices with QSFP cables and a QSFP s
 - Basic understanding of distributed computing concepts
 - Working with network interface configuration and netplan
 - Experience with SSH key management
+- Basic understanding and experience in configuring the managed QSFP network switch which you plan to use. Refer to the instruction manuals to:
+  - Know how to connect to the switch for management of ports and features
+  - Know how to enable/disable QSFP ports and create a software bridge on the switch
+  - Know how to configure the link speed manually on the port and disable auto-negotiation if needed
 
 ## Prerequisites
 
-- Four DGX Spark systems (these instructions will also work with two or three nodes cluster with a switch)
+- Multiple DGX Spark systems (these instructions will work for any number of DGX Spark devices connected with a switch)
 - QSFP switch with at least 4 QSFP56-DD ports (at least 200Gbps each)
-- QSFP cables for 200Gbps connection from the switch to the devices
+- QSFP cables for 200Gbps connection from the switch to the devices. Use [recommended cable](https://marketplace.nvidia.com/en-us/enterprise/personal-ai-supercomputers/qsfp-cable-0-4m-for-dgx-spark/) or similar.
   - One cable per spark
   - If the switch has 400Gbps ports then you can also use breakout cables to split them into two 200Gbps ports
 - SSH access available to all systems
@@ -49,23 +52,24 @@ You will physically connect four DGX Spark devices with QSFP cables and a QSFP s
 All required files for this playbook can be found [here on GitHub](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/multi-sparks-through-switch/)
 
 - [**discover-sparks.sh**](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/connect-two-sparks/assets/discover-sparks) script for automatic node discovery and SSH key distribution
+- [**Cluster setup script**](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/multi-sparks-through-switch/assets/spark_cluster_setup) for automatic network configuration, validation and running NCCL sanity test
 
 ## Time & risk
 
-- **Duration:** 1 hour including validation
+- **Duration:** 2 hours including validation
 
 - **Risk level:** Medium - involves network reconfiguration
 
 - **Rollback:** Network changes can be reversed by removing netplan configs or IP assignments
 
-- **Last Updated:** 3/12/2026
+- **Last Updated:** 3/19/2026
   * First publication
 
 ## Run on Four Sparks
 
 ## Step 1. Ensure Same Username on all four Systems
 
-On all four systems check the username and make sure it's the same:
+On all four systems check and make sure the usernames are the same:
 
 ```bash
 ## Check current username
@@ -88,11 +92,11 @@ su - nvidia
 
 ## Step 2. Switch Management
 
-Most QSFP switches offer some form of management interface, either through CLI or UI. Refer to the documentation and connect to the management interface. Make sure that the ports on the switch are enabled. For connecting four sparks, you will need to ensure that the switch is configured to provide 200Gbps connection to each DGX Spark.
+Most QSFP switches offer some form of management interface, either through CLI or UI. Refer to the documentation and connect to the management interface. Make sure that the ports on the switch are enabled. For connecting four sparks, you will need to ensure that the switch is configured to provide 200Gbps connection to each DGX Spark. If not done already, refer to the [Overview](https://build.nvidia.com/spark/multi-sparks-through-switch/overview) of this playbook for the prior knowledge and pre-requisites required for this playbook.
 
 ## Step 3. Physical Hardware Connection
 
-Connect the QSFP cables between DGX Spark systems and the switch(QSFP56-DD/QSFP56 ports) using one CX7 port on each system. It is recommended to use the same CX7 port on all Spark systems for easier network configuration and avoiding NCCL test failures. In this playbook the second port (the one further from the ethernet port) is used. This should establish the 200Gbps connection required for high-speed inter-node communication. You will see an output like the one below on all four sparks. In this example the interfaces showing as 'Up' are **enp1s0f1np1** and **enP2p1s0f1np1** (each physical port has two logical interfaces).
+Connect the QSFP cables between DGX Spark systems and the switch(QSFP56-DD/QSFP56 ports) using one CX7 port on each Spark system. It is recommended to use the same CX7 port on all Spark systems for easier network configuration and avoiding NCCL test failures. In this playbook the second port (the one further from the ethernet port) is used. This should establish the 200Gbps connection required for high-speed inter-node communication. You will see an output like the one below on all four sparks. In this example the interfaces showing as 'Up' are **enp1s0f1np1** and **enP2p1s0f1np1** (each physical port has two logical interfaces).
 
 Example output:
 ```bash
@@ -110,14 +114,14 @@ roceP2p1s0f1 port 1 ==> enP2p1s0f1np1 (Up)
 
 ### Step 3.1. Verify negotiated Link speed
 
-The link speed might not default to 200Gbps with auto-negotiation. To confirm, run the command below on all sparks and check that the speed is shown as 200000Mb/s. If it shows lesser than that value, then the link speed needs to be set to 200Gbps manually in the switch port configuration. Refer to the switch's manual/documentation to disable auto-negotiation and set the link speed manually to 200Gbps (eg. 200G-baseCR4)
+The link speed might not default to 200Gbps with auto-negotiation. To confirm, run the command below on all sparks and check that the speed is shown as 200000Mb/s. If it shows lesser than that value, then the link speed needs to be set to 200Gbps manually in the switch port configuration and auto-negotiation should be disabled. Refer to the switch's manual/documentation to disable auto-negotiation and set the link speed manually to 200Gbps (eg. 200G-baseCR4)
 
 Example output:
 ```bash
-nvidia@dxg-spark-1:~$ ethtool enp1s0f1np1 | grep Speed
+nvidia@dxg-spark-1:~$ sudo ethtool enp1s0f1np1 | grep Speed
 	Speed: 100000Mb/s
 
-nvidia@dxg-spark-1:~$ ethtool enP2p1s0f1np1 | grep Speed
+nvidia@dxg-spark-1:~$ sudo ethtool enP2p1s0f1np1 | grep Speed
 	Speed: 100000Mb/s
 ```
 
@@ -125,10 +129,10 @@ After setting the correct speed on the switch ports. Verify the link speed on al
 
 Example output:
 ```bash
-nvidia@dxg-spark-1:~$ ethtool enp1s0f1np1 | grep Speed
+nvidia@dxg-spark-1:~$ sudo ethtool enp1s0f1np1 | grep Speed
 	Speed: 200000Mb/s
 
-nvidia@dxg-spark-1:~$ ethtool enP2p1s0f1np1 | grep Speed
+nvidia@dxg-spark-1:~$ sudo ethtool enP2p1s0f1np1 | grep Speed
 	Speed: 200000Mb/s
 ```
 
@@ -138,9 +142,9 @@ nvidia@dxg-spark-1:~$ ethtool enP2p1s0f1np1 | grep Speed
 > Full bandwidth can be achieved with just one QSFP cable.
 
 For a clustered setup, all DGX sparks:
-1. Should be able to talk to each other using TCP/IP over CX7.
-2. Should be accessible for management (eg. SSH and run commands)
-3. Should be able to access internet (eg. to download models/utilities)
+1. Should be accessible for management (eg. SSH and run commands)
+2. Should be able to access internet (eg. to download models/utilities)
+3. Should be able to talk to each other using TCP/IP over CX7. The steps below help configure that.
 
 It is recommended to use the Ethernet/WiFi network for management and internet traffic and keep it separate from the CX7 network to avoid CX7 bandwidth from being used for non-workload traffic.
 
@@ -153,7 +157,7 @@ Once you are done creating/adding ports to the bridge, you should be ready to co
 ### 4.1 Script for Cluster networking configuration
 
 We have created a script [here on GitHub](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/multi-sparks-through-switch/assets/spark_cluster_setup) which automates the following:
-1. Interface network configuration for all DGX Sparks
+1. Interface network IP configuration for all DGX Sparks
 2. Set up password-less authentication between the DGX Sparks
 3. Verify multi-node communication
 4. Run NCCL Bandwidth tests
@@ -170,7 +174,7 @@ git clone https://github.com/NVIDIA/dgx-spark-playbooks
 ## Enter the script directory
 cd dgx-spark-playbooks/nvidia/multi-sparks-through-switch/assets/spark_cluster_setup
 
-## Check the README.md for steps to run the script and configure the cluster networking
+## Check the README.md in the script directory for steps to run the script and configure the cluster networking with "--run-setup" argument
 ```
 
 ### 4.2 Manual Cluster networking configuration
@@ -344,7 +348,7 @@ curl -O https://raw.githubusercontent.com/NVIDIA/dgx-spark-playbooks/refs/heads/
 bash ./discover-sparks
 ```
 
-Expected output similar to the below, with different IPs and node names. The first time you run the script, you'll be prompted for your password for each node.
+Expected output similar to the below, with different IPs and node names. You may see up to two IPs for each node as two interfaces (eg. **enp1s0f1np1** and **enP2p1s0f1np1**) have IP addresses assigned. This is expected and does not cause any issues. The first time you run the script, you'll be prompted for your password for each node.
 ```
 Found: 169.254.35.62 (dgx-spark-1.local)
 Found: 169.254.35.63 (dgx-spark-2.local)
@@ -404,9 +408,13 @@ ssh <IP for Node 4> hostname
 
 ## Step 7. Running Tests and Workloads
 
-Now your cluster is set up to run distributed workloads across four nodes. For example, you can run the [NCCL playbook](https://build.nvidia.com/spark/nccl/stacked-sparks). Wherever the playbook asks to run a command on two nodes, just run it on all four nodes and modify the mpirun command which you run on the head node to use four nodes instead of two.
+Now your cluster is set up to run distributed workloads across four nodes. Try running the [NCCL playbook](https://build.nvidia.com/spark/nccl/stacked-sparks).
 
-Example mpirun command for four nodes:
+> [!NOTE]
+> Wherever the playbook asks to run a command on **two nodes**, just run it on **all four nodes**.
+> Make sure to adapt the *mpirun* NCCL command which you run on the **head node** to accommodate **four nodes**
+
+Example mpirun command for NCCL:
 ```bash
 ## Set network interface environment variables (use your Up interface from the previous step)
 export UCX_NET_DEVICES=enp1s0f1np1
@@ -444,3 +452,5 @@ sudo netplan apply
 | "Network unreachable" errors | Network interfaces not configured | Verify netplan config and `sudo netplan apply` |
 | SSH authentication failures | SSH keys not properly distributed | Re-run `./discover-sparks` and enter passwords |
 | Nodes not visible in cluster | Network connectivity issue | Verify QSFP cable connection, check IP configuration |
+| "APT update" errors (eg. E: The list of sources could not be read.) | APT sources errors, conflicting sources or signing keys | Check APT and Ubuntu documentation to fix the APT sources or keys conflicts |
+| NCCL test failures (eg. libnccl.so.2: cannot open shared object file) | NCCL configuration not done on all nodes | Make sure to follow the NCCL playbook to configure **all** nodes before running the NCCL test|
