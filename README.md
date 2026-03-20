@@ -22,6 +22,7 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 ### NVIDIA
 
 - [Comfy UI](nvidia/comfy-ui/)
+- [Connect Three DGX Spark in a Ring Topology](nvidia/connect-three-sparks/)
 - [Set Up Local Network Access](nvidia/connect-to-your-spark/)
 - [Connect Two Sparks](nvidia/connect-two-sparks/)
 - [CUDA-X Data Science](nvidia/cuda-x-data-science/)
