@@ -19,11 +19,11 @@
 
 ## Basic idea
 
-Configure multiple DGX Spark systems for high-speed inter-node communication using 200Gbps QSFP connections through a QSFP switch. This setup enables distributed workloads across multiple DGX Spark nodes by establishing network connectivity and configuring SSH authentication.
+Configure four DGX Spark systems for high-speed inter-node communication using 200Gbps QSFP connections through a QSFP switch. This setup enables distributed workloads across multiple DGX Spark nodes by establishing network connectivity and configuring SSH authentication.
 
 ## What you will accomplish
 
-You will physically connect four DGX Spark devices with QSFP cables and a QSFP switch, configure network interfaces for cluster communication, and establish passwordless SSH between nodes to create a functional distributed computing environment. 
+In this playbook, you will physically connect four DGX Spark devices with QSFP cables and a QSFP switch, configure network interfaces for cluster communication, and establish passwordless SSH between nodes to create a functional distributed computing environment. The same set up can be scaled up to more DGX Spark devices connected via the same switch.
 
 ## What to know before starting
 
@@ -37,7 +37,7 @@ You will physically connect four DGX Spark devices with QSFP cables and a QSFP s
 
 ## Prerequisites
 
-- Multiple DGX Spark systems (these instructions will work for any number of DGX Spark devices connected with a switch)
+- Four DGX Spark systems (these instructions will work for any number of DGX Spark devices connected with a switch)
 - QSFP switch with at least 4 QSFP56-DD ports (at least 200Gbps each)
 - QSFP cables for 200Gbps connection from the switch to the devices. Use [recommended cable](https://marketplace.nvidia.com/en-us/enterprise/personal-ai-supercomputers/qsfp-cable-0-4m-for-dgx-spark/) or similar.
   - One cable per spark
