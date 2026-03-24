@@ -249,6 +249,8 @@ Next, run a model from Ollama (adjust the model name to match your choice from [
 ollama run nemotron-3-super:120b
 ```
 
+Type `/bye` to exit.
+
 Verify the model is available:
 
 ```bash

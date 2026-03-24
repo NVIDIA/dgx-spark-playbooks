@@ -247,9 +247,11 @@ nemoclaw onboard
 The wizard walks you through seven steps:
 
 1. **Preflight** — Checks Docker and OpenShell CLI. Detects GPU. "No GPU detected" or the VRAM count is normal on DGX Spark (GB10 reports unified memory differently).
-2. **Gateway** — Destroys any old `nemoclaw` gateway and starts a new one (30–60 seconds on first run). If port 8080 is already in use by another container, see [Troubleshooting](troubleshooting.md).
-3. **Sandbox** — Enter a name or press Enter for the default (`my-assistant`). The wizard builds a Docker image from the NemoClaw Dockerfile (which includes OpenClaw, the NemoClaw plugin, and the `nemoclaw-start` entrypoint script), then creates a sandbox from that image. On creation, `nemoclaw-start` runs inside the sandbox to configure and launch the OpenClaw gateway. The wizard also sets up port forwarding from port 18789 on the host to the sandbox. First build takes 2–5 minutes.
-4. **Inference (NIM)** — Auto-detects local inference engines. If Ollama is running, the wizard selects it automatically and defaults to `nemotron-3-nano`. No API key is needed for local Ollama. If no local engine is found, you will be prompted to choose an inference option (cloud API requires an NVIDIA API key).
+2. **Starting OpenShell Gateway** — Destroys any old `nemoclaw` gateway and starts a new one (30–60 seconds on first run). If port 8080 is already in use by another container, see [Troubleshooting](troubleshooting.md).
+3. **Creating Sandbox** — Enter a name or press Enter for the default (`my-assistant`). The wizard builds a Docker image from the NemoClaw Dockerfile (which includes OpenClaw, the NemoClaw plugin, and the `nemoclaw-start` entrypoint script), then creates a sandbox from that image. On creation, `nemoclaw-start` runs inside the sandbox to configure and launch the OpenClaw gateway. The wizard also sets up port forwarding from port 18789 on the host to the sandbox. First build takes 2–5 minutes.
+4. **Configuring Inference (NIM)** — Auto-detects local inference engine options.
+    - **Inference options**: If Ollama is running, the wizard will suggest that you select option 2 to use `localhost:11434`. No API key is needed for local Ollama. If no local engine is found, you will be prompted to choose the NVIDIA Endpoint API option (cloud API requires an NVIDIA API key).
+    - **Choose model**: If you downloaded Nemotron 3 120B in Step 3, the onboarding wizard will default to using that model for the inference route. Otherwise, the onboarding wizard will default to `nemotron-3-nano:30b`.
 5. **Inference provider** — Creates the `ollama-local` provider on the gateway and sets the inference route.
 6. **OpenClaw** — Already configured inside the sandbox during step 3.
 7. **Policies** — Press Enter or Y to accept suggested presets (pypi, npm).
@@ -260,7 +262,7 @@ When complete you will see something like:
   ──────────────────────────────────────────────────
   Dashboard    http://localhost:18789/
   Sandbox      my-assistant (Landlock + seccomp + netns)
-  Model        nemotron-3-nano (ollama-local)
+  Model        nemotron-3-super:120b (Local Ollama)
   NIM          not running
   ──────────────────────────────────────────────────
   Run:         nemoclaw my-assistant connect
@@ -271,7 +273,7 @@ When complete you will see something like:
 
 ## Step 7. Configure inference for Nemotron 3 Super
 
-The onboard wizard defaults to `nemotron-3-nano`. If you downloaded Nemotron 3 Super 120B in Step 3, switch the inference route to the larger model.
+If you did not download Nemotron 3 Super 120B in Step 3, then the onboarding wizard will default to `nemotron-3-nano:30b`.
 
 If the wizard did not create the `ollama-local` provider (you will see `provider 'ollama-local' not found` when running the next command), create it manually first:
 
@@ -385,10 +387,16 @@ export ANTHROPIC_API_KEY=local-ollama
 openclaw agent --agent main --local -m "How many rs are there in strawberry?" --session-id s1
 ```
 
-Test sandbox isolation (this should be blocked by the network policy):
+To test the sandbox isolation, try the following:
 
 ```bash
 curl -sI https://httpbin.org/get
+```
+
+The expected output should be as follows, since this is blocked by the network policy:
+
+```bash
+HTTP/1.1 403 Forbidden
 ```
 
 Type `exit` to leave the sandbox.
@@ -401,7 +409,7 @@ In a separate terminal on the host:
 openshell term
 ```
 
-Press `f` to follow live output, `s` to filter by source, `q` to quit.
+First, press any key to proceed. Press `f` to follow live output, `s` to filter by source, `q` to quit.
 
 ## Step 12. Cleanup
 
@@ -409,6 +417,7 @@ Remove the sandbox and destroy the NemoClaw gateway:
 
 ```bash
 openshell sandbox delete my-assistant
+openshell provider delete ollama-local
 openshell gateway destroy -g nemoclaw
 ```
 
@@ -419,18 +428,6 @@ sudo npm uninstall -g nemoclaw
 rm -rf ~/.nemoclaw
 ```
 
-## Step 13. Clean slate (start over)
-
-To remove everything and start again from Step 5:
-
-```bash
-cd ~
-openshell sandbox delete my-assistant 2>/dev/null
-openshell gateway destroy -g nemoclaw 2>/dev/null
-sudo npm uninstall -g nemoclaw
-rm -rf ~/NemoClaw ~/.nemoclaw
-```
-
 Verify:
 
 ```bash
@@ -438,9 +435,16 @@ which nemoclaw        # Should report "not found"
 openshell status      # Should report "No gateway configured"
 ```
 
-Then restart from Step 5 (Install NemoClaw).
+Then, you can choose to restart from Step 5 (Install NemoClaw).
 
-## Step 14. Optional: Remote access via SSH
+To also remove the Ollama model:
+
+```bash
+ollama rm nemotron-3-super:120b
+```
+
+
+## Step 13. Optional: Remote access via SSH
 
 If you access the Spark remotely, forward port 18789 to your machine.
 
