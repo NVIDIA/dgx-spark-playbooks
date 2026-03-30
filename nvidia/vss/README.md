@@ -204,27 +204,34 @@ In this hybrid deployment, we would use NIMs from [build.nvidia.com](https://bui
 ## Start Standard VSS (Base)
 export NGC_CLI_API_KEY='your_ngc_api_key'
 export LLM_ENDPOINT_URL=https://your-llm-endpoint.com
-scripts/dev-profile.sh up -p base -H DGX-SPARK --use-remote-llm
+scripts/dev-profile.sh up -p base -H DGX-SPARK --use-remote-llm --llm <REMOTE LLM MODEL NAME>
 
 ## Start Standard VSS (Alert Verification)
 export NGC_CLI_API_KEY='your_ngc_api_key'
 export LLM_ENDPOINT_URL=https://your-llm-endpoint.com
-scripts/dev-profile.sh up -p alerts -m verification -H DGX-SPARK --use-remote-llm
+scripts/dev-profile.sh up -p alerts -m verification -H DGX-SPARK --use-remote-llm --llm <REMOTE LLM MODEL NAME>
 
 ## Start Standard VSS (Real-Time Alerts)
 export NGC_CLI_API_KEY='your_ngc_api_key'
 export LLM_ENDPOINT_URL=https://your-llm-endpoint.com
-scripts/dev-profile.sh up -p alerts -m real-time -H DGX-SPARK --use-remote-llm
+scripts/dev-profile.sh up -p alerts -m real-time -H DGX-SPARK --use-remote-llm --llm <REMOTE LLM MODEL NAME>
 ```
 
 > [!NOTE]
 > This step will take several minutes as containers are pulled and services initialize. The VSS backend requires additional startup time.
-> The following the environment variable needs to be set first before any deployment:
-> • NGC_CLI_API_KEY     — (required) for vss deployment
-> • LLM_ENDPOINT_URL    — (required) when --use-remote-llm is passed, used as LLM base URL
-> • NVIDIA_API_KEY      — (optional) used for accessing remote LLM/VLM endpoints
-> • OPENAI_API_KEY      — (optional) used for accessing remote LLM/VLM endpoints
-> • VLM_CUSTOM_WEIGHTS  — (optional) absolute path to custom weights dir
+> Set the following environment variables before deployment:
+> • **NGC_CLI_API_KEY** — (required) NGC API key for pulling images and deployment
+> • **LLM_ENDPOINT_URL** — (required when using `--use-remote-llm`) Base URL for the remote LLM
+> • **NVIDIA_API_KEY** — (optional) For remote LLM/VLM endpoints that require it
+> • **OPENAI_API_KEY** — (optional) For remote LLM/VLM endpoints that require it
+> • **VLM_CUSTOM_WEIGHTS** — (optional) Absolute path to a custom weights directory
+>
+> Pass these additional flags to **`scripts/dev-profile.sh`** for remote LLM mode:
+> • **`--use-remote-llm`** — (required) Use a remote LLM, the base URL is read from **`LLM_ENDPOINT_URL`** in the environment
+> • **`--llm`** — (required) Remote LLM model name (for example: `nvidia/nvidia-nemotron-nano-9b-v2`). **Strongly recommended** for alert workflows (verification and real-time): use `nvidia/nvidia-nemotron-nano-9b-v2`. Omitting `--llm` may cause the script to use whatever model is returned by the remote endpoint.
+>
+> Run **`scripts/dev-profile.sh -h`** for a full list of supported arguments.
+
 
 **7.3 Validate Standard VSS deployment**
 
