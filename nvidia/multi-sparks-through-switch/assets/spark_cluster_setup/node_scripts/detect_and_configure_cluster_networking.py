@@ -268,6 +268,27 @@ def ip_for_2node_link(link_index: int, node_id: int, local_index_in_pair: int) -
     host = 1 + (0 if node_id == 1 else 2) + local_index_in_pair
     return f"192.168.{link_index}.{host}/24"
 
+def ip_for_3node_ring_link(link_index: int, node_id: int, local_index_in_pair: int) -> str:
+    """
+    /24 scheme for 3-node ring topology.
+
+    For each node_id:
+      network = 192.168.third_octet.node_id/24
+      third_octet = link_index * 2 + local_index_in_pair
+
+    Node 1:
+      192.168.[0, 1].1/24 -> Node 2
+      192.168.[2, 3].1/24 -> Node 3
+
+    Node 2:
+      192.168.[4, 5].1/24 -> Node 3
+      192.168.[0, 1].2/24 -> Node 1
+
+    Node 3:
+      192.168.[2, 3].2/24 -> Node 1
+      192.168.[4, 5].2/24 -> Node 2
+    """
+    return f"192.168.{link_index * 2 + local_index_in_pair}.{node_id}/24"
 
 def ip_for_switch_link(link_index: int, node_index: int, local_index_in_pair: int) -> str:
     """
@@ -602,7 +623,7 @@ def main() -> bool:
             node_id_link = 1 if local_machine_id < neighbor_machine else 2
 
             for local_idx, cfg_iface in enumerate(config_ifaces):
-                ip_cidr = ip_for_2node_link(link_index, node_id_link, local_idx)
+                ip_cidr = ip_for_3node_ring_link(link_index, node_id_link, local_idx)
                 iface_to_ip[cfg_iface] = ip_cidr
 
             print(

@@ -158,15 +158,15 @@ network:
     enP2p1s0f0np0:
       dhcp4: false
       addresses:
-        - 192.168.0.2/24
+        - 192.168.1.1/24
     enp1s0f1np1:
       dhcp4: false
       addresses:
-        - 192.168.1.1/24
+        - 192.168.2.1/24
     enP2p1s0f1np1:
       dhcp4: false
       addresses:
-        - 192.168.1.2/24
+        - 192.168.3.1/24
 EOF
 
 ## Set appropriate permissions
@@ -186,19 +186,19 @@ network:
     enp1s0f0np0:
       dhcp4: false
       addresses:
-        - 192.168.2.1/24
+        - 192.168.4.1/24
     enP2p1s0f0np0:
       dhcp4: false
       addresses:
-        - 192.168.2.2/24
+        - 192.168.5.1/24
     enp1s0f1np1:
       dhcp4: false
       addresses:
-        - 192.168.0.3/24
+        - 192.168.0.2/24
     enP2p1s0f1np1:
       dhcp4: false
       addresses:
-        - 192.168.0.4/24
+        - 192.168.1.2/24
 EOF
 
 ## Set appropriate permissions
@@ -218,19 +218,19 @@ network:
     enp1s0f0np0:
       dhcp4: false
       addresses:
-        - 192.168.1.3/24
+        - 192.168.2.2/24
     enP2p1s0f0np0:
       dhcp4: false
       addresses:
-        - 192.168.1.4/24
+        - 192.168.3.2/24
     enp1s0f1np1:
       dhcp4: false
       addresses:
-        - 192.168.2.3/24
+        - 192.168.4.2/24
     enP2p1s0f1np1:
       dhcp4: false
       addresses:
-        - 192.168.2.4/24
+        - 192.168.5.2/24
 EOF
 
 ## Set appropriate permissions
@@ -254,8 +254,8 @@ bash ./discover-sparks
 Expected output similar to the below, with different IPs and node names. You may see more than one IP for each node as four interfaces (**enp1s0f0np0**, **enP2p1s0f0np0**, **enp1s0f1np1** and **enP2p1s0f1np1**) have IP addresses assigned. This is expected and does not cause any issues. The first time you run the script, you'll be prompted for your password for each node.
 ```
 Found: 192.168.0.1 (dgx-spark-1.local)
-Found: 192.168.0.3 (dgx-spark-2.local)
-Found: 192.168.1.3 (dgx-spark-3.local)
+Found: 192.168.0.2 (dgx-spark-2.local)
+Found: 192.168.3.2 (dgx-spark-3.local)
 
 Setting up bidirectional SSH access (local <-> remote nodes)...
 You may be prompted for your password for each node.
