@@ -8,6 +8,7 @@
 - [Instructions](#instructions)
 - [Run on two Sparks](#run-on-two-sparks)
   - [Step 11. (Optional) Launch 405B inference server](#step-11-optional-launch-405b-inference-server)
+- [Run on multiple Sparks through a switch](#run-on-multiple-sparks-through-a-switch)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -392,6 +393,194 @@ http://<head-node-ip>:8265
 ## - Log rotation for long-running services
 ## - Persistent model caching across restarts
 ## - Alternative quantization methods (FP8, INT4)
+```
+
+## Run on multiple Sparks through a switch
+
+## Step 1. Configure network connectivity
+
+Follow the network setup instructions from the [Multi Sparks through switch](https://build.nvidia.com/spark/multi-sparks-through-switch) playbook to establish connectivity between your DGX Spark nodes.
+
+This includes:
+- Physical QSFP cable connections between Sparks and Switch
+- Network interface configuration (automatic or manual IP assignment)
+- Passwordless SSH setup
+- Network connectivity verification
+- NCCL Bandwidth test
+
+## Step 2. Download cluster deployment script
+
+Download the vLLM cluster deployment script on all nodes. This script orchestrates the Ray cluster setup required for distributed inference.
+
+```bash
+## Download on all nodes
+wget https://raw.githubusercontent.com/vllm-project/vllm/refs/heads/main/examples/online_serving/run_cluster.sh
+chmod +x run_cluster.sh
+```
+
+## Step 3. Pull the NVIDIA vLLM Image from NGC
+
+Do this step on all nodes.
+
+First, you will need to configure docker to pull from NGC
+If this is your first time using docker run:
+```bash
+sudo groupadd docker
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+After this, you should be able to run docker commands without using `sudo`.
+
+Find the latest container build from https://catalog.ngc.nvidia.com/orgs/nvidia/containers/vllm
+
+```bash
+docker pull nvcr.io/nvidia/vllm:26.02-py3
+export VLLM_IMAGE=nvcr.io/nvidia/vllm:26.02-py3
+```
+
+## Step 4. Start Ray head node
+
+Launch the Ray cluster head node on Node 1. This node coordinates the distributed inference and serves the API endpoint.
+
+```bash
+## On Node 1, start head node
+
+## Get the IP address of the high-speed interface
+## Use the interface that shows "(Up)" from ibdev2netdev (enp1s0f0np0 or enp1s0f1np1)
+export MN_IF_NAME=enp1s0f1np1
+export VLLM_HOST_IP=$(ip -4 addr show $MN_IF_NAME | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
+
+echo "Using interface $MN_IF_NAME with IP $VLLM_HOST_IP"
+
+bash run_cluster.sh $VLLM_IMAGE $VLLM_HOST_IP --head ~/.cache/huggingface \
+  -e VLLM_HOST_IP=$VLLM_HOST_IP \
+  -e UCX_NET_DEVICES=$MN_IF_NAME \
+  -e NCCL_SOCKET_IFNAME=$MN_IF_NAME \
+  -e OMPI_MCA_btl_tcp_if_include=$MN_IF_NAME \
+  -e GLOO_SOCKET_IFNAME=$MN_IF_NAME \
+  -e TP_SOCKET_IFNAME=$MN_IF_NAME \
+  -e RAY_memory_monitor_refresh_ms=0 \
+  -e MASTER_ADDR=$VLLM_HOST_IP
+```
+
+## Step 5. Start Ray worker nodes
+
+Connect rest of the nodes to the Ray cluster as a worker nodes. This provides additional GPU resources for tensor parallelism.
+
+```bash
+## On other Nodes, join as workers
+
+## Set the interface name (same as Node 1)
+export MN_IF_NAME=enp1s0f1np1
+
+## Get Node's own IP address
+export VLLM_HOST_IP=$(ip -4 addr show $MN_IF_NAME | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
+
+## IMPORTANT: Set HEAD_NODE_IP to Node 1's IP address
+## You must get this value from Node 1 (run: echo $VLLM_HOST_IP on Node 1)
+export HEAD_NODE_IP=<NODE_1_IP_ADDRESS>
+
+echo "Worker IP: $VLLM_HOST_IP, connecting to head node at: $HEAD_NODE_IP"
+
+bash run_cluster.sh $VLLM_IMAGE $HEAD_NODE_IP --worker ~/.cache/huggingface \
+  -e VLLM_HOST_IP=$VLLM_HOST_IP \
+  -e UCX_NET_DEVICES=$MN_IF_NAME \
+  -e NCCL_SOCKET_IFNAME=$MN_IF_NAME \
+  -e OMPI_MCA_btl_tcp_if_include=$MN_IF_NAME \
+  -e GLOO_SOCKET_IFNAME=$MN_IF_NAME \
+  -e TP_SOCKET_IFNAME=$MN_IF_NAME \
+  -e RAY_memory_monitor_refresh_ms=0 \
+  -e MASTER_ADDR=$HEAD_NODE_IP
+```
+> **Note:** Replace `<NODE_1_IP_ADDRESS>` with the actual IP address from Node 1, specifically the QSFP interface enp1s0f1np1 configured in the [Multi Sparks through switch](https://build.nvidia.com/spark/multi-sparks-through-switch) playbook.
+
+## Step 6. Verify cluster status
+
+Confirm all nodes are recognized and available in the Ray cluster.
+
+```bash
+## On Node 1 (head node)
+## Find the vLLM container name (it will be node-<random_number>)
+export VLLM_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '^node-[0-9]+$')
+echo "Found container: $VLLM_CONTAINER"
+
+docker exec $VLLM_CONTAINER ray status
+```
+
+Expected output shows all nodes with available GPU resources.
+
+## Step 7. Download MiniMax M2.5 model
+
+If you are running with four or more sparks, you can comfortably run this model with tensor parallelism. Authenticate with Hugging Face and download the model.
+
+```bash
+## On all nodes, from within the docker containers created in previous steps, run the following
+hf auth login
+hf download MiniMaxAI/MiniMax-M2.5
+```
+
+## Step 8. Launch inference server for MiniMax M2.5
+
+Start the vLLM inference server with tensor parallelism across all nodes.
+
+```bash
+## On Node 1, enter container and start server
+## Assuming that you run on a 4 node cluster, set --tensor-parallel-size as 4
+export VLLM_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '^node-[0-9]+$')
+docker exec -it $VLLM_CONTAINER /bin/bash -c '
+  vllm serve MiniMaxAI/MiniMax-M2.5 \
+    --tensor-parallel-size 4 --max-model-len 129000 --max-num-seqs 4 --trust-remote-code'
+```
+
+## Step 9. Test MiniMax M2.5 model inference
+
+Verify the deployment with a sample inference request.
+
+```bash
+## Test from Node 1 or external client.
+## If testing with external client change localhost to the Node 1 Mgmt IP address.
+curl http://localhost:8000/v1/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "MiniMaxAI/MiniMax-M2.5",
+    "prompt": "Write a haiku about a GPU",
+    "max_tokens": 32,
+    "temperature": 0.7
+  }'
+```
+
+## Step 10. Validate deployment
+
+Perform comprehensive validation of the distributed inference system.
+
+```bash
+## Check Ray cluster health
+export VLLM_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '^node-[0-9]+$')
+docker exec $VLLM_CONTAINER ray status
+
+## Verify server health endpoint on Node 1
+curl http://localhost:8000/health
+
+## Monitor GPU utilization on all nodes
+nvidia-smi
+export VLLM_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '^node-[0-9]+$')
+docker exec $VLLM_CONTAINER nvidia-smi --query-gpu=memory.used,memory.total --format=csv
+```
+
+## Step 11. Next steps
+
+Access the Ray dashboard for cluster monitoring and explore additional features:
+
+```bash
+## Ray dashboard available at:
+http://<head-node-ip>:8265
+
+## Consider implementing for production:
+## - Health checks and automatic restarts
+## - Log rotation for long-running services
+## - Persistent model caching across restarts
+## - Other models which can fit on the cluster with different quantization methods (FP8, NVFP4)
 ```
 
 ## Troubleshooting
