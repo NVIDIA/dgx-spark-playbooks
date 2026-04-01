@@ -27,6 +27,8 @@
   - [Step 8. Exit the sandbox and access the Web UI](#step-8-exit-the-sandbox-and-access-the-web-ui)
   - [Step 9. Prepare credentials](#step-9-prepare-credentials)
   - [Step 10. Configure and start the Telegram bridge](#step-10-configure-and-start-the-telegram-bridge)
+  - [Step 11. Stop services](#step-11-stop-services)
+  - [Step 12. Uninstall NemoClaw](#step-12-uninstall-nemoclaw)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -128,6 +130,7 @@ All required assets are handled by the NemoClaw installer. No manual cloning is 
 - **Estimated time:** 20--30 minutes (with Ollama and model already downloaded). First-time model download adds ~15--30 minutes depending on network speed.
 - **Risk level:** Medium -- you are running an AI agent in a sandbox; risks are reduced by isolation but not eliminated. Use a clean environment and do not connect sensitive data or production accounts.
 - **Last Updated:** 03/31/2026
+  * First Publication
 
 ## Instructions
 
@@ -231,10 +234,10 @@ You should see `nemotron-3-super:120b` in the output.
 
 ### Step 4. Install NemoClaw
 
-This single command handles everything: installs Node.js (if needed), installs OpenShell, clones NemoClaw, builds the CLI, and runs the onboard wizard to create a sandbox.
+This single command handles everything: installs Node.js (if needed), installs OpenShell, clones NemoClaw at the pinned stable release (`v0.0.1`), builds the CLI, and runs the onboard wizard to create a sandbox.
 
 ```bash
-curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash
+curl -fsSL https://www.nvidia.com/nemoclaw.sh | NEMOCLAW_INSTALL_TAG=v0.0.1 bash
 ```
 
 The onboard wizard walks you through setup:
@@ -259,7 +262,7 @@ Logs:        nemoclaw my-assistant logs --follow
 ```
 
 > [!IMPORTANT]
-> Save the tokenized Web UI URL printed at the end -- you will need it for Step 8. It looks like:
+> Save the tokenized Web UI URL printed at the end -- you will need it in [Step 8](#step-8-exit-the-sandbox-and-access-the-web-ui). It looks like:
 > `http://127.0.0.1:18789/#token=<long-token-here>`
 
 > [!NOTE]
@@ -311,7 +314,7 @@ Exit the sandbox to return to the host:
 exit
 ```
 
-**If accessing the Web UI directly on the Spark** (keyboard and monitor attached), open a browser and navigate to the tokenized URL from Step 4:
+**If accessing the Web UI directly on the Spark** (keyboard and monitor attached), open a browser and navigate to the tokenized URL from [Step 4](#step-4-install-nemoclaw-and-complete-the-onboard-wizard):
 
 ```text
 http://127.0.0.1:18789/#token=<long-token-here>
@@ -393,7 +396,64 @@ Open Telegram, find your bot, and send it a message. The bot forwards it to the 
 > The first response may include a debug log line like "gateway Running as non-root..." -- this is cosmetic and can be ignored.
 
 > [!NOTE]
-> If you need to restart the bridge, `nemoclaw stop` may not cleanly stop the process. If that happens, find the PID from the `nemoclaw start` output, force-kill it with `kill -9 <PID>`, then run `nemoclaw start` again.
+> If you need to restart the bridge, `nemoclaw stop` may not cleanly stop the process. If that happens, find and kill the bridge process via its PID file:
+> ```bash
+> kill -9 "$(cat /tmp/nemoclaw-services-${SANDBOX_NAME}/telegram-bridge.pid)"
+> ```
+> Then run `nemoclaw start` again.
+
+---
+
+## Phase 4: Cleanup and Uninstall
+
+### Step 11. Stop services
+
+Stop any running auxiliary services (Telegram bridge, cloudflared):
+
+```bash
+nemoclaw stop
+```
+
+Stop the port forward:
+
+```bash
+openshell forward list          # find active forwards
+openshell forward stop 18789    # stop the dashboard forward
+```
+
+### Step 12. Uninstall NemoClaw
+
+Run the uninstaller from the cloned source directory. It removes all sandboxes, the OpenShell gateway, Docker containers/images/volumes, the CLI, and all state files. Docker, Node.js, npm, and Ollama are preserved.
+
+```bash
+cd ~/.nemoclaw/source
+./uninstall.sh
+```
+
+**Uninstaller flags:**
+
+| Flag | Effect |
+|------|--------|
+| `--yes` | Skip the confirmation prompt |
+| `--keep-openshell` | Leave the `openshell` binary in place |
+| `--delete-models` | Also remove the Ollama models pulled by NemoClaw |
+
+To remove everything including the Ollama model:
+
+```bash
+./uninstall.sh --yes --delete-models
+```
+
+The uninstaller runs 6 steps:
+1. Stop NemoClaw helper services and port-forward processes
+2. Delete all OpenShell sandboxes, the NemoClaw gateway, and providers
+3. Remove the global `nemoclaw` npm package
+4. Remove NemoClaw/OpenShell Docker containers, images, and volumes
+5. Remove Ollama models (only with `--delete-models`)
+6. Remove state directories (`~/.nemoclaw`, `~/.config/openshell`, `~/.config/nemoclaw`) and the OpenShell binary
+
+> [!NOTE]
+> The source clone at `~/.nemoclaw/source` is removed as part of state cleanup in step 6. If you want to keep a local copy, move or back it up before running the uninstaller.
 
 ## Useful commands
 
@@ -408,6 +468,8 @@ Open Telegram, find your bot, and send it a message. The bot forwards it to the 
 | `openshell term` | Open the monitoring TUI on the host |
 | `openshell forward list` | List active port forwards |
 | `openshell forward start 18789 my-assistant --background` | Restart port forwarding for Web UI |
+| `cd ~/.nemoclaw/source && ./uninstall.sh` | Remove NemoClaw (preserves Docker, Node.js, Ollama) |
+| `cd ~/.nemoclaw/source && ./uninstall.sh --delete-models` | Remove NemoClaw and Ollama models |
 
 ## Troubleshooting
 
