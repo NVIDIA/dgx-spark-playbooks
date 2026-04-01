@@ -262,7 +262,7 @@ Logs:        nemoclaw my-assistant logs --follow
 ```
 
 > [!IMPORTANT]
-> Save the tokenized Web UI URL printed at the end -- you will need it in [Step 8](#step-8-exit-the-sandbox-and-access-the-web-ui). It looks like:
+> Save the tokenized Web UI URL printed at the end -- you will need it in Step 8. It looks like:
 > `http://127.0.0.1:18789/#token=<long-token-here>`
 
 > [!NOTE]
@@ -314,7 +314,7 @@ Exit the sandbox to return to the host:
 exit
 ```
 
-**If accessing the Web UI directly on the Spark** (keyboard and monitor attached), open a browser and navigate to the tokenized URL from [Step 4](#step-4-install-nemoclaw-and-complete-the-onboard-wizard):
+**If accessing the Web UI directly on the Spark** (keyboard and monitor attached), open a browser and navigate to the tokenized URL from Step 4:
 
 ```text
 http://127.0.0.1:18789/#token=<long-token-here>
