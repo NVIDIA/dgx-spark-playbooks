@@ -442,7 +442,7 @@ Replace the IP addresses with your actual node IPs.
 On **each node** (primary and worker), run the following command to start the TRT-LLM container:
 
 ```bash
-docker run -d --rm \
+  docker run -d --rm \
   --name trtllm-multinode \
   --gpus '"device=all"' \
   --network host \
@@ -456,9 +456,11 @@ docker run -d --rm \
   -e OMPI_MCA_rmaps_ppr_n_pernode="1" \
   -e OMPI_ALLOW_RUN_AS_ROOT="1" \
   -e OMPI_ALLOW_RUN_AS_ROOT_CONFIRM="1" \
+  -e CPATH=/usr/local/cuda/include \
+  -e TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas \
   -v ~/.cache/huggingface/:/root/.cache/huggingface/ \
   -v ~/.ssh:/tmp/.ssh:ro \
-  nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6 \
+  nvcr.io/nvidia/tensorrt-llm/release:1.3.0rc5 \
   sh -c "curl https://raw.githubusercontent.com/NVIDIA/dgx-spark-playbooks/refs/heads/main/nvidia/trt-llm/assets/trtllm-mn-entrypoint.sh | sh"
 ```
 
@@ -477,7 +479,7 @@ You should see output similar to:
 
 ```
 CONTAINER ID   IMAGE                                                 COMMAND                  CREATED          STATUS          PORTS     NAMES
-abc123def456   nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6         "sh -c 'curl https:…"    10 seconds ago   Up 8 seconds              trtllm-multinode
+abc123def456   nvcr.io/nvidia/tensorrt-llm/release:1.3.0rc5         "sh -c 'curl https:…"    10 seconds ago   Up 8 seconds              trtllm-multinode
 ```
 
 ### Step 6. Copy hostfile to primary container

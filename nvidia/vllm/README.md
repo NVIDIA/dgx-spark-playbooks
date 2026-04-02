@@ -54,6 +54,10 @@ The following models are supported with vLLM on Spark. All listed models are ava
 
 | Model | Quantization | Support Status | HF Handle |
 |-------|-------------|----------------|-----------|
+| **Gemma 4 31B IT** | Base | ✅ | [`google/gemma-4-31B-it`](https://huggingface.co/google/gemma-4-31B-it) |
+| **Gemma 4 26B A4B IT** | Base | ✅ | [`google/gemma-4-26B-A4B-it`](https://huggingface.co/google/gemma-4-26B-A4B-it) |
+| **Gemma 4 E4B IT** | Base | ✅ | [`google/gemma-4-E4B-it`](https://huggingface.co/google/gemma-4-E4B-it) |
+| **Gemma 4 E2B IT** | Base | ✅ | [`google/gemma-4-E2B-it`](https://huggingface.co/google/gemma-4-E2B-it) |
 | **Nemotron-3-Super-120B** | NVFP4 | ✅ | [`nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4`](https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4) |
 | **GPT-OSS-20B** | MXFP4 | ✅ | [`openai/gpt-oss-20b`](https://huggingface.co/openai/gpt-oss-20b) |
 | **GPT-OSS-120B** | MXFP4 | ✅ | [`openai/gpt-oss-120b`](https://huggingface.co/openai/gpt-oss-120b) |
@@ -89,9 +93,8 @@ Reminder: not all model architectures are supported for NVFP4 quantization.
 * **Duration:** 30 minutes for Docker approach
 * **Risks:** Container registry access requires internal credentials
 * **Rollback:** Container approach is non-destructive.
-* **Last Updated:** 03/12/2026
-  * Added support for Nemotron-3-Super-120B model
-  * Updated container to Feb 2026 release (26.02-py3)
+* **Last Updated:** 04/02/2026
+  * Add support for Gemma 4 model family
 
 ## Instructions
 
@@ -117,11 +120,19 @@ Find the latest container build from https://catalog.ngc.nvidia.com/orgs/nvidia/
 
 ```bash
 export LATEST_VLLM_VERSION=<latest_container_version>
-
 ## example
 ## export LATEST_VLLM_VERSION=26.02-py3
 
+export HF_MODEL_HANDLE=<HF_HANDLE>
+## example
+## export HF_MODEL_HANDLE=openai/gpt-oss-20b
+
 docker pull nvcr.io/nvidia/vllm:${LATEST_VLLM_VERSION}
+```
+
+For Gemma 4 model family, use vLLM custom containers:
+```bash
+docker pull vllm/vllm-openai:gemma4-cu130
 ```
 
 ## Step 3. Test vLLM in container
@@ -131,7 +142,14 @@ Launch the container and start vLLM server with a test model to verify basic fun
 ```bash
 docker run -it --gpus all -p 8000:8000 \
 nvcr.io/nvidia/vllm:${LATEST_VLLM_VERSION} \
-vllm serve "Qwen/Qwen2.5-Math-1.5B-Instruct"
+vllm serve ${HF_MODEL_HANDLE}
+```
+
+To run models from Gemma 4 model family, (e.g. `google/gemma-4-31B-it`):
+```bash
+docker run -it --gpus all -p 8000:8000 \
+vllm/vllm-openai:gemma4-cu130 \
+vllm serve ${HF_MODEL_HANDLE}
 ```
 
 Expected output should include:
@@ -145,7 +163,7 @@ In another terminal, test the server:
 curl http://localhost:8000/v1/chat/completions \
 -H "Content-Type: application/json" \
 -d '{
-    "model": "Qwen/Qwen2.5-Math-1.5B-Instruct",
+    "model": "'"${HF_MODEL_HANDLE}"'",
     "messages": [{"role": "user", "content": "12*17"}],
     "max_tokens": 500
 }'
