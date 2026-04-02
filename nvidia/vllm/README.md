@@ -148,8 +148,7 @@ vllm serve ${HF_MODEL_HANDLE}
 To run models from Gemma 4 model family, (e.g. `google/gemma-4-31B-it`):
 ```bash
 docker run -it --gpus all -p 8000:8000 \
-vllm/vllm-openai:gemma4-cu130 \
-vllm serve ${HF_MODEL_HANDLE}
+vllm/vllm-openai:gemma4-cu130 ${HF_MODEL_HANDLE}
 ```
 
 Expected output should include:
