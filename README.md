@@ -31,6 +31,7 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 - [Install and Use Isaac Sim and Isaac Lab](nvidia/isaac/)
 - [Optimized JAX](nvidia/jax/)
 - [Live VLM WebUI](nvidia/live-vlm-webui/)
+- [Run models with llama.cpp on DGX Spark](nvidia/llama-cpp/)
 - [LLaMA Factory](nvidia/llama-factory/)
 - [LM Studio on DGX Spark](nvidia/lm-studio/)
 - [Build and Deploy a Multi-Agent Chatbot](nvidia/multi-agent-chatbot/)
