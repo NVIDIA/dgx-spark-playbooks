@@ -55,6 +55,7 @@ The following models are supported with vLLM on Spark. All listed models are ava
 | Model | Quantization | Support Status | HF Handle |
 |-------|-------------|----------------|-----------|
 | **Gemma 4 31B IT** | Base | ✅ | [`google/gemma-4-31B-it`](https://huggingface.co/google/gemma-4-31B-it) |
+| **Gemma 4 31B IT** | NVFP4 | ✅ | [`nvidia/Gemma-4-31B-IT-NVFP4`](https://huggingface.co/nvidia/Gemma-4-31B-IT-NVFP4) |
 | **Gemma 4 26B A4B IT** | Base | ✅ | [`google/gemma-4-26B-A4B-it`](https://huggingface.co/google/gemma-4-26B-A4B-it) |
 | **Gemma 4 E4B IT** | Base | ✅ | [`google/gemma-4-E4B-it`](https://huggingface.co/google/gemma-4-E4B-it) |
 | **Gemma 4 E2B IT** | Base | ✅ | [`google/gemma-4-E2B-it`](https://huggingface.co/google/gemma-4-E2B-it) |
