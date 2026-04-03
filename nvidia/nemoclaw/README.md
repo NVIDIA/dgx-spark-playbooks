@@ -237,7 +237,7 @@ You should see `nemotron-3-super:120b` in the output.
 This single command handles everything: installs Node.js (if needed), installs OpenShell, clones NemoClaw at the pinned stable release (`v0.0.1`), builds the CLI, and runs the onboard wizard to create a sandbox.
 
 ```bash
-curl -fsSL https://www.nvidia.com/nemoclaw.sh | NEMOCLAW_INSTALL_TAG=v0.0.1 bash
+curl -fsSL https://www.nvidia.com/nemoclaw.sh | NEMOCLAW_INSTALL_TAG=v0.0.4 bash
 ```
 
 The onboard wizard walks you through setup:
