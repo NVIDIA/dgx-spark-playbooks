@@ -27,8 +27,8 @@ services:
       # Ollama configuration
       - OLLAMA_BASE_URL=http://ollama:11434/v1
       - OLLAMA_MODEL=llama3.1:8b
-      # Disable vLLM
-      - VLLM_BASE_URL=http://localhost:8001/v1
+      # vLLM disabled in default Ollama mode
+      # - VLLM_BASE_URL=http://localhost:8001/v1
       - VLLM_MODEL=disabled
       # Vector DB configuration
       - QDRANT_URL=http://qdrant:6333

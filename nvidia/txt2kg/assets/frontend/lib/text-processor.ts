@@ -108,7 +108,7 @@ export class TextProcessor {
     
     // Determine which LLM provider to use based on configuration
     // Priority: vLLM > NVIDIA > Ollama
-    if (process.env.VLLM_BASE_URL) {
+    if (process.env.VLLM_BASE_URL && process.env.VLLM_MODEL && process.env.VLLM_MODEL !== 'disabled') {
       this.selectedLLMProvider = 'vllm';
     } else if (process.env.NVIDIA_API_KEY) {
       this.selectedLLMProvider = 'nvidia';
