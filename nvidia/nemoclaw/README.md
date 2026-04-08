@@ -172,11 +172,14 @@ Verify the NVIDIA runtime works:
 docker run --rm --runtime=nvidia --gpus all ubuntu nvidia-smi
 ```
 
-If you get a permission denied error on `docker`, add your user to the Docker group and log out/in:
+If you get a permission denied error on `docker`, add your user to the Docker group and activate the new group in your current session:
 
 ```bash
 sudo usermod -aG docker $USER
+newgrp docker
 ```
+
+This applies the group change immediately. Alternatively, you can log out and back in instead of running `newgrp docker`.
 
 > [!NOTE]
 > DGX Spark uses cgroup v2. OpenShell's gateway embeds k3s inside Docker and needs host cgroup namespace access. Without `default-cgroupns-mode: host`, the gateway can fail with "Failed to start ContainerManager" errors.
@@ -322,13 +325,21 @@ http://127.0.0.1:18789/#token=<long-token-here>
 
 **If accessing the Web UI from a remote machine**, you need to set up port forwarding.
 
+First, find your Spark's IP address. On the Spark, run:
+
+```bash
+hostname -I | awk '{print $1}'
+```
+
+This prints the primary IP address (e.g. `192.168.1.42`). You can also find it in **Settings > Wi-Fi** or **Settings > Network** on the Spark's desktop, or check your router's connected-devices list.
+
 Start the port forward on the Spark host:
 
 ```bash
 openshell forward start 18789 my-assistant --background
 ```
 
-Then from your remote machine, create an SSH tunnel to the Spark:
+Then from your remote machine, create an SSH tunnel to the Spark (replace `<your-spark-ip>` with the IP address from above):
 
 ```bash
 ssh -L 18789:127.0.0.1:18789 <your-user>@<your-spark-ip>
