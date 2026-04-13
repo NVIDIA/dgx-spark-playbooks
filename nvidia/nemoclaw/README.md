@@ -25,7 +25,7 @@
   - [Step 6. Talk to the agent (CLI)](#step-6-talk-to-the-agent-cli)
   - [Step 7. Interactive TUI](#step-7-interactive-tui)
   - [Step 8. Exit the sandbox and access the Web UI](#step-8-exit-the-sandbox-and-access-the-web-ui)
-  - [Step 9. Prepare credentials](#step-9-prepare-credentials)
+  - [Step 9. Create a Telegram bot](#step-9-create-a-telegram-bot)
   - [Step 10. Configure and start the Telegram bridge](#step-10-configure-and-start-the-telegram-bridge)
   - [Step 11. Stop services](#step-11-stop-services)
   - [Step 12. Uninstall NemoClaw](#step-12-uninstall-nemoclaw)
@@ -192,14 +192,6 @@ Install Ollama:
 curl -fsSL https://ollama.com/install.sh | sh
 ```
 
-Verify it is running:
-
-```bash
-curl http://localhost:11434
-```
-
-Expected: `Ollama is running`. If not, start it: `ollama serve &`
-
 Configure Ollama to listen on all interfaces so the sandbox container can reach it:
 
 ```bash
@@ -208,6 +200,17 @@ printf '[Service]\nEnvironment="OLLAMA_HOST=0.0.0.0"\n' | sudo tee /etc/systemd/
 sudo systemctl daemon-reload
 sudo systemctl restart ollama
 ```
+
+Verify it is running and reachable on all interfaces:
+
+```bash
+curl http://0.0.0.0:11434
+```
+
+Expected: `Ollama is running`. If not, start it with `sudo systemctl start ollama`.
+
+> [!IMPORTANT]
+> Always start Ollama via systemd (`sudo systemctl restart ollama`) — do not use `ollama serve &`. A manually started Ollama process does not pick up the `OLLAMA_HOST=0.0.0.0` setting above, and the NemoClaw sandbox will not be able to reach the inference server.
 
 ### Step 3. Pull the Nemotron 3 Super model
 
@@ -237,10 +240,10 @@ You should see `nemotron-3-super:120b` in the output.
 
 ### Step 4. Install NemoClaw
 
-This single command handles everything: installs Node.js (if needed), installs OpenShell, clones NemoClaw at the pinned stable release (`v0.0.1`), builds the CLI, and runs the onboard wizard to create a sandbox.
+This single command handles everything: installs Node.js (if needed), installs OpenShell, clones the latest stable NemoClaw release, builds the CLI, and runs the onboard wizard to create a sandbox.
 
 ```bash
-curl -fsSL https://www.nvidia.com/nemoclaw.sh | NEMOCLAW_INSTALL_TAG=v0.0.4 bash
+curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash
 ```
 
 The onboard wizard walks you through setup:
@@ -358,60 +361,53 @@ http://127.0.0.1:18789/#token=<long-token-here>
 
 ## Phase 3: Telegram Bot
 
-### Step 9. Prepare credentials
+> [!NOTE]
+> If you already configured Telegram during the NemoClaw onboarding wizard (step 5/8), you can skip this phase. These steps cover adding Telegram after the initial setup.
 
-You need two items:
+### Step 9. Create a Telegram bot
 
-| Item | Where to get it |
-|------|----------------|
-| Telegram bot token | Open Telegram, find [@BotFather](https://t.me/BotFather), send `/newbot`, and follow the prompts. Copy the token it gives you. |
-| NVIDIA API key | Go to [build.nvidia.com/settings/api-keys](https://build.nvidia.com/settings/api-keys) and create or copy a key (starts with `nvapi-`). |
+Open Telegram, find [@BotFather](https://t.me/BotFather), send `/newbot`, and follow the prompts. Copy the bot token it gives you.
 
 ### Step 10. Configure and start the Telegram bridge
 
 Make sure you are on the **host** (not inside the sandbox). If you are inside the sandbox, run `exit` first.
 
-Set the required environment variables. Replace the placeholders with your actual values. `SANDBOX_NAME` must match the sandbox name you chose during the onboard wizard:
-
-```bash
-export TELEGRAM_BOT_TOKEN=<your-bot-token>
-export SANDBOX_NAME=my-assistant
-```
-
-Add the Telegram network policy to the sandbox:
+Add the Telegram network policy to the sandbox so it can reach the Telegram API:
 
 ```bash
 nemoclaw my-assistant policy-add
 ```
 
-When prompted, type `telegram` and hit **Y** to confirm.
+When prompted, select `telegram` and hit **Y** to confirm.
 
-Start the Telegram bridge. On first run it will ask for your NVIDIA API key:
+Set the bot token and start auxiliary services:
 
 ```bash
+export TELEGRAM_BOT_TOKEN=<your-bot-token>
 nemoclaw start
 ```
 
-Paste your `nvapi-` key when prompted.
+The Telegram bridge starts only when the `TELEGRAM_BOT_TOKEN` environment variable is set. Verify the services are running:
 
-You should see:
-
-```text
-[services] telegram-bridge started
-Telegram:    bridge running
+```bash
+nemoclaw status
 ```
 
 Open Telegram, find your bot, and send it a message. The bot forwards it to the agent and replies.
 
 > [!NOTE]
-> The first response may include a debug log line like "gateway Running as non-root..." -- this is cosmetic and can be ignored.
+> The first response may take 30--90 seconds for a 120B parameter model running locally.
 
 > [!NOTE]
-> If you need to restart the bridge, `nemoclaw stop` may not cleanly stop the process. If that happens, find and kill the bridge process via its PID file:
+> If the bridge does not appear in `nemoclaw status`, make sure `TELEGRAM_BOT_TOKEN` is exported in the same shell session where you run `nemoclaw start`. You can also try stopping and restarting:
 > ```bash
-> kill -9 "$(cat /tmp/nemoclaw-services-${SANDBOX_NAME}/telegram-bridge.pid)"
+> nemoclaw stop
+> export TELEGRAM_BOT_TOKEN=<your-bot-token>
+> nemoclaw start
 > ```
-> Then run `nemoclaw start` again.
+
+> [!NOTE]
+> For details on restricting which Telegram chats can interact with the agent, see the [NemoClaw Telegram bridge documentation](https://docs.nvidia.com/nemoclaw/latest/deployment/set-up-telegram-bridge.html).
 
 ---
 
@@ -419,7 +415,7 @@ Open Telegram, find your bot, and send it a message. The bot forwards it to the 
 
 ### Step 11. Stop services
 
-Stop any running auxiliary services (Telegram bridge, cloudflared):
+Stop any running auxiliary services (Telegram bridge, cloudflared tunnel):
 
 ```bash
 nemoclaw stop
@@ -474,7 +470,7 @@ The uninstaller runs 6 steps:
 | `nemoclaw my-assistant status` | Show sandbox status and inference config |
 | `nemoclaw my-assistant logs --follow` | Stream sandbox logs in real time |
 | `nemoclaw list` | List all registered sandboxes |
-| `nemoclaw start` | Start auxiliary services (Telegram bridge) |
+| `nemoclaw start` | Start auxiliary services (Telegram bridge, cloudflared) |
 | `nemoclaw stop` | Stop auxiliary services |
 | `openshell term` | Open the monitoring TUI on the host |
 | `openshell forward list` | List active port forwards |
