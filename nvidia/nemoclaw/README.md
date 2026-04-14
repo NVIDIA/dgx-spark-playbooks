@@ -1,4 +1,4 @@
-# NemoClaw with Nemotron-3-Super and Telegram on DGX Spark
+# NemoClaw with Nemotron 3 Super and Telegram on DGX Spark
 
 > Install NemoClaw on DGX Spark with local Ollama inference and Telegram bot integration
 
@@ -372,7 +372,15 @@ Open Telegram, find [@BotFather](https://t.me/BotFather), send `/newbot`, and fo
 
 Make sure you are on the **host** (not inside the sandbox). If you are inside the sandbox, run `exit` first.
 
-Add the Telegram network policy to the sandbox so it can reach the Telegram API:
+Set the required environment variables. Replace the placeholders with your actual values. `SANDBOX_NAME` must match the sandbox name you chose during the onboard wizard:
+
+```bash
+export TELEGRAM_BOT_TOKEN=<your-bot-token>
+export SANDBOX_NAME=my-assistant
+export NVIDIA_API_KEY=<your-nvidia-api-key>
+```
+
+Add the Telegram network policy to the sandbox:
 
 ```bash
 nemoclaw my-assistant policy-add
@@ -380,7 +388,7 @@ nemoclaw my-assistant policy-add
 
 When prompted, select `telegram` and hit **Y** to confirm.
 
-Set the bot token and start auxiliary services:
+Start the Telegram bridge.
 
 ```bash
 export TELEGRAM_BOT_TOKEN=<your-bot-token>
