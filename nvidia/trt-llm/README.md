@@ -685,6 +685,7 @@ docker rmi ghcr.io/open-webui/open-webui:main
 | "invalid mount config for type 'bind'" | Missing or non-executable entrypoint script | Run `docker inspect <container_id>` to see full error message. Verify `trtllm-mn-entrypoint.sh` exists on both nodes in your home directory (`ls -la $HOME/trtllm-mn-entrypoint.sh`) and has executable permissions (`chmod +x $HOME/trtllm-mn-entrypoint.sh`) |
 | "task: non-zero exit (255)" | Container exit with error code 255 | Check container logs with `docker ps -a --filter "name=trtllm-multinode_trtllm"` to get container ID, then `docker logs <container_id>` to see detailed error messages |
 | Docker state stuck in "Pending" with "no suitable node (insufficien...)" | Docker daemon not properly configured for GPU access | Verify steps 2-4 were completed successfully and check that `/etc/docker/daemon.json` contains correct GPU configuration |
+| Serving model fails `ptxas fatal` errors | Model needs runtime triton kernel compilation | In Step 10, add `-x TRITON_PTXAS_PATH` to your `mpirun` command |
 
 > [!NOTE]
 > DGX Spark uses a Unified Memory Architecture (UMA), which enables dynamic memory sharing between the GPU and CPU.
