@@ -214,34 +214,22 @@ Verify Ollama is running (it auto-starts as a service after installation). If no
 ollama serve &
 ```
 
-Configure Ollama to listen on all interfaces so the OpenShell gateway container can reach it. Create a systemd override:
+Configure Ollama to listen on all interfaces so the OpenShell gateway container can reach it:
 
 ```bash
-mkdir -p /etc/systemd/system/ollama.service.d/
-sudo nano /etc/systemd/system/ollama.service.d/override.conf
-```
-
-Add these lines to the file (create the file if it does not exist):
-
-```ini
-[Service]
-Environment="OLLAMA_HOST=0.0.0.0"
-```
-
-Save and exit, then reload and restart Ollama:
-
-```bash
+sudo mkdir -p /etc/systemd/system/ollama.service.d
+printf '[Service]\nEnvironment="OLLAMA_HOST=0.0.0.0"\n' | sudo tee /etc/systemd/system/ollama.service.d/override.conf
 sudo systemctl daemon-reload
 sudo systemctl restart ollama
 ```
 
-Verify Ollama is listening on all interfaces:
+Verify Ollama is running and reachable on all interfaces:
 
 ```bash
-ss -tlnp | grep 11434
+curl http://0.0.0.0:11434
 ```
 
-You should see `*:11434` in the output. If it only shows `127.0.0.1:11434`, confirm the override file contents and that you ran `systemctl daemon-reload` before restarting.
+Expected: `Ollama is running`. If not, start it with `sudo systemctl start ollama`.
 
 Next, run a model from Ollama (adjust the model name to match your choice from [the Ollama model library](https://ollama.com/library)). The `ollama run` command will pull the model automatically if it is not already present. Running the model here ensures it is loaded and ready when you use it with OpenClaw, reducing the chance of timeouts later. Example for nemotron-3-super:
 
