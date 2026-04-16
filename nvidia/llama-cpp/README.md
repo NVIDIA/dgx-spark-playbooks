@@ -74,7 +74,7 @@ The following models are supported with llama.cpp on Spark. All listed models ar
 
 ## Step 1. Verify prerequisites
 
-This walkthrough uses **Gemma 4 31B IT** (`gemma-4-31B-it-f16.gguf`) as the example checkpoint. You can substitute another GGUF from [`ggml-org/gemma-4-31B-it-GGUF`](https://huggingface.co/ggml-org/gemma-4-31B-it-GGUF) (for example `Q4_K_M` or `Q8_0`) by changing the `hf download` filename and `--model` path in later steps.
+This walkthrough uses **Gemma 4 31B IT** (`gemma-4-31B-it-bf16.gguf`) as the example checkpoint. You can substitute another GGUF from [`ggml-org/gemma-4-31B-it-GGUF`](https://huggingface.co/ggml-org/gemma-4-31B-it-GGUF) (for example `Q4_K_M` or `Q8_0`) by changing the `hf download` filename and `--model` path in later steps.
 
 Ensure the required tools are installed:
 
@@ -127,7 +127,7 @@ llama.cpp loads models in **GGUF** format. **gemma-4-31B-it** is available in GG
 
 ```bash
 hf download ggml-org/gemma-4-31B-it-GGUF \
-  gemma-4-31B-it-f16.gguf \
+  gemma-4-31B-it-bf16.gguf \
   --local-dir ~/models/gemma-4-31B-it-GGUF
 ```
 
@@ -139,7 +139,7 @@ From your `llama.cpp/build` directory, launch the OpenAI-compatible server with 
 
 ```bash
 ./bin/llama-server \
-  --model ~/models/gemma-4-31B-it-GGUF/gemma-4-31B-it-f16.gguf \
+  --model ~/models/gemma-4-31B-it-GGUF/gemma-4-31B-it-bf16.gguf \
   --host 0.0.0.0 \
   --port 30000 \
   --n-gpu-layers 99 \
@@ -195,7 +195,7 @@ Example shape of the response (fields vary by llama.cpp version; `message` may i
     }
   ],
   "created": 1765916539,
-  "model": "gemma-4-31B-it-f16.gguf",
+  "model": "gemma-4-31B-it-bf16.gguf",
   "object": "chat.completion",
   "usage": {
     "completion_tokens": 100,
