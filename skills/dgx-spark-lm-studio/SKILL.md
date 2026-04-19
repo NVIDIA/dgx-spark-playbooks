@@ -21,5 +21,5 @@ This playbook shows you how to deploy LM Studio on an NVIDIA DGX Spark device to
 - Interact with models from your laptop using the LM Studio SDK
 - Optionally use **LM Link** to connect Spark and laptop over an encrypted link so remote models appear as local (no same-network or bind setup required)
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/lm-studio/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/lm-studio/README.md`
 <!-- GENERATED:END -->

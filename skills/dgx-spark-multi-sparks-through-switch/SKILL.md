@@ -10,5 +10,5 @@ description: Set up a cluster of DGX Spark devices that are connected through Sw
 
 Configure four DGX Spark systems for high-speed inter-node communication using 200Gbps QSFP connections through a QSFP switch. This setup enables distributed workloads across multiple DGX Spark nodes by establishing network connectivity and configuring SSH authentication.
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/multi-sparks-through-switch/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/multi-sparks-through-switch/README.md`
 <!-- GENERATED:END -->

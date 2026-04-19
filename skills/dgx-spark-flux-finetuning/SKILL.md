@@ -24,5 +24,5 @@ The setup includes:
 
 Duration: * 30-45 minutes for initial setup model download time
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/flux-finetuning/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/flux-finetuning/README.md`
 <!-- GENERATED:END -->

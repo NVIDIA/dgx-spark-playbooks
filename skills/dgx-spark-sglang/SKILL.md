@@ -18,5 +18,5 @@ pre-installed.
 enabling high-performance LLM serving with support for text generation, chat completion, and
 vision-language tasks using models like DeepSeek-V2-Lite.
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/sglang/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/sglang/README.md`
 <!-- GENERATED:END -->

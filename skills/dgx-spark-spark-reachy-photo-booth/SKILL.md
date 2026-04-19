@@ -19,5 +19,5 @@ Spark & Reachy Photo Booth is an interactive and event-driven photo booth demo t
 
 **Outcome**: You'll deploy a complete photo booth system on DGX Spark running multiple inference models locally — LLM, image generation, speech recognition, speech generation, and computer vision — all without cloud dependencies. The Reachy robot interacts with users through natural conversation, captures photos, and generates custom images based on prompts, demonstrating real-time multimodal AI processing on edge hardware.
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/spark-reachy-photo-booth/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/spark-reachy-photo-booth/README.md`
 <!-- GENERATED:END -->

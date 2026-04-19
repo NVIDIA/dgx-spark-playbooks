@@ -23,5 +23,5 @@ The setup includes:
 - Multi-agent system orchestration using a supervisor agent powered by gpt-oss-120B
 - MCP (Model Context Protocol) servers as tools for the supervisor agent
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/multi-agent-chatbot/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/multi-agent-chatbot/README.md`
 <!-- GENERATED:END -->

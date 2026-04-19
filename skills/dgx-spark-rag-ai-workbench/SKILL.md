@@ -20,5 +20,5 @@ advanced RAG capabilities including query routing, response evaluation, and iter
 giving you hands-on experience with both AI Workbench's development environment and sophisticated RAG
 architectures.
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/rag-ai-workbench/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/rag-ai-workbench/README.md`
 <!-- GENERATED:END -->

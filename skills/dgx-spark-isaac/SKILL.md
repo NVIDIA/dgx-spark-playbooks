@@ -14,5 +14,5 @@ Isaac Sim uses GPU-accelerated physics simulation to enable fast, realistic robo
 
 **Outcome**: You'll build Isaac Sim from source on your NVIDIA DGX Spark device and set up Isaac Lab for reinforcement learning experiments. This includes compiling the Isaac Sim engine, configuring the development environment, and running a sample RL training task to verify the installation.
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/isaac/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/isaac/README.md`
 <!-- GENERATED:END -->

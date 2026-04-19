@@ -18,5 +18,5 @@ large language models using LLaMA Factory CLI on your NVIDIA Spark device.
 language models using LoRA, QLoRA, and full fine-tuning methods. This enables efficient
 model adaptation for specialized domains while leveraging hardware-specific optimizations.
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/llama-factory/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/llama-factory/README.md`
 <!-- GENERATED:END -->

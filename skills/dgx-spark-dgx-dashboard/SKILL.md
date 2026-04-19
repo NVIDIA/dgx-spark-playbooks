@@ -12,5 +12,5 @@ The DGX Dashboard is a web application that runs locally on DGX Spark devices, p
 
 **Outcome**: You will learn how to access and use the DGX Dashboard on your DGX Spark device. By the end of this walkthrough, you will be able to launch JupyterLab instances with pre-configured Python environments, monitor GPU performance, manage system updates, and run a sample AI workload using Stable Diffusion. You'll understand multiple access methods including desktop shortcuts, NVIDIA Sync, and manual SSH tunneling.
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/dgx-dashboard/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/dgx-dashboard/README.md`
 <!-- GENERATED:END -->

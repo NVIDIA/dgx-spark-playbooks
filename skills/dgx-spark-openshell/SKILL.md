@@ -19,5 +19,5 @@ By combining OpenClaw with OpenShell on DGX Spark, you get the full power of a l
 
 **Outcome**: You will install the OpenShell CLI (`openshell`), deploy a gateway on your DGX Spark, and launch OpenClaw inside a sandboxed environment using the pre-built OpenClaw community sandbox. The sandbox enforces filesystem, network, and process isolation by default. You will also configure local inference routing so OpenClaw uses a model running on your Spark without needing external API keys.
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/openshell/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/openshell/README.md`
 <!-- GENERATED:END -->

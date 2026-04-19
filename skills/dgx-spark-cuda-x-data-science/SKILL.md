@@ -17,5 +17,5 @@ CUDA-X Data Science (formally RAPIDS) is an open-source library collection that 
 
 **Outcome**: You will accelerate popular machine learning algorithms and data analytics operations GPU. You will understand how to accelerate popular Python tools, and the value of running data science workflows on your DGX Spark.
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/cuda-x-data-science/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/cuda-x-data-science/README.md`
 <!-- GENERATED:END -->

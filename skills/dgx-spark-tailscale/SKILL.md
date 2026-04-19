@@ -22,5 +22,5 @@ all traffic automatically encrypted and NAT traversal handled transparently.
 
 Duration: 15-30 minutes for initial setup, 5 minutes per additional device
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/tailscale/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/tailscale/README.md`
 <!-- GENERATED:END -->

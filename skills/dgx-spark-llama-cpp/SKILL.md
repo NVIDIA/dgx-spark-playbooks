@@ -18,5 +18,5 @@ This playbook walks through that stack end to end. As the model example, it uses
 - An OpenAI-compatible `/v1/chat/completions` endpoint for tools and apps
 - A concrete validation that **Gemma 4 31B IT** runs on this stack on DGX Spark
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/llama-cpp/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/llama-cpp/README.md`
 <!-- GENERATED:END -->

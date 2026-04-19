@@ -20,5 +20,5 @@ The interface provides WebRTC-based video streaming, integrated GPU monitoring, 
 - Customize prompts for various use cases (object detection, scene description, OCR, safety monitoring)
 - Access the interface from any device on your network with a web browser
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/live-vlm-webui/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/live-vlm-webui/README.md`
 <!-- GENERATED:END -->

@@ -14,5 +14,5 @@ This way, the big model doesn't need to predict every token step-by-step, reduci
 **Outcome**: You'll explore speculative decoding using TensorRT-LLM on NVIDIA Spark using two approaches: EAGLE-3 and Draft-Target.
 These examples demonstrate how to accelerate large language model inference while maintaining output quality.
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/speculative-decoding/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/speculative-decoding/README.md`
 <!-- GENERATED:END -->

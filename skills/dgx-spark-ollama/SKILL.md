@@ -21,7 +21,7 @@ the powerful GPU capabilities of your Spark device without complex network confi
 
 Duration: 10-15 minutes for initial setup, 2-3 minutes for model download (varies by model size) · Risk: Low - No system-level changes, easily reversible by stopping the custom app
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/ollama/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/ollama/README.md`
 <!-- GENERATED:END -->
 
 ## When to use this skill

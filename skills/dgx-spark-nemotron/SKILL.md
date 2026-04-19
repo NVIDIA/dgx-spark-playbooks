@@ -18,5 +18,5 @@ This playbook demonstrates how to run Nemotron-3-Nano using llama.cpp, which com
 - OpenAI-compatible API endpoint for easy integration with existing tools
 - Built-in reasoning and tool calling capabilities
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/nemotron/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/nemotron/README.md`
 <!-- GENERATED:END -->

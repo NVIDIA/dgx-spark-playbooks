@@ -16,5 +16,5 @@ This walkthrough will help you set up Visual Studio Code, a full-featured IDE wi
 
 **Outcome**: You will have VS Code set up for development on your DGX Spark device with access to the system's ARM64 architecture and GPU resources. This setup enables direct code development, debugging, and execution.
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/vscode/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/vscode/README.md`
 <!-- GENERATED:END -->

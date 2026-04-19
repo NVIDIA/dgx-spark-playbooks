@@ -26,5 +26,5 @@ By the end of this playbook you will have a working AI agent inside an OpenShell
 
 ### Notice and disclaimers
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/nemoclaw/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/nemoclaw/README.md`
 <!-- GENERATED:END -->

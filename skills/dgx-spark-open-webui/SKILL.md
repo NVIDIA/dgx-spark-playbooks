@@ -15,7 +15,7 @@ This playbook shows you how to deploy Open WebUI with an integrated Ollama serve
 
 Duration: 15-20 minutes for initial setup, plus model download time (varies by model size)
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/open-webui/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/open-webui/README.md`
 <!-- GENERATED:END -->
 
 ## When to use this skill

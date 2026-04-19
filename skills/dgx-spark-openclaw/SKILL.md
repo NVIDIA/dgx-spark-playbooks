@@ -16,5 +16,5 @@ Running OpenClaw and its LLMs **fully on your DGX Spark** keeps your data privat
 
 Duration: About 30 minutes for install and first-time model setup; model download time depends on size and network (gpt-oss-120b is ~65GB and may take longer on slower connections). · Risk: **Medium to High**—the agent has access to whatever files, tools, and channels you configure. Risk increases significantly if you enable terminal/command execution skills or connect external accounts. Without proper isolation, this setup could expose sensitive data or allow code execution. **Always follow the security measures above.**
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/openclaw/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/openclaw/README.md`
 <!-- GENERATED:END -->
