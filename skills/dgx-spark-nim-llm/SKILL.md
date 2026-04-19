@@ -25,5 +25,5 @@ You'll launch a NIM container on your DGX Spark device to expose a GPU-accelerat
 - Basic familiarity with REST APIs and curl commands
 - Understanding of NVIDIA GPU environments and CUDA
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/nim-llm/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/nim-llm/README.md`
 <!-- GENERATED:END -->

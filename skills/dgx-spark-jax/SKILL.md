@@ -21,5 +21,5 @@ JAX lets you write **NumPy-style Python code** and run it fast on GPUs without w
 high-performance machine learning prototyping using familiar NumPy-like abstractions, complete with 
 GPU acceleration and performance optimization capabilities.
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/jax/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/jax/README.md`
 <!-- GENERATED:END -->

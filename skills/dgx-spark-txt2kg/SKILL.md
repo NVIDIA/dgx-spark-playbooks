@@ -26,5 +26,5 @@ The setup includes:
 
 Duration: - 2-3 minutes for initial setup and container deployment
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/txt2kg/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/txt2kg/README.md`
 <!-- GENERATED:END -->

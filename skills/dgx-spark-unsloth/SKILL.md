@@ -20,5 +20,5 @@ parameter-efficient fine-tuning methods like LoRA and QLoRA.
 
 Duration: 30-60 minutes for initial setup and test run
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/unsloth/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/unsloth/README.md`
 <!-- GENERATED:END -->

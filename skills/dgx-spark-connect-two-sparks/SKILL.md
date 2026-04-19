@@ -16,5 +16,5 @@ by establishing network connectivity and configuring SSH authentication.
 interfaces for cluster communication, and establish passwordless SSH between nodes to create
 a functional distributed computing environment.
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/connect-two-sparks/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/connect-two-sparks/README.md`
 <!-- GENERATED:END -->

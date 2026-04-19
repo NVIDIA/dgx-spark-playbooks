@@ -20,5 +20,5 @@ This playbook shows an end-to-end GPU-powered workflow for scRNA-seq using [RAPI
 6. Batch Correction and analysis using Harmony, k-nearest neighbors, UMAP, and tSNE
 7. Explore the biological information from the data with differential expression analysis and trajectory analysis
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/single-cell/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/single-cell/README.md`
 <!-- GENERATED:END -->

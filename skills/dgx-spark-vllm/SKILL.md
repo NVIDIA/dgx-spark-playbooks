@@ -18,7 +18,7 @@ vLLM is an inference engine designed to run large language models efficiently. T
 either using a pre-built Docker container or building from source with custom LLVM/Triton
 support for ARM64.
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/vllm/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/vllm/README.md`
 <!-- GENERATED:END -->
 
 ## When to use this skill

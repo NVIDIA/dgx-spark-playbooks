@@ -19,5 +19,5 @@ FP8, FP4).
 
 Duration: 45-90 minutes depending on model downloads and optimization steps
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/multi-modal-inference/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/multi-modal-inference/README.md`
 <!-- GENERATED:END -->

@@ -19,5 +19,5 @@ and proper GPU topology detection.
 
 Duration: 30 minutes for setup and validation · Risk: Medium - involves network configuration changes
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/nccl/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/nccl/README.md`
 <!-- GENERATED:END -->

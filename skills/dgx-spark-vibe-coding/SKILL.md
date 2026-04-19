@@ -26,5 +26,5 @@ You'll have a fully configured DGX Spark system capable of:
 
 - DGX Spark (128GB unified memory recommended)
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/vibe-coding/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/vibe-coding/README.md`
 <!-- GENERATED:END -->

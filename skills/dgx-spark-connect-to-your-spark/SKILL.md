@@ -22,7 +22,7 @@ integrated app launching, while manual SSH gives you direct command-line control
 forwarding capabilities. Both approaches enable you to run terminal commands, access web
 applications, and manage your DGX Spark remotely from your laptop.
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/connect-to-your-spark/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/connect-to-your-spark/README.md`
 <!-- GENERATED:END -->
 
 ## When to use this skill

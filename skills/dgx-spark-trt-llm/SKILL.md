@@ -19,5 +19,5 @@ inference through kernel-level optimizations, efficient memory layouts, and adva
 
 Duration: 45-60 minutes for setup and API server deployment · Risk: Medium - container pulls and model downloads may fail due to network issues
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/trt-llm/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/trt-llm/README.md`
 <!-- GENERATED:END -->

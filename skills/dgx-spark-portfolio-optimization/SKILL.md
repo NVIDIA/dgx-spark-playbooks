@@ -19,5 +19,5 @@ Portfolio Optimization (PO) involves solving high-dimensional, non-linear numeri
 - **Real-World Constraint Management:** Implementing constraints including concentration limits, leverage constraints, turnover limits, and cardinality constraints.
 - **Comprehensive Backtesting:** Evaluating portfolio performance with specific tools for testing rebalancing strategies.
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/portfolio-optimization/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/portfolio-optimization/README.md`
 <!-- GENERATED:END -->

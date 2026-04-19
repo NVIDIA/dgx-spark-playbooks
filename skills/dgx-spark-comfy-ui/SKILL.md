@@ -16,5 +16,5 @@ Workflows are saved as JSON files, so you can version them for future work, coll
 
 **Outcome**: You'll install and configure ComfyUI on your NVIDIA DGX Spark device so you can use the unified memory to work with large models.
 
-**Full playbook**: `/Users/jkneen/Documents/GitHub/dgx-spark-playbooks/nvidia/comfy-ui/README.md`
+**Full playbook**: `/home/runner/work/dgx-spark-playbooks/dgx-spark-playbooks/nvidia/comfy-ui/README.md`
 <!-- GENERATED:END -->
