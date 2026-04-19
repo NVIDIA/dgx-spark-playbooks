@@ -1,0 +1,14 @@
+{
+  "name": "dgx-spark-playbooks",
+  "owner": {
+    "name": "Jason Kneen",
+    "email": "jason@bouncingfish.com"
+  },
+  "plugins": [
+    {
+      "name": "dgx-spark-playbooks",
+      "source": "./",
+      "description": "Skills for setting up AI/ML workloads on NVIDIA DGX Spark hardware — derived from the official DGX Spark playbooks."
+    }
+  ]
+}
