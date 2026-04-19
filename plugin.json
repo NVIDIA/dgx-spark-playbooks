@@ -1,0 +1,9 @@
+{
+  "name": "dgx-spark-playbooks",
+  "version": "0.1.0",
+  "description": "Skills for setting up AI/ML workloads on NVIDIA DGX Spark hardware. Derived from the official DGX Spark playbooks.",
+  "author": {
+    "name": "Jason Kneen",
+    "email": "jason@bouncingfish.com"
+  }
+}
