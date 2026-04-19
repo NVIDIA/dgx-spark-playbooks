@@ -52,14 +52,20 @@ fi
 # Clean previous installs from BOTH targets so switching modes stays clean.
 cleanup_skills() {
   [ -d "$SKILLS_DIR" ] || return 0
-  for link in "$SKILLS_DIR/dgx-spark" "$SKILLS_DIR/dgx-spark-"*; do
-    [ -L "$link" ] && rm "$link"
+  shopt -s nullglob
+  local links=("$SKILLS_DIR/dgx-spark" "$SKILLS_DIR/dgx-spark-"*)
+  shopt -u nullglob
+  for link in "${links[@]}"; do
+    if [ -L "$link" ]; then
+      rm "$link"
+    fi
   done
 }
 cleanup_plugin() {
   local link="$PLUGINS_DIR/dgx-spark-playbooks"
-  [ -L "$link" ] && rm "$link"
-  return 0
+  if [ -L "$link" ]; then
+    rm "$link"
+  fi
 }
 cleanup_skills
 cleanup_plugin
