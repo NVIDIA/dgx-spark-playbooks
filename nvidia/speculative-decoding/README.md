@@ -57,7 +57,7 @@ In short: two Sparks let you run models that are too large for one, while specul
 - Docker with GPU support enabled
 
   ```bash
-  docker run --gpus all nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6 nvidia-smi
+  docker run --gpus all nvcr.io/nvidia/tensorrt-llm/release:1.3.0rc12 nvidia-smi
   ```
 - Active HuggingFace Token for model access
 - Network connectivity for model downloads
@@ -68,9 +68,9 @@ In short: two Sparks let you run models that are too large for one, while specul
 * **Duration:** 10-20 minutes for setup, additional time for model downloads (varies by network speed)
 * **Risks:** GPU memory exhaustion with large models, container registry access issues, network timeouts during downloads
 * **Rollback:** Stop Docker containers and optionally clean up downloaded model cache.
-* **Last Updated:** 01/02/2026
-  * Upgrade to latest container v1.2.0rc6
-  * Add EAGLE-3 Speculative Decoding example with GPT-OSS-120B
+* **Last Updated:** 04/20/2026
+  * Upgrade to latest container 1.3.0rc12
+  * Add Speculative Decoding example with Qwen3-235B-A22B on Two Sparks
 
 ## Instructions
 
@@ -111,7 +111,7 @@ docker run \
   -v $HOME/.cache/huggingface/:/root/.cache/huggingface/ \
   --rm -it --ulimit memlock=-1 --ulimit stack=67108864 \
   --gpus=all --ipc=host --network host \
-  nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6 \
+  nvcr.io/nvidia/tensorrt-llm/release:1.3.0rc12 \
   bash -c '
     hf download openai/gpt-oss-120b && \
     hf download nvidia/gpt-oss-120b-Eagle3-long-context \
@@ -172,7 +172,7 @@ docker run \
   -e HF_TOKEN=$HF_TOKEN \
   -v $HOME/.cache/huggingface/:/root/.cache/huggingface/ \
   --rm -it --ulimit memlock=-1 --ulimit stack=67108864 \
-  --gpus=all --ipc=host --network host nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6 \
+  --gpus=all --ipc=host --network host nvcr.io/nvidia/tensorrt-llm/release:1.3.0rc12 \
   bash -c "
 #    # Download models
     hf download nvidia/Llama-3.3-70B-Instruct-FP4 && \
@@ -309,7 +309,7 @@ docker run -d --rm \
   -e TRITON_PTXAS_PATH="/usr/local/cuda/bin/ptxas" \
   -v ~/.cache/huggingface/:/root/.cache/huggingface/ \
   -v ~/.ssh:/tmp/.ssh:ro \
-  nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6 \
+  nvcr.io/nvidia/tensorrt-llm/release:1.3.0rc12 \
   bash -c "curl https://raw.githubusercontent.com/NVIDIA/dgx-spark-playbooks/refs/heads/main/nvidia/trt-llm/assets/trtllm-mn-entrypoint.sh | bash"
 ```
 
