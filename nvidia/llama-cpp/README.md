@@ -1,6 +1,6 @@
 # Run models with llama.cpp on DGX Spark
 
-> Build llama.cpp with CUDA and serve models via an OpenAI-compatible API (Gemma 4 31B IT as example)
+> Build llama.cpp with CUDA and serve models via an OpenAI-compatible API (Qwen3.6 as example)
 
 
 ## Table of Contents
@@ -17,15 +17,15 @@
 
 [llama.cpp](https://github.com/ggml-org/llama.cpp) is a lightweight C/C++ inference stack for large language models. You build it with CUDA so tensor work runs on the DGX Spark GB10 GPU, then load GGUF weights and expose chat through `llama-server`’s OpenAI-compatible HTTP API.
 
-This playbook walks through that stack end to end. As the model example, it uses **Gemma 4 31B IT** - a frontier reasoning model built by Google DeepMind that llama.cpp supports, with strengths in coding, agentic workflows, and fine-tuning. The instructions download its **F16** GGUF from Hugging Face. The same build and server steps apply to other GGUFs (including other sizes in the support matrix below).
+This playbook walks through that stack end to end using **Qwen3.6** as the hands-on example: a current-generation family that runs well from quantized GGUF on Spark. Checkpoint choices and paths for all supported models are summarized in the matrix below; commands are in the instructions.
 
 ## What you'll accomplish
 
-You will build llama.cpp with CUDA for GB10, download a Gemma 4 31B IT model checkpoint, and run **`llama-server`** with GPU offload. You get:
+You will build llama.cpp with CUDA for GB10, download a **Qwen3.6** example checkpoint, and run **`llama-server`** with GPU offload. You get:
 
 - Local inference through llama.cpp (no separate Python inference framework required)
 - An OpenAI-compatible `/v1/chat/completions` endpoint for tools and apps
-- A concrete validation that **Gemma 4 31B IT** runs on this stack on DGX Spark
+- A concrete validation that the **Qwen3.6** example runs on this stack on DGX Spark
 
 ## What to know before starting
 
@@ -39,8 +39,8 @@ You will build llama.cpp with CUDA for GB10, download a Gemma 4 31B IT model che
 **Hardware requirements**
 
 - NVIDIA DGX Spark with GB10 GPU
-- Sufficient unified memory for the F16 checkpoint (on the order of **~62GB** for weights alone; more when KV cache and runtime overhead are included)
-- At least **~70GB** free disk for the F16 download plus build artifacts (use a smaller quant from the same repo if you need less disk and VRAM)
+- Sufficient unified memory for the example **UD-Q4_K_M** MoE checkpoint (weights on the order of **~20GB**, plus KV cache and runtime overhead—scale up if you pick a larger quant or longer context)
+- At least **~30GB** free disk for the example download plus build artifacts (more if you keep multiple GGUFs)
 
 **Software requirements**
 
@@ -50,12 +50,14 @@ You will build llama.cpp with CUDA for GB10, download a Gemma 4 31B IT model che
 - CUDA Toolkit: `nvcc --version`
 - Network access to GitHub and Hugging Face
 
-## Model Support Matrix
+## Model support matrix
 
-The following models are supported with llama.cpp on Spark. All listed models are available and ready to use:
+The following models are supported with llama.cpp on Spark. The instructions use the **Qwen3.6** example row by default.
 
 | Model | Support Status | HF Handle |
 |-------|----------------|-----------|
+| **Qwen3.6-35B-A3B** (example walkthrough) | ✅ | `unsloth/Qwen3.6-35B-A3B-GGUF/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf` |
+| **Qwen3.6-27B** | ✅ | `unsloth/Qwen3.6-27B-GGUF/Qwen3.6-27B-Q4_K_M.gguf` |
 | **Gemma 4 31B IT** | ✅ | `ggml-org/gemma-4-31B-it-GGUF` |
 | **Gemma 4 26B A4B IT** | ✅ | `ggml-org/gemma-4-26B-A4B-it-GGUF` |
 | **Gemma 4 E4B IT** | ✅ | `ggml-org/gemma-4-E4B-it-GGUF` |
@@ -64,17 +66,17 @@ The following models are supported with llama.cpp on Spark. All listed models ar
 
 ## Time & risk
 
-* **Estimated time:** About 30 minutes, plus downloading the ~62GB example 
+* **Estimated time:** About 30 minutes, plus downloading the example GGUF (~20GB order of magnitude for the default quant)
 * **Risk level:** Low — build is local to your clone; no system-wide installs required for the steps below
 * **Rollback:** Remove the `llama.cpp` clone and the model directory under `~/models/` to reclaim disk space
-* **Last updated:** 04/02/2026
-  * First Publication
+* **Last updated:** 04/27/2026
+  * We now walk you through Qwen3.6 first; other models remain in the list
 
 ## Instructions
 
 ## Step 1. Verify prerequisites
 
-This walkthrough uses **Gemma 4 31B IT** (`gemma-4-31B-it-f16.gguf`) as the example checkpoint. You can substitute another GGUF from [`ggml-org/gemma-4-31B-it-GGUF`](https://huggingface.co/ggml-org/gemma-4-31B-it-GGUF) (for example `Q4_K_M` or `Q8_0`) by changing the `hf download` filename and `--model` path in later steps.
+The **example** checkpoint is **`Qwen3.6-35B-A3B-UD-Q4_K_M.gguf`** from Hugging Face repo **`unsloth/Qwen3.6-35B-A3B-GGUF`** (full handle: `unsloth/Qwen3.6-35B-A3B-GGUF/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf`). The other supported file is **`Qwen3.6-27B-Q4_K_M.gguf`** from **`unsloth/Qwen3.6-27B-GGUF`**—use the same build and server steps, changing `hf download` and `--model` paths (see the [overview model matrix](overview.md)).
 
 Ensure the required tools are installed:
 
@@ -121,25 +123,25 @@ make -j8
 
 The build usually takes on the order of 5–10 minutes. When it finishes, binaries such as `llama-server` appear under `build/bin/`.
 
-## Step 4. Download Gemma 4 31B IT GGUF (supported model example)
+## Step 4. Download example Qwen3.6-35B-A3B GGUF
 
-llama.cpp loads models in **GGUF** format. **gemma-4-31B-it** is available in GGUF from Hugging Face; this playbook uses a F16 variant that balances quality and memory on GB10-class hardware.
+llama.cpp loads models in **GGUF** format. This playbook uses the **UD-Q4_K_M** quantized MoE checkpoint from Unsloth, which fits comfortably on DGX Spark GB10 unified memory while keeping strong quality.
 
 ```bash
-hf download ggml-org/gemma-4-31B-it-GGUF \
-  gemma-4-31B-it-f16.gguf \
-  --local-dir ~/models/gemma-4-31B-it-GGUF
+hf download unsloth/Qwen3.6-35B-A3B-GGUF \
+  Qwen3.6-35B-A3B-UD-Q4_K_M.gguf \
+  --local-dir ~/models/Qwen3.6-35B-A3B-GGUF
 ```
 
-The F16 file is large (**~62GB**). The download can be resumed if interrupted.
+The file is on the order of **~20GB** (exact size may vary). The download can be resumed if interrupted.
 
-## Step 5. Start llama-server with Gemma 4 31B IT
+## Step 5. Start llama-server with Qwen3.6-35B-A3B
 
 From your `llama.cpp/build` directory, launch the OpenAI-compatible server with GPU offload:
 
 ```bash
 ./bin/llama-server \
-  --model ~/models/gemma-4-31B-it-GGUF/gemma-4-31B-it-f16.gguf \
+  --model ~/models/Qwen3.6-35B-A3B-GGUF/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf \
   --host 0.0.0.0 \
   --port 30000 \
   --n-gpu-layers 99 \
@@ -162,7 +164,7 @@ llama_new_context_with_model: n_ctx = 8192
 main: server is listening on 0.0.0.0:30000
 ```
 
-**Keep this terminal open** while testing. Large GGUFs can take several minutes to load; until you see `server is listening`, nothing accepts connections on port 30000 (see Troubleshooting if `curl` reports connection refused).
+**Keep this terminal open** while testing. Large GGUFs can take a minute or more to load; until you see `server is listening`, nothing accepts connections on port 30000 (see Troubleshooting if `curl` reports connection refused).
 
 ## Step 6. Test the API
 
@@ -195,7 +197,7 @@ Example shape of the response (fields vary by llama.cpp version; `message` may i
     }
   ],
   "created": 1765916539,
-  "model": "gemma-4-31B-it-f16.gguf",
+  "model": "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
   "object": "chat.completion",
   "usage": {
     "completion_tokens": 100,
@@ -209,15 +211,15 @@ Example shape of the response (fields vary by llama.cpp version; `message` may i
 }
 ```
 
-## Step 7. Longer completion (with example model)
+## Step 7. Longer completion (with Qwen3.6)
 
-Try a slightly longer prompt to confirm stable generation with **Gemma 4 31B IT**:
+Try a slightly longer prompt to confirm stable generation with **Qwen3.6-35B-A3B**:
 
 ```bash
 curl -X POST http://127.0.0.1:30000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gemma4",
+    "model": "qwen3",
     "messages": [{"role": "user", "content": "Solve this step by step: If a train travels 120 miles in 2 hours, what is its average speed?"}],
     "max_tokens": 500
   }'
@@ -231,7 +233,7 @@ To remove this tutorial’s artifacts:
 
 ```bash
 rm -rf ~/llama.cpp
-rm -rf ~/models/gemma-4-31B-it-GGUF
+rm -rf ~/models/Qwen3.6-35B-A3B-GGUF
 ```
 
 Deactivate the Python venv if you no longer need `hf`:

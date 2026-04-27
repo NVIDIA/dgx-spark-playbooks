@@ -54,6 +54,9 @@ You'll deploy LM Studio on an NVIDIA DGX Spark device to run gpt-oss 120B, and u
 - Laptop and DGX Spark must be on the same local network
 - Network access to download packages and models
 
+## Model support matrix
+To explore supported models in LM Studio, check out [LM Studio model catalog](https://lmstudio.ai/models) page.
+
 ## LM Link (optional)
 
 [LM Link](https://lmstudio.ai/link) lets you **use your local models remotely**. You link machines (e.g. your DGX Spark and your laptop), then load models on the Spark and use them from the laptop as if they were local.
@@ -80,8 +83,8 @@ All required assets can be found below. These sample scripts can be used in Step
 * **Rollback:**
   * Downloaded models can be removed manually from the models directory.
   * Uninstall LM Studio or llmster
-* **Last Updated:** 03/12/2026
-  * Add instructions for LM Link features
+* **Last Updated:** 04/27/2026
+  * Introduce Qwen3.6 35B as example
 
 ## Instructions
 
@@ -153,7 +156,7 @@ LM Link is in **Preview** and is free for up to 2 users, 5 devices each. For det
 As an example, let's download and run gpt-oss 120B, one of the best open source models from OpenAI. This model is too large for many laptops due to memory limitations, which makes this a fantastic use case for the Spark.
 
 ```bash
-lms get openai/gpt-oss-120b
+lms get qwen/qwen3.6-35b-a3b
 ```
 
 This download will take a while due to its large size. Verify that the model has been successfully downloaded by listing your models:
@@ -167,7 +170,7 @@ lms ls
 Load the model on your Spark so that it is ready to respond to requests from your laptop.
 
 ```bash
-lms load openai/gpt-oss-120b
+lms load qwen/qwen3.6-35b-a3b
 ```
 
 ## Step 6. Set up a simple program that uses LM Studio SDK on the laptop

@@ -297,7 +297,7 @@ Expected: JSON listing `nemotron-3-super:120b`.
 Still inside the sandbox, send a test message:
 
 ```bash
-openclaw agent --agent main --local -m "hello" --session-id test
+openclaw agent --agent main -m "hello" --session-id test
 ```
 
 The agent will respond using Nemotron 3 Super. First responses may take 30--90 seconds for a 120B parameter model running locally.
@@ -326,7 +326,7 @@ exit
 http://127.0.0.1:18789/#token=<long-token-here>
 ```
 
-**If accessing the Web UI from a remote machine**, you need to set up port forwarding.
+**If accessing the Web UI from a remote machine**, you need to set up an SSH tunnel. The NemoClaw onboard wizard already created the port 18789 forward on the Spark, so you only need to tunnel from your remote machine.
 
 First, find your Spark's IP address. On the Spark, run:
 
@@ -336,13 +336,7 @@ hostname -I | awk '{print $1}'
 
 This prints the primary IP address (e.g. `192.168.1.42`). You can also find it in **Settings > Wi-Fi** or **Settings > Network** on the Spark's desktop, or check your router's connected-devices list.
 
-Start the port forward on the Spark host:
-
-```bash
-openshell forward start 18789 my-assistant --background
-```
-
-Then from your remote machine, create an SSH tunnel to the Spark (replace `<your-spark-ip>` with the IP address from above):
+From your remote machine, create an SSH tunnel to the Spark (replace `<your-spark-ip>` with the IP address from above):
 
 ```bash
 ssh -L 18789:127.0.0.1:18789 <your-user>@<your-spark-ip>
@@ -356,6 +350,13 @@ http://127.0.0.1:18789/#token=<long-token-here>
 
 > [!IMPORTANT]
 > Use `127.0.0.1`, not `localhost` -- the gateway origin check requires an exact match.
+
+> [!NOTE]
+> If the Web UI fails to load and the port forward may be stale, reset it on the Spark host:
+> ```bash
+> openshell forward stop 18789 my-assistant || true
+> openshell forward start 18789 my-assistant --background
+> ```
 
 ---
 
@@ -372,15 +373,7 @@ Open Telegram, find [@BotFather](https://t.me/BotFather), send `/newbot`, and fo
 
 Make sure you are on the **host** (not inside the sandbox). If you are inside the sandbox, run `exit` first.
 
-Set the required environment variables. Replace the placeholders with your actual values. `SANDBOX_NAME` must match the sandbox name you chose during the onboard wizard:
-
-```bash
-export TELEGRAM_BOT_TOKEN=<your-bot-token>
-export SANDBOX_NAME=my-assistant
-export NVIDIA_API_KEY=<your-nvidia-api-key>
-```
-
-Add the Telegram network policy to the sandbox:
+Add the Telegram network policy to the sandbox so it can reach the Telegram API:
 
 ```bash
 nemoclaw my-assistant policy-add
@@ -388,31 +381,42 @@ nemoclaw my-assistant policy-add
 
 When prompted, select `telegram` and hit **Y** to confirm.
 
-Start the Telegram bridge.
+The Telegram bridge uses cloudflared to expose a public webhook URL. Install cloudflared on the Spark host (arm64):
+
+```bash
+curl -L --output cloudflared.deb \
+  https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64.deb
+sudo dpkg -i cloudflared.deb
+```
+
+Set the bot token and start auxiliary services:
 
 ```bash
 export TELEGRAM_BOT_TOKEN=<your-bot-token>
 nemoclaw start
 ```
 
-The Telegram bridge starts only when the `TELEGRAM_BOT_TOKEN` environment variable is set. Verify the services are running:
+The Telegram bridge starts only when the `TELEGRAM_BOT_TOKEN` environment variable is set. Verify the services are running and note the public URL:
 
 ```bash
 nemoclaw status
 ```
 
+You should see `● cloudflared` with a `trycloudflare.com` public URL (e.g. `https://assembled-peer-persian-kitty.trycloudflare.com`).
+
 Open Telegram, find your bot, and send it a message. The bot forwards it to the agent and replies.
+
+> [!NOTE]
+> If `nemoclaw start` prints `cloudflared not found — no public URL`, the cloudflared install above did not complete successfully. Re-run the install, then restart services:
+> ```bash
+> nemoclaw stop && nemoclaw start
+> ```
 
 > [!NOTE]
 > The first response may take 30--90 seconds for a 120B parameter model running locally.
 
 > [!NOTE]
-> If the bridge does not appear in `nemoclaw status`, make sure `TELEGRAM_BOT_TOKEN` is exported in the same shell session where you run `nemoclaw start`. You can also try stopping and restarting:
-> ```bash
-> nemoclaw stop
-> export TELEGRAM_BOT_TOKEN=<your-bot-token>
-> nemoclaw start
-> ```
+> If the bridge does not appear in `nemoclaw status`, make sure `TELEGRAM_BOT_TOKEN` is exported in the same shell session where you run `nemoclaw start`.
 
 > [!NOTE]
 > For details on restricting which Telegram chats can interact with the agent, see the [NemoClaw Telegram bridge documentation](https://docs.nvidia.com/nemoclaw/latest/deployment/set-up-telegram-bridge.html).
