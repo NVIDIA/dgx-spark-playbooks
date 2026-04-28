@@ -26,7 +26,7 @@
   - [Step 7. Interactive TUI](#step-7-interactive-tui)
   - [Step 8. Exit the sandbox and access the Web UI](#step-8-exit-the-sandbox-and-access-the-web-ui)
   - [Step 9. Create a Telegram bot](#step-9-create-a-telegram-bot)
-  - [Step 10. Configure and start the Telegram bridge](#step-10-configure-and-start-the-telegram-bridge)
+  - [Step 10. Install cloudflared and start the Telegram bridge](#step-10-install-cloudflared-and-start-the-telegram-bridge)
   - [Step 11. Stop services](#step-11-stop-services)
   - [Step 12. Uninstall NemoClaw](#step-12-uninstall-nemoclaw)
 - [Troubleshooting](#troubleshooting)
@@ -97,8 +97,7 @@ By participating in this demo, you acknowledge that you are solely responsible f
 **Hardware and access:**
 
 - A DGX Spark (GB10) with keyboard and monitor, or SSH access
-- An **NVIDIA API key** from [build.nvidia.com](https://build.nvidia.com/settings/api-keys) (needed for the Telegram bridge)
-- A **Telegram bot token** from [@BotFather](https://t.me/BotFather) (create one with `/newbot`)
+- A **Telegram bot token** from [@BotFather](https://t.me/BotFather) (create one with `/newbot`) -- only needed if you want the Telegram bot. Have it ready *before* running the installer; the onboard wizard prompts for it.
 
 **Software:**
 
@@ -118,8 +117,7 @@ Expected: Ubuntu 24.04, NVIDIA GB10 GPU, Docker 28.x+.
 
 | Item | Where to get it |
 |------|----------------|
-| NVIDIA API key | [build.nvidia.com/settings/api-keys](https://build.nvidia.com/settings/api-keys) |
-| Telegram bot token | [@BotFather](https://t.me/BotFather) on Telegram -- create with `/newbot` |
+| Telegram bot token (optional) | [@BotFather](https://t.me/BotFather) on Telegram -- create with `/newbot`. Required only for the Telegram bot; have it ready before running the installer. |
 
 ### Ancillary files
 
@@ -129,8 +127,8 @@ All required assets are handled by the NemoClaw installer. No manual cloning is 
 
 - **Estimated time:** 20--30 minutes (with Ollama and model already downloaded). First-time model download adds ~15--30 minutes depending on network speed.
 - **Risk level:** Medium -- you are running an AI agent in a sandbox; risks are reduced by isolation but not eliminated. Use a clean environment and do not connect sensitive data or production accounts.
-- **Last Updated:** 03/31/2026
-  * First Publication
+- **Last Updated:** 04/28/2026
+  * Updated for NemoClaw v0.0.22+: revised Telegram setup, renamed tunnel commands, refreshed uninstall instructions.
 
 ## Instructions
 
@@ -249,9 +247,13 @@ curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash
 The onboard wizard walks you through setup:
 
 1. **Sandbox name** -- Pick a name (e.g. `my-assistant`). Names must be lowercase alphanumeric with hyphens only.
-2. **Inference provider** -- Select **Local Ollama** (option 7).
-3. **Model** -- Select **nemotron-3-super:120b** (option 1).
-4. **Policy presets** -- Accept the suggested presets when prompted (hit **Y**).
+2. **Inference provider** -- Select **Local Ollama**.
+3. **Model** -- Select **nemotron-3-super:120b**.
+4. **Messaging channels** -- If you want a Telegram bot, select `telegram` here and paste your bot token when prompted. Create the bot first via [@BotFather](https://t.me/BotFather) in Telegram (see Step 9). If you skip this, you can re-run the installer later to recreate the sandbox with Telegram enabled.
+5. **Policy presets** -- Accept the suggested presets when prompted (hit **Y**).
+
+> [!IMPORTANT]
+> Telegram must be configured at this step. The channel plugin and bot token are wired into the sandbox container during onboarding — they cannot be added to an existing sandbox by exporting environment variables on the host.
 
 When complete you will see output like:
 
@@ -362,26 +364,22 @@ http://127.0.0.1:18789/#token=<long-token-here>
 
 ## Phase 3: Telegram Bot
 
-> [!NOTE]
-> If you already configured Telegram during the NemoClaw onboarding wizard (step 5/8), you can skip this phase. These steps cover adding Telegram after the initial setup.
+> [!IMPORTANT]
+> Telegram must be enabled in the **NemoClaw onboard wizard** (Step 4 → Messaging channels). The channel plugin and bot token are wired into the sandbox container at sandbox creation time — `policy-add` only opens network egress and is not enough on its own. If you skipped Telegram during onboard, re-run the installer to recreate the sandbox with Telegram enabled.
 
 ### Step 9. Create a Telegram bot
 
-Open Telegram, find [@BotFather](https://t.me/BotFather), send `/newbot`, and follow the prompts. Copy the bot token it gives you.
+Do this **before** running the NemoClaw installer in Step 4 so you have your bot token ready when the wizard prompts for it.
 
-### Step 10. Configure and start the Telegram bridge
+Open Telegram, find [@BotFather](https://t.me/BotFather), send `/newbot`, and follow the prompts. Copy the bot token it gives you and paste it into the wizard when you reach the **Messaging channels** step.
+
+### Step 10. Install cloudflared and start the Telegram bridge
+
+The Telegram bridge needs a public webhook URL so Telegram can deliver messages to your bot. NemoClaw uses [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) to create a free `trycloudflare.com` tunnel.
 
 Make sure you are on the **host** (not inside the sandbox). If you are inside the sandbox, run `exit` first.
 
-Add the Telegram network policy to the sandbox so it can reach the Telegram API:
-
-```bash
-nemoclaw my-assistant policy-add
-```
-
-When prompted, select `telegram` and hit **Y** to confirm.
-
-The Telegram bridge uses cloudflared to expose a public webhook URL. Install cloudflared on the Spark host (arm64):
+Install cloudflared (DGX Spark is arm64):
 
 ```bash
 curl -L --output cloudflared.deb \
@@ -389,14 +387,13 @@ curl -L --output cloudflared.deb \
 sudo dpkg -i cloudflared.deb
 ```
 
-Set the bot token and start auxiliary services:
+Start the tunnel:
 
 ```bash
-export TELEGRAM_BOT_TOKEN=<your-bot-token>
-nemoclaw start
+nemoclaw tunnel start
 ```
 
-The Telegram bridge starts only when the `TELEGRAM_BOT_TOKEN` environment variable is set. Verify the services are running and note the public URL:
+Verify the public URL is live:
 
 ```bash
 nemoclaw status
@@ -407,16 +404,16 @@ You should see `● cloudflared` with a `trycloudflare.com` public URL (e.g. `ht
 Open Telegram, find your bot, and send it a message. The bot forwards it to the agent and replies.
 
 > [!NOTE]
-> If `nemoclaw start` prints `cloudflared not found — no public URL`, the cloudflared install above did not complete successfully. Re-run the install, then restart services:
+> If `nemoclaw tunnel start` prints `cloudflared not found — no public URL`, the cloudflared install above did not complete successfully. Re-run the install, then restart the tunnel:
 > ```bash
-> nemoclaw stop && nemoclaw start
+> nemoclaw tunnel stop && nemoclaw tunnel start
 > ```
 
 > [!NOTE]
 > The first response may take 30--90 seconds for a 120B parameter model running locally.
 
 > [!NOTE]
-> If the bridge does not appear in `nemoclaw status`, make sure `TELEGRAM_BOT_TOKEN` is exported in the same shell session where you run `nemoclaw start`.
+> If sending a message returns `Error: Channel is unavailable: telegram`, the channel was not enabled during onboard. Re-run the installer to recreate the sandbox with Telegram selected at the **Messaging channels** step.
 
 > [!NOTE]
 > For details on restricting which Telegram chats can interact with the agent, see the [NemoClaw Telegram bridge documentation](https://docs.nvidia.com/nemoclaw/latest/deployment/set-up-telegram-bridge.html).
@@ -427,10 +424,10 @@ Open Telegram, find your bot, and send it a message. The bot forwards it to the 
 
 ### Step 11. Stop services
 
-Stop any running auxiliary services (Telegram bridge, cloudflared tunnel):
+Stop the cloudflared tunnel:
 
 ```bash
-nemoclaw stop
+nemoclaw tunnel stop
 ```
 
 Stop the port forward:
@@ -442,14 +439,13 @@ openshell forward stop 18789    # stop the dashboard forward
 
 ### Step 12. Uninstall NemoClaw
 
-Run the uninstaller from the cloned source directory. It removes all sandboxes, the OpenShell gateway, Docker containers/images/volumes, the CLI, and all state files. Docker, Node.js, npm, and Ollama are preserved.
+Run the uninstaller via curl (matches the [NemoClaw README](https://github.com/NVIDIA/NemoClaw)). It removes all sandboxes, the OpenShell gateway, Docker containers/images/volumes, the CLI, and all state files. Docker, Node.js, npm, and Ollama are preserved.
 
 ```bash
-cd ~/.nemoclaw/source
-./uninstall.sh
+curl -fsSL https://raw.githubusercontent.com/NVIDIA/NemoClaw/refs/heads/main/uninstall.sh | bash
 ```
 
-**Uninstaller flags:**
+**Uninstaller flags** (pass via `bash -s -- <flags>`):
 
 | Flag | Effect |
 |------|--------|
@@ -457,10 +453,10 @@ cd ~/.nemoclaw/source
 | `--keep-openshell` | Leave the `openshell` binary in place |
 | `--delete-models` | Also remove the Ollama models pulled by NemoClaw |
 
-To remove everything including the Ollama model:
+To remove everything including the Ollama model, non-interactively:
 
 ```bash
-./uninstall.sh --yes --delete-models
+curl -fsSL https://raw.githubusercontent.com/NVIDIA/NemoClaw/refs/heads/main/uninstall.sh | bash -s -- --yes --delete-models
 ```
 
 The uninstaller runs 6 steps:
@@ -472,7 +468,7 @@ The uninstaller runs 6 steps:
 6. Remove state directories (`~/.nemoclaw`, `~/.config/openshell`, `~/.config/nemoclaw`) and the OpenShell binary
 
 > [!NOTE]
-> The source clone at `~/.nemoclaw/source` is removed as part of state cleanup in step 6. If you want to keep a local copy, move or back it up before running the uninstaller.
+> If you have a local clone at `~/.nemoclaw/source` you want to keep, move or back it up before running the uninstaller — it is removed as part of state cleanup in step 6.
 
 ## Useful commands
 
@@ -482,13 +478,13 @@ The uninstaller runs 6 steps:
 | `nemoclaw my-assistant status` | Show sandbox status and inference config |
 | `nemoclaw my-assistant logs --follow` | Stream sandbox logs in real time |
 | `nemoclaw list` | List all registered sandboxes |
-| `nemoclaw start` | Start auxiliary services (Telegram bridge, cloudflared) |
-| `nemoclaw stop` | Stop auxiliary services |
+| `nemoclaw tunnel start` | Start cloudflared tunnel (public URL for Telegram webhooks) |
+| `nemoclaw tunnel stop` | Stop the cloudflared tunnel |
 | `openshell term` | Open the monitoring TUI on the host |
 | `openshell forward list` | List active port forwards |
 | `openshell forward start 18789 my-assistant --background` | Restart port forwarding for Web UI |
-| `cd ~/.nemoclaw/source && ./uninstall.sh` | Remove NemoClaw (preserves Docker, Node.js, Ollama) |
-| `cd ~/.nemoclaw/source && ./uninstall.sh --delete-models` | Remove NemoClaw and Ollama models |
+| `curl -fsSL https://raw.githubusercontent.com/NVIDIA/NemoClaw/refs/heads/main/uninstall.sh \| bash` | Remove NemoClaw (preserves Docker, Node.js, Ollama) |
+| `curl -fsSL https://raw.githubusercontent.com/NVIDIA/NemoClaw/refs/heads/main/uninstall.sh \| bash -s -- --delete-models` | Remove NemoClaw and Ollama models |
 
 ## Troubleshooting
 

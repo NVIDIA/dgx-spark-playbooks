@@ -57,7 +57,7 @@ inference through kernel-level optimizations, efficient memory layouts, and adva
 
 - DGX Spark device
 - NVIDIA drivers compatible with CUDA 12.x: `nvidia-smi`
-- Docker installed and GPU support configured: `docker run --rm --gpus all nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6 nvidia-smi`
+- Docker installed and GPU support configured: `docker run --rm --gpus all nvcr.io/nvidia/tensorrt-llm/release:1.3.0rc5 nvidia-smi`
 - Hugging Face account with token for model access: `echo $HF_TOKEN`
 - Sufficient GPU VRAM (40GB+ recommended for 70B models)
 - Internet connectivity for downloading models and container images
@@ -136,7 +136,7 @@ models and containers.
 nvidia-smi
 
 ## Verify Docker GPU support
-docker run --rm --gpus all nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6 nvidia-smi
+docker run --rm --gpus all nvcr.io/nvidia/tensorrt-llm/release:1.3.0rc5 nvidia-smi
 
 ```
 
@@ -146,7 +146,7 @@ docker run --rm --gpus all nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6 nvidia-s
 ## Set `HF_TOKEN` for model access.
 export HF_TOKEN=<your-huggingface-token>
 
-export DOCKER_IMAGE="nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6"
+export DOCKER_IMAGE="nvcr.io/nvidia/tensorrt-llm/release:1.3.0rc5"
 ```
 
 ## Step 4. Validate TensorRT-LLM installation
@@ -161,8 +161,8 @@ docker run --rm -it --gpus all \
 
 Expected output:
 ```
-[TensorRT-LLM] TensorRT-LLM version: 1.2.0rc6
-TensorRT-LLM version: 1.2.0rc6
+[TensorRT-LLM] TensorRT-LLM version: 1.3.0rc5
+TensorRT-LLM version: 1.3.0rc5
 ```
 
 ## Step 5. Create cache directory

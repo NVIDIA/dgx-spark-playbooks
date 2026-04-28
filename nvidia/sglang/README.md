@@ -53,6 +53,7 @@ The following models are supported with SGLang on Spark. All listed models are a
 
 | Model | Quantization | Support Status | HF Handle |
 |-------|-------------|----------------|-----------|
+| **Nemotron-3-Nano-Omni-30B-A3B-Reasoning** | BF16 | ✅ | [`nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-BF16`](https://huggingface.co/nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-BF16) |
 | **GPT-OSS-20B** | MXFP4 | ✅ | `openai/gpt-oss-20b` |
 | **GPT-OSS-120B** | MXFP4 | ✅ | `openai/gpt-oss-120b` |
 | **Llama-3.1-8B-Instruct** | FP8 | ✅ | `nvidia/Llama-3.1-8B-Instruct-FP8` |
@@ -75,12 +76,19 @@ Note: for NVFP4 models, add the `--quantization modelopt_fp4` flag.
 * **Estimated time:** 30 minutes for initial setup and validation
 * **Risk level:** Low - Uses pre-built, validated SGLang container with minimal configuration
 * **Rollback:** Stop and remove containers with `docker stop` and `docker rm` commands
-* **Last Updated:** 03/15/2026
-    * Use latest NGC SGLang container: nvcr.io/nvidia/sglang:26.02-py3
+* **Last Updated:** 04/28/2026
+    * Introduce Nemotron-3-Nano-Omni reasoning FP8 support
 
 ## Instructions
 
-## Step 1. Verify system prerequisites
+## Step 1. Use model specific deployment guide
+
+Certain models require special deployment configurations. Please refer to their respective model cards to run on DGX Spark:
+| Model | Quantization | HF Model Card Link |
+|-------|-------------|----------------|
+| **Nemotron-3-Nano-Omni-30B-A3B-Reasoning** | BF16 | https://huggingface.co/nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-BF16 |
+
+## Step 2. Verify system prerequisites
 
 Check that your NVIDIA Spark device meets all requirements before proceeding. This step runs on
 your host system and ensures Docker, GPU drivers, and container toolkit are properly configured. 
@@ -108,7 +116,7 @@ sudo usermod -aG docker $USER
 newgrp docker
 ```
 
-## Step 2. Pull the SGLang Container
+## Step 3. Pull the SGLang Container
 
 Download the latest SGLang container. This step runs on the host and may take
 several minutes depending on your network connection.
@@ -122,7 +130,7 @@ docker pull nvcr.io/nvidia/sglang:26.02-py3
 docker images | grep sglang
 ```
 
-## Step 3. Launch SGLang container for server mode
+## Step 4. Launch SGLang container for server mode
 
 Start the SGLang container in server mode to enable HTTP API access. This runs the inference
 server inside the container, exposing it on port 30000 for client connections.
@@ -136,7 +144,7 @@ docker run --gpus all -it --rm \
   bash
 ```
 
-## Step 4. Start the SGLang inference server
+## Step 5. Start the SGLang inference server
 
 Inside the container, launch the HTTP inference server with a supported model. This step runs
 inside the Docker container and starts the SGLang server daemon.
@@ -159,7 +167,7 @@ sleep 30
 curl http://localhost:30000/health
 ```
 
-## Step 5. Test client-server inference
+## Step 6. Test client-server inference
 
 From a new terminal on your host system, test the SGLang server API to ensure it's working
 correctly. This validates that the server is accepting requests and generating responses.
@@ -177,7 +185,7 @@ curl -X POST http://localhost:30000/generate \
   }'
 ```
 
-## Step 6. Test Python client API
+## Step 7. Test Python client API
 
 Create a simple Python script to test programmatic access to the SGLang server. This runs on
 the host system and demonstrates how to integrate SGLang into applications.
@@ -197,7 +205,7 @@ response = requests.post('http://localhost:30000/generate', json={
 print(f"Response: {response.json()['text']}")
 ```
 
-## Step 7. Validate installation
+## Step 8. Validate installation
 
 Confirm that both server and offline modes are working correctly. This step verifies the
 complete SGLang setup and ensures reliable operation.
@@ -213,7 +221,7 @@ docker ps
 docker logs <CONTAINER_ID>
 ```
 
-## Step 8. Cleanup and rollback
+## Step 9. Cleanup and rollback
 
 Stop and remove containers to clean up resources. This step returns your system to its
 original state.
@@ -232,7 +240,7 @@ docker container prune -f
 docker rmi nvcr.io/nvidia/sglang:26.02-py3
 ```
 
-## Step 9. Next steps
+## Step 10. Next steps
 
 With SGLang successfully deployed, you can now:
 

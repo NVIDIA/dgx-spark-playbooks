@@ -1,6 +1,6 @@
 # Run models with llama.cpp on DGX Spark
 
-> Build llama.cpp with CUDA and serve models via an OpenAI-compatible API (Qwen3.6 as example)
+> Build llama.cpp with CUDA and serve models via an OpenAI-compatible API (Nemotron 3 Nano Omni as example)
 
 
 ## Table of Contents
@@ -17,15 +17,15 @@
 
 [llama.cpp](https://github.com/ggml-org/llama.cpp) is a lightweight C/C++ inference stack for large language models. You build it with CUDA so tensor work runs on the DGX Spark GB10 GPU, then load GGUF weights and expose chat through `llama-server`’s OpenAI-compatible HTTP API.
 
-This playbook walks through that stack end to end using **Qwen3.6** as the hands-on example: a current-generation family that runs well from quantized GGUF on Spark. Checkpoint choices and paths for all supported models are summarized in the matrix below; commands are in the instructions.
+This playbook walks through that stack end to end using **Nemotron 3 Nano Omni** as the hands-on example: an NVIDIA MoE family that runs well from quantized GGUF on Spark. Checkpoint choices and paths for all supported models are summarized in the matrix below; commands are in the instructions.
 
 ## What you'll accomplish
 
-You will build llama.cpp with CUDA for GB10, download a **Qwen3.6** example checkpoint, and run **`llama-server`** with GPU offload. You get:
+You will build llama.cpp with CUDA for GB10, download a **Nemotron 3 Nano Omni** example checkpoint, and run **`llama-server`** with GPU offload. You get:
 
 - Local inference through llama.cpp (no separate Python inference framework required)
 - An OpenAI-compatible `/v1/chat/completions` endpoint for tools and apps
-- A concrete validation that the **Qwen3.6** example runs on this stack on DGX Spark
+- A concrete validation that the **Nemotron 3 Nano Omni** example runs on this stack on DGX Spark
 
 ## What to know before starting
 
@@ -39,8 +39,8 @@ You will build llama.cpp with CUDA for GB10, download a **Qwen3.6** example chec
 **Hardware requirements**
 
 - NVIDIA DGX Spark with GB10 GPU
-- Sufficient unified memory for the example **UD-Q4_K_M** MoE checkpoint (weights on the order of **~20GB**, plus KV cache and runtime overhead—scale up if you pick a larger quant or longer context)
-- At least **~30GB** free disk for the example download plus build artifacts (more if you keep multiple GGUFs)
+- Sufficient unified memory for the example **Q8_0** checkpoint (weights on the order of **~35GB**, plus KV cache and runtime overhead—scale up if you pick a larger quant or longer context)
+- At least **~40GB** free disk for the example download plus build artifacts (more if you keep multiple GGUFs)
 
 **Software requirements**
 
@@ -52,12 +52,13 @@ You will build llama.cpp with CUDA for GB10, download a **Qwen3.6** example chec
 
 ## Model support matrix
 
-The following models are supported with llama.cpp on Spark. The instructions use the **Qwen3.6** example row by default.
+The following models are supported with llama.cpp on Spark. The instructions use the **Nemotron 3 Nano Omni** example row by default.
 
 | Model | Support Status | HF Handle |
 |-------|----------------|-----------|
-| **Qwen3.6-35B-A3B** (example walkthrough) | ✅ | `unsloth/Qwen3.6-35B-A3B-GGUF/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf` |
-| **Qwen3.6-27B** | ✅ | `unsloth/Qwen3.6-27B-GGUF/Qwen3.6-27B-Q4_K_M.gguf` |
+| **Nemotron 3 Nano Omni** (example walkthrough) | ✅ | `ggml-org/NVIDIA-Nemotron-3-Nano-Omni` |
+| **Qwen3.6-35B-A3B** | ✅ | `unsloth/Qwen3.6-35B-A3B-GGUF` |
+| **Qwen3.6-27B** | ✅ | `unsloth/Qwen3.6-27B-GGUF` |
 | **Gemma 4 31B IT** | ✅ | `ggml-org/gemma-4-31B-it-GGUF` |
 | **Gemma 4 26B A4B IT** | ✅ | `ggml-org/gemma-4-26B-A4B-it-GGUF` |
 | **Gemma 4 E4B IT** | ✅ | `ggml-org/gemma-4-E4B-it-GGUF` |
@@ -66,17 +67,17 @@ The following models are supported with llama.cpp on Spark. The instructions use
 
 ## Time & risk
 
-* **Estimated time:** About 30 minutes, plus downloading the example GGUF (~20GB order of magnitude for the default quant)
+* **Estimated time:** About 30 minutes, plus downloading the example GGUF (~35GB order of magnitude for the default quant)
 * **Risk level:** Low — build is local to your clone; no system-wide installs required for the steps below
 * **Rollback:** Remove the `llama.cpp` clone and the model directory under `~/models/` to reclaim disk space
-* **Last updated:** 04/27/2026
-  * We now walk you through Qwen3.6 first; other models remain in the list
+* **Last updated:** 04/28/2026
+  * Walkthrough now uses Nemotron Omni; other model rows stay available
 
 ## Instructions
 
 ## Step 1. Verify prerequisites
 
-The **example** checkpoint is **`Qwen3.6-35B-A3B-UD-Q4_K_M.gguf`** from Hugging Face repo **`unsloth/Qwen3.6-35B-A3B-GGUF`** (full handle: `unsloth/Qwen3.6-35B-A3B-GGUF/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf`). The other supported file is **`Qwen3.6-27B-Q4_K_M.gguf`** from **`unsloth/Qwen3.6-27B-GGUF`**—use the same build and server steps, changing `hf download` and `--model` paths (see the [overview model matrix](overview.md)).
+The **example** checkpoint is **`nemotron-3-nano-omni-ga_v1.0-Q8_0.gguf`** from Hugging Face repo **`ggml-org/NVIDIA-Nemotron-3-Nano-Omni`** (full handle: `ggml-org/NVIDIA-Nemotron-3-Nano-Omni/nemotron-3-nano-omni-ga_v1.0-Q8_0.gguf`). Other supported GGUFs—including Qwen3.6, Gemma, and alternate Nemotron Omni builds—use the same build and server steps; change `hf download` and `--model` paths (see the [overview model matrix](overview.md)).
 
 Ensure the required tools are installed:
 
@@ -123,25 +124,25 @@ make -j8
 
 The build usually takes on the order of 5–10 minutes. When it finishes, binaries such as `llama-server` appear under `build/bin/`.
 
-## Step 4. Download example Qwen3.6-35B-A3B GGUF
+## Step 4. Download example Nemotron 3 Nano Omni GGUF
 
-llama.cpp loads models in **GGUF** format. This playbook uses the **UD-Q4_K_M** quantized MoE checkpoint from Unsloth, which fits comfortably on DGX Spark GB10 unified memory while keeping strong quality.
+llama.cpp loads models in **GGUF** format. This playbook uses the **Q8_0** checkpoint from `ggml-org/NVIDIA-Nemotron-3-Nano-Omni`, which balances quality and memory on DGX Spark GB10 unified memory.
 
 ```bash
-hf download unsloth/Qwen3.6-35B-A3B-GGUF \
-  Qwen3.6-35B-A3B-UD-Q4_K_M.gguf \
-  --local-dir ~/models/Qwen3.6-35B-A3B-GGUF
+hf download ggml-org/NVIDIA-Nemotron-3-Nano-Omni \
+  nemotron-3-nano-omni-ga_v1.0-Q8_0.gguf \
+  --local-dir ~/models/NVIDIA-Nemotron-3-Nano-Omni
 ```
 
-The file is on the order of **~20GB** (exact size may vary). The download can be resumed if interrupted.
+The file is on the order of **~35GB** (exact size may vary). The download can be resumed if interrupted.
 
-## Step 5. Start llama-server with Qwen3.6-35B-A3B
+## Step 5. Start llama-server with Nemotron 3 Nano Omni
 
 From your `llama.cpp/build` directory, launch the OpenAI-compatible server with GPU offload:
 
 ```bash
 ./bin/llama-server \
-  --model ~/models/Qwen3.6-35B-A3B-GGUF/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf \
+  --model ~/models/NVIDIA-Nemotron-3-Nano-Omni/nemotron-3-nano-omni-ga_v1.0-Q8_0.gguf \
   --host 0.0.0.0 \
   --port 30000 \
   --n-gpu-layers 99 \
@@ -174,7 +175,7 @@ Use a **second terminal on the same machine** that runs `llama-server` (for exam
 curl -X POST http://127.0.0.1:30000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gemma4",
+    "model": "nemotron",
     "messages": [{"role": "user", "content": "New York is a great city because..."}],
     "max_tokens": 100
   }'
@@ -197,7 +198,7 @@ Example shape of the response (fields vary by llama.cpp version; `message` may i
     }
   ],
   "created": 1765916539,
-  "model": "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
+  "model": "nemotron-3-nano-omni-ga_v1.0-Q8_0.gguf",
   "object": "chat.completion",
   "usage": {
     "completion_tokens": 100,
@@ -211,15 +212,15 @@ Example shape of the response (fields vary by llama.cpp version; `message` may i
 }
 ```
 
-## Step 7. Longer completion (with Qwen3.6)
+## Step 7. Longer completion (with Nemotron 3 Nano Omni)
 
-Try a slightly longer prompt to confirm stable generation with **Qwen3.6-35B-A3B**:
+Try a slightly longer prompt to confirm stable generation with **Nemotron 3 Nano Omni**:
 
 ```bash
 curl -X POST http://127.0.0.1:30000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "qwen3",
+    "model": "nemotron",
     "messages": [{"role": "user", "content": "Solve this step by step: If a train travels 120 miles in 2 hours, what is its average speed?"}],
     "max_tokens": 500
   }'
@@ -233,7 +234,7 @@ To remove this tutorial’s artifacts:
 
 ```bash
 rm -rf ~/llama.cpp
-rm -rf ~/models/Qwen3.6-35B-A3B-GGUF
+rm -rf ~/models/NVIDIA-Nemotron-3-Nano-Omni
 ```
 
 Deactivate the Python venv if you no longer need `hf`:
