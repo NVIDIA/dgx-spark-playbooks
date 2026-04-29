@@ -28,8 +28,6 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 - [CUDA-X Data Science](nvidia/cuda-x-data-science/)
 - [DGX Dashboard](nvidia/dgx-dashboard/)
 - [FLUX.1 Dreambooth LoRA Fine-tuning](nvidia/flux-finetuning/)
-- [Hermes-agent with Local Models](nvidia/hermes-agent/)
-- [Develop and Deploy Healthcare Robots with Isaac For Healthcare](nvidia/i4h-so-arm/)
 - [Install and Use Isaac Sim and Isaac Lab](nvidia/isaac/)
 - [Optimized JAX](nvidia/jax/)
 - [Live VLM WebUI](nvidia/live-vlm-webui/)
