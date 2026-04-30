@@ -57,7 +57,7 @@ inference through kernel-level optimizations, efficient memory layouts, and adva
 
 - DGX Spark device
 - NVIDIA drivers compatible with CUDA 12.x: `nvidia-smi`
-- Docker installed and GPU support configured: `docker run --rm --gpus all nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6 nvidia-smi`
+- Docker installed and GPU support configured: `docker run --rm --gpus all nvcr.io/nvidia/tensorrt-llm/release:1.3.0rc13 nvidia-smi`
 - Hugging Face account with token for model access: `echo $HF_TOKEN`
 - Sufficient GPU VRAM (40GB+ recommended for 70B models)
 - Internet connectivity for downloading models and container images
@@ -75,6 +75,9 @@ The following models are supported with TensorRT-LLM on Spark. All listed models
 
 | Model | Quantization | Support Status | HF Handle |
 |-------|-------------|----------------|-----------|
+| **Nemotron-3-Nano-Omni-30B-A3B-Reasoning** | BF16 | ✅ | `nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-BF16` |
+| **Nemotron-3-Nano-Omni-30B-A3B-Reasoning** | FP8 | ✅ | `nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-FP8` |
+| **Nemotron-3-Nano-Omni-30B-A3B-Reasoning** | NVFP4 | ✅ | `nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-NVFP4` |
 | **Nemotron-3-Super-120B** | NVFP4 | ✅ | `nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4` |
 | **GPT-OSS-20B** | MXFP4 | ✅ | `openai/gpt-oss-20b` |
 | **GPT-OSS-120B** | MXFP4 | ✅ | `openai/gpt-oss-120b` |
@@ -104,8 +107,8 @@ Reminder: not all model architectures are supported for NVFP4 quantization.
 * **Duration**: 45-60 minutes for setup and API server deployment
 * **Risk level**: Medium - container pulls and model downloads may fail due to network issues
 * **Rollback**: Stop inference servers and remove downloaded models to free resources.
-* **Last Updated:** 03/12/2026
-  * Introduce Nemotron-3-Super-120B support on TRT-LLM
+* **Last Updated:** 04/28/2026
+  * Docker image 1.3.0rc13; Nemotron Omni reasoning BF16, FP8, NVFP4 in matrix
 
 ## Single Spark
 
@@ -136,7 +139,7 @@ models and containers.
 nvidia-smi
 
 ## Verify Docker GPU support
-docker run --rm --gpus all nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6 nvidia-smi
+docker run --rm --gpus all nvcr.io/nvidia/tensorrt-llm/release:1.3.0rc13 nvidia-smi
 
 ```
 
@@ -146,7 +149,7 @@ docker run --rm --gpus all nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6 nvidia-s
 ## Set `HF_TOKEN` for model access.
 export HF_TOKEN=<your-huggingface-token>
 
-export DOCKER_IMAGE="nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6"
+export DOCKER_IMAGE="nvcr.io/nvidia/tensorrt-llm/release:1.3.0rc13"
 ```
 
 ## Step 4. Validate TensorRT-LLM installation
@@ -161,8 +164,8 @@ docker run --rm -it --gpus all \
 
 Expected output:
 ```
-[TensorRT-LLM] TensorRT-LLM version: 1.2.0rc6
-TensorRT-LLM version: 1.2.0rc6
+[TensorRT-LLM] TensorRT-LLM version: 1.3.0rc13
+TensorRT-LLM version: 1.3.0rc13
 ```
 
 ## Step 5. Create cache directory
@@ -289,6 +292,43 @@ sudo sh -c 'sync; echo 3 > /proc/sys/vm/drop_caches'
 ## Step 8. Serve LLM with OpenAI-compatible API
 
 Serve with OpenAI-compatible API via trtllm-serve:
+
+#### Nemotron-3-Nano-Omni-30B-A3B-Reasoning-BF16
+
+This example writes **`nano_v3.yaml`** for KV cache, MoE, and CUDA graph settings, then starts **`trtllm-serve`** on port **8000** with Nemotron Omni reasoning parsers.
+
+```bash
+export MODEL_HANDLE="nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-BF16"
+
+docker run --name trtllm_llm_server --rm -it --gpus all --ipc host --network host \
+  -e HF_TOKEN=$HF_TOKEN \
+  -e MODEL_HANDLE="$MODEL_HANDLE" \
+  -v $HOME/.cache/huggingface/:/root/.cache/huggingface/ \
+  $DOCKER_IMAGE \
+  bash -c '
+    hf download $MODEL_HANDLE && \
+    cat > nano_v3.yaml <<EOF
+kv_cache_config:
+  enable_block_reuse: false
+  free_gpu_memory_fraction: 0.80
+  mamba_ssm_cache_dtype: float32
+moe_config:
+  backend: CUTLASS
+cuda_graph_config:
+  enable_padding: true
+  max_batch_size: 1
+max_batch_size: 1
+EOF
+    PYTORCH_ALLOC_CONF=expandable_segments:True \
+    trtllm-serve serve "$MODEL_HANDLE" \
+      --host 0.0.0.0 \
+      --port 8355 \
+      --trust_remote_code \
+      --reasoning_parser nano-v3 \
+      --tool_parser qwen3_coder \
+      --extra_llm_api_options nano_v3.yaml
+  '
+```
 
 #### Llama 3.1 8B Instruct
 ```bash

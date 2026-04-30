@@ -54,6 +54,9 @@ The following models are supported with vLLM on Spark. All listed models are ava
 
 | Model | Quantization | Support Status | HF Handle |
 |-------|-------------|----------------|-----------|
+| **Nemotron-3-Nano-Omni-30B-A3B-Reasoning** | BF16 | ✅ | [`nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-BF16`](https://huggingface.co/nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-BF16) |
+| **Nemotron-3-Nano-Omni-30B-A3B-Reasoning** | FP8 | ✅ | [`nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-FP8`](https://huggingface.co/nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-FP8) |
+| **Nemotron-3-Nano-Omni-30B-A3B-Reasoning** | NVFP4 | ✅ | [`nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-NVFP4`](https://huggingface.co/nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-NVFP4) |
 | **Gemma 4 31B IT** | Base | ✅ | [`google/gemma-4-31B-it`](https://huggingface.co/google/gemma-4-31B-it) |
 | **Gemma 4 31B IT** | NVFP4 | ✅ | [`nvidia/Gemma-4-31B-IT-NVFP4`](https://huggingface.co/nvidia/Gemma-4-31B-IT-NVFP4) |
 | **Gemma 4 26B A4B IT** | Base | ✅ | [`google/gemma-4-26B-A4B-it`](https://huggingface.co/google/gemma-4-26B-A4B-it) |
@@ -94,12 +97,22 @@ Reminder: not all model architectures are supported for NVFP4 quantization.
 * **Duration:** 30 minutes for Docker approach
 * **Risks:** Container registry access requires internal credentials
 * **Rollback:** Container approach is non-destructive.
-* **Last Updated:** 04/02/2026
-  * Add support for Gemma 4 model family
+* **Last Updated:** 04/28/2026
+  * Add support for Nemotron-3-Nano-Omni reasoning BF16, FP8, NVFP4
 
 ## Instructions
 
-## Step 1. Configure Docker permissions
+## Step 1. Use model specific deployment guide
+
+Certain models require special deployment configurations. Please refer to their respective model cards to run on DGX Spark:
+
+| Model | Quantization | HF Model Card Link |
+|-------|-------------|----------------|
+| **Nemotron-3-Nano-Omni-30B-A3B-Reasoning** | BF16 | https://huggingface.co/nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-BF16 |
+| **Nemotron-3-Nano-Omni-30B-A3B-Reasoning** | FP8 | https://huggingface.co/nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-FP8 |
+| **Nemotron-3-Nano-Omni-30B-A3B-Reasoning** | NVFP4 | https://huggingface.co/nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-NVFP4 |
+
+## Step 2. Configure Docker permissions
 
 To easily manage containers without sudo, you must be in the `docker` group. If you choose to skip this step, you will need to run Docker commands with sudo.
 
@@ -115,7 +128,7 @@ sudo usermod -aG docker $USER
 newgrp docker
 ```
 
-## Step 2. Pull vLLM container image
+## Step 3. Pull vLLM container image
 
 Find the latest container build from https://catalog.ngc.nvidia.com/orgs/nvidia/containers/vllm
 
@@ -136,7 +149,7 @@ For Gemma 4 model family, use vLLM custom containers:
 docker pull vllm/vllm-openai:gemma4-cu130
 ```
 
-## Step 3. Test vLLM in container
+## Step 4. Test vLLM in container
 
 Launch the container and start vLLM server with a test model to verify basic functionality.
 
@@ -171,7 +184,7 @@ curl http://localhost:8000/v1/chat/completions \
 
 Expected response should contain `"content": "204"` or similar mathematical calculation.
 
-## Step 4. Cleanup and rollback
+## Step 5. Cleanup and rollback
 
 For container approach (non-destructive):
 
@@ -180,7 +193,7 @@ docker rm $(docker ps -aq --filter ancestor=nvcr.io/nvidia/vllm:${LATEST_VLLM_VE
 docker rmi nvcr.io/nvidia/vllm
 ```
 
-## Step 5. Next steps
+## Step 6. Next steps
 
 - **Production deployment:** Configure vLLM with your specific model requirements
 - **Performance tuning:** Adjust batch sizes and memory settings for your workload

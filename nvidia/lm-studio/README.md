@@ -27,7 +27,7 @@ This playbook shows you how to deploy LM Studio on an NVIDIA DGX Spark device to
 
 ## What you'll accomplish
 
-You'll deploy LM Studio on an NVIDIA DGX Spark device to run gpt-oss 120B, and use the model from your laptop. More specifically, you will:
+You'll deploy LM Studio on an NVIDIA DGX Spark device to run **Nemotron 3 Nano Omni** (`nvidia/nemotron-3-nano-omni`), and use the model from your laptop. More specifically, you will:
 
 - Install **llmster**, a totally headless, terminal native LM Studio on the Spark
 - Run LLM inference locally on DGX Spark via API
@@ -54,6 +54,15 @@ You'll deploy LM Studio on an NVIDIA DGX Spark device to run gpt-oss 120B, and u
 - Laptop and DGX Spark must be on the same local network
 - Network access to download packages and models
 
+## Model support matrix
+To explore all supported models in LM Studio, check out [LM Studio model catalog](https://lmstudio.ai/models) page.
+
+| Model | Support Status | Model Path |
+|-------|----------------|-----------|
+| **Nemotron 3 Nano Omni** | ✅ | `nvidia/nemotron-3-nano-omni` |
+| **Qwen3.6-35B-A3B** | ✅ | `qwen/qwen3.6-35b-a3b` |
+| **GPT-OSS-120B** | ✅ | `openai/gpt-oss-120b` |
+
 ## LM Link (optional)
 
 [LM Link](https://lmstudio.ai/link) lets you **use your local models remotely**. You link machines (e.g. your DGX Spark and your laptop), then load models on the Spark and use them from the laptop as if they were local.
@@ -66,7 +75,7 @@ If you use LM Link, you can skip binding the server to `0.0.0.0` and using the S
 
 ## Ancillary files
 
-All required assets can be found below. These sample scripts can be used in Step 6 of Instructions.
+All required assets can be found below. These sample scripts can be used in Step 7 of Instructions.
 
 - [run.js](https://github.com/lmstudio-ai/docs/blob/main/_assets/nvidia-spark-playbook/js/run.js) - JavaScript script for sending a test prompt to Spark
 - [run.py](https://github.com/lmstudio-ai/docs/blob/main/_assets/nvidia-spark-playbook/py/run.py) - Python script for sending a test prompt to Spark
@@ -80,8 +89,8 @@ All required assets can be found below. These sample scripts can be used in Step
 * **Rollback:**
   * Downloaded models can be removed manually from the models directory.
   * Uninstall LM Studio or llmster
-* **Last Updated:** 03/12/2026
-  * Add instructions for LM Link features
+* **Last Updated:** 04/28/2026
+  * Introduce Nemotron Omni as example
 
 ## Instructions
 
@@ -138,22 +147,22 @@ where `<SPARK_IP>` is your device's IP address. You can find your Spark’s IP a
 hostname -I
 ```
 
-## Step 3b. (Optional) Connect with LM Link
+## Step 4. (Optional) Connect with LM Link
 
 **LM Link** lets you use your Spark’s models from your laptop (or other devices) as if they were local, over an end-to-end encrypted connection. You don’t need to be on the same local network or bind the server to `0.0.0.0`.
 
 1. **Create a Link** — Go to [lmstudio.ai/link](https://lmstudio.ai/link) and follow **Create your Link** to set up your private LM Link network.
 2. **Link both devices** — On your DGX Spark (llmster) and on your laptop, sign in and join the same Link. LM Link uses Tailscale mesh VPNs; devices communicate without opening ports to the internet.
-3. **Use remote models** — On your laptop, open LM Studio (or use the local server). Remote models from your Spark appear in the model loader. Any tool that connects to `localhost:1234` — including the LM Studio SDK, Codex, Claude Code, OpenCode, and the scripts in Step 6 — can use those models without changing the endpoint.
+3. **Use remote models** — On your laptop, open LM Studio (or use the local server). Remote models from your Spark appear in the model loader. Any tool that connects to `localhost:1234` — including the LM Studio SDK, Codex, Claude Code, OpenCode, and the scripts in Step 7 — can use those models without changing the endpoint.
 
 LM Link is in **Preview** and is free for up to 2 users, 5 devices each. For details and limits, see [LM Link](https://lmstudio.ai/link).
 
-## Step 4. Download a model to your Spark
+## Step 5. Download a model to your Spark
 
-As an example, let's download and run gpt-oss 120B, one of the best open source models from OpenAI. This model is too large for many laptops due to memory limitations, which makes this a fantastic use case for the Spark.
+As an example, download **NVIDIA Nemotron 3 Nano Omni** from the LM Studio catalog (`nvidia/nemotron-3-nano-omni`) so you can run it on Spark with plenty of unified memory.
 
 ```bash
-lms get openai/gpt-oss-120b
+lms get nvidia/nemotron-3-nano-omni
 ```
 
 This download will take a while due to its large size. Verify that the model has been successfully downloaded by listing your models:
@@ -162,15 +171,15 @@ This download will take a while due to its large size. Verify that the model has
 lms ls
 ```
 
-## Step 5. Load the model 
+## Step 6. Load the model 
 
 Load the model on your Spark so that it is ready to respond to requests from your laptop.
 
 ```bash
-lms load openai/gpt-oss-120b
+lms load nvidia/nemotron-3-nano-omni
 ```
 
-## Step 6. Set up a simple program that uses LM Studio SDK on the laptop
+## Step 7. Set up a simple program that uses LM Studio SDK on the laptop
 
 Install the LM Studio SDKs and use a simple script to send a prompt to your Spark and validate the response. To get started quickly, we provide simple scripts below for Python, JavaScript, and Bash. Download the scripts from the Overview page of this playbook and run the corresponding command from the directory containing it.
 
@@ -202,12 +211,12 @@ Pre-reqs: User has installed `jq` and `curl`
 bash run.sh
 ```
 
-## Step 7. Next Steps
+## Step 8. Next Steps
 
 - Try downloading and serving different models from the [LM Studio model catalog](https://lmstudio.ai/models).
 - Use [LM Link](https://lmstudio.ai/link) to connect more devices and use your Spark’s models from anywhere with end-to-end encryption.
 
-## Step 8. Cleanup and rollback
+## Step 9. Cleanup and rollback
 Remove and uninstall LM Studio completely if needed. Note that LM Studio stores models separately from the application. Uninstalling LM Studio will not remove downloaded models unless you explicitly delete them.
 
 If you want to remove the entire LM Studio application, quit LM Studio from the tray first, then move the application to trash.
