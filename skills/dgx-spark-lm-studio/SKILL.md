@@ -14,7 +14,7 @@ This playbook shows you how to deploy LM Studio on an NVIDIA DGX Spark device to
 
 **LM Link** (optional) lets you use your Spark’s models from another machine as if they were local. You can link your DGX Spark and your laptop (or other devices) over an end-to-end encrypted connection, so you can load and run models on the Spark from your laptop without being on the same LAN or opening network access. See [LM Link](https://lmstudio.ai/link) and Step 3b in the Instructions.
 
-**Outcome**: You'll deploy LM Studio on an NVIDIA DGX Spark device to run gpt-oss 120B, and use the model from your laptop. More specifically, you will:
+**Outcome**: You'll deploy LM Studio on an NVIDIA DGX Spark device to run **Nemotron 3 Nano Omni** (`nvidia/nemotron-3-nano-omni`), and use the model from your laptop. More specifically, you will:
 
 - Install **llmster**, a totally headless, terminal native LM Studio on the Spark
 - Run LLM inference locally on DGX Spark via API
