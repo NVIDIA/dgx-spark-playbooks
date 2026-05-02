@@ -10,7 +10,7 @@ description: Install and run vLLM for high-throughput LLM inference on NVIDIA DG
 
 vLLM is an inference engine designed to run large language models efficiently. The key idea is **maximizing throughput and minimizing memory waste** when serving LLMs.
 
-- It uses a memory-efficient attention algoritm called **PagedAttention** to handle long sequences without running out of GPU memory.
+- It uses a memory-efficient attention algo called **PagedAttention** to handle long sequences without running out of GPU memory.
 - New requests can be added to a batch already in process through **continuous batching** to keep GPUs fully utilized.
 - It has an **OpenAI-compatible API** so applications built for the OpenAI API can switch to a vLLM backend with little or no modification.
 
