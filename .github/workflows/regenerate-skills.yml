@@ -1,0 +1,47 @@
+name: Regenerate skills
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'nvidia/**/README.md'
+      - 'overrides/**'
+      - 'scripts/generate.mjs'
+      - 'plugin.json'
+  workflow_dispatch:
+
+concurrency:
+  group: regenerate-skills-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Regenerate skills
+        run: node scripts/generate.mjs
+
+      - name: Commit if changed
+        run: |
+          if git diff --quiet skills/; then
+            echo "No changes to skills/ - skipping commit"
+            exit 0
+          fi
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add skills/
+          git commit -m "chore: regenerate skills/ from upstream playbooks [skip ci]"
+          git push

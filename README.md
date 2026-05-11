@@ -17,6 +17,39 @@ These playbooks provide detailed instructions for:
 
 Each playbook includes prerequisites, step-by-step instructions, troubleshooting guidance, and example code.
 
+## Use as Claude Code Skills
+
+Every playbook in this repo is also exposed as a [Claude Code](https://docs.claude.com/claude-code) skill, so Claude can install and configure them for you interactively. An index skill (`dgx-spark`) routes broad questions to the right specific playbook, and each leaf skill carries cross-references to related playbooks (prerequisites, alternatives, what to try next).
+
+### Option A: install via Claude Code plugin marketplace (recommended)
+
+In Claude Code, run:
+
+```
+/plugin marketplace add jkneen/dgx-spark-playbooks
+/plugin install dgx-spark-playbooks@dgx-spark-playbooks
+```
+
+### Option B: install locally via script
+
+Clone and run the install script. This symlinks each skill into `~/.claude/skills/`, so `git pull` updates them in place.
+
+```bash
+git clone https://github.com/jkneen/dgx-spark-playbooks
+cd dgx-spark-playbooks
+./scripts/install.sh                  # individual skills → ~/.claude/skills/
+./scripts/install.sh --plugin         # or: whole repo as a plugin → ~/.claude/plugins/
+./scripts/uninstall.sh                # remove
+```
+
+Requires Node 18+ if you want to regenerate skills from overrides; otherwise the committed `skills/` directory is used as-is.
+
+### Customizing a skill
+
+Hand-curate any skill by creating or editing `overrides/<playbook-name>.md` (see [`overrides/ollama.md`](overrides/ollama.md) as a worked example), then run `node scripts/generate.mjs` to rebuild. Overrides contribute the frontmatter `description` (which controls when the skill triggers) and any extra sections like "Related skills" or gotchas. Generated content between `<!-- GENERATED:BEGIN -->` and `<!-- GENERATED:END -->` markers is rewritten from the upstream README on every regeneration; override content outside those markers is preserved.
+
+A GitHub Action auto-regenerates `skills/` whenever a playbook README or override changes.
+
 ## Available Playbooks
 
 ### NVIDIA
