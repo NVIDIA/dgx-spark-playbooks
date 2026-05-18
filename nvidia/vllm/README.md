@@ -218,7 +218,7 @@ Obtain the vLLM cluster deployment script on both nodes. This script orchestrate
 
 ```bash
 ## Download on both nodes
-wget https://raw.githubusercontent.com/vllm-project/vllm/refs/heads/main/examples/online_serving/run_cluster.sh
+wget https://raw.githubusercontent.com/vllm-project/vllm/refs/heads/main/examples/ray_serving/run_cluster.sh
 chmod +x run_cluster.sh
 ```
 
@@ -445,7 +445,7 @@ Download the vLLM cluster deployment script on all nodes. This script orchestrat
 
 ```bash
 ## Download on all nodes
-wget https://raw.githubusercontent.com/vllm-project/vllm/refs/heads/main/examples/online_serving/run_cluster.sh
+wget https://raw.githubusercontent.com/vllm-project/vllm/refs/heads/main/examples/ray_serving/run_cluster.sh
 chmod +x run_cluster.sh
 ```
 
