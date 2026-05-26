@@ -1,0 +1,86 @@
+services:
+  app:
+    environment:
+      - PINECONE_HOST=entity-embeddings
+      - PINECONE_PORT=5081
+      - PINECONE_API_KEY=pclocal
+      - PINECONE_ENVIRONMENT=local
+      - SENTENCE_TRANSFORMER_URL=http://sentence-transformers:80
+      - MODEL_NAME=all-MiniLM-L6-v2
+      - VLLM_BASE_URL=http://vllm:8001/v1
+      - VLLM_MODEL=meta-llama/Llama-3.2-3B-Instruct
+    networks:
+      - pinecone-net
+    depends_on:
+      - entity-embeddings
+      - sentence-transformers
+      - vllm
+  entity-embeddings:
+    image: ghcr.io/pinecone-io/pinecone-index:latest
+    container_name: entity-embeddings
+    environment:
+      PORT: 5081
+      INDEX_TYPE: serverless
+      VECTOR_TYPE: dense
+      DIMENSION: 384
+      METRIC: cosine
+      INDEX_NAME: entity-embeddings
+    ports:
+      - "5081:5081"
+    platform: linux/amd64
+    networks:
+      - pinecone-net
+    restart: unless-stopped
+  sentence-transformers:
+    build:
+      context: ../../deploy/services/sentence-transformers
+      dockerfile: Dockerfile
+    ports:
+      - '8000:80'
+    environment:
+      - MODEL_NAME=all-MiniLM-L6-v2
+    networks:
+      - default
+  vllm:
+    build:
+      context: ../../deploy/services/vllm
+      dockerfile: Dockerfile
+    container_name: vllm-service
+    ports:
+      - '8001:8001'
+    environment:
+      - VLLM_MODEL=meta-llama/Llama-3.2-3B-Instruct
+      - VLLM_TENSOR_PARALLEL_SIZE=1
+      - VLLM_MAX_MODEL_LEN=4096
+      - VLLM_GPU_MEMORY_UTILIZATION=0.9
+      - VLLM_QUANTIZATION=fp8
+      - VLLM_KV_CACHE_DTYPE=fp8
+      - VLLM_PORT=8001
+      - VLLM_HOST=0.0.0.0
+    volumes:
+      - vllm_models:/app/models
+      - /tmp:/tmp
+    networks:
+      - default
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/v1/models"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  vllm_models:
+
+networks:
+  pinecone-net:
+    name: pinecone
+

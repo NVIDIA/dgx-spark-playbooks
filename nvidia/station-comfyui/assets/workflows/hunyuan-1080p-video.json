@@ -1,0 +1,837 @@
+{
+  "last_node_id": 14,
+  "last_link_id": 14,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "UNETLoader",
+      "pos": [
+        80,
+        40
+      ],
+      "size": [
+        320,
+        120
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "unet_name",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "weight_dtype",
+          "type": "*",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "0",
+          "type": "*",
+          "links": [
+            3
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.0",
+        "Node name for S&R": "UNETLoader"
+      },
+      "widgets_values": [
+        "hunyuan_video_t2v_720p_bf16.safetensors",
+        "default"
+      ]
+    },
+    {
+      "id": 2,
+      "type": "DualCLIPLoader",
+      "pos": [
+        500,
+        40
+      ],
+      "size": [
+        320,
+        120
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip_name1",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "clip_name2",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "type",
+          "type": "*",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "0",
+          "type": "*",
+          "links": [
+            1
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.0",
+        "Node name for S&R": "DualCLIPLoader"
+      },
+      "widgets_values": [
+        "clip_l_hunyuan.safetensors",
+        "llava_llama3_fp8_scaled.safetensors",
+        "hunyuan_video"
+      ]
+    },
+    {
+      "id": 3,
+      "type": "VAELoader",
+      "pos": [
+        920,
+        40
+      ],
+      "size": [
+        320,
+        120
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "vae_name",
+          "type": "*",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "0",
+          "type": "*",
+          "links": [
+            13
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.0",
+        "Node name for S&R": "VAELoader"
+      },
+      "widgets_values": [
+        "hunyuan_video_vae_bf16.safetensors"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "CLIPTextEncode",
+      "pos": [
+        1340,
+        40
+      ],
+      "size": [
+        320,
+        120
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "text",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "clip",
+          "type": "*",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "0",
+          "type": "*",
+          "links": [
+            2
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.0",
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        "A time-lapse of cherry blossoms falling in a Japanese garden with a koi pond, cinematic 4K quality, soft natural lighting"
+      ]
+    },
+    {
+      "id": 5,
+      "type": "FluxGuidance",
+      "pos": [
+        1760,
+        40
+      ],
+      "size": [
+        320,
+        120
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "conditioning",
+          "type": "*",
+          "link": 2
+        },
+        {
+          "name": "guidance",
+          "type": "*",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "0",
+          "type": "*",
+          "links": [
+            5
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.0",
+        "Node name for S&R": "FluxGuidance"
+      },
+      "widgets_values": [
+        6
+      ]
+    },
+    {
+      "id": 6,
+      "type": "ModelSamplingSD3",
+      "pos": [
+        80,
+        260
+      ],
+      "size": [
+        320,
+        120
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "shift",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "model",
+          "type": "*",
+          "link": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "0",
+          "type": "*",
+          "links": [
+            4,
+            6
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.0",
+        "Node name for S&R": "ModelSamplingSD3"
+      },
+      "widgets_values": [
+        7
+      ]
+    },
+    {
+      "id": 7,
+      "type": "BasicGuider",
+      "pos": [
+        500,
+        260
+      ],
+      "size": [
+        320,
+        120
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "*",
+          "link": 4
+        },
+        {
+          "name": "conditioning",
+          "type": "*",
+          "link": 5
+        }
+      ],
+      "outputs": [
+        {
+          "name": "0",
+          "type": "*",
+          "links": [
+            8
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.0",
+        "Node name for S&R": "BasicGuider"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 8,
+      "type": "RandomNoise",
+      "pos": [
+        920,
+        260
+      ],
+      "size": [
+        320,
+        120
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "noise_seed",
+          "type": "*",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "0",
+          "type": "*",
+          "links": [
+            7
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.0",
+        "Node name for S&R": "RandomNoise"
+      },
+      "widgets_values": [
+        42
+      ]
+    },
+    {
+      "id": 9,
+      "type": "KSamplerSelect",
+      "pos": [
+        1340,
+        260
+      ],
+      "size": [
+        320,
+        120
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "sampler_name",
+          "type": "*",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "0",
+          "type": "*",
+          "links": [
+            9
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.0",
+        "Node name for S&R": "KSamplerSelect"
+      },
+      "widgets_values": [
+        "euler"
+      ]
+    },
+    {
+      "id": 10,
+      "type": "BasicScheduler",
+      "pos": [
+        1760,
+        260
+      ],
+      "size": [
+        320,
+        120
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "*",
+          "link": 6
+        },
+        {
+          "name": "scheduler",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "steps",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "denoise",
+          "type": "*",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "0",
+          "type": "*",
+          "links": [
+            10
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.0",
+        "Node name for S&R": "BasicScheduler"
+      },
+      "widgets_values": [
+        "simple",
+        20,
+        1.0
+      ]
+    },
+    {
+      "id": 11,
+      "type": "EmptyHunyuanLatentVideo",
+      "pos": [
+        80,
+        480
+      ],
+      "size": [
+        320,
+        120
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "width",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "height",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "length",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "batch_size",
+          "type": "*",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "0",
+          "type": "*",
+          "links": [
+            11
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.0",
+        "Node name for S&R": "EmptyHunyuanLatentVideo"
+      },
+      "widgets_values": [
+        1920,
+        1056,
+        49,
+        1
+      ]
+    },
+    {
+      "id": 12,
+      "type": "SamplerCustomAdvanced",
+      "pos": [
+        500,
+        480
+      ],
+      "size": [
+        320,
+        120
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "noise",
+          "type": "*",
+          "link": 7
+        },
+        {
+          "name": "guider",
+          "type": "*",
+          "link": 8
+        },
+        {
+          "name": "sampler",
+          "type": "*",
+          "link": 9
+        },
+        {
+          "name": "sigmas",
+          "type": "*",
+          "link": 10
+        },
+        {
+          "name": "latent_image",
+          "type": "*",
+          "link": 11
+        }
+      ],
+      "outputs": [
+        {
+          "name": "0",
+          "type": "*",
+          "links": [
+            12
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.0",
+        "Node name for S&R": "SamplerCustomAdvanced"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 13,
+      "type": "VAEDecodeTiled",
+      "pos": [
+        920,
+        480
+      ],
+      "size": [
+        320,
+        120
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "*",
+          "link": 12
+        },
+        {
+          "name": "vae",
+          "type": "*",
+          "link": 13
+        },
+        {
+          "name": "tile_size",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "overlap",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "temporal_size",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "temporal_overlap",
+          "type": "*",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "0",
+          "type": "*",
+          "links": [
+            14
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.0",
+        "Node name for S&R": "VAEDecodeTiled"
+      },
+      "widgets_values": [
+        256,
+        64,
+        64,
+        8
+      ]
+    },
+    {
+      "id": 14,
+      "type": "SaveAnimatedWEBP",
+      "pos": [
+        1340,
+        480
+      ],
+      "size": [
+        320,
+        120
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "*",
+          "link": 14
+        },
+        {
+          "name": "filename_prefix",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "fps",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "lossless",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "quality",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "method",
+          "type": "*",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "0",
+          "type": "*",
+          "links": [],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.0",
+        "Node name for S&R": "SaveAnimatedWEBP"
+      },
+      "widgets_values": [
+        "hunyuan_1080p_output",
+        24,
+        false,
+        85,
+        "default"
+      ]
+    }
+  ],
+  "links": [
+    [
+      1,
+      2,
+      0,
+      4,
+      1,
+      "*"
+    ],
+    [
+      2,
+      4,
+      0,
+      5,
+      0,
+      "*"
+    ],
+    [
+      3,
+      1,
+      0,
+      6,
+      1,
+      "*"
+    ],
+    [
+      4,
+      6,
+      0,
+      7,
+      0,
+      "*"
+    ],
+    [
+      5,
+      5,
+      0,
+      7,
+      1,
+      "*"
+    ],
+    [
+      6,
+      6,
+      0,
+      10,
+      0,
+      "*"
+    ],
+    [
+      7,
+      8,
+      0,
+      12,
+      0,
+      "*"
+    ],
+    [
+      8,
+      7,
+      0,
+      12,
+      1,
+      "*"
+    ],
+    [
+      9,
+      9,
+      0,
+      12,
+      2,
+      "*"
+    ],
+    [
+      10,
+      10,
+      0,
+      12,
+      3,
+      "*"
+    ],
+    [
+      11,
+      11,
+      0,
+      12,
+      4,
+      "*"
+    ],
+    [
+      12,
+      12,
+      0,
+      13,
+      0,
+      "*"
+    ],
+    [
+      13,
+      3,
+      0,
+      13,
+      1,
+      "*"
+    ],
+    [
+      14,
+      13,
+      0,
+      14,
+      0,
+      "*"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1,
+      "offset": [
+        0,
+        0
+      ]
+    }
+  },
+  "version": 0.4
+}

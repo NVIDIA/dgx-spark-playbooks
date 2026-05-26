@@ -1,0 +1,137 @@
+{
+  "agents": {
+    "defaults": {
+      "model": "local-ollama/nemotron-3-super:120b-a12b",
+      "timeoutSeconds": 600,
+      "subagents": {
+        "maxConcurrent": 4,
+        "maxSpawnDepth": 2,
+        "runTimeoutSeconds": 600
+      },
+      "elevatedDefault": "full"
+    },
+    "list": [
+      {
+        "id": "main",
+        "name": "Clinical Intelligence Coordinator",
+        "subagents": {
+          "allowAgents": [
+            "patient-data",
+            "labs-vitals",
+            "medications",
+            "analyst",
+            "molecular"
+          ]
+        }
+      },
+      {
+        "id": "patient-data",
+        "name": "Patient Data Agent"
+      },
+      {
+        "id": "labs-vitals",
+        "name": "Labs & Vitals Agent"
+      },
+      {
+        "id": "medications",
+        "name": "Medications Agent"
+      },
+      {
+        "id": "analyst",
+        "name": "Clinical Analyst Agent"
+      },
+      {
+        "id": "molecular",
+        "name": "Molecular Visualization Agent"
+      }
+    ]
+  },
+  "tools": {
+    "profile": "coding",
+    "allow": [
+      "group:fs",
+      "group:runtime",
+      "group:web",
+      "group:sessions"
+    ],
+    "sessions": {
+      "visibility": "all"
+    },
+    "elevated": {
+      "enabled": true
+    },
+    "exec": {
+      "host": "gateway",
+      "security": "full"
+    }
+  },
+  "skills": {
+    "load": {
+      "watch": true
+    },
+    "entries": {
+      "weather": {
+        "enabled": false
+      },
+      "tmux": {
+        "enabled": false
+      },
+      "healthcheck": {
+        "enabled": false
+      },
+      "gh-issues": {
+        "enabled": false
+      },
+      "skill-creator": {
+        "enabled": false
+      },
+      "github": {
+        "enabled": false
+      }
+    }
+  },
+  "models": {
+    "providers": {
+      "local-ollama": {
+        "baseUrl": "https://inference.local/v1",
+        "apiKey": "ollama-local",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "nemotron-3-super:120b-a12b",
+            "name": "nemotron-3-super:120b-a12b",
+            "reasoning": false,
+            "input": [
+              "text"
+            ],
+            "contextWindow": 131072,
+            "maxTokens": 8192,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0
+            }
+          },
+          {
+            "id": "qwen2.5:72b",
+            "name": "qwen2.5:72b",
+            "reasoning": false,
+            "input": [
+              "text"
+            ],
+            "contextWindow": 131072,
+            "maxTokens": 8192,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0
+            }
+          }
+        ]
+      }
+    },
+    "mode": "merge"
+  }
+}

@@ -1,0 +1,235 @@
+{
+  "_comment": "Combined pipeline: FLUX.1 dev generates an image, then Wan 2.1 I2V animates it into video.",
+
+  "101": {
+    "inputs": {
+      "unet_name": "flux1-dev.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": { "title": "[FLUX] Load Diffusion Model" }
+  },
+  "102": {
+    "inputs": {
+      "clip_name1": "t5xxl_fp16.safetensors",
+      "clip_name2": "clip_l.safetensors",
+      "type": "flux"
+    },
+    "class_type": "DualCLIPLoader",
+    "_meta": { "title": "[FLUX] DualCLIPLoader" }
+  },
+  "103": {
+    "inputs": {
+      "vae_name": "ae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": { "title": "[FLUX] Load VAE" }
+  },
+  "104": {
+    "inputs": {
+      "text": "A serene lighthouse on a rocky coast at sunset, dramatic clouds, photorealistic",
+      "clip": ["102", 0]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "[FLUX] Positive Prompt" }
+  },
+  "105": {
+    "inputs": {
+      "guidance": 3.5,
+      "conditioning": ["104", 0]
+    },
+    "class_type": "FluxGuidance",
+    "_meta": { "title": "[FLUX] Guidance" }
+  },
+  "106": {
+    "inputs": {
+      "max_shift": 1.15,
+      "base_shift": 0.5,
+      "width": 1280,
+      "height": 720,
+      "model": ["101", 0]
+    },
+    "class_type": "ModelSamplingFlux",
+    "_meta": { "title": "[FLUX] Model Sampling" }
+  },
+  "107": {
+    "inputs": {
+      "model": ["106", 0],
+      "conditioning": ["105", 0]
+    },
+    "class_type": "BasicGuider",
+    "_meta": { "title": "[FLUX] Basic Guider" }
+  },
+  "108": {
+    "inputs": { "noise_seed": 42 },
+    "class_type": "RandomNoise",
+    "_meta": { "title": "[FLUX] Random Noise" }
+  },
+  "109": {
+    "inputs": { "sampler_name": "euler" },
+    "class_type": "KSamplerSelect",
+    "_meta": { "title": "[FLUX] Sampler Select" }
+  },
+  "110": {
+    "inputs": {
+      "scheduler": "simple",
+      "steps": 20,
+      "denoise": 1.0,
+      "model": ["106", 0]
+    },
+    "class_type": "BasicScheduler",
+    "_meta": { "title": "[FLUX] Scheduler" }
+  },
+  "111": {
+    "inputs": {
+      "width": 1280,
+      "height": 720,
+      "batch_size": 1
+    },
+    "class_type": "EmptySD3LatentImage",
+    "_meta": { "title": "[FLUX] Empty Latent (720p)" }
+  },
+  "112": {
+    "inputs": {
+      "noise": ["108", 0],
+      "guider": ["107", 0],
+      "sampler": ["109", 0],
+      "sigmas": ["110", 0],
+      "latent_image": ["111", 0]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": { "title": "[FLUX] Advanced Sampler" }
+  },
+  "113": {
+    "inputs": {
+      "samples": ["112", 0],
+      "vae": ["103", 0]
+    },
+    "class_type": "VAEDecode",
+    "_meta": { "title": "[FLUX] VAE Decode" }
+  },
+  "114": {
+    "inputs": {
+      "filename_prefix": "flux_to_wan_image",
+      "images": ["113", 0]
+    },
+    "class_type": "SaveImage",
+    "_meta": { "title": "[FLUX] Save Generated Image" }
+  },
+
+  "201": {
+    "inputs": {
+      "unet_name": "wan2.1_i2v_720p_14B_bf16.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": { "title": "[Wan] Load I2V 14B Model" }
+  },
+  "202": {
+    "inputs": {
+      "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "type": "wan",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": { "title": "[Wan] Load UMT5-XXL Text Encoder" }
+  },
+  "203": {
+    "inputs": {
+      "vae_name": "wan_2.1_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": { "title": "[Wan] Load VAE" }
+  },
+  "204": {
+    "inputs": {
+      "clip_name": "clip_vision_h.safetensors"
+    },
+    "class_type": "CLIPVisionLoader",
+    "_meta": { "title": "[Wan] Load CLIP Vision" }
+  },
+  "205": {
+    "inputs": {
+      "text": "The scene comes to life with gentle ocean waves, clouds drifting across the sky, and light shifting, cinematic",
+      "clip": ["202", 0]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "[Wan] Positive Prompt" }
+  },
+  "206": {
+    "inputs": {
+      "text": "low quality, blurry, distorted",
+      "clip": ["202", 0]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "[Wan] Negative Prompt" }
+  },
+  "207": {
+    "inputs": {
+      "crop": "none",
+      "clip_vision": ["204", 0],
+      "image": ["113", 0]
+    },
+    "class_type": "CLIPVisionEncode",
+    "_meta": { "title": "[Wan] CLIP Vision Encode" }
+  },
+  "208": {
+    "inputs": {
+      "width": 1280,
+      "height": 720,
+      "length": 81,
+      "batch_size": 1,
+      "positive": ["205", 0],
+      "negative": ["206", 0],
+      "vae": ["203", 0],
+      "clip_vision_output": ["207", 0],
+      "start_image": ["113", 0]
+    },
+    "class_type": "WanImageToVideo",
+    "_meta": { "title": "[Wan] Image-to-Video Conditioning" }
+  },
+  "209": {
+    "inputs": {
+      "shift": 8,
+      "model": ["201", 0]
+    },
+    "class_type": "ModelSamplingSD3",
+    "_meta": { "title": "[Wan] Model Sampling (shift=8)" }
+  },
+  "210": {
+    "inputs": {
+      "seed": 42,
+      "steps": 20,
+      "cfg": 6,
+      "sampler_name": "uni_pc",
+      "scheduler": "simple",
+      "denoise": 1.0,
+      "model": ["209", 0],
+      "positive": ["208", 0],
+      "negative": ["208", 1],
+      "latent_image": ["208", 2]
+    },
+    "class_type": "KSampler",
+    "_meta": { "title": "[Wan] KSampler" }
+  },
+  "211": {
+    "inputs": {
+      "samples": ["210", 0],
+      "vae": ["203", 0]
+    },
+    "class_type": "VAEDecode",
+    "_meta": { "title": "[Wan] VAE Decode" }
+  },
+  "212": {
+    "inputs": {
+      "fps": 16,
+      "lossless": false,
+      "quality": 85,
+      "method": "default",
+      "filename_prefix": "flux_to_wan_video",
+      "images": ["211", 0]
+    },
+    "class_type": "SaveAnimatedWEBP",
+    "_meta": { "title": "[Wan] Save Animated WEBP" }
+  }
+}

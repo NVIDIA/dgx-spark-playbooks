@@ -1,0 +1,652 @@
+{
+  "last_node_id": 10,
+  "last_link_id": 11,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "UNETLoader",
+      "pos": [
+        80,
+        40
+      ],
+      "size": [
+        320,
+        120
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "unet_name",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "weight_dtype",
+          "type": "*",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "0",
+          "type": "*",
+          "links": [
+            5
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.0",
+        "Node name for S&R": "UNETLoader"
+      },
+      "widgets_values": [
+        "cosmos_predict2_14B_video2world_720p_16fps.safetensors",
+        "default"
+      ]
+    },
+    {
+      "id": 2,
+      "type": "CLIPLoader",
+      "pos": [
+        500,
+        40
+      ],
+      "size": [
+        320,
+        120
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip_name",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "type",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "device",
+          "type": "*",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "0",
+          "type": "*",
+          "links": [
+            1,
+            2
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.0",
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "oldt5_xxl_fp8_e4m3fn_scaled.safetensors",
+        "cosmos",
+        "default"
+      ]
+    },
+    {
+      "id": 3,
+      "type": "VAELoader",
+      "pos": [
+        920,
+        40
+      ],
+      "size": [
+        320,
+        120
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "vae_name",
+          "type": "*",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "0",
+          "type": "*",
+          "links": [
+            3,
+            10
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.0",
+        "Node name for S&R": "VAELoader"
+      },
+      "widgets_values": [
+        "wan_2.1_vae.safetensors"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "CLIPTextEncode",
+      "pos": [
+        1340,
+        40
+      ],
+      "size": [
+        320,
+        120
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "text",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "clip",
+          "type": "*",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "0",
+          "type": "*",
+          "links": [
+            6
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.0",
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        "A red ball rolling down a wooden ramp and bouncing off a wall, physics simulation, realistic lighting"
+      ]
+    },
+    {
+      "id": 5,
+      "type": "CLIPTextEncode",
+      "pos": [
+        1760,
+        40
+      ],
+      "size": [
+        320,
+        120
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "text",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "clip",
+          "type": "*",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "0",
+          "type": "*",
+          "links": [
+            7
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.0",
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        ""
+      ]
+    },
+    {
+      "id": 6,
+      "type": "CosmosPredict2ImageToVideoLatent",
+      "pos": [
+        80,
+        260
+      ],
+      "size": [
+        320,
+        120
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "vae",
+          "type": "*",
+          "link": 3
+        },
+        {
+          "name": "width",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "height",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "length",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "batch_size",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "start_image",
+          "type": "*",
+          "link": 4
+        }
+      ],
+      "outputs": [
+        {
+          "name": "0",
+          "type": "*",
+          "links": [
+            8
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.0",
+        "Node name for S&R": "CosmosPredict2ImageToVideoLatent"
+      },
+      "widgets_values": [
+        1280,
+        704,
+        93,
+        1
+      ]
+    },
+    {
+      "id": 7,
+      "type": "KSampler",
+      "pos": [
+        500,
+        260
+      ],
+      "size": [
+        320,
+        120
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "*",
+          "link": 5
+        },
+        {
+          "name": "seed",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "steps",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "cfg",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "sampler_name",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "scheduler",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "positive",
+          "type": "*",
+          "link": 6
+        },
+        {
+          "name": "negative",
+          "type": "*",
+          "link": 7
+        },
+        {
+          "name": "latent_image",
+          "type": "*",
+          "link": 8
+        },
+        {
+          "name": "denoise",
+          "type": "*",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "0",
+          "type": "*",
+          "links": [
+            9
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.0",
+        "Node name for S&R": "KSampler"
+      },
+      "widgets_values": [
+        42,
+        30,
+        4,
+        "euler",
+        "simple",
+        1.0
+      ]
+    },
+    {
+      "id": 8,
+      "type": "VAEDecode",
+      "pos": [
+        920,
+        260
+      ],
+      "size": [
+        320,
+        120
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "*",
+          "link": 9
+        },
+        {
+          "name": "vae",
+          "type": "*",
+          "link": 10
+        }
+      ],
+      "outputs": [
+        {
+          "name": "0",
+          "type": "*",
+          "links": [
+            11
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.0",
+        "Node name for S&R": "VAEDecode"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 9,
+      "type": "SaveAnimatedWEBP",
+      "pos": [
+        1340,
+        260
+      ],
+      "size": [
+        320,
+        120
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "*",
+          "link": 11
+        },
+        {
+          "name": "filename_prefix",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "fps",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "lossless",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "quality",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "method",
+          "type": "*",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "0",
+          "type": "*",
+          "links": [],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.0",
+        "Node name for S&R": "SaveAnimatedWEBP"
+      },
+      "widgets_values": [
+        "cosmos_v2w_output",
+        16,
+        false,
+        85,
+        "default"
+      ]
+    },
+    {
+      "id": 10,
+      "type": "LoadImage",
+      "pos": [
+        1760,
+        260
+      ],
+      "size": [
+        320,
+        120
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "*",
+          "link": null
+        },
+        {
+          "name": "upload",
+          "type": "*",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "0",
+          "type": "*",
+          "links": [
+            4
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.0",
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "input_image.png",
+        "image"
+      ]
+    }
+  ],
+  "links": [
+    [
+      1,
+      2,
+      0,
+      4,
+      1,
+      "*"
+    ],
+    [
+      2,
+      2,
+      0,
+      5,
+      1,
+      "*"
+    ],
+    [
+      3,
+      3,
+      0,
+      6,
+      0,
+      "*"
+    ],
+    [
+      4,
+      10,
+      0,
+      6,
+      5,
+      "*"
+    ],
+    [
+      5,
+      1,
+      0,
+      7,
+      0,
+      "*"
+    ],
+    [
+      6,
+      4,
+      0,
+      7,
+      6,
+      "*"
+    ],
+    [
+      7,
+      5,
+      0,
+      7,
+      7,
+      "*"
+    ],
+    [
+      8,
+      6,
+      0,
+      7,
+      8,
+      "*"
+    ],
+    [
+      9,
+      7,
+      0,
+      8,
+      0,
+      "*"
+    ],
+    [
+      10,
+      3,
+      0,
+      8,
+      1,
+      "*"
+    ],
+    [
+      11,
+      8,
+      0,
+      9,
+      0,
+      "*"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1,
+      "offset": [
+        0,
+        0
+      ]
+    }
+  },
+  "version": 0.4
+}

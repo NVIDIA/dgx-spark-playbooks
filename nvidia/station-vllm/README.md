@@ -1,0 +1,163 @@
+# Serve Qwen3-235B with vLLM
+
+> Set up vLLM server with Qwen3-235B on DGX Station
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Serve Qwen3-235B](#serve-qwen3-235b)
+- [Troubleshooting](#troubleshooting)
+
+---
+
+## Overview
+
+## Basic idea
+
+vLLM is an inference engine designed to run large language models efficiently. The key idea is **maximizing throughput and minimizing memory waste** when serving LLMs.
+
+- **PagedAttention** handles long sequences without running out of GPU memory.
+- **Continuous batching** keeps GPUs fully utilized by adding new requests to batches in progress.
+- **OpenAI-compatible API** allows applications built for OpenAI to switch to vLLM with minimal changes.
+
+## What you'll accomplish
+
+Serve the **Qwen3-235B-A22B-NVFP4** model using vLLM on NVIDIA DGX Station. This 235B parameter model uses NVFP4 quantization and fits entirely in VRAM on the GB300 GPU.
+
+## What to know before starting
+
+- Basic Docker container usage
+- Familiarity with REST APIs
+
+## Prerequisites
+
+- NVIDIA DGX Station with GB300 and RTX 6000 Pro GPUs
+- Docker installed: `docker --version`
+- NVIDIA Container Toolkit configured
+- HuggingFace account with access token
+- Network access to NGC and HuggingFace
+
+
+## Time & risk
+
+* **Duration:** 15-20 minutes (longer on first run due to model download)
+* **Risks:** Model download requires HuggingFace authentication
+* **Rollback:** Stop and remove the container to restore state
+* **Last Updated:** 03/02/2026
+  * First Publication
+
+## Serve Qwen3-235B
+
+## Step 1. Set up Docker permissions
+
+If you haven't already, add your user to the docker group to run Docker without sudo:
+
+```bash
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+## Step 2. Set up environment variables
+
+Set the following so the vLLM container can download the model and use your chosen context length:
+
+```bash
+## HuggingFace token (required)
+## Get a token from https://huggingface.co/settings/tokens
+export HF_TOKEN="your_huggingface_token"
+
+## Model to serve
+export MODEL_HANDLE="nvidia/Qwen3-235B-A22B-NVFP4"
+
+## Maximum context length
+export MAX_MODEL_LEN=8192
+```
+
+## Step 3. Pull vLLM container image
+
+Pull the vLLM container from NGC. Use the **26.01** image on DGX Station; the 25.10 image can fail during engine startup with a FlashInfer buffer overflow on some configurations.
+
+```bash
+docker pull nvcr.io/nvidia/vllm:26.01-py3
+```
+
+## Step 4. Start vLLM server
+
+Start the vLLM server with the Qwen3-235B model. This model fits entirely in VRAM on the GB300. On a single-GPU DGX Station, `--gpus all` uses the GB300; if you have multiple GPUs and want to use only the GB300, replace with `--gpus '"device=N"'` where N is the GB300 device ID from `nvidia-smi`.
+
+```bash
+docker run -d \
+  --name vllm-server \
+  --gpus all \
+  --ipc host \
+  --ulimit memlock=-1 \
+  --ulimit stack=67108864 \
+  -p 8000:8000 \
+  -e HF_TOKEN="$HF_TOKEN" \
+  -v "$HOME/.cache/huggingface/hub:/root/.cache/huggingface/hub" \
+  nvcr.io/nvidia/vllm:26.01-py3 \
+  vllm serve "$MODEL_HANDLE" \
+    --max-model-len $MAX_MODEL_LEN \
+    --gpu-memory-utilization 0.9
+```
+
+Check the server logs for startup progress:
+
+```bash
+docker logs -f vllm-server
+```
+
+Expected output includes:
+- Model download progress (first run only)
+- Model loading into GPU memory
+- `Uvicorn running on http://0.0.0.0:8000`
+
+Press `Ctrl+C` to exit log view once the server is ready.
+
+## Step 5. Test the API
+
+Send a test request to verify the server is working:
+
+```bash
+curl http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "'"$MODEL_HANDLE"'",
+    "messages": [{"role": "user", "content": "Explain quantum computing in simple terms."}],
+    "max_tokens": 256
+  }'
+```
+
+The response should contain a `choices` array with the model's answer.
+
+## Step 6. Cleanup
+
+Stop and remove the container:
+
+```bash
+docker stop vllm-server
+docker rm vllm-server
+```
+
+Optionally, remove the image and cached model:
+
+```bash
+docker rmi nvcr.io/nvidia/vllm:26.01-py3
+rm -rf $HOME/.cache/huggingface/hub/models--nvidia--Qwen3-235B-A22B-NVFP4
+```
+
+## Troubleshooting
+
+## Common issues
+
+| Symptom | Cause | Fix |
+|---------|--------|-----|
+| "permission denied" when running docker | User not in docker group | Run `sudo usermod -aG docker $USER && newgrp docker` |
+| Container fails to start with GPU error | NVIDIA Container Toolkit not configured | Run `nvidia-ctk runtime configure --runtime=docker` and restart Docker |
+| "Token is required" or 401 error | Missing HuggingFace token | Ensure `HF_TOKEN` is exported before running docker command |
+| Model download hangs or fails | Network or authentication issue | Check internet connection, verify HF_TOKEN is valid |
+| CUDA out of memory | Context length too large | Reduce `MAX_MODEL_LEN` or lower `--gpu-memory-utilization` |
+| Server not responding on port 8000 | Port already in use | Check with `lsof -i :8000`, use `-p 8001:8000` for different port |
+| Model runs on wrong GPU | Default GPU selection | Use `--gpus '"device=0"'` to select specific GPU |
+| NGC authentication fails | Invalid or missing credentials | Run `docker login nvcr.io` with NGC API key |
+| EngineCore failed / FlashInfer "Buffer overflow when allocating memory for batch_prefill_tmp_v" | Known issue with vLLM 25.10 on some DGX Station setups during CUDA graph capture | Use the **26.01** container image: `nvcr.io/nvidia/vllm:26.01-py3` instead of 25.10. |

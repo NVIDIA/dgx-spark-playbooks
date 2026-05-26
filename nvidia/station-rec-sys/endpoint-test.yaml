@@ -1,0 +1,431 @@
+kind: Playbook
+metadata:
+  name: station-rec-sys
+  displayName: Fine-Tune a Recommender System on DGX Station
+  shortDescription: Train and serve an HLLM product recommender with LoRA, FAISS, and an interactive UI
+
+  publisher: nvidia
+  description: |
+    # REPLACE THIS WITH YOUR MODEL CARD
+    https://gitlab-master.nvidia.com/api-catalog/examples/-/blob/main/modelcard-example-mixtral8x7b.md?ref_type=heads
+    
+  labelsV2:
+  - gpuType:playbook:gpu_type_station
+  - DGX Station
+  - GB300
+  - Recommender Systems
+  - Fine-Tuning
+  - LoRA
+  - HLLM
+  - FAISS
+  - Retail
+  
+  attributes:
+  - key: DURATION
+    value: 3 HRS
+  
+spec:
+  artifactName: station-rec-sys
+  nvcfFunctionId: None
+  attributes:
+
+    showUnavailableBanner: false
+    apiDocsUrl: None
+    termsOfUse: |
+      
+    cta:
+      text: View on GitHub
+      url: https://github.com/NVIDIA/dgx-station-playbooks/blob/main/nvidia/station-rec-sys/
+      
+
+    tabs:
+    - 
+      id: overview
+      
+      label: Overview
+      content: |
+        # Basic idea
+        
+        DGX Station is an all-in-one platform for training and serving enterprise-scale recommender systems. This playbook packages an end-to-end fashion recommendation pipeline on Amazon Dresses: a two-stage retriever-and-ranker, a PPO dynamic-pricing agent, a live FastAPI UI, and a high-concurrency benchmark.
+        
+        The retriever uses **HLLM** (Hierarchical Large Language Model) in a two-tower setup: an item tower encodes product titles + descriptions, a user tower encodes interaction histories (ByteDance 2024). A nearest neighbor similarity search (FAISS) then retrieves the top 100 candidates per user via inner-product search over the 16k-item catalog (293k interactions). Then, the re-ranker, **LightGBM with the lambdarank objective**, orders the top 3–5 recommendations from those 100 using ~20 handcrafted features (popularity windows, user history, price ratios, embedding similarity). Together: HLLM learns *what* each item/user is like; LightGBM learns *which* of the top 100 are most likely to be the next purchase.
+        
+        Once the recommender pipeline is trained, a **PPO reinforcement-learning agent** decides *at what price* — picking per-item daily price multipliers based on inventory state, time-on-shelf, and item popularity to increase margin and revenue while reducing stockouts.
+        
+        Finally, a FastAPI web UI demonstrates live recommendations end-to-end, and a high-concurrency benchmarking script measures throughput with up to 1M concurrent users.
+        
+        # What you'll accomplish
+        
+        Train and serve an enterprise recommender system:
+        
+        - Pre-process the Amazon Reviews 2023 dataset (dresses category subset).
+        - Train a two-stage recommender (HLLM retriever + LightGBM re-ranker).
+        - Train a PPO dynamic-pricing agent to increase margin and revenue.
+        - Launch a web UI showing live per-user recommendations.
+        - Benchmark serving throughput up to 1M concurrent users.
+        
+        # What to know before starting
+        
+        - Comfortable using a Linux terminal.
+        - Basic Python environment familiarity, especially `uv`.
+        - Basic machine learning and reinforcement learning familiarity.
+        - Basic recommender-system concepts: users, items, interactions, retrieval, and re-ranking.
+        
+        # Prerequisites
+        
+        **Hardware:**
+        - NVIDIA DGX Station with GB300 GPU.
+        - At least 80 GB available storage for the dataset, HLLM checkout, TinyLlama model, virtual environment, and checkpoints.
+        - Network access for GitHub, Hugging Face, Ollama, and Python package downloads.
+        
+        **Software:**
+        - NVIDIA driver and CUDA toolkit visible on the host:
+        
+        ```bash
+        nvidia-smi
+        nvcc --version
+        ```
+        
+        - `git`, `wget`, and `curl`.
+        - `sudo` access if Ollama is not already installed.
+        - Optional W&B account for experiment tracking.
+        
+        # Ancillary files
+        
+        All user-facing assets are in `assets/`.
+        
+        - `assets/setup.sh` - Installs tools, syncs the Python environment, builds flash-attn, clones and patches HLLM, downloads TinyLlama/Nemotron/Amazon data, and prepares the dataset.
+        - `assets/train_retriever.sh` - Launches HLLM LoRA retriever training on Amazon Dresses.
+        - `assets/extract_embeddings.py` - Extracts HLLM item embeddings to `.npy` for FAISS retrieval; `--regression-eval` optionally runs held-out validation metrics.
+        - `assets/train_reranker.sh` and `assets/train_reranker_lightgbm.py` - Train the LightGBM lambdarank re-ranker on cached HLLM embeddings + handcrafted features.
+        - `assets/pricing_agent.py` and `assets/pricing_agent.sh` - Train and evaluate a PPO dynamic pricing agent against simulator baselines.
+        - `assets/app.py` - FastAPI recommendation UI.
+        - `assets/launch_web_ui.sh` - Starts Ollama if needed and launches the UI.
+        - `assets/benchmark_retrieval.py` - In-process throughput + latency benchmark for the retrieval engine (optionally with the LightGBM re-ranker).
+        - `assets/teardown.sh` - Stops playbook processes and can optionally remove downloaded assets while preserving checkpoints.
+        - `assets/patches/HLLM/` - HLLM patch files applied during setup.
+        
+        # Time & risk
+        
+        * **Estimated time:** About 2 hours with default settings. Setup and downloads can take about 1 hour. flash-attn source build can take up to 30 minutes on first run. Retriever training is about 20 minutes on a GB300 with the default 1-epoch recipe at bs=512 (set `PLAYBOOK_EPOCHS=3-5` for the production-quality recipe, which takes ~60–100 minutes). Pricing-agent training takes about 5–7 minutes. Inference, re-ranking, UI launch, and benchmarking take minutes after training.
+        * **Risk level:** Medium
+          * Large downloads can fail or be interrupted.
+          * flash-attn builds from source for the target GPU and can take time.
+          * HLLM training is GPU-memory intensive; avoid running other large GPU jobs during training.
+          * `assets/teardown.sh --purge-downloads` removes downloaded data/models after an explicit confirmation, but preserves checkpoints.
+        * **Rollback:** Use `bash assets/teardown.sh` to stop running processes. Use `bash assets/teardown.sh --purge-downloads --dry-run` to preview removable assets, then run without `--dry-run` only if you want to reclaim disk.
+        * **Last Updated:** 05/11/2026
+          * First standalone playbook publication.
+        
+      
+
+    - 
+      id: instructions
+      
+      label: Instructions
+      content: |
+        # Step 1. Setup the development environment
+        
+        Clone the playbook repository and navigate to the assets directory:
+        ```
+        git clone https://github.com/NVIDIA/dgx-station-playbooks.git
+        cd dgx-station-playbooks/nvidia/station-rec-sys
+        ```
+        
+        From the repository root, verify the development environment is suitable:
+        ```bash
+        bash assets/setup.sh --check
+        ```
+        
+        Expected output:
+        
+        ```text
+        Checking pre-requisites...
+        
+          [OK] GPU: NVIDIA GB300 (...)
+          [OK] CUDA: 13.1
+          [OK] Disk: ... GB available ...
+          [OK] git: /usr/bin/git
+          [OK] wget: /usr/bin/wget
+          [OK] curl: /usr/bin/curl
+        
+        Result: ... passed, ... warnings, ... failed
+        ```
+        
+        >[!Note:] If you are low on disk space (~80 GB needed), point `PLAYBOOK_WORKSPACE` at a location with more room and re-run the check, for example:
+        
+        ```bash
+        export PLAYBOOK_WORKSPACE=/raid/recsys-playbook
+        mkdir -p "$PLAYBOOK_WORKSPACE"
+        bash assets/setup.sh --check
+        ```
+        
+        Run setup. This installs `uv` and Ollama if needed, creates the virtual environment, builds flash-attn, clones and patches HLLM, downloads the LLM backbone (TinyLlama) and dataset (Amazon Reviews 2023, dresses category), processes the data, and starts Ollama. Compiling flash attention from source can take up to an 1 hour.
+        
+        ```bash
+        bash assets/setup.sh
+        ```
+        
+        Expected output includes these sections:
+        
+        ```text
+        ============================================================
+          Step 1: System tools (uv, Ollama)
+        ============================================================
+        ...
+        ============================================================
+          Step 4: Clone and patch HLLM
+        ============================================================
+          Applying LoRA patches from .../assets/patches/HLLM ...
+          LoRA patches applied.
+        ...
+        ============================================================
+          Setup complete!
+        ============================================================
+        ```
+        
+        # Step 2. Train the HLLM retriever
+        
+        The retriever is the first of the two-stage pipeline: given a user's history, it returns the top-N (default 100) most similar items from the 16k item catalog. By default we train for 1 epoch (~20 min at the bs=512 default). Train for 3-5 epochs to further refine embeddings.
+        
+        The architecture uses **TinyLlama-1.1B fine-tuned with LoRA and 4096 negatives** in a two-tower setup with item and user towers. Training optimizes for high-quality generalization with 4096 sampled negatives per positive, enabling the model to learn against 25% of the entire catalog per gradient step.
+        
+        See assets/train_retriever for the full training config. Checkpoints are written to `$PLAYBOOK_WORKSPACE/checkpoints/dresses_lora_r16/`.
+        
+        Launch training:
+        
+        ```bash
+        bash assets/train_retriever.sh
+        ```
+        
+        Expected startup output:
+        
+        ```text
+        ============================================================
+          HLLM Retriever Training (LoRA, TinyLlama-1.1B)
+        ============================================================
+        
+          Model:        TinyLlama-1.1B + LoRA r16
+          Dataset:      Amazon Dresses (293K interactions)
+          GPU:          0
+          Checkpoints:  .../checkpoints/dresses_lora_r16
+        ```
+        
+        Monitor GPU usage in another terminal with `watch nvidia-smi` and view the training curves in wandb (if logged in).
+        
+        # Step 3. Extract retriever embeddings
+        
+        After training the retriever, we extract embeddings from the current checkpoint (~20s) and save them to a file for efficient access during live inference. In the full pipeline, the 100 best recommendation candidates will be accessed with a nearest-neighbor search from this pool of saved embeddings. Of those 100 candidates, the ranking model trained in the next step will be used to order the top 3-5 recommendations.
+        
+        ```bash
+        uv run python assets/extract_embeddings.py
+        ```
+        
+        Expected output:
+        
+        ```text
+        Checkpoint:        .../checkpoints/dresses_lora_r16/HLLM-0.pth
+        Output dir:        .../data/processed
+        Mode:              embeddings only
+        
+        Items: 16,460, Users: 39,247
+        
+        Loading checkpoint and computing item embeddings...
+        Item embeddings shape: (16461, 2048)
+        Saved to .../data/processed/hllm_item_embeddings.npy
+        ```
+        
+        # Step 4. Train the re-ranker
+        
+        For our ranking model, we use **LightGBM with the lambdarank objective** trained on ~20 handcrafted features. LightGBM is industry SOTA for sparse retail datasets, utilizing gradient-boosted decision trees to extract fine-grained signals. With the GB300 Chip delivering high parallelism across 72 CPU cores, this CPU-heavy training job completes quickly, training ~50 trees in under 30 seconds.
+        
+        ```bash
+        bash assets/train_reranker.sh
+        ```
+        
+        Expected output:
+        
+        ```text
+        ============================================================
+        HLLM Re-ranker Training (LightGBM lambdarank)
+        ============================================================
+          ...
+        
+        --- Building feature matrix ---
+          Kept .../... users (positive in top-100: ...%); ... rows × 23 features
+        
+        --- Training LightGBM lambdarank ---
+        [50]   train's ndcg@10: ...   valid's ndcg@10: ...
+        Trained ... rounds in ...s
+        
+        Top 10 features by gain:
+          hllm_max_hist_sim         gain=...   splits=...
+          user_unique_items         gain=...   splits=...
+          is_repurchase             gain=...   splits=...
+          ...
+        
+        Saved model to .../models/reranker_lightgbm/reranker_lightgbm.txt
+        Saved metrics to .../models/reranker_lightgbm/metrics.json
+        ```
+        
+        # Step 5. Train the dynamic pricing agent
+        
+        Once the recommender knows *what* products to recommend, the next question is *at what price*? Static pricing leaves money on the table: aging stock languishes at full price, popular items underprice their demand, and budget items hit unnecessary stockouts.
+        
+        To improve revenue and margin, we train a **PPO reinforcement-learning agent**. The agent learns daily price multipliers based on inventory state, time-on-shelf, and item popularity. Over 200 PPO iterations, the agent delivers **+5.3% revenue, +17.8% margin, and a 3.6× reduction in stockouts** vs static fixed pricing on the Amazon Dresses catalog.
+        
+        **Training Defaults**: 200 PPO iterations × 16 parallel simulator envs × 14-day horizon × 1000 dresses sampled from the catalog.
+        
+        Train the agent (~5–7 minutes):
+        ```bash
+        bash assets/pricing_agent.sh
+        ```
+        
+        Expected output:
+        
+        ```text
+        Catalog [Amazon Dresses]: 1000 items | price median $29.99 | tiers: {'luxury': 354, 'midrange': 334, 'budget': 312}
+        Multipliers: [0.6, 0.7, 0.8, 0.9, 1.0, 1.05, 1.1, 1.15, 1.25], horizon: 14d
+        Training PPO: 200 iters × 16 envs × 14 days × 1000 items on cuda
+          iter   10/200 | rev/ep:  3791437 | margin/ep:  1933387 | pi_loss: -0.002 | v_loss: 27.5 | H: 1.83 | ent_c: 0.048
+          ...
+          iter  200/200 | rev/ep:  3970279 | margin/ep:  2142018 | pi_loss: +0.000 | v_loss:  9.0 | H: 0.43 | ent_c: 0.005
+        Training complete in 369.4s
+        Saved checkpoint → .../models/pricing_ppo/policy.pt
+        Saved training curve → .../data/processed/pricing_training_curve.png
+        ```
+        
+        > [!NOTE]
+        > The simulator's price→demand response is *parametric and calibrated*, not learned from real price experiments, since our source dataset has no per-item price variation (e.g. A/B tests, markdown events, seasonal repricing). To deploy in a commercial setting, either (a) re-fit the demand model from your own price-variation logs, or (b) utilize historical sales data with offline RL.
+        
+        # Step 6. Launch the web UI
+        
+        Launch the FastAPI app to interact with the full pipeline.
+        
+        ```bash
+        bash assets/launch_web_ui.sh
+        ```
+        
+        Expected output:
+        
+        ```text
+        Loading data...
+          ... items, ... interactions
+        Loading HLLM embeddings...
+        Building FAISS index...
+        ```
+        
+        Open the UI from a browser:
+        
+        ```text
+        http://localhost:7860
+        ```
+        
+        >[!Note] Run `ssh -L 7860:localhost:7860 <Station IP Address>` to enable local port forwarding if connected to DGX Station over SSH.
+        
+        # Step 7. Benchmark the retrieval engine
+        
+        Measure throughput and latency of product recommendations pipeline with up to 1M concurrent requests.
+        
+        ```bash
+        uv run python assets/benchmark_retrieval.py --with-reranker
+        ```
+        
+        Expected output:
+        
+        ```text
+        ================================================================================
+        HLLM Retrieval Engine Benchmark
+        ================================================================================
+        Loaded: ... items × 2048 dims, ... user embeddings. (...s)
+        Search backend: torch.mm + topk on cuda:0 (NVIDIA GB300)
+        top_k retrieval depth: 100
+        
+        Running           1 users... done (...)
+        Running       1,000 users... done (...)
+        Running      10,000 users... done (...)
+        Running     100,000 users... done (...)
+        Running   1,000,000 users... done (...)
+        
+        ================================================================================
+        Summary
+        ================================================================================
+              Users |     Per-user |     Throughput
+        -------------------------------------------
+                  1 |       ...ms  |        ... /s
+              1,000 |       ...ms  |        ... /s
+             10,000 |       ...ms  |        ... /s
+            100,000 |       ...ms  |        ... /s
+          1,000,000 |       ...ms  |        ... /s
+        ```
+        
+        # Step 8. Next Steps
+        Next steps can include:
+        1. Swap in a custom dataset
+        2. Train the price optimization agent on real price variation logs
+        3. Incorporate live user feedback to continuously refine the retrieval and ranking models. For example, you could train the ranker daily on yesterday's interaction data in ~30s and fine-tune the retriever weekly from the previous checkpoint using `--resume`. Continual retraining keeps recommendations responsive to catalog churn and shifting user preferences.
+        
+        # Step 9. Clean up
+        
+        Stop running playbook processes:
+        
+        ```bash
+        bash assets/teardown.sh
+        ```
+        
+        To preview downloaded assets that can be removed, add `--purge-downloads --dry-run` and to remove all downloaded data, base models, HLLM code, and local environments while preserving checkpoints, run `bash assets/teardown.sh --purge-downloads`.
+        
+      
+
+    - 
+      id: troubleshooting
+      
+      label: Troubleshooting
+      content: |
+        | Symptom | Cause | Fix |
+        |---------|-------|-----|
+        | `bash assets/setup.sh --check` reports low disk space | The Amazon raw data, processed data, model, environment, and checkpoints need a large workspace | Use a larger workspace: `export PLAYBOOK_WORKSPACE=/raid/recsys-playbook && mkdir -p "$PLAYBOOK_WORKSPACE"`, then rerun `bash assets/setup.sh --workspace "$PLAYBOOK_WORKSPACE"`. |
+        | flash-attn build takes 20-30 minutes | flash-attn is built from source for the local GPU architecture | Let the first build finish. Re-runs should skip once the editable install exists. |
+        | `uv sync` removes flash-attn | Plain `uv sync` reconciles the environment and can remove editable packages not represented in the lockfile | Run `bash assets/setup.sh` again, then use `uv sync --inexact` for future dependency syncs. |
+        | `torch.OutOfMemoryError: CUDA out of memory` during retriever training | Another GPU job is using memory, or a larger experimental batch/negative setting is being used | Stop unrelated GPU jobs with `nvidia-smi`/`kill`, or return to the packaged `assets/train_retriever.sh` settings. The script already sets `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`. |
+        | First training step appears stalled for 60-120 seconds | `torch.compile` graph capture and compile happen on the first step | Wait for compilation to complete. Watch `nvidia-smi`; later steps should progress normally. |
+        | Repeated `torch._dynamo hit config.recompile_limit` warnings | Dynamic module attributes can cause excessive recompilation | Use the packaged scripts and patches. If experimenting, disable `--torch_compile` or revert to the packaged training settings. |
+        | `ValueError: Training loss is nan` | Unstable experimental training settings, usually from unsupported batch/negative/model changes | Re-run with the packaged TinyLlama LoRA settings. If modifying training, reduce learning rate or negatives and inspect the W&B loss curve. |
+        | `RuntimeError: basic_ios::clear: iostream error` or checkpoint save errors | Disk is full or the checkpoint write was interrupted | Check `df -h "$PLAYBOOK_WORKSPACE"`, clear space, and rerun training. Checkpoints are under `$PLAYBOOK_WORKSPACE/checkpoints/dresses_lora_r16/`. |
+        | Training was interrupted (Ctrl-C, OOM, reboot) and you want to continue | Step checkpoints are saved every `PLAYBOOK_SAVE_STEPS` micro-batches (default 200) under `$PLAYBOOK_WORKSPACE/checkpoints/dresses_lora_r16/` | Re-run with `bash assets/train_retriever.sh --resume`. The script picks up the latest checkpoint and restores model + optimizer + RNG state. The startup banner shows `Resume: on` and the log prints `auto_resume: Resuming from <ckpt>`. Without `--resume` the script trains from scratch and ignores existing checkpoints. |
+        | `RuntimeError: PytorchStreamReader failed reading zip archive` during auto-resume | The latest checkpoint file is corrupted (interrupted write, partial transfer, manual edit) | Re-run without `--resume` (the default) to ignore the broken checkpoint and start fresh, or manually remove the corrupted file under `$PLAYBOOK_WORKSPACE/checkpoints/dresses_lora_r16/` and re-run with `--resume` so the trainer picks up the previous valid checkpoint. |
+        | W&B link does not appear | W&B is not logged in or networking is unavailable | Run `uv run wandb login`, then rerun `bash assets/train_retriever.sh`. The script prints the project URL and W&B emits the run URL after initialization. |
+        | `ModuleNotFoundError: No module named 'faiss'` when running Python directly | The ambient Python interpreter is outside the playbook `uv` environment | Run commands through `uv run`, for example `uv run python assets/extract_embeddings.py`. |
+        | `Embeddings not found` or similar when running Step 4 | Processed parquet files or checkpoint missing | Run setup/data prep first (`bash assets/setup.sh`), then training (`bash assets/train_retriever.sh`) to produce a checkpoint. Then re-run `uv run python assets/extract_embeddings.py`. |
+        | Ollama warning when the web UI requests an explanation | The local Ollama service is not running or `nemotron-mini` has not been pulled | Run `ollama serve &` and `ollama pull nemotron-mini`. |
+        | Web UI exits while loading data | Required processed parquet files or HLLM embeddings are missing | Run `bash assets/setup.sh`, train or provide a checkpoint, then run `uv run python assets/extract_embeddings.py` before launching the UI. |
+        | Benchmark requests fail with connection errors | The FastAPI UI is not running on the benchmark URL | Start `bash assets/launch_web_ui.sh` first, then run `bash assets/benchmark_inference.sh --url http://localhost:7860`. |
+        | `FileNotFoundError: Amazon Dresses metadata not found` from `pricing_agent.sh` | Setup/data prep has not been run for the playbook workspace | Run `bash assets/setup.sh` to download and prepare the Dresses dataset, or pass `--synthetic` to train against a generated catalog (`bash assets/pricing_agent.sh train --synthetic`). |
+        | Pricing-agent entropy (`H`) collapses to 0 in the first ~50 iterations | The policy committed to a single action before learning per-category specialization (rare with the default `--entropy-coef-start 0.05`, but can happen with very small `--n-items` or non-default learning rates) | Re-run with the default flags, or pass a different `--seed`. If it persists, lower `--lr` to `1e-4`. |
+        | Pricing-agent `v_loss` grows by orders of magnitude during training | Value function is diverging — typically caused by overly large `--lr` for the catalog size | Lower `--lr` to `1e-4`. The clipped value loss should normally contain this; if not, also lower `--n-items` to reduce per-iteration batch noise. |
+        | `CUDA out of memory` during pricing-agent training | Too many parallel envs × items for available GPU memory | Lower `--n-envs` (default 16) or `--n-items` (default 1000). On Station this usually only triggers when other large GPU jobs are competing. |
+        
+      
+
+
+    resources:
+    - name: HLLM paper
+      url: https://arxiv.org/abs/2409.12740
+      
+
+    - name: HLLM source repository
+      url: https://github.com/bytedance/HLLM
+      
+
+    - name: Amazon Reviews 2023 dataset
+      url: https://huggingface.co/datasets/McAuley-Lab/Amazon-Reviews-2023
+      
+
+    - name: TinyLlama-1.1B
+      url: https://huggingface.co/TinyLlama/TinyLlama-1.1B-Chat-v1.0
+      
+
+    - name: FAISS
+      url: https://github.com/facebookresearch/faiss
+      
+

@@ -1,0 +1,44 @@
+# Dependencies
+node_modules
+.pnpm-store
+**/node_modules
+**/.pnpm-store
+
+# Next.js build outputs
+.next
+out
+**/.next
+**/out
+
+# Git
+.git
+.gitignore
+**/.git
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+.DS_Store
+
+# Testing
+coverage
+__tests__
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+
+# Misc
+.env.local
+.env.*.local
+README.md
+.eslintcache 

@@ -1,0 +1,30 @@
+# Remote WebGPU Clustering Service Dependencies
+# For GPU-accelerated graph clustering and WebRTC streaming
+
+# Core FastAPI and web service dependencies
+fastapi==0.104.1
+uvicorn==0.24.0
+websockets==12.0
+python-multipart==0.0.6
+
+# RAPIDS dependencies (GPU-accelerated data processing)
+# These are included in the NVIDIA PyTorch container
+# cudf, cugraph, cuml, cupy are pre-installed
+
+# Data processing and scientific computing
+numpy>=1.24.0
+pandas>=2.0.0
+networkx>=3.0
+
+# WebRTC streaming and visualization dependencies
+opencv-python-headless==4.8.1.78
+plotly>=5.17.0
+kaleido>=0.2.1
+Pillow>=10.0.0
+
+# Redis for session management (optional)
+redis>=5.0.0
+
+# Additional utilities
+pydantic>=2.0.0
+python-dotenv>=1.0.0

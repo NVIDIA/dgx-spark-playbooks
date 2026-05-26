@@ -1,0 +1,50 @@
+# Remote WebGPU Clustering Service Dockerfile
+# Based on NVIDIA PyTorch Geometric container which includes cuGraph/RAPIDS for GPU acceleration
+
+FROM nvcr.io/nvidia/pyg:25.05-py3
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    git \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies for remote WebGPU service
+COPY requirements-remote-webgpu.txt .
+RUN pip install --no-cache-dir -r requirements-remote-webgpu.txt
+
+# Install additional dependencies for WebRTC streaming
+RUN pip install --no-cache-dir \
+    opencv-python-headless \
+    plotly \
+    kaleido \
+    Pillow \
+    redis
+
+# Copy service files
+COPY remote_webgpu_clustering_service.py .
+COPY unified_gpu_service.py .
+COPY local_gpu_viz_service.py .
+COPY simple_webgpu_test.py .
+
+# Create directories for temporary files
+RUN mkdir -p /tmp/webrtc_frames
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV CUDA_VISIBLE_DEVICES=0
+
+# Expose port
+EXPOSE 8083
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8083/health || exit 1
+
+# Start the main remote WebGPU clustering service
+CMD ["python", "remote_webgpu_clustering_service.py"]

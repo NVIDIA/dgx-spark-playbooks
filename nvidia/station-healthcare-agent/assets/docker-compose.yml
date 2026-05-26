@@ -1,0 +1,127 @@
+###############################################################################
+# Clinical Intelligence — Docker Compose
+#
+# Manages the infrastructure layer: LLM inference and protein structure
+# prediction. OpenShell + OpenClaw run on the host.
+#
+# Quick start:
+#   cp .env.example .env           # fill in NGC_API_KEY
+#   make up                        # start all services
+#   make setup                     # create sandbox + deploy config
+#   make test                      # run test suite (levels 1-3)
+#   make test-full                 # run all levels including agent tests
+#
+# Individual services:
+#   docker compose up ollama -d    # just the LLM
+#   docker compose up openfold3 -d # just protein prediction
+#   docker compose logs -f ollama   # watch Ollama logs
+###############################################################################
+
+services:
+
+  # ── Ollama (local LLM inference) ──────────────────────────────────
+  # GPU pinning: LLM_GPU defaults to "0". On dual-GPU stations (e.g. RTX PRO
+  # 6000 + GB300), set LLM_GPU in .env to the GB300 index — the RTX PRO 6000
+  # is too small (98 GB) for Nemotron-3-Super (~94 GB resident).
+  # Find the GB300 index with:
+  #   nvidia-smi --query-gpu=index,name --format=csv,noheader | awk -F', ' '/GB300/{print $1; exit}'
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    environment:
+      OLLAMA_HOST: "0.0.0.0"
+      OLLAMA_KEEP_ALIVE: "4h"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${LLM_GPU:-0}"]
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+
+  # ── Model puller (one-shot: pulls the model if missing) ──────────
+  model-pull:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        if ! ollama list 2>/dev/null | grep -q "${OLLAMA_MODEL:-nemotron-3-super:120b-a12b}"; then
+          echo "Pulling ${OLLAMA_MODEL:-nemotron-3-super:120b-a12b}..."
+          ollama pull "${OLLAMA_MODEL:-nemotron-3-super:120b-a12b}"
+        else
+          echo "Model already available."
+        fi
+    environment:
+      OLLAMA_HOST: "http://ollama:11434"
+    restart: "no"
+
+  # ── OpenFold3 NIM (protein structure prediction) ──────────────────
+  # GPU pinning: OPENFOLD_GPU defaults to "0". OpenFold3's PyTorch backend
+  # crashes on multi-GPU containers with:
+  #   "device >= 0 && device < num_gpus INTERNAL ASSERT FAILED"
+  # Pinning to a single device avoids the crash loop. Set OPENFOLD_GPU in
+  # .env to share or separate from the LLM GPU.
+  # Image pull requires `docker login nvcr.io` first (see `make ngc-login`
+  # or instructions.md Step 2). NGC_API_KEY in .env alone is not enough —
+  # NGC_API_KEY is the runtime credential; docker login is the pull credential.
+  openfold3:
+    image: nvcr.io/nim/openfold/openfold3:latest
+    ports:
+      - "${OPENFOLD_PORT:-8000}:8000"
+    environment:
+      NGC_API_KEY: ${NGC_API_KEY:?Set NGC_API_KEY in .env}
+      NIM_OPTIMIZED_BACKEND: torch_baseline
+    shm_size: 16g
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${OPENFOLD_GPU:-0}"]
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/v1/health/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 180s
+    restart: unless-stopped
+
+  # ── Test runner ───────────────────────────────────────────────────
+  test:
+    build:
+      context: .
+      dockerfile: docker/test/Dockerfile
+    environment:
+      OLLAMA_HOST: "ollama"
+      OPENFOLD_HOST: "openfold3"
+      SANDBOX_NAME: "${SANDBOX_NAME:-clinical-sandbox}"
+    volumes:
+      - ./test-results:/app/test-results
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      ollama:
+        condition: service_healthy
+    profiles:
+      - test
+    entrypoint: ["bash", "scripts/test-all.sh"]
+    command: ["--level", "3", "--verbose"]
+
+volumes:
+  ollama-data:

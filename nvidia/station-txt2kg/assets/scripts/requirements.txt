@@ -1,0 +1,6 @@
+torch>=2.6.0
+tqdm
+python-arango
+torch-geometric
+transformers
+numpy 

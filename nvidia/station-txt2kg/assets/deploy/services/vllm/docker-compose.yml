@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  vllm-nvfp4:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vllm-nvfp4-server
+    ports:
+      - "8001:8001"
+    environment:
+      # HuggingFace configuration
+      - HF_TOKEN=${HF_TOKEN}
+      - HF_HOME=/app/models/.cache
+      
+    volumes:
+      # Cache HuggingFace models locally
+      - ./models:/app/models
+      - huggingface_cache:/app/models/.cache
+      # Mount the launch script
+      - ./launch_server.sh:/app/launch_server.sh
+    
+    # NVIDIA recommended settings for PyTorch
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    shm_size: 2gb
+      
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    
+    restart: unless-stopped
+    
+    entrypoint: ["/bin/bash", "/app/launch_server.sh"]
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+volumes:
+  huggingface_cache:
+    driver: local

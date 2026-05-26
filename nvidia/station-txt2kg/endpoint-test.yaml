@@ -1,0 +1,246 @@
+kind: Playbook
+metadata:
+  name: station-txt2kg
+  displayName: Text to Knowledge Graph on DGX Station
+  shortDescription: Transform unstructured text into interactive knowledge graphs with LLM inference and graph visualization
+
+  publisher: nvidia
+  description: |
+    # REPLACE THIS WITH YOUR MODEL CARD
+    https://gitlab-master.nvidia.com/api-catalog/examples/-/blob/main/modelcard-example-mixtral8x7b.md?ref_type=heads
+    
+  labelsV2:
+  - gpuType:playbook:gpu_type_station
+  - DGX Station
+  - GB300
+  - Knowledge Graphs
+  - GraphRAG
+  - Ollama
+  - Graph Visualization
+  - NLP
+  - Graph Databases
+  
+  attributes:
+  - key: DURATION
+    value: 30 MIN
+  
+spec:
+  artifactName: station-txt2kg
+  nvcfFunctionId: None
+  attributes:
+
+    showUnavailableBanner: false
+    apiDocsUrl: None
+    termsOfUse: |
+      
+    cta:
+      text: View on GitHub
+      url: https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/station-txt2kg/
+      
+
+    tabs:
+    - 
+      id: overview
+      
+      label: Overview
+      content: |
+        # Basic idea
+        
+        This playbook demonstrates how to build and deploy a comprehensive knowledge graph generation and visualization solution that serves as a reference for knowledge graph extraction.
+        The GB300 Ultra's massive GPU memory enables running the Llama 3.1 405B model, producing the highest-quality knowledge graphs and delivering superior downstream GraphRAG performance.
+        
+        This txt2kg playbook transforms unstructured text documents into structured knowledge graphs using:
+        - **Knowledge Triple Extraction**: Using Ollama with GPU acceleration for local LLM inference to extract subject-predicate-object relationships
+        - **Graph Database Storage**: ArangoDB for storing and querying knowledge triples with relationship traversal
+        - **GPU-Accelerated Visualization**: Three.js WebGPU rendering for interactive 2D/3D graph exploration
+        
+        > **Future Enhancements**: Vector embeddings and GraphRAG capabilities are planned enhancements.
+        
+        # What you'll accomplish
+        
+        You will have a fully functional system capable of processing documents, generating and editing knowledge graphs, and providing querying, accessible through an interactive web interface.
+        The setup includes:
+        - **Local LLM Inference**: Ollama for GPU-accelerated LLM inference with no API keys required
+        - **Graph Database**: ArangoDB for storing and querying triples with relationship traversal
+        - **Interactive Visualization**: GPU-accelerated graph rendering with Three.js WebGPU
+        - **Modern Web Interface**: Next.js frontend with document management and query interface
+        - **Fully Containerized**: Reproducible deployment with Docker Compose and GPU support
+        
+        # What to know before starting
+        
+        - Basic Docker container usage
+        - Familiarity with command line operations
+        - Understanding of knowledge graphs (helpful but not required)
+        
+        # Prerequisites
+        
+        - NVIDIA DGX Station with GB300 Ultra Blackwell GPU
+        - Docker installed and configured with NVIDIA Container Toolkit
+        - Docker Compose
+        - Network access for container image downloads
+        
+        # Ancillary files
+        
+        All required assets are in the playbook directory `nvidia/station-txt2kg/assets` (see Instructions, Step 1). Key files:
+        
+        - `start.sh` - Launch script for all services
+        - `stop.sh` - Stop script to shut down services
+        - `deploy/compose/` - Docker Compose configurations
+        
+        
+        # Time & risk
+        
+        - **Duration**:
+          - 2-3 minutes for initial setup and container deployment
+          - 5-10 minutes for Ollama model download (depending on model size)
+          - Immediate document processing and knowledge graph generation
+        
+        - **Risks**:
+          - GPU memory requirements depend on chosen Ollama model size
+          - Document processing time scales with document size and complexity
+        
+        - **Rollback**: Stop and remove Docker containers, delete downloaded models if needed
+        * **Last Updated:** 03/02/2026
+          * First Publication
+        
+      
+
+    - 
+      id: instructions
+      
+      label: Instructions
+      content: |
+        # Step 1. Clone the repository
+        
+        This playbook is for **DGX Station**. In a terminal, clone the repository and navigate to the project directory.
+        
+        ```bash
+        git clone https://github.com/NVIDIA/dgx-spark-playbooks
+        cd dgx-spark-playbooks/nvidia/station-txt2kg/assets
+        ```
+        
+        # Step 2. Start the txt2kg services
+        
+        The default backend is **vLLM** (supported on DGX Station). The script starts services and waits for the vLLM backend to be ready (model load can take 30+ minutes; progress is shown in the terminal). To use Ollama instead, run `./start.sh --ollama`.
+        
+        ```bash
+        ./start.sh
+        # Optional: ./start.sh --ollama   # Use ArangoDB + Ollama instead of vLLM
+        # Optional: ./start.sh --no-wait # Skip waiting for vLLM readiness
+        ```
+        
+        The script will:
+        - Check for GPU availability
+        - Start Docker Compose services (Neo4j + vLLM by default)
+        - Wait for vLLM to be ready and show elapsed time
+        - Print the Web UI URL when ready
+        
+        # Step 3. Pull the model (Ollama only)
+        
+        If you started with **Ollama** (`./start.sh --ollama`), pull the Llama model:
+        
+        ```bash
+        docker exec ollama-compose ollama pull llama3.1:405b
+        ```
+        
+        Browse available models at [https://ollama.com/search](https://ollama.com/search). With the default **vLLM** stack, the model is loaded automatically by the vLLM container.
+        
+        # Step 4. Access the web interface
+        
+        Open your browser and navigate to:
+        
+        ```
+        http://localhost:3001
+        ```
+        
+        You can also access:
+        - **Neo4j Browser** (vLLM default): http://localhost:7474
+        - **vLLM API**: http://localhost:8001
+        - **ArangoDB** (Ollama only): http://localhost:8529
+        - **Ollama API** (Ollama only): http://localhost:11434
+        
+        # Step 5. Upload documents and build knowledge graphs
+        
+        The web UI defaults to **local** (vLLM or Ollama). If the backend is still loading, a banner and the model selector will show “Initializing…” until the backend is ready.
+        
+        ### 5.1. Document Upload
+        - Use the web interface to upload text documents (markdown, text, CSV supported)
+        - Documents are automatically chunked and processed for triple extraction
+        
+        ### 5.2. Knowledge Graph Generation
+        - The system extracts subject-predicate-object triples using the selected LLM (vLLM or Ollama)
+        - Triples are stored in Neo4j (vLLM) or ArangoDB (Ollama) for relationship querying
+        
+        ### 5.3. Interactive Visualization
+        - View your knowledge graph in 2D or 3D with GPU-accelerated rendering
+        - Explore nodes and relationships interactively
+        
+        ### 5.4. Graph-based Queries
+        - Ask questions about your documents using the query interface
+        - Graph traversal enhances context with entity relationships from ArangoDB
+        - LLM generates responses using the enriched graph context
+        
+        > **Future Enhancement**: GraphRAG capabilities with vector-based KNN search for entity retrieval are planned.
+        
+        # Step 6. Cleanup and rollback
+        
+        Stop all services (use the same flags as when you started):
+        
+        ```bash
+        # Stop services (default: vLLM stack)
+        ./stop.sh
+        # If you started with Ollama: ./stop.sh --ollama
+        
+        # Remove containers and volumes (optional)
+        # From assets dir: docker compose -f deploy/compose/docker-compose.vllm.yml down -v
+        # Or with Ollama: docker compose -f deploy/compose/docker-compose.yml down -v
+        
+        # Remove downloaded Ollama models (Ollama only)
+        # docker exec ollama-compose ollama rm llama3.1:405b
+        ```
+        
+        # Step 7. Next steps
+        
+        - Default is vLLM on DGX Station; use `./start.sh --ollama` for ArangoDB + Ollama.
+        - The UI shows a readiness banner and “vLLM (Local) – Initializing…” until the backend is ready.
+        - Experiment with different models for extraction quality and speed tradeoffs.
+        - Customize triple extraction prompts for domain-specific knowledge.
+        - Explore advanced graph querying and visualization features.
+        
+      
+
+    - 
+      id: troubleshooting
+      
+      label: Troubleshooting
+      content: |
+        # Common issues
+        
+        | Symptom | Cause | Fix |
+        |---------|--------|-----|
+        | Ollama performance issues | Suboptimal settings for GB300 | Set environment variables:<br>`OLLAMA_FLASH_ATTENTION=1` (enables flash attention for better performance)<br>`OLLAMA_KEEP_ALIVE=30m` (keeps model loaded for 30 minutes)<br>`OLLAMA_MAX_LOADED_MODELS=1` (avoids VRAM contention)<br>`OLLAMA_KV_CACHE_TYPE=q8_0` (reduces KV cache VRAM with minimal performance impact) |
+        | VRAM exhausted or memory pressure (e.g. when switching between Ollama models) | GPU memory fragmentation | Clear GPU memory: `nvidia-smi --gpu-reset` or restart Docker containers |
+        | Slow triple extraction | Large model or large context window | Reduce document chunk size or use faster models |
+        | ArangoDB connection refused | Service not fully started | Wait 30s after start.sh, verify with `docker ps` |
+        | Container fails to start with GPU error | NVIDIA Container Toolkit not configured | Run `nvidia-ctk runtime configure --runtime=docker` and restart Docker |
+        | Port already in use | Previous instance still running | Run `./stop.sh` first or use `docker compose down` |
+        | Default is vLLM; need Ollama instead | Prefer ArangoDB + Ollama | Start with `./start.sh --ollama`. |
+        | vLLM takes long to become ready | Model load can take 30+ minutes | The start script waits and shows elapsed time. The UI shows a banner and "vLLM (Local) – Initializing…" until ready. Check progress: `docker logs vllm-service -f`. |
+        
+        > [!NOTE]
+        > DGX Station with GB300 Ultra provides massive GPU memory capacity, enabling you to run larger models (70B+) 
+        > for higher-quality knowledge extraction. If you encounter memory issues with very large models, 
+        > try reducing the context window size or using quantized model variants.
+        
+      
+
+
+    resources:
+    - name: Ollama Documentation
+      url: https://ollama.ai/
+      
+
+    - name: ArangoDB Documentation
+      url: https://docs.arangodb.com/
+      
+

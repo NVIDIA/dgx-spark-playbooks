@@ -1,0 +1,127 @@
+{
+  "1": {
+    "inputs": {
+      "unet_name": "hunyuan_video_t2v_720p_bf16.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": { "title": "Load HunyuanVideo 13B Model" }
+  },
+  "2": {
+    "inputs": {
+      "clip_name1": "clip_l_hunyuan.safetensors",
+      "clip_name2": "llava_llama3_fp8_scaled.safetensors",
+      "type": "hunyuan_video"
+    },
+    "class_type": "DualCLIPLoader",
+    "_meta": { "title": "DualCLIPLoader (CLIP-L + LLaVA-Llama3)" }
+  },
+  "3": {
+    "inputs": {
+      "vae_name": "hunyuan_video_vae_bf16.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": { "title": "Load HunyuanVideo VAE" }
+  },
+  "4": {
+    "inputs": {
+      "text": "A time-lapse of cherry blossoms falling in a Japanese garden with a koi pond, cinematic 4K quality, soft natural lighting",
+      "clip": ["2", 0]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "CLIP Text Encode (Positive Prompt)" }
+  },
+  "5": {
+    "inputs": {
+      "guidance": 6,
+      "conditioning": ["4", 0]
+    },
+    "class_type": "FluxGuidance",
+    "_meta": { "title": "FLUX Guidance (6)" }
+  },
+  "6": {
+    "inputs": {
+      "shift": 7,
+      "model": ["1", 0]
+    },
+    "class_type": "ModelSamplingSD3",
+    "_meta": { "title": "Model Sampling (shift=7)" }
+  },
+  "7": {
+    "inputs": {
+      "model": ["6", 0],
+      "conditioning": ["5", 0]
+    },
+    "class_type": "BasicGuider",
+    "_meta": { "title": "Basic Guider" }
+  },
+  "8": {
+    "inputs": {
+      "noise_seed": 42
+    },
+    "class_type": "RandomNoise",
+    "_meta": { "title": "Random Noise" }
+  },
+  "9": {
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": { "title": "Sampler Select (Euler)" }
+  },
+  "10": {
+    "inputs": {
+      "scheduler": "simple",
+      "steps": 20,
+      "denoise": 1.0,
+      "model": ["6", 0]
+    },
+    "class_type": "BasicScheduler",
+    "_meta": { "title": "Basic Scheduler (20 steps)" }
+  },
+  "11": {
+    "inputs": {
+      "width": 1920,
+      "height": 1056,
+      "length": 49,
+      "batch_size": 1
+    },
+    "class_type": "EmptyHunyuanLatentVideo",
+    "_meta": { "title": "Empty Video Latent (1080p, 49 frames)" }
+  },
+  "12": {
+    "inputs": {
+      "noise": ["8", 0],
+      "guider": ["7", 0],
+      "sampler": ["9", 0],
+      "sigmas": ["10", 0],
+      "latent_image": ["11", 0]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": { "title": "Advanced Sampler" }
+  },
+  "13": {
+    "inputs": {
+      "tile_size": 256,
+      "overlap": 64,
+      "temporal_size": 64,
+      "temporal_overlap": 8,
+      "samples": ["12", 0],
+      "vae": ["3", 0]
+    },
+    "class_type": "VAEDecodeTiled",
+    "_meta": { "title": "VAE Decode Tiled (for 1080p)" }
+  },
+  "14": {
+    "inputs": {
+      "fps": 24,
+      "lossless": false,
+      "quality": 85,
+      "method": "default",
+      "filename_prefix": "hunyuan_1080p_output",
+      "images": ["13", 0]
+    },
+    "class_type": "SaveAnimatedWEBP",
+    "_meta": { "title": "Save Animated WEBP (24fps)" }
+  }
+}

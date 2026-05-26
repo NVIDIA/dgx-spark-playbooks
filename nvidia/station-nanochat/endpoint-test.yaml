@@ -1,0 +1,248 @@
+kind: Playbook
+metadata:
+  name: station-nanochat
+  displayName: Nanochat Training
+  shortDescription: Train a small ChatGPT-style LLM (nanochat) with tokenizer, pretraining, midtraining, and SFT on DGX Station with GB300 Ultra
+
+  publisher: nvidia
+  description: |
+    # REPLACE THIS WITH YOUR MODEL CARD
+    https://gitlab-master.nvidia.com/api-catalog/examples/-/blob/main/modelcard-example-mixtral8x7b.md?ref_type=heads
+    
+  labelsV2:
+  - gpuType:playbook:gpu_type_station
+  - DGX Station
+  - GB300
+  - LLM
+  - Training
+  - PyTorch
+  - Fine-tuning
+  - nanochat
+  
+  attributes:
+  - key: DURATION
+    value: 30 MIN
+  
+spec:
+  artifactName: station-nanochat
+  nvcfFunctionId: None
+  attributes:
+
+    showUnavailableBanner: false
+    apiDocsUrl: None
+    termsOfUse: |
+      
+    cta:
+      text: View on GitHub
+      url: https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/station-nanochat/
+      
+
+    tabs:
+    - 
+      id: overview
+      
+      label: Overview
+      content: |
+        # Basic idea
+        
+        This playbook demonstrates training of [nanochat](https://github.com/karpathy/nanochat) on DGX Station with the GB300 Ultra Superchip. You run the full pipeline on a single system: custom BPE tokenizer training, base model pretraining, midtraining (conversation format), supervised fine-tuning (SFT), and inference via CLI or web UI.
+        
+        The project uses the PyTorch NGC container, FineWeb for pretraining, SmolTalk for SFT, and Weights & Biases for logging. The default speedrun configuration trains a 561M-parameter (d20) model suitable for learning and experimentation.
+        
+        # What you'll accomplish
+        
+        You will have a working nanochat setup that trains a small LLM and serves it for chat.
+        
+        - **Environment:** Docker image with PyTorch and nanochat dependencies on your DGX Station.
+        - **Training pipeline:** Tokenizer (65K BPE), pretraining (~11.2B tokens), midtraining, SFT, and automated report generation.
+        - **Inference:** ChatGPT-style web UI and CLI to chat with the base, mid, or SFT checkpoints.
+        - **Monitoring:** W&B dashboards and `nanochat/report.md` with metrics and samples.
+        
+        # What to know before starting
+        
+        - Basic Linux command line and shell usage.
+        - Familiarity with Docker and GPU containers (e.g. `docker run --gpus all`).
+        - Optional: understanding of LLM training (tokenizer, pretraining, fine-tuning).
+        
+        # Prerequisites
+        
+        **Hardware:**
+        
+        - NVIDIA DGX Station with GB300 Ultra Superchip.
+        - Sufficient GPU memory for the chosen model (the GB300 Ultra provides ample memory for the d20 speedrun).
+        - Adequate storage for cache (~24GB+ for FineWeb data and checkpoints).
+        
+        **Software:**
+        
+        - Docker with NVIDIA Container Toolkit: `docker run --rm --gpus all nvcr.io/nvidia/pytorch:26.01-py3 nvidia-smi`
+        - Network access to download datasets (Hugging Face, FineWeb) and container images.
+        - [Weights & Biases](https://wandb.ai/) account and API key.
+        - [Hugging Face](https://huggingface.co/docs/hub/en/security-tokens) token for evaluation datasets.
+        
+        # Ancillary files
+        
+        All required assets are in the playbook directory `nvidia/station-nanochat/assets` (see the [dgx-spark-playbooks](https://github.com/NVIDIA/dgx-spark-playbooks) repository).
+        
+        - `assets/Dockerfile` – PyTorch NGC image plus nanochat dependencies and venv.
+        - `assets/setup.sh` – Clones nanochat, checks out the supported commit, and builds the Docker image.
+        - `assets/launch.sh` – Runs the training container on your DGX Station (runs the full pipeline: tokenizer, pretrain, midtrain, SFT, and report generation).
+        - `assets/README.md` – Additional detail on training stages, inference, and troubleshooting.
+        
+        
+        # Time & risk
+        
+        - **Estimated time:** About 30 minutes for clone, setup, and launching the run. Full d20 speedrun training time depends on your DGX Station configuration (hours to a day or more).
+        - **Risk level:** Medium  
+          - Large downloads (FineWeb) can fail or be slow; ensure stable network and disk space.  
+          - API keys (W&B, HF) must be set or the launch script will exit.
+        - **Rollback:** Stop containers with `docker stop`, remove caches under `~/.cache/nanochat` (or paths in `launch.sh`), and run `docker system prune -a` if needed.
+        * **Last Updated:** 03/02/2026
+          * First Publication
+        
+      
+
+    - 
+      id: instructions
+      
+      label: Instructions
+      content: |
+        # Step 1. Prerequisites and environment
+        
+        This playbook is for **DGX Station** (single node). Ensure your DGX Station has Docker with NVIDIA runtime, GPU access, and required API keys. Nanochat uses Weights & Biases (W&B) for training visualization and a Hugging Face token for evaluation datasets.
+        
+        ```bash
+        # Verify GPU and Docker
+        nvidia-smi
+        docker run --rm --gpus all nvcr.io/nvidia/pytorch:26.01-py3 nvidia-smi
+        ```
+        
+        Expected output should show your GPU(s) and driver version. Create a [W&B account](https://wandb.ai/) and a [Hugging Face token](https://huggingface.co/docs/hub/en/security-tokens) if you do not have them.
+        
+        ```bash
+        export WANDB_API_KEY=<YOUR_WANDB_API_KEY>
+        export HF_TOKEN=<YOUR_HF_TOKEN>
+        ```
+        
+        # Step 2. Clone the playbook and set up nanochat
+        
+        Clone the playbook repository and run the setup script to clone the nanochat repo and build the Docker image.
+        
+        ```bash
+        git clone https://github.com/NVIDIA/dgx-spark-playbooks
+        cd dgx-spark-playbooks/nvidia/station-nanochat/assets
+        ```
+        
+        From the `assets` directory, run the setup script. It clones [nanochat](https://github.com/karpathy/nanochat), checks out the supported commit, and builds the `nanochat` Docker image (PyTorch NGC base with tiktoken, tokenizers, datasets, wandb, etc.).
+        
+        ```bash
+        ./setup.sh
+        ```
+        
+        Setup may take several minutes while the image builds. Verify the image:
+        
+        ```bash
+        docker images | grep nanochat
+        ```
+        
+        You should see the `nanochat` image listed.
+        
+        # Step 3. Launch full training
+        
+        > [!NOTE]
+        > The default `launch.sh` uses cache directories under `/nanochat_cache`. If that path does not exist on your DGX Station, edit `launch.sh` and replace those paths with your own (e.g. `$(pwd)/nanochat_cache` and `$(pwd)/hf_cache`), and create the directories before running.
+        
+        To run **full** training (d20 model, 240 shards, midtraining, SFT, report) for higher-quality results, use the full launcher. On a DGX Station with GB300 Ultra this can take on the order of 16 hours:
+        
+        ```bash
+        export WANDB_API_KEY=<YOUR_WANDB_API_KEY>
+        export HF_TOKEN=<YOUR_HF_TOKEN>
+        ./launch_full.sh
+        ```
+        
+        This runs `speedrun_full.sh` inside the container: full FineWeb download (240 shards), 561M-parameter (d20) pretraining, midtraining, supervised fine-tuning, and report generation. 
+        
+        # Step 4. Verify and use the model
+        
+        After training completes, checkpoints and the tokenizer are under `~/.cache/nanochat/` (or the cache path used in `launch.sh`). Run inference from the nanochat directory (e.g. `assets/nanochat`) on your DGX Station.
+        
+        **Web UI (recommended):**
+        
+        ```bash
+        cd nanochat
+        source ../.venv/bin/activate   # if using venv from container context; otherwise use the container
+        python -m scripts.chat_web
+        ```
+        
+        Open a browser to `http://<STATION_IP>:8000` where `<STATION_IP>` is your DGX Station’s IP address.
+        
+        **CLI:**
+        
+        ```bash
+        cd nanochat
+        python -m scripts.chat_cli -p "Why is the sky blue?"
+        python -m scripts.chat_cli -i sft -p "Write a haiku about machine learning"
+        ```
+        
+        A full report is generated at `nanochat/report.md` after the run. You can also monitor training at [wandb.ai](https://wandb.ai/) under your project.
+        
+        # Step 5. Cleanup
+        
+        To stop training early, interrupt the launch script or stop the container:
+        
+        > [!WARNING]
+        > This stops the training run and any in-progress work in the container.
+        
+        ```bash
+        # If launch.sh is running: press Ctrl+C
+        
+        # Or stop the container by name
+        docker stop $(docker ps -q --filter ancestor=nanochat)
+        ```
+        
+        To free disk space after training (use the same path as your cache if you set `NANOCHAT_CACHE`):
+        
+        ```bash
+        rm -rf ./nanochat_cache ./hf_cache
+        docker system prune -a
+        ```
+        
+        # Step 6. Next steps and customization
+        
+        - **Small scale run:** `./launch.sh` can run a lite training by following the customization guide to make changes to `speedrun_station.sh`. This can potentially bring down the training time. 
+        - **Custom cache paths:** Set `NANOCHAT_CACHE` and `HF_CACHE` before launching (e.g. `export NANOCHAT_CACHE=/path/to/nanochat_cache`) if you want cache outside the assets directory.
+        - **Monitoring:** Use `nvidia-smi` and W&B dashboards to watch GPU utilization and training metrics (loss, throughput).
+        - **Inference:** Try the web UI and CLI with different checkpoints (`base`, `mid`, `sft`) and prompts; see sample prompts in `assets/README.md`.
+        
+      
+
+    - 
+      id: troubleshooting
+      
+      label: Troubleshooting
+      content: |
+        | Symptom | Cause | Fix |
+        |--------|--------|-----|
+        | `WANDB_API_KEY is not set` or `HF_TOKEN is not set` | Required env vars not exported before `launch.sh` | `export WANDB_API_KEY=<your_key>` and `export HF_TOKEN=<your_token>` in the same shell, then run `./launch.sh`. |
+        | `RuntimeError: CUDA out of memory` | Batch size or model too large for GPU | In the training script in the cloned nanochat repo (e.g. `speedrun.sh`), reduce `--device_batch_size` (e.g. `16`, `8`, `4`, `2`, or `1`). |
+        | Docker container not starting or no GPU | Docker or NVIDIA runtime misconfigured | Run `nvidia-smi` on your DGX Station. Check no other containers hold GPUs: `docker ps`. Test GPU in Docker: `docker run --rm --gpus all nvidia/cuda:12.0-base nvidia-smi`. |
+        | `Permission denied` or `No such file or directory` for cache paths in `launch.sh` | Paths like `/home/scratch.lramesh_dpt/...` don’t exist on your system | Edit `launch.sh`: set cache dirs to paths you can create (e.g. `$(pwd)/nanochat_cache`, `$(pwd)/hf_cache`). Run `mkdir -p <your_cache_dirs>` and re-run `launch.sh`. |
+        | `nanochat` image not found when running `launch.sh` | Setup not run or build failed | From `nvidia/nanochat/assets`, run `./setup.sh` and confirm with `docker images` (look for the `nanochat` image). |
+        | Training exits immediately or script doesn’t wait | Container fails early (missing keys, paths, or OOM) | Check container logs: `docker ps -a` then `docker logs <container_id>`. Fix env vars, cache paths, or batch size as above. |
+        | Wrong cache path or "No such file" when launching | `launch.sh` uses non-existent paths (e.g. `/home/scratch...`) | On DGX Station, edit `launch.sh`: replace cache dirs with `$(pwd)/nanochat_cache` and `$(pwd)/hf_cache`, then run `mkdir -p nanochat_cache hf_cache`. |
+        
+      
+
+
+    resources:
+    - name: nanochat (GitHub)
+      url: https://github.com/karpathy/nanochat
+      
+
+    - name: Weights & Biases
+      url: https://wandb.ai/
+      
+
+    - name: Hugging Face (datasets / token)
+      url: https://huggingface.co/
+      
+

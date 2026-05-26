@@ -1,0 +1,178 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Machine-specific: the openfold3 policy references the Docker bridge IP.
+#   GB300:       Docker bridge 172.18.0.1
+#   New Station: Docker bridge 172.17.0.1
+# Use scripts/gen_sandbox_policy.sh to generate a policy with the correct IP,
+# or edit the openfold3 section below before sandbox creation.
+
+version: 1
+
+filesystem_policy:
+  include_workdir: true
+  read_only:
+    - /usr
+    - /lib
+    - /proc
+    - /dev/urandom
+    - /etc
+    - /var/log
+  read_write:
+    - /tmp
+    - /sandbox
+    - /dev/null
+
+landlock:
+  # NOTE: hard_requirement causes CrashLoopBackOff with the OpenClaw community
+  # sandbox image (tested on OpenShell 0.0.16 and 0.0.21). The image likely
+  # references paths that Landlock cannot enforce. Use best_effort until the
+  # upstream image is updated. All other security controls (L7 enforcement,
+  # implicit-deny networking, process isolation) remain active.
+  compatibility: best_effort
+
+process:
+  run_as_user: sandbox
+  run_as_group: sandbox
+
+network_policies:
+  # inference.local is a virtual hostname handled by OpenShell's proxy routing
+  # layer, NOT by network_policies. The proxy intercepts CONNECT requests,
+  # TLS-terminates, and routes to the host Ollama. Raw IP endpoints
+  # (127.0.0.1, 172.x.0.1) cannot work here -- the sandbox CIDR-blocks
+  # private/loopback ranges regardless of policy entries.
+  # OpenClaw must use OPENCLAW_HTTPS_PROXY so Node.js routes through the
+  # proxy where inference.local virtual hostname resolution works.
+  inference:
+    name: inference
+    endpoints:
+      - host: inference.local
+        port: 443
+    binaries:
+      - { path: /usr/bin/node }
+      - { path: /usr/bin/curl }
+      - { path: "/usr/bin/python3*" }
+      - { path: "/usr/local/bin/python3*" }
+      - { path: "/sandbox/.venv/bin/python*" }
+
+  fhir:
+    name: fhir
+    endpoints:
+      - host: r4.smarthealthit.org
+        port: 443
+        protocol: rest
+        tls: terminate
+        enforcement: enforce
+        access: read-only
+    binaries:
+      - { path: /usr/bin/curl }
+      - { path: "/usr/bin/python3*" }
+      - { path: "/usr/local/bin/python3*" }
+      - { path: "/sandbox/.venv/bin/python*" }
+
+  pubchem:
+    name: pubchem
+    endpoints:
+      - host: pubchem.ncbi.nlm.nih.gov
+        port: 443
+        protocol: rest
+        tls: terminate
+        enforcement: enforce
+        access: read-only
+    binaries:
+      - { path: /usr/bin/curl }
+      - { path: "/usr/bin/python3*" }
+      - { path: "/usr/local/bin/python3*" }
+      - { path: "/sandbox/.venv/bin/python*" }
+
+  openfold3:
+    name: openfold3
+    endpoints:
+      - host: __DOCKER_BRIDGE_IP__
+        port: 8000
+        protocol: rest
+        tls: passthrough
+        enforcement: enforce
+        rules:
+          - allow:
+              method: POST
+              path: /biology/openfold/**
+          - allow:
+              method: GET
+              path: /v1/health/*
+          - allow:
+              method: GET
+              path: /v1/models
+    binaries:
+      - { path: /usr/bin/curl }
+      - { path: "/usr/bin/python3*" }
+      - { path: "/usr/local/bin/python3*" }
+      - { path: "/sandbox/.venv/bin/python*" }
+
+  cdn:
+    name: cdn
+    endpoints:
+      - host: code.jquery.com
+        port: 443
+        protocol: rest
+        tls: terminate
+        enforcement: enforce
+        access: read-only
+      - host: 3dmol.org
+        port: 443
+        protocol: rest
+        tls: terminate
+        enforcement: enforce
+        access: read-only
+      - host: unpkg.com
+        port: 443
+        protocol: rest
+        tls: terminate
+        enforcement: enforce
+        access: read-only
+    binaries:
+      - { path: /usr/bin/curl }
+      - { path: "/usr/bin/python3*" }
+      - { path: "/usr/local/bin/python3*" }
+      - { path: "/sandbox/.venv/bin/python*" }
+
+  # Setup-only: required during initial sandbox provisioning to clone the repo
+  # and install npm packages. Not used at runtime.
+  github:
+    name: github
+    endpoints:
+      - host: github.com
+        port: 443
+        protocol: rest
+        tls: terminate
+        enforcement: enforce
+        access: read-only
+      - host: objects.githubusercontent.com
+        port: 443
+        protocol: rest
+        tls: terminate
+        enforcement: enforce
+        access: read-only
+    binaries:
+      - { path: /usr/bin/git }
+      - { path: /usr/bin/node }
+      - { path: /usr/bin/npm }
+
+  # Setup-only: required during initial sandbox provisioning to install
+  # openclaw and other npm packages. Not used at runtime.
+  npm:
+    name: npm
+    endpoints:
+      - { host: registry.npmjs.org, port: 443 }
+    binaries:
+      - { path: /usr/bin/npm }
+      - { path: /usr/bin/node }
+
+  pypi:
+    name: pypi
+    endpoints:
+      - { host: pypi.org, port: 443 }
+      - { host: files.pythonhosted.org, port: 443 }
+    binaries:
+      - { path: /usr/local/bin/uv }
+      - { path: "/sandbox/.uv/python/**" }

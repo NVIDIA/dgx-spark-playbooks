@@ -1,0 +1,8 @@
+.git
+.env
+*.pdb
+test-results/
+sandbox-policy-local.yaml
+.cursor/
+__pycache__
+*.pyc
