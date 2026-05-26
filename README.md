@@ -54,6 +54,7 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 - [Spark & Reachy Photo Booth](nvidia/reachy-photo-booth/)
 - [SGLang for Inference](nvidia/sglang/)
 - [Single-cell RNA Sequencing](nvidia/single-cell/)
+- [Spark & Reachy Photo Booth](nvidia/spark-reachy-photo-booth/)
 - [Speculative Decoding](nvidia/speculative-decoding/)
 - [Set up Tailscale on Your Spark](nvidia/tailscale/)
 - [TRT LLM for Inference](nvidia/trt-llm/)
