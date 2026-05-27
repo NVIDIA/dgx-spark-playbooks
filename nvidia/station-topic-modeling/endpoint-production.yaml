@@ -32,7 +32,8 @@ spec:
       
     cta:
       text: View on GitHub
-      url: https://github.com/NVIDIA/dgx-station-playbooks/blob/main/nvidia/station-topic-modeling/
+      url: https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/station-topic-modeling/
+
       
 
     tabs:
@@ -196,8 +197,8 @@ spec:
         Clone the playbook repository and download the Amazon Electronics Reviews dataset.
         
         ```bash
-        git clone https://github.com/NVIDIA/dgx-station-playbooks
-        cd dgx-station-playbooks/nvidia/station-topic-modeling/assets
+        git clone https://github.com/NVIDIA/dgx-spark-playbooks
+        cd dgx-spark-playbooks/nvidia/station-topic-modeling/assets
         ```
         
         Download the dataset (~14GB compressed):
@@ -272,8 +273,8 @@ spec:
         # Optional: remove Hugging Face cache (embedding cache from the notebook)
         rm -rf ~/.cache/huggingface
         
-        # From the parent of dgx-station-playbooks/, remove the cloned repo
-        rm -rf dgx-station-playbooks/
+        # From the parent of dgx-spark-playbooks/, remove the cloned repo
+        rm -rf dgx-spark-playbooks/
         ```
         
         # Next steps

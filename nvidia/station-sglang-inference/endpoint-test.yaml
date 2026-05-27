@@ -2,7 +2,7 @@ kind: Playbook
 metadata:
   name: station-sglang-inference
   displayName: LLM Inference with SGLang
-  shortDescription: Serve LLMs with SGLang on DGX Station for prefix-cached multi-turn and structured output inference
+  shortDescription: Serve LLMs with SGLang on DGX Station (Qwen3-8B default; Qwen3.6 MoE optional)—prefix-cached multi-turn, structured output, benchmarks, and inference-server guidance
 
   publisher: nvidia
   description: |
@@ -21,7 +21,7 @@ metadata:
   
   attributes:
   - key: DURATION
-    value: 25 MIN
+    value: 30 MIN
   
 spec:
   artifactName: station-sglang-inference
@@ -54,12 +54,13 @@ spec:
         
         # What you'll accomplish
         
-        Launch SGLang on DGX Station to serve an LLM, then exercise its two key differentiators: prefix-cached multi-turn chat and structured JSON output generation. You will also benchmark multi-turn throughput to see RadixAttention's effect.
+        Launch SGLang on DGX Station to serve an LLM, then exercise its two key differentiators: prefix-cached multi-turn chat and structured JSON output generation. You will also benchmark multi-turn throughput and interpret results together with server logs (wall time alone is not a reliable cache signal under parallel load).
         
-        - Serve Qwen3-8B with SGLang's Blackwell-optimized backend
-        - Send multi-turn conversations and observe prefix cache hits in server metrics
+        - Serve **Qwen3-8B** (`Qwen/Qwen3-8B` by default for fast first-run validation) or another checkpoint from the in-playbook model table — including the larger **Qwen3.6 MoE** (`Qwen/Qwen3.6-35B-A3B`) once the workflow is verified
+        - Send multi-turn conversations and observe prefix cache hits in **Docker logs** (`#cached-token`)
         - Generate structured JSON output using schema-constrained decoding
-        - Benchmark multi-turn throughput with and without prefix caching
+        - Benchmark multi-turn throughput; optional **single-conversation** run to reduce contention; full cache/metrics scrape written to a **log file** for review
+        - Optional next step: large MoE such as **DeepSeek-V4** on Station when your SGLang build and VRAM allow
         
         # What to know before starting
         
@@ -76,14 +77,14 @@ spec:
         
         # Ancillary files
         
-        - `assets/benchmark_multiturn.py` — Python script that benchmarks multi-turn conversation throughput and demonstrates structured output generation
+        - `assets/benchmark_multiturn.py` — Benchmarks multi-turn chat under parallel load, structured JSON output, and writes full `/server_info` + `/metrics` bodies to a detail log (terminal shows a short summary only)
         
         # Time & risk
         
-        * **Duration:** 20–25 minutes (including model download)
-        * **Risks:** Model download requires HuggingFace authentication
+        * **Duration:** 20–30 minutes for the default `Qwen/Qwen3-8B`; 45–60 minutes if you switch to `Qwen/Qwen3.6-35B-A3B` (download + Blackwell CUDA-graph capture)
+        * **Risks:** Gated models (e.g., Llama 3.3) require HuggingFace authentication and license acceptance
         * **Rollback:** Stop and remove the container to restore state
-        * **Last Updated:** 04/06/2026
+        * **Last Updated:** 05/26/2026
           * First Publication
         
       
@@ -105,16 +106,51 @@ spec:
         # Step 2. Set up environment variables
         
         ```bash
-        # HuggingFace token (required)
-        # Get a token from https://huggingface.co/settings/tokens
-        export HF_TOKEN="your_huggingface_token"
+        # HuggingFace token (only required for gated models such as Llama 3.3).
+        # Leave empty for public models like Qwen3-8B; for gated models get a token at
+        # https://huggingface.co/settings/tokens.
+        export HF_TOKEN=""
         
-        # Model to serve
+        # Model to serve (see **Example model IDs** below).
+        # Default uses Qwen3-8B for fast first-run validation (~10–15 min boot on Station).
+        # Switch to Qwen3.6-35B-A3B once the workflow is working end-to-end.
         export MODEL_HANDLE="Qwen/Qwen3-8B"
         
         # Maximum context length
         export MAX_MODEL_LEN=8192
         ```
+        
+        ## Example model IDs (`MODEL_HANDLE`)
+        
+        Use any **Hugging Face text-generation or chat** checkpoint that your SGLang build supports. The table below lists common starting points on DGX Station; always check the model card for **license / gated access**, **VRAM**, and **context length**.
+        
+        | Model ID | Notes |
+        |----------|--------|
+        | `Qwen/Qwen3-8B` | **Default in this playbook.** Dense Qwen3 8B; ~16 GB download, fast warmup, ideal for validating the workflow end-to-end. |
+        | `Qwen/Qwen3.6-35B-A3B` | Qwen3.6 MoE (~3B active experts); strong quality per GPU hour on Blackwell. ~70 GB download; allow ~30–45 min to first request. |
+        | `Qwen/Qwen3.6-27B` | Dense Qwen3.6; higher VRAM than the MoE row above at equal batch settings. |
+        | `google/gemma-3-12b-it` | Popular Gemma 3 instruct (text + vision in full stack; chat API usage is typically text-only). |
+        | `google/gemma-3-27b-it` | Larger Gemma 3 instruct variant. |
+        | `meta-llama/Llama-3.3-70B-Instruct` | Llama 3.3 70B instruct (gated on Hugging Face; accept the license in the model card before download). |
+        
+        Heavyweight MoE (very large weights; confirm **SGLang version + GPU memory** before serving):
+        
+        | Model ID | Notes |
+        |----------|--------|
+        | `deepseek-ai/DeepSeek-V4-Flash` | DeepSeek-V4 family (MoE). Intended to showcase **large local models on Station**; expect long downloads, strict VRAM headroom, and possible extra flags per SGLang docs. |
+        | `deepseek-ai/DeepSeek-V4-Pro` | Larger V4 variant; only if you have sufficient GPU memory and a supported SGLang build. |
+        
+        ## Choosing an inference backend (DGX Station)
+        
+        Several OpenAI-compatible servers run well on NVIDIA hardware. None is universally “best”—pick by workload shape and operational constraints.
+        
+        | Backend | Strengths | Typical “use this when…” |
+        |---------|-----------|---------------------------|
+        | **SGLang** | RadixAttention for shared-prefix workloads; strong structured / grammar decoding; active Blackwell + CUDA 13 paths. | Highly **multi-turn**, **RAG** (repeated system + documents), **agents**, or **schema-constrained** JSON at scale. |
+        | **vLLM** | MaturePagedAttention, broad model coverage, common default in examples. | You want a **well-trodden** OSS server with **maximum community recipes** and straightforward PagedAttention behavior. |
+        | **TensorRT-LLM** | NVIDIA-optimized kernels and quantization workflows for throughput-focused deployment. | You are **productionizing** on NVIDIA GPUs and can invest in **TensorRT-LLM export / engines** for peak throughput. |
+        
+        This playbook focuses on **SGLang**; consult each project’s documentation for model support matrices and quantization modes.
         
         # Step 3. Pull the SGLang container
         
@@ -126,24 +162,26 @@ spec:
         
         # Step 4. Identify the GB300 GPU
         
-        On DGX Station with multiple GPUs, identify the GB300's device index:
+        Identify the GB300's device index:
         
         ```bash
         nvidia-smi --query-gpu=index,name --format=csv,noheader
         ```
         
-        Look for the row showing `NVIDIA GB300`. Note its index (e.g., `1`).
+        Look for the row showing `NVIDIA GB300`. Note its index — on DGX Station the GB300 may be at index `0` or `1` depending on configuration. If `nvidia-smi` shows only a single GB300, you can simply use `--gpus all` in the next step.
         
         # Step 5. Start SGLang server
         
-        Launch the SGLang server:
+        Launch the SGLang server. The flags below are tuned for GB300 (Blackwell SM103) — see notes after the command:
         
         ```bash
-        # Replace device=1 with your GB300's index from Step 4
+        # Use --gpus all on a single-GPU Station, or --gpus '"device=N"' with the
+        # index from Step 4 if multiple GPUs are present.
         docker run -d \
           --name sglang-server \
-          --gpus '"device=1"' \
+          --gpus all \
           --ipc host \
+          --cap-add SYS_NICE \
           --ulimit memlock=-1 \
           --ulimit stack=67108864 \
           -p 30000:30000 \
@@ -154,8 +192,16 @@ spec:
             --host 0.0.0.0 \
             --port 30000 \
             --context-length $MAX_MODEL_LEN \
-            --mem-fraction-static 0.85
+            --mem-fraction-static 0.85 \
+            --attention-backend flashinfer \
+            --enable-cache-report
         ```
+        
+        > [!IMPORTANT]
+        > **Why these flags on GB300:**
+        > - `--attention-backend flashinfer` — the auto-selected `trtllm_mha` backend currently fails CUDA-graph capture on Blackwell SM103 with `buildNdTmaDescriptor` errors; `fa3` is also rejected (it requires SM ≤ 90). FlashInfer is the safe default.
+        > - `--cap-add SYS_NICE` — lets SGLang set NUMA affinity; otherwise the server logs a warning on every launch.
+        > - `--enable-cache-report` — populates `usage.prompt_tokens_details.cached_tokens` in OpenAI-style responses so the benchmark in Step 9 can report cached prefill tokens.
         
         Check the server logs:
         
@@ -172,7 +218,7 @@ spec:
         Press `Ctrl+C` to exit the log view.
         
         > [!NOTE]
-        > First launch downloads the model and compiles kernels. Subsequent starts are faster thanks to cached weights and compiled artifacts.
+        > First launch downloads the model and captures CUDA graphs. Plan for ~10–15 min for `Qwen/Qwen3-8B` and ~30–45 min for `Qwen/Qwen3.6-35B-A3B` before the server is ready. Subsequent starts are faster thanks to cached weights and compiled artifacts.
         
         # Step 6. Test basic inference
         
@@ -224,15 +270,15 @@ spec:
           }' | python3 -m json.tool
         ```
         
-        The second request reuses the KV cache from the shared prefix (system message + first user turn + assistant response), only computing attention for the new user message. This reduces first-token latency for follow-up turns.
+        The second request **reuses the KV cache for the shared prefix** (system message + first user turn + assistant response) via RadixAttention, so repeated **prefill** work on that prefix is avoided. **End-to-end HTTP latency can still go up** on later turns: the transcript is longer (more tokens to attend to even with cache hits on the prefix), each assistant reply adds decode work, and the client measures full request time—not prefill alone.
         
-        Check the cache hit rate in the server logs. SGLang logs each prefill batch with the number of cached tokens reused:
+        Check cache reuse in the server logs. SGLang logs each prefill batch with the number of cached tokens reused:
         
         ```bash
         docker logs sglang-server 2>&1 | grep "cached-token" | tail -10
         ```
         
-        Look for `#cached-token` values greater than 0 on later turns — this confirms RadixAttention is reusing the KV cache from the shared prefix.
+        Look for `#cached-token` values greater than 0 on later turns — this confirms RadixAttention is reusing the KV cache from the shared prefix. Treat that as the primary signal of prefix caching; wall-clock `curl` latency alone can be misleading.
         
         # Step 8. Structured JSON output
         
@@ -280,30 +326,72 @@ spec:
         
         # Step 9. Benchmark multi-turn throughput
         
-        Run the included benchmark script to measure how prefix caching improves multi-turn latency. The script is in the `assets/` directory of this playbook.
+        This step uses `benchmark_multiturn.py` from this playbook's `assets/` directory. Clone (or download) the playbook repository first so the script is available locally:
         
         ```bash
+        git clone https://github.com/NVIDIA/dgx-spark-playbooks
+        cd dgx-station-playbooks/nvidia/station-sglang-inference
+        ```
+        
+        > [!TIP]
+        > If `git` is not available, download the repository as a ZIP from the [playbook repository](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/station-sglang-inference/) and extract it. All commands below assume your working directory is the playbook root (`dgx-station-playbooks/nvidia/station-sglang-inference/`), so `assets/benchmark_multiturn.py` resolves correctly.
+        
+        The benchmark stress-tests the server with **parallel** conversations (default: 20) and reports **per-turn wall time**, token counts, and (when the API exposes it) **cached prefill tokens**.
+        
+        Install the `requests` dependency. The **virtualenv approach below is the preferred, default installation path** — it keeps the script's dependencies isolated from the system Python interpreter so you cannot accidentally damage Ubuntu's own Python packages. Ubuntu 24.04 on DGX Station does not ship `python3-venv` by default, so install it once before creating the virtualenv:
+        
+        ```bash
+        sudo apt update && sudo apt install -y python3-venv
         python3 -m venv .venv && source .venv/bin/activate
         pip install requests
         ```
+        
+        If you cannot run `sudo apt install python3-venv` (for example, a locked-down host), the next safest option is a **per-user install** that still respects PEP 668:
+        
+        ```bash
+        python3 -m pip install --user requests
+        ```
+        
+        > [!CAUTION]
+        > **Last-resort only — `--break-system-packages` can damage your system Python.**
+        > Ubuntu 24.04 ships an "externally managed" system Python (PEP 668). The `--break-system-packages` flag tells `pip` to ignore that guard and install into the system or per-user site-packages anyway. This can shadow or conflict with packages installed by `apt` and break system tooling that depends on them. Only use this command when both the **venv** and plain **`--user`** paths above are unavailable, and only if you are willing to take that risk on the host you are running on:
+        > ```bash
+        > python3 -m pip install --user --break-system-packages requests
+        > ```
         
         ```bash
         python3 assets/benchmark_multiturn.py \
           --base-url http://localhost:30000 \
           --model "$MODEL_HANDLE" \
           --num-conversations 20 \
+          --turns-per-conversation 5 \
+          --cache-detail-file ./sglang_benchmark_cache_details.log
+        ```
+        
+        The script prints:
+        - **Median / P90 wall time per turn** — often **increases** as prompts grow and under parallel load; that does **not** contradict RadixAttention.
+        - **Median prompt tokens per turn** — should climb as history lengthens.
+        - **Median cached prefill tokens** (when returned in `usage`) — populated by `--enable-cache-report` (already set in Step 5); this is the primary cache signal from the OpenAI-style `usage` payload.
+        - A **short summary** of cache-related `/server_info` or `/metrics` lines; the **full** responses are written to `--cache-detail-file` (default `./sglang_benchmark_cache_details.log`) so you are not flooded with an unparsed metrics blob in the terminal.
+        
+        > [!NOTE]
+        > The Step 5 launch enables `--enable-cache-report` (which fills `usage.prompt_tokens_details.cached_tokens`) but does **not** enable the Prometheus `/metrics` endpoint, since cached-prefill data is already exposed through `usage` and the `docker logs` `#cached-token` lines. If `/metrics` returns `404`/empty in the detail log, that is expected — the benchmark's primary cache signals (`usage.prompt_tokens_details.cached_tokens` and Docker logs) still work. To populate `/metrics` as well, add `--enable-metrics` to the `sglang serve` invocation in Step 5 and restart the container.
+        
+        To isolate prefix-cache behavior from multi-client contention, rerun with a single conversation:
+        
+        ```bash
+        python3 assets/benchmark_multiturn.py \
+          --base-url http://localhost:30000 \
+          --model "$MODEL_HANDLE" \
+          --num-conversations 1 \
           --turns-per-conversation 5
         ```
         
-        The script sends parallel multi-turn conversations and measures:
-        - **Per-turn latency** for turn 1 vs subsequent turns (shows prefix caching effect)
-        - **Total throughput** in tokens per second
-        - **Cache statistics** from server metrics
+        Always correlate behavior with **`docker logs`** (`#cached-token` lines) as in Step 7.
         
-        You should see latency decrease for later turns in each conversation as the shared prefix grows, demonstrating RadixAttention's cache reuse.
+        ## Next steps: heavier models on Station
         
-        > [!TIP]
-        > If you downloaded this playbook as a zip, the `assets/` directory is already present. If you cloned the full repository, navigate to `nvidia/station-sglang-inference/` first.
+        To stress GPU memory and throughput after completing the steps above, point `MODEL_HANDLE` at a larger checkpoint (for example `deepseek-ai/DeepSeek-V4-Flash`), **lower** `--mem-fraction-static` if you hit OOM, and reduce `--context-length` until the server starts cleanly. Confirm your SGLang image version supports the architecture (see [SGLang documentation](https://docs.sglang.io/)) and accept any **gated** model licenses on Hugging Face before pulling weights.
         
         # Step 10. Cleanup
         
@@ -333,18 +421,24 @@ spec:
         |---------|-------|-----|
         | "permission denied" when running docker | User not in docker group | Run `sudo usermod -aG docker $USER && newgrp docker` |
         | Container fails to start with GPU error | NVIDIA Container Toolkit not configured | Run `nvidia-ctk runtime configure --runtime=docker` and restart Docker |
-        | `device >= 0 && device < num_gpus INTERNAL ASSERT FAILED` | Using `--gpus all` on a multi-GPU system | Use `--gpus '"device=N"'` to target the GB300 specifically (check index with `nvidia-smi`) |
-        | "Token is required" or 401 error | Missing HuggingFace token | Ensure `HF_TOKEN` is exported before running the docker command |
+        | `device >= 0 && device < num_gpus INTERNAL ASSERT FAILED` | `--gpus '"device=N"'` index does not exist on this Station | Re-run `nvidia-smi --query-gpu=index,name --format=csv,noheader` and use the actual GB300 index, or `--gpus all` if there is only one GPU |
+        | `RuntimeError: ... buildNdTmaDescriptor ... Check failed: false` during CUDA-graph capture | Default `trtllm_mha` attention backend is incompatible with Blackwell SM103 | Pass `--attention-backend flashinfer` to `sglang serve` |
+        | `AssertionError: FlashAttention v3 Backend requires SM>=80 and SM<=90` | `--attention-backend fa3` selected on Blackwell (SM103) | Use `--attention-backend flashinfer` instead |
+        | `User lacks permission to set NUMA affinity ... try adding --cap-add SYS_NICE` warning | Docker dropped the `SYS_NICE` capability | Add `--cap-add SYS_NICE` to the `docker run` command |
+        | `python3 -m venv .venv` fails with `apt install python3.12-venv` hint | Ubuntu 24.04 ships without `python3-venv` | Run `sudo apt update && sudo apt install -y python3-venv` (or use `python3 -m pip install --user --break-system-packages requests`) |
+        | "Token is required" or 401 error | Missing HuggingFace token for a gated model | Export `HF_TOKEN` before running the docker command and accept the model license on huggingface.co |
         | Server exits with OOM error | Model too large for available GPU memory | Lower `--mem-fraction-static` (e.g., 0.7) or reduce `--context-length`. Check GPU memory with `nvidia-smi` |
         | `json_schema` response_format returns error | SGLang version too old | Ensure you are using `lmsysorg/sglang:latest-cu130`. Older versions may not support `json_schema` format |
         | Server starts but CUDA errors on inference | Wrong CUDA version for Blackwell | Use the `latest-cu130` image tag. SM103 requires CUDA 13.0+ |
-        | Model runs on wrong GPU | Default GPU selection | Use `--gpus '"device=N"'` to select the GB300 specifically |
-        | Slow first request after server start | Kernel JIT compilation | First request triggers kernel compilation. Subsequent requests are fast. Wait ~30 seconds |
-        | Connection refused on port 30000 | Server still loading model | Check `docker logs sglang-server` — wait for the Uvicorn startup message |
-        | `/server_info` shows no cache stats | Endpoint may differ across versions | Try `curl http://localhost:30000/v1/models` to verify the server is responsive. Cache metrics may be under `/metrics` (requires `--enable-metrics` server flag) |
+        | Slow first request after server start | Kernel JIT + CUDA-graph capture | First launch can take 10–15 min for `Qwen/Qwen3-8B` and 30–45 min for `Qwen/Qwen3.6-35B-A3B` before the server prints "fired up and ready to roll!". Subsequent requests are fast. |
+        | Connection refused on port 30000 | Server still loading model or capturing CUDA graphs | Check `docker logs sglang-server` — wait for the Uvicorn startup message and "The server is fired up and ready to roll!" |
+        | `Med cached prefill` column is `n/a` in the benchmark | OpenAI-style `cached_tokens` not enabled on the server | Add `--enable-cache-report` to `sglang serve` so `usage.prompt_tokens_details.cached_tokens` is populated |
+        | `/server_info` body floods the benchmark "cache highlights" output | Older `benchmark_multiturn.py` matched any line containing "cache" — including the single-line `/server_info` JSON | Use the version of `benchmark_multiturn.py` shipped with this playbook (it skips JSON blobs and lines longer than 200 chars); the full body is still saved to `--cache-detail-file` |
+        | Benchmark shows **higher** median latency on later turns | Expected under parallel load + longer transcripts | RadixAttention reduces repeated **prefill** on shared prefixes—use `docker logs` (`#cached-token`) and optionally `--num-conversations 1`. See Step 9 and `sglang_benchmark_cache_details.log` |
+        | `deepseek-ai/DeepSeek-V4-*` fails to load | Unsupported in this SGLang build or insufficient VRAM | Check [SGLang docs](https://docs.sglang.io/) for model support; try `DeepSeek-V4-Flash` before Pro; lower `--mem-fraction-static` and `--context-length` |
         
         > [!NOTE]
-        > On DGX Station, the GB300 is typically device 1 (device 0 is the RTX Pro 6000 workstation GPU). Always verify with `nvidia-smi --query-gpu=index,name --format=csv,noheader`.
+        > On DGX Station the GB300 may be at device `0` or `1` depending on configuration (some Stations also expose a workstation GPU at `0`). Always verify with `nvidia-smi --query-gpu=index,name --format=csv,noheader` before launching the container.
         
       
 

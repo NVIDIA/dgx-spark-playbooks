@@ -35,7 +35,7 @@ spec:
       
     cta:
       text: View on GitHub
-      url: https://github.com/NVIDIA/dgx-station-playbooks/blob/main/nvidia/station-txt2kg/
+      url: https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/station-txt2kg/
       
 
     tabs:
@@ -115,8 +115,8 @@ spec:
         This playbook is for **DGX Station**. In a terminal, clone the repository and navigate to the project directory.
         
         ```bash
-        git clone https://github.com/NVIDIA/dgx-station-playbooks
-        cd dgx-station-playbooks/nvidia/station-txt2kg/assets
+        git clone https://github.com/NVIDIA/dgx-spark-playbooks
+        cd dgx-spark-playbooks/nvidia/station-txt2kg/assets
         ```
         
         # Step 2. Start the txt2kg services

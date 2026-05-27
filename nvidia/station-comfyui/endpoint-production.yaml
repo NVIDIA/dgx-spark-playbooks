@@ -82,7 +82,7 @@ spec:
         
         # Ancillary files
         
-        All required assets can be found in the [ComfyUI playbook repository](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/station-comfyui/).
+        All required assets can be found [in the ComfyUI playbook repository](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/station-comfyui/).
         
         - `assets/Dockerfile` — Builds the ComfyUI container image from NGC PyTorch base (ARM64)
         - `assets/scripts/download-models.sh` — Downloads all model weights from Hugging Face using the **`hf`** CLI (`huggingface-hub` package)
@@ -97,8 +97,9 @@ spec:
           * Model downloads require HuggingFace authentication and substantial bandwidth (~150 GB total)
           * Port 8188 must be accessible for the ComfyUI web interface
         * **Rollback:** Stop and remove the Docker container. Delete the `models/` directory to reclaim disk space.
-        * **Last Updated:** 05/26/2026
-          * First Publication
+        * **Last Updated:** 05/07/2026
+          * Re-validated end-to-end on GB300: clean image build (`comfyui-gb300`, ~24 GB), container starts and serves on port 8188, all 8 mounted UI workflows enumerate correctly, `/object_info` returns 1092 node types, `/prompt` validation rejects on missing-model with clean errors. Documented benign startup warnings (`aimdo` CUDA-hook fallback, `urllib3` / `charset_normalizer` version skew) so users do not chase non-issues.
+          * 05/06/2026 — first publication; fixed walkthrough issues found on GB300: torchaudio shim for NGC PyTorch ABI mismatch, aarch64 onnxruntime swap, model-filename collisions (HiDream VAE → `ae_hidream.safetensors`, HunyuanVideo CLIP → `clip_l_hunyuan.safetensors`), `--gpus device=0` default, `df -h /` prereq, `~/.local/bin` PATH guidance, FLUX node list aligned with the actual graph, `.webp` output (not MP4), HF token via env not CLI, container output `chown` cleanup hint.
         
       
 
@@ -367,7 +368,7 @@ spec:
         
         ## Cosmos-Predict2 Video2World
         
-        Load `cosmos-video2world.json`.
+        Load `cosmos-text-to-video.json`.
         
         **NVIDIA Cosmos-Predict2 14B** is NVIDIA's world foundation model for Video2World generation. It takes an input image and generates a physically plausible video extending from that scene. Place your source image in the `input/` directory before running.
         

@@ -1,0 +1,472 @@
+kind: Playbook
+metadata:
+  name: station-gr00t
+  displayName: Isaac GR00T N1.6 Fine-Tuning
+  shortDescription: Fine-tune and benchmark NVIDIA's GR00T N1.6 robotics foundation model on DGX Station
+
+  publisher: nvidia
+  description: |
+    # REPLACE THIS WITH YOUR MODEL CARD
+    https://gitlab-master.nvidia.com/api-catalog/examples/-/blob/main/modelcard-example-mixtral8x7b.md?ref_type=heads
+    
+  labelsV2:
+  - gpuType:playbook:gpu_type_station
+  - DGX Station
+  - GB300
+  - Robotics
+  - Isaac GR00T
+  - Fine-Tuning
+  - Blackwell
+  - VLA
+  
+  attributes:
+  - key: DURATION
+    value: 45 MIN
+  
+spec:
+  artifactName: station-gr00t
+  nvcfFunctionId: None
+  attributes:
+
+    showUnavailableBanner: false
+    apiDocsUrl: None
+    termsOfUse: |
+      
+    cta:
+      text: View on GitHub
+      url: https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/station-gr00t/
+      
+
+    tabs:
+    - 
+      id: overview
+      
+      label: Overview
+      content: |
+        # Basic idea
+        
+        NVIDIA Isaac GR00T N1.6 is a 3-billion-parameter open vision-language-action (VLA) foundation model for generalist humanoid robot skills. It combines a Cosmos-Reason-2B vision-language backbone with a 32-layer Diffusion Transformer (DiT) action head that denoises continuous robot actions from multimodal input — language instructions and camera images. The model is pre-trained on over 10,000 hours of robot demonstration data spanning bimanual arms, semi-humanoid platforms, and full humanoids, then adapted to specific embodiments and tasks through fine-tuning.
+        
+        In this playbook you will fine-tune GR00T N1.6 on the LIBERO Spatial benchmark — a manipulation task suite that tests spatial reasoning with a Panda robot arm. DGX Station's GB300 GPU with 284 GB of HBM3e memory enables a per-device batch size of **128**, far exceeding the typical 32–64 used on smaller GPUs, which accelerates convergence and improves training throughput.
+        
+        # What you'll accomplish
+        
+        - Set up the Isaac GR00T environment using `uv` (fast, reproducible Python packaging)
+        - Verify the pre-trained base model loads and runs inference
+        - Fine-tune GR00T N1.6 on the LIBERO Spatial dataset with batch size 128
+        - Evaluate the fine-tuned model using open-loop evaluation and measure inference latency
+        
+        # What to know before starting
+        
+        - Familiarity with Python virtual environments
+        - Familiarity with PyTorch training workflows (epochs, batch size, loss curves)
+        - General understanding of robot manipulation concepts (actions, observations, trajectories)
+        
+        # Prerequisites
+        
+        - NVIDIA DGX Station with GB300 GPU (Blackwell SM103, 284 GB HBM3e)
+        - CUDA toolkit installed: `nvcc --version` should show CUDA 12.8+
+        - Git installed: `git --version`
+        - HuggingFace account with access token (for model and dataset downloads)
+        - Network access to HuggingFace, GitHub, and PyPI
+        - At least 30 GB of free disk space (venv + model + dataset)
+        
+        # Time & risk
+        
+        * **Duration:** ~45 minutes (5 min setup, 5 min dataset download, 25 min fine-tuning at 2000 steps, 5 min evaluation)
+        * **Risks:** Model download requires HuggingFace authentication; `uv sync` installs packages into a project-local `.venv`
+        * **Rollback:** Delete the cloned `Isaac-GR00T` directory to restore state. No system-level changes are made.
+        * **Last Updated:** 04/06/2026
+          * First Publication
+        
+      
+
+    - 
+      id: instructions
+      
+      label: Instructions
+      content: |
+        # Step 1. Clone Isaac GR00T and install dependencies
+        
+        Clone the repository and run the dGPU install script. This uses `uv` for fast, reproducible dependency management and automatically detects the aarch64 architecture:
+        
+        ```bash
+        git clone --recurse-submodules https://github.com/NVIDIA/Isaac-GR00T
+        cd Isaac-GR00T
+        I_CONFIRM_THIS_IS_NOT_A_LICENSE_VIOLATION=1 bash scripts/deployment/dgpu/install_deps.sh
+        ```
+        
+        The install script:
+        - Installs system dependencies (`ffmpeg`, `libaio-dev`)
+        - Installs `uv` if not present
+        - Runs `uv sync` to create a `.venv` with all Python dependencies (PyTorch 2.7.1 + CUDA 12.8)
+        - Builds `torchcodec` from source on aarch64 (required for video decoding)
+        
+        Activate the virtual environment:
+        
+        ```bash
+        source .venv/bin/activate
+        ```
+        
+        Verify GPU access:
+        
+        ```bash
+        CUDA_VISIBLE_DEVICES=1 python -c "import torch; print(torch.cuda.get_device_name(0))"
+        ```
+        
+        Expected output: `NVIDIA GB300`
+        
+        > [!NOTE]
+        > Replace `CUDA_VISIBLE_DEVICES=1` with the index of your GB300 GPU throughout this playbook. Run `nvidia-smi --query-gpu=index,name --format=csv,noheader` to find it.
+        
+        # Step 2. Set up HuggingFace authentication
+        
+        ```bash
+        export HF_TOKEN="your_huggingface_token"
+        ```
+        
+        Get a token from https://huggingface.co/settings/tokens if you don't have one.
+        
+        # Step 3. Download the dataset and model
+        
+        Download the LIBERO Spatial dataset and the GR00T N1.6 base model:
+        
+        ```bash
+        # Download LIBERO Spatial dataset (~2-3 GB)
+        huggingface-cli download \
+            --repo-type dataset IPEC-COMMUNITY/libero_spatial_no_noops_1.0.0_lerobot \
+            --local-dir examples/LIBERO/libero_spatial_no_noops_1.0.0_lerobot/
+        
+        # Copy the LIBERO modality config into the dataset's meta/ directory
+        cp examples/LIBERO/modality.json \
+            examples/LIBERO/libero_spatial_no_noops_1.0.0_lerobot/meta/
+        
+        # Download GR00T N1.6 base model (~6 GB)
+        huggingface-cli download nvidia/GR00T-N1.6-3B
+        ```
+        
+        Verify the dataset is ready:
+        
+        ```bash
+        ls examples/LIBERO/libero_spatial_no_noops_1.0.0_lerobot/meta/modality.json
+        ```
+        
+        # Step 4. Verify the base model loads and runs
+        
+        Confirm the GR00T N1.6 base model loads correctly and can produce actions. The base model ships with a GR1 demo dataset for quick verification:
+        
+        ```bash
+        CUDA_VISIBLE_DEVICES=1 python scripts/deployment/standalone_inference_script.py \
+            --model-path nvidia/GR00T-N1.6-3B \
+            --dataset-path demo_data/gr1.PickNPlace \
+            --embodiment-tag GR1 \
+            --traj-ids 0 \
+            --inference-mode pytorch \
+            --action-horizon 8 \
+            --steps 32
+        ```
+        
+        You should see per-step timing output and no errors. This confirms the model, CUDA, and data pipeline all work before committing to a longer fine-tuning run.
+        
+        > [!NOTE]
+        > If you see Triton/PTXAS errors about `sm_103a`, prepend `TORCHDYNAMO_DISABLE=1` to the command. See Troubleshooting for details.
+        
+        > [!NOTE]
+        > The base model's pretrained processor does not include the `LIBERO_PANDA` embodiment configuration, so you cannot run evaluation directly on the LIBERO dataset with the base model. The LIBERO modality config is registered during fine-tuning. This is expected — LIBERO is a post-training benchmark.
+        
+        # Step 5. Fine-tune GR00T N1.6 on LIBERO Spatial
+        
+        Fine-tune the base model on the LIBERO Spatial dataset. DGX Station's GB300 GPU with 284 GB HBM3e lets you use a batch size of **128** — roughly 4x what fits on a typical 80 GB GPU. Larger batch sizes mean more stable gradients and faster convergence per wall-clock hour.
+        
+        ```bash
+        CUDA_VISIBLE_DEVICES=1 python \
+            gr00t/experiment/launch_finetune.py \
+            --base-model-path nvidia/GR00T-N1.6-3B \
+            --dataset-path examples/LIBERO/libero_spatial_no_noops_1.0.0_lerobot/ \
+            --embodiment-tag LIBERO_PANDA \
+            --num-gpus 1 \
+            --output-dir output/libero_spatial_ft \
+            --save-steps 500 \
+            --save-total-limit 5 \
+            --max-steps 2000 \
+            --global-batch-size 128 \
+            --learning-rate 1e-4 \
+            --warmup-ratio 0.05 \
+            --weight-decay 1e-5 \
+            --state-dropout-prob 0.8 \
+            --color-jitter-params brightness 0.3 contrast 0.4 saturation 0.5 hue 0.08 \
+            --dataloader-num-workers 4
+        ```
+        
+        Training runs for **2000 steps** at batch size 128 and takes approximately 20–25 minutes on the GB300.
+        
+        > [!NOTE]
+        > This playbook uses 2000 steps to keep execution time under an hour. For production-quality results matching the published 97.65% success rate on LIBERO Spatial, increase to **20,000 steps** by changing `--max-steps 20000`. Published results used batch size 640 across 8 GPUs (80 per GPU) — batch size 128 on a single GB300 exceeds the per-GPU batch size used in the published benchmarks.
+        
+        **What the training flags mean:**
+        
+        | Flag | Value | Purpose |
+        |------|-------|---------|
+        | `--global-batch-size` | 128 | Total samples per training step. GB300's 284 GB HBM3e makes this possible on a single GPU. |
+        | `--state-dropout-prob` | 0.8 | Drops state input 80% of the time during training, forcing the model to rely on vision. Improves generalization. |
+        | `--color-jitter-params` | brightness/contrast/saturation/hue | Randomly perturbs image colors during training for robustness to lighting variation. |
+        | `--warmup-ratio` | 0.05 | Linearly ramps learning rate from 0 to 1e-4 over the first 5% of steps (100 steps). |
+        | `--save-steps` | 500 | Saves a checkpoint every 500 steps. |
+        
+        Monitor the training loss in the terminal. The HuggingFace Trainer logs progress at each step — look for the `loss` field decreasing over time. Checkpoints are saved every 500 steps to `output/libero_spatial_ft/`.
+        
+        # Step 6. Evaluate the fine-tuned model
+        
+        Run open-loop evaluation on the fine-tuned checkpoint. This compares the model's predicted actions against the ground truth from the dataset:
+        
+        ```bash
+        CUDA_VISIBLE_DEVICES=1 python gr00t/eval/open_loop_eval.py \
+            --dataset-path examples/LIBERO/libero_spatial_no_noops_1.0.0_lerobot/ \
+            --embodiment-tag LIBERO_PANDA \
+            --model-path output/libero_spatial_ft/checkpoint-2000/ \
+            --traj-ids 0 1 2 \
+            --action-horizon 16
+        ```
+        
+        The evaluation outputs:
+        
+        - **Per-trajectory MSE and MAE** printed to the terminal
+        - **Average MSE** across all evaluated trajectories
+        - **JPEG visualizations** saved to `/tmp/open_loop_eval/` showing ground truth vs. predicted actions for each action dimension (x, y, z, roll, pitch, yaw, gripper)
+        
+        Key things to look for in the plots:
+        
+        - **Predicted trajectories** (orange line) should closely track the **ground truth** (blue line)
+        - **Gripper timing** — opening and closing at the correct moments
+        - **Lower MSE** indicates better action prediction accuracy
+        
+        > [!TIP]
+        > Even at 2000 steps, the fine-tuned model should show clearly improved action prediction compared to random. With 20,000 steps, LIBERO Spatial achieves 97.65% success rate in closed-loop simulation.
+        
+        # Step 7. Run inference timing benchmark
+        
+        Measure the fine-tuned model's per-step inference latency:
+        
+        ```bash
+        CUDA_VISIBLE_DEVICES=1 python scripts/deployment/standalone_inference_script.py \
+            --model-path output/libero_spatial_ft/checkpoint-2000/ \
+            --dataset-path examples/LIBERO/libero_spatial_no_noops_1.0.0_lerobot/ \
+            --embodiment-tag LIBERO_PANDA \
+            --traj-ids 0 \
+            --inference-mode pytorch \
+            --action-horizon 8
+        ```
+        
+        > [!NOTE]
+        > If you see Triton/PTXAS errors about `sm_103a`, prepend `TORCHDYNAMO_DISABLE=1` to the command. This runs inference in eager mode. See Troubleshooting for details.
+        
+        The timing output breaks down into:
+        
+        - **Data processing** — loading and preprocessing the observation
+        - **Backbone** — vision-language model forward pass
+        - **Action head** — diffusion transformer denoising (4 steps)
+        - **End-to-end** — total inference time per action chunk
+        
+        In eager mode (without `torch.compile`), expect ~240 ms per step. With `torch.compile` working, expect ~38 ms per step comparable to H100.
+        
+        # Step 8. Clean up
+        
+        To remove the environment:
+        
+        ```bash
+        deactivate
+        cd ..
+        rm -rf Isaac-GR00T
+        ```
+        
+        Your fine-tuned checkpoints in `output/libero_spatial_ft/` are deleted with the repo. Copy them elsewhere first if you want to keep them.
+        
+        # Next steps
+        
+        - **Increase training steps** — Change `--max-steps` to 20000 for results closer to the published 97.65% success rate on LIBERO Spatial. Training time scales linearly (~3.5 hours at 20K steps).
+        - **Try other LIBERO suites** — Download `libero_10_no_noops`, `libero_goal_no_noops`, or `libero_object_no_noops` datasets from the `IPEC-COMMUNITY` HuggingFace organization and repeat the workflow. Published success rates: Object 98.45%, Goal 97.5%, 10-Long 94.35%.
+        - **Closed-loop simulation evaluation** — Set up the LIBERO simulation environment to test the fine-tuned model in a live control loop with the Panda robot arm. See the [LIBERO evaluation guide](https://github.com/NVIDIA/Isaac-GR00T/blob/main/examples/LIBERO/README.md#evaluate-checkpoint) for server-client setup.
+        - **Custom embodiments** — Fine-tune GR00T on your own robot data by following the [custom embodiment guide](https://github.com/NVIDIA/Isaac-GR00T/blob/main/getting_started/finetune_new_embodiment.md). Requires converting your data to LeRobot v2 format and defining a modality config.
+        - **Experiment with batch size** — The GB300's 284 GB HBM3e may support even larger batch sizes depending on which model components are being tuned. The default configuration tunes the projector and diffusion model only. Enabling `--tune-llm` or `--tune-visual` increases memory usage significantly.
+        
+      
+
+    - 
+      id: troubleshooting
+      
+      label: Troubleshooting
+      content: |
+        # Common Issues
+        
+        ## Issue: `install_deps.sh` fails building torchcodec
+        
+        **Solution:**
+        
+        Ensure the license confirmation env var is set:
+        
+        ```bash
+        I_CONFIRM_THIS_IS_NOT_A_LICENSE_VIOLATION=1 bash scripts/deployment/dgpu/install_deps.sh
+        ```
+        
+        If the build still fails, ensure FFmpeg dev libraries are installed:
+        
+        ```bash
+        sudo apt-get install -y libavdevice-dev libavfilter-dev libavformat-dev \
+            libavcodec-dev libavutil-dev libswresample-dev libswscale-dev
+        ```
+        
+        ## Issue: `huggingface-cli download` fails with 401 Unauthorized
+        
+        **Solution:**
+        
+        Verify your HuggingFace token is set and valid:
+        
+        ```bash
+        echo $HF_TOKEN
+        huggingface-cli whoami
+        ```
+        
+        If the token is not set:
+        
+        ```bash
+        export HF_TOKEN="your_token_here"
+        ```
+        
+        Make sure you have accepted any required model agreements on the HuggingFace model page.
+        
+        ## Issue: CUDA out of memory during fine-tuning
+        
+        **Solution:**
+        
+        If fine-tuning fails with an OOM error at batch size 128, reduce the batch size:
+        
+        ```bash
+        --global-batch-size 64
+        ```
+        
+        Also check that no other processes are using GPU memory:
+        
+        ```bash
+        nvidia-smi
+        ```
+        
+        If you are tuning additional model components (`--tune-llm` or `--tune-visual`), these significantly increase memory usage. The default configuration (projector + diffusion model only) is the most memory-efficient.
+        
+        ## Issue: Triton/PTXAS errors about `sm_103a` during inference
+        
+        **Solution:**
+        
+        The bundled Triton version may not yet support SM103 (GB300). This causes errors like:
+        
+        ```
+        ptxas-blackwell fatal: Value 'sm_103a' is not defined for option 'gpu-name'
+        ```
+        
+        Disable `torch.compile` by prepending:
+        
+        ```bash
+        TORCHDYNAMO_DISABLE=1 python scripts/deployment/standalone_inference_script.py ...
+        ```
+        
+        This runs inference in eager mode (~240 ms/step instead of ~38 ms/step with compile). Training and open-loop evaluation are not affected since they use eager mode by default.
+        
+        ## Issue: `ModuleNotFoundError: No module named 'gr00t'`
+        
+        **Solution:**
+        
+        The virtual environment is not activated. Run:
+        
+        ```bash
+        source .venv/bin/activate
+        ```
+        
+        Verify you are in the Isaac-GR00T directory:
+        
+        ```bash
+        pwd
+        # Should show: .../Isaac-GR00T
+        ```
+        
+        ## Issue: Training loss is not decreasing
+        
+        **Solution:**
+        
+        At 2000 steps, the model may not have converged fully — this is expected for the shortened playbook run. If loss remains flat after 500+ steps:
+        
+        1. Verify the dataset was downloaded correctly and the modality config was copied:
+           ```bash
+           ls examples/LIBERO/libero_spatial_no_noops_1.0.0_lerobot/meta/modality.json
+           ```
+        
+        2. Check that the correct embodiment tag is used (`LIBERO_PANDA`, not `NEW_EMBODIMENT`).
+        
+        3. Try increasing the learning rate to `5e-4` for faster initial convergence on short runs.
+        
+        ## Issue: `nvidia-smi` shows the wrong GPU
+        
+        **Solution:**
+        
+        On DGX Station, the GB300 may not be device 0. Find the correct index:
+        
+        ```bash
+        nvidia-smi --query-gpu=index,name --format=csv,noheader
+        ```
+        
+        Use the GB300's index with `CUDA_VISIBLE_DEVICES`:
+        
+        ```bash
+        CUDA_VISIBLE_DEVICES=1 python ...
+        ```
+        
+        ## Issue: Slow data loading during training
+        
+        **Solution:**
+        
+        Increase the number of dataloader workers:
+        
+        ```bash
+        --dataloader-num-workers 8
+        ```
+        
+        ## Issue: Video decoding errors (`NotImplementedError` or torchcodec not found)
+        
+        **Solution:**
+        
+        The `install_deps.sh` script builds torchcodec from source on aarch64. If it wasn't built correctly, reinstall:
+        
+        ```bash
+        sudo apt-get install -y libavdevice-dev libavfilter-dev libavformat-dev \
+            libavcodec-dev libavutil-dev libswresample-dev libswscale-dev \
+            pkg-config cmake build-essential pybind11-dev
+        
+        git clone --depth 1 --branch release/0.4 https://github.com/meta-pytorch/torchcodec.git /tmp/torchcodec
+        cd /tmp/torchcodec
+        I_CONFIRM_THIS_IS_NOT_A_LICENSE_VIOLATION=1 ENABLE_CUDA=1 \
+            uv pip install --python .venv/bin/python . --no-build-isolation
+        cd - && rm -rf /tmp/torchcodec
+        ```
+        
+      
+
+
+    resources:
+    - name: Isaac GR00T (GitHub)
+      url: https://github.com/NVIDIA/Isaac-GR00T
+      
+
+    - name: GR00T N1.6 Model (HuggingFace)
+      url: https://huggingface.co/nvidia/GR00T-N1.6-3B
+      
+
+    - name: GR00T N1.6 Research Blog
+      url: https://research.nvidia.com/labs/gear/gr00t-n1_6/
+      
+
+    - name: GR00T N1.6 Paper
+      url: https://arxiv.org/abs/2503.14734
+      
+
+    - name: LIBERO Benchmark
+      url: https://libero-project.github.io/main.html
+      
+

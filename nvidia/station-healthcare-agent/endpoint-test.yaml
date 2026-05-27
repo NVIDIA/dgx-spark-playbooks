@@ -152,10 +152,8 @@ spec:
           * Large model downloads (~86 GB) may fail on slow or unstable connections
           * OpenFold3 NIM takes ~3 minutes to load — the healthcheck waits automatically
         * **Rollback:** `openshell sandbox delete clinical-sandbox`, `make down`, `make clean` (see Cleanup in Instructions).
-        * **Last Updated:** 05/06/2026
-          * Refocused positioning on secure local agent workflows
-          * Added architecture section with agent descriptions and skill file examples
-          * Addressed VDR feedback: documented host-Ollama port conflict, NGC docker login, multi-GPU pinning, Node.js v22 upgrade, and other infrastructure setup gaps
+        * **Last Updated:** 05/12/2026
+          * First Publication
         
         ## Notice and disclaimers
         

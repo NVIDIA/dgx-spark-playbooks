@@ -309,4 +309,4 @@ After running `sudo nvidia-smi -mig 0`, confirm MIG is fully disabled:
 nvidia-smi -q | grep -A2 "MIG Mode"
 ```
 
-Expected output should show `Current: Disabled` for each GPU. If you still see MIG devices in `nvidia-smi -L`, destroy any remaining instances with `-dci`/`-dgi` per GPU, then run `-mig 0` again.
+Expected output should show `Current: Disabled` for each GPU. If you still see MIG devices in `nvidia-smi -L`, destroy any remaining instances with `-dci`/`-dgi` per GPU, then run `-mig 0` again

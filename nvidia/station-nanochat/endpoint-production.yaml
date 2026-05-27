@@ -34,7 +34,7 @@ spec:
       
     cta:
       text: View on GitHub
-      url: https://github.com/NVIDIA/dgx-station-playbooks/blob/main/nvidia/station-nanochat/
+      url: https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/station-nanochat/
       
 
     tabs:
@@ -81,7 +81,7 @@ spec:
         
         # Ancillary files
         
-        All required assets are in the playbook directory `nvidia/station-nanochat/assets` (see the [dgx-station-playbooks](https://github.com/NVIDIA/dgx-station-playbooks) repository).
+        All required assets are in the playbook directory `nvidia/station-nanochat/assets` (see the [dgx-spark-playbooks](https://github.com/NVIDIA/dgx-spark-playbooks) repository).
         
         - `assets/Dockerfile` – PyTorch NGC image plus nanochat dependencies and venv.
         - `assets/setup.sh` – Clones nanochat, checks out the supported commit, and builds the Docker image.
@@ -128,8 +128,8 @@ spec:
         Clone the playbook repository and run the setup script to clone the nanochat repo and build the Docker image.
         
         ```bash
-        git clone https://github.com/NVIDIA/dgx-station-playbooks.git
-        cd dgx-station-playbooks/nvidia/station-nanochat/assets
+        git clone https://github.com/NVIDIA/dgx-spark-playbooks
+        cd dgx-spark-playbooks/nvidia/station-nanochat/assets
         ```
         
         From the `assets` directory, run the setup script. It clones [nanochat](https://github.com/karpathy/nanochat), checks out the supported commit, and builds the `nanochat` Docker image (PyTorch NGC base with tiktoken, tokenizers, datasets, wandb, etc.).
