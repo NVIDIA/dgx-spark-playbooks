@@ -330,7 +330,7 @@ spec:
         
         ```bash
         git clone https://github.com/NVIDIA/dgx-spark-playbooks
-        cd dgx-station-playbooks/nvidia/station-sglang-inference
+        cd dgx-spark-playbooks/nvidia/station-sglang-inference
         ```
         
         > [!TIP]

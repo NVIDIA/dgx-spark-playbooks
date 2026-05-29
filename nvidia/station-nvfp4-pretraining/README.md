@@ -66,7 +66,7 @@ NVFP4 is **1.68× faster** than BF16 (≈68% higher throughput) with ≈13.8 GB 
 - NVIDIA DGX Station with Blackwell architecture GPU (GB300 chip)
 - Docker installed with GPU support
 - NVIDIA Container Toolkit configured
-- Megatron-Bridge installed (via the the NeMo Framework NGC container)
+- Megatron-Bridge installed (via the NeMo Framework NGC container)
 
 Verify your setup:
 
@@ -113,7 +113,7 @@ docker run --rm -it \
   nvcr.io/nvidia/nemo:${TAG}
 ```
 
-All subsequent `torchrun` / `python` commands in this playbook are meant to be executed **from the shell inside this container** .
+All subsequent `torchrun` / `python` commands in this playbook are meant to be executed **from the shell inside this container**.
 
 ## Step 2. Review the pretraining script
 
@@ -248,6 +248,6 @@ Then exit the container shell (`exit`) — the `--rm` flag in Step 1 deletes it 
 | `CUDA out of memory` during model init | Insufficient GPU memory for Llama 3.1 8B + optimizer states | Reduce `micro_batch_size` or use `--nproc_per_node` for model parallelism |
 | `torchrun` hangs or times out | NCCL communication failure between GPUs | Check `NCCL_DEBUG=INFO torchrun ...` for details; verify all GPUs are visible |
 | Training loss is NaN | Precision instability | Increase `num_layers_at_end_in_bf16` (e.g., from 4 to 8) or reduce learning rate |
-| `--no-fp4` works but NVFP4 crashes | Transformer Engine version mismatch | Ensure Transformer Engine supports NVFP4; update with `pip install --upgrade transformer-engine` |
+| `--disable-fp4` works but NVFP4 crashes | Transformer Engine version mismatch | Ensure Transformer Engine supports NVFP4; update with `pip install --upgrade transformer-engine` |
 | Slow training throughput | Not using Tensor Cores efficiently | Ensure batch dimensions are multiples of 8; check that `nvidia-smi` shows high GPU utilization |
 | Permission denied on Docker | User not in docker group | Run `sudo usermod -aG docker $USER && newgrp docker` |

@@ -101,12 +101,12 @@ spec:
         
         # Time & risk
         
-        * **Estimated duration**: 20-30 minutes (quick test loop with default `--train-iters 10`); longer for real data
+        * **Estimated duration**: 20-30 minutes (quick test loop with default `--train-iters 50`); longer for real data
         * **Risks**:
           * NVFP4 requires Blackwell GPUs — will fail on Hopper or older
           * Mock data is used by default (`eval_iters=0`); real data requires a preprocessed Megatron-format dataset
         * **Rollback**: Stop the `torchrun` process and remove any checkpoint directories
-        * **Last Updated:** 04/19/2026
+        * **Last Updated:** 05/26/2026
           * First Publication
         
       
@@ -276,7 +276,7 @@ spec:
         |---------|-------|-----|
         | `RuntimeError: NVFP4 is not supported on this GPU` or similar FP4 error | GPU is not Blackwell architecture | NVFP4 requires Blackwell GPUs (GB200, GB300). Check with `nvidia-smi` |
         | `ModuleNotFoundError: No module named 'megatron.bridge'` | Megatron Bridge not installed | Run `pip install megatron-bridge` or use the NGC container |
-        | `CUDA out of memory` during model init | Insufficient GPU memory for Llama 1B + optimizer states | Reduce `micro_batch_size` or use `--nproc_per_node` for model parallelism |
+        | `CUDA out of memory` during model init | Insufficient GPU memory for Llama 3.1 8B + optimizer states | Reduce `micro_batch_size` or use `--nproc_per_node` for model parallelism |
         | `torchrun` hangs or times out | NCCL communication failure between GPUs | Check `NCCL_DEBUG=INFO torchrun ...` for details; verify all GPUs are visible |
         | Training loss is NaN | Precision instability | Increase `num_layers_at_end_in_bf16` (e.g., from 4 to 8) or reduce learning rate |
         | `--no-fp4` works but NVFP4 crashes | Transformer Engine version mismatch | Ensure Transformer Engine supports NVFP4; update with `pip install --upgrade transformer-engine` |

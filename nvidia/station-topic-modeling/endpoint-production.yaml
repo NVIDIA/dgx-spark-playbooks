@@ -33,7 +33,6 @@ spec:
     cta:
       text: View on GitHub
       url: https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/station-topic-modeling/
-
       
 
     tabs:

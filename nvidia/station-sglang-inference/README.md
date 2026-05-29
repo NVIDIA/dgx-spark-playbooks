@@ -298,7 +298,7 @@ This step uses `benchmark_multiturn.py` from this playbook's `assets/` directory
 
 ```bash
 git clone https://github.com/NVIDIA/dgx-spark-playbooks
-cd dgx-station-playbooks/nvidia/station-sglang-inference
+cd dgx-spark-playbooks/nvidia/station-sglang-inference
 ```
 
 > [!TIP]

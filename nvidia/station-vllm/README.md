@@ -1,11 +1,11 @@
-# Serve Qwen3-235B with vLLM
+# vLLM for Inference
 
-> Set up vLLM server with Qwen3-235B on DGX Station
+> Install and use vLLM on DGX Station
 
 ## Table of Contents
 
 - [Overview](#overview)
-- [Serve Qwen3-235B](#serve-qwen3-235b)
+- [Instructions](#instructions)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -22,7 +22,9 @@ vLLM is an inference engine designed to run large language models efficiently. T
 
 ## What you'll accomplish
 
-Serve the **Qwen3-235B-A22B-NVFP4** model using vLLM on NVIDIA DGX Station. This 235B parameter model uses NVFP4 quantization and fits entirely in VRAM on the GB300 GPU.
+Serve a **supported model** using vLLM on NVIDIA DGX Station. Refer to the table below to see the supported models.
+
+You'll set up vLLM high-throughput LLM serving on NVIDIA DGX Station with Blackwell architecture.
 
 ## What to know before starting
 
@@ -37,16 +39,25 @@ Serve the **Qwen3-235B-A22B-NVFP4** model using vLLM on NVIDIA DGX Station. This
 - HuggingFace account with access token
 - Network access to NGC and HuggingFace
 
+## Model Support Matrix
+
+The following models are supported with vLLM on DGX Station. All listed models are available and ready to use:
+
+| Model | Quantization | Support Status | HF Handle |
+|-------|-------------|----------------|-----------|
+| **Step-3.7-Flash-FP8** | FP8 | ✅ | [`stepfun-ai/Step-3.7-Flash-FP8`](https://huggingface.co/stepfun-ai/Step-3.7-Flash-FP8) |
+| **Step-3.7-Flash-NVFP4** | NVFP4 | ✅ | [`stepfun-ai/Step-3.7-Flash-NVFP4`](https://huggingface.co/stepfun-ai/Step-3.7-Flash-NVFP4) |
+| **Qwen3-235B-A22B-NVFP4** | NVFP4 | ✅ | [`nvidia/Qwen3-235B-A22B-NVFP4`](https://huggingface.co/nvidia/Qwen3-235B-A22B-NVFP4) |
 
 ## Time & risk
 
-* **Duration:** 15-20 minutes (longer on first run due to model download)
+* **Duration:** 30 minutes (longer on first run due to model download)
 * **Risks:** Model download requires HuggingFace authentication
 * **Rollback:** Stop and remove the container to restore state
-* **Last Updated:** 03/02/2026
-  * First Publication
+* **Last Updated:** 05/28/2026
+  * Update models
 
-## Serve Qwen3-235B
+## Instructions
 
 ## Step 1. Set up Docker permissions
 
@@ -67,7 +78,7 @@ Set the following so the vLLM container can download the model and use your chos
 export HF_TOKEN="your_huggingface_token"
 
 ## Model to serve
-export MODEL_HANDLE="nvidia/Qwen3-235B-A22B-NVFP4"
+export MODEL_HANDLE="<HF_HANDLE>"
 
 ## Maximum context length
 export MAX_MODEL_LEN=8192
@@ -81,9 +92,16 @@ Pull the vLLM container from NGC. Use the **26.01** image on DGX Station; the 25
 docker pull nvcr.io/nvidia/vllm:26.01-py3
 ```
 
+For Step-3.7-Flash models, pull the custom VLLM container
+```bash
+docker pull vllm/vllm-openai:stepfun37
+```
+
 ## Step 4. Start vLLM server
 
-Start the vLLM server with the Qwen3-235B model. This model fits entirely in VRAM on the GB300. On a single-GPU DGX Station, `--gpus all` uses the GB300; if you have multiple GPUs and want to use only the GB300, replace with `--gpus '"device=N"'` where N is the GB300 device ID from `nvidia-smi`.
+Start the vLLM server with the model. On a single-GPU DGX Station, `--gpus all` uses the GB300; if you have multiple GPUs and want to use only the GB300, replace with `--gpus '"device=N"'` where N is the GB300 device ID from `nvidia-smi`.
+
+For Qwen3-235B NVFP4 model, run with the NGC container. This model fits entirely in VRAM on the GB300.
 
 ```bash
 docker run -d \
@@ -101,6 +119,28 @@ docker run -d \
     --gpu-memory-utilization 0.9
 ```
 
+For Step-3.7-Flash models, run with the custom VLLM container. The FP8 and the NVFP4 versions fit entirely in VRAM on the GB300.
+
+```bash
+docker run -d \
+  --name vllm-server \
+  --gpus all \
+  --ipc host \
+  --ulimit memlock=-1 \
+  --ulimit stack=67108864 \
+  -p 8000:8000 \
+  -e HF_TOKEN="$HF_TOKEN" \
+  -v "$HOME/.cache/huggingface/hub:/root/.cache/huggingface/hub" \
+  vllm/vllm-openai:stepfun37 \
+  "$MODEL_HANDLE" \
+    --gpu-memory-utilization 0.95 \
+    --trust-remote-code \
+    --reasoning-parser step3p5 \
+    --enable-auto-tool-choice \
+    --tool-call-parser step3p5 \
+    --kv-cache-dtype fp8
+```
+
 Check the server logs for startup progress:
 
 ```bash
@@ -110,7 +150,7 @@ docker logs -f vllm-server
 Expected output includes:
 - Model download progress (first run only)
 - Model loading into GPU memory
-- `Uvicorn running on http://0.0.0.0:8000`
+- `Application startup complete.`
 
 Press `Ctrl+C` to exit log view once the server is ready.
 
@@ -141,9 +181,10 @@ docker rm vllm-server
 
 Optionally, remove the image and cached model:
 
+Eg.
 ```bash
-docker rmi nvcr.io/nvidia/vllm:26.01-py3
-rm -rf $HOME/.cache/huggingface/hub/models--nvidia--Qwen3-235B-A22B-NVFP4
+docker rmi "<docker image name>"
+rm -rf $HOME/.cache/huggingface/hub/"<downloaded model name>"
 ```
 
 ## Troubleshooting
