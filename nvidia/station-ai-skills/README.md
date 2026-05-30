@@ -1,0 +1,327 @@
+# DGX Station AI Skills for Coding Agents
+
+> Give your coding agent (Claude Code, Codex, Gemini CLI, Cursor) DGX Station expertise via an AGENTS.md and on-demand Agent Skills
+
+
+## Table of Contents
+
+- [Overview](#overview)
+  - [AGENTS.md vs Agent Skill — why split?](#agentsmd-vs-agent-skill-why-split)
+- [Instructions](#instructions)
+  - [Project-specific](#project-specific)
+- [Troubleshooting](#troubleshooting)
+
+---
+
+## Overview
+
+## Basic idea
+
+Modern coding agents — Claude Code, OpenAI Codex CLI, Gemini CLI, Cursor — all support two extension mechanisms: a project-level **context file** that's loaded into every conversation, and **on-demand procedural workflows** (called skills, prompts, commands, or rules depending on the harness). This playbook ships both for DGX Station:
+
+- An **`AGENTS.md`** with the critical DGX Station constraints your agent should always know (mixed coherency, GPU targeting, common pitfalls). `AGENTS.md` is the cross-harness standard; an `install.sh` lays it down as `CLAUDE.md`, `GEMINI.md`, or `AGENTS.md` depending on the agent you use.
+- **Four Agent Skills** — `vllm-setup`, `sglang-setup`, `mig-configure`, `dgx-diagnose` — authored once in the [Anthropic Agent Skills format](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) and installed into the right per-harness location (`.claude/skills/`, `.codex/prompts/`, `.gemini/commands/`, or `.cursor/rules/`).
+
+This approach keeps your agent's context lean in every conversation while giving it deep procedural knowledge on demand, regardless of which agent you use.
+
+### AGENTS.md vs Agent Skill — why split?
+
+| | AGENTS.md | Agent Skill |
+|---|---|---|
+| **Loaded** | Every conversation, automatically | Only when invoked by name (or matched by description, in Claude) |
+| **Best for** | Constraints, pitfalls, "never do X" rules | Step-by-step workflows, deployment procedures |
+| **Context cost** | Consumed every time | Zero until invoked |
+
+The DGX Station mixed-coherency constraint (`--gpus all` will crash) should be in every conversation. The full vLLM deployment procedure should not.
+
+## What you'll accomplish
+
+- Install the `AGENTS.md` and four Agent Skills into your project directory for your chosen agent (Claude Code, Codex, Gemini CLI, or Cursor).
+- Verify the agent loads the constraints automatically and the skills on demand.
+- Invoke `vllm-setup` to deploy a vLLM inference server with validated configuration.
+- Invoke `sglang-setup` to deploy an SGLang inference server.
+- Invoke `mig-configure` to partition the GB300 into MIG instances.
+- Invoke `dgx-diagnose` to troubleshoot common DGX Station issues.
+
+## What to know before starting
+
+- Basic familiarity with one supported coding agent (running it, giving it prompts, using slash commands or rule references)
+- General understanding of DGX Station (two GPUs, Docker-based workflows)
+
+## Prerequisites
+
+- NVIDIA DGX Station with GB300
+- One of the supported coding agents installed:
+  - **Claude Code:** `curl -fsSL https://claude.ai/install.sh | sh`
+  - **OpenAI Codex CLI:** `npm i -g @openai/codex`
+  - **Gemini CLI:** `npm i -g @google/gemini-cli`
+  - **Cursor:** download from `https://cursor.com/`
+- A project directory where you do DGX Station work
+
+## Ancillary files
+
+- `assets/AGENTS.md` — canonical context file with critical constraints, GPU targeting, software versions, and common pitfalls. Cross-harness standard.
+- `assets/skills/vllm-setup/SKILL.md` — skill: deploy vLLM with validated configuration.
+- `assets/skills/sglang-setup/SKILL.md` — skill: deploy SGLang with validated configuration.
+- `assets/skills/mig-configure/SKILL.md` — skill: configure MIG partitions on the GB300.
+- `assets/skills/dgx-diagnose/SKILL.md` — skill: troubleshoot common DGX Station issues.
+- `assets/install.sh` — per-harness installer (`claude`, `codex`, `gemini`, `cursor`, or `all`).
+
+## Time & risk
+
+* **Duration:** 10-15 minutes
+* **Risk level:** Low — this playbook copies markdown files into your project directory
+* **Rollback:** Delete the context file (`AGENTS.md` / `CLAUDE.md` / `GEMINI.md`) and the harness-specific skill directory (`.claude/skills/`, `.codex/prompts/`, `.gemini/commands/`, or `.cursor/rules/`) from your project directory
+* **Last Updated:** 05/18/2026
+  * Restructured as harness-agnostic Agent Skills (Claude Code, Codex, Gemini CLI, Cursor)
+
+## Instructions
+
+## Step 1. Install your coding agent
+
+Pick whichever agent you prefer — the rest of this playbook works the same regardless. Install commands:
+
+| Agent | Install |
+|-------|---------|
+| Claude Code | `curl -fsSL https://claude.ai/install.sh \| sh` |
+| OpenAI Codex CLI | `npm i -g @openai/codex` |
+| Gemini CLI | `npm i -g @google/gemini-cli` |
+| Cursor | Download from `https://cursor.com/` |
+
+Verify with `claude --version`, `codex --version`, `gemini --version`, or by launching Cursor.
+
+## Step 2. Install the skills into your project
+
+Navigate to the project where you want DGX Station expertise, then run the installer with the harness you use:
+
+```bash
+cd ~/your-project
+
+## Pick one:
+/path/to/this/playbook/assets/install.sh claude
+/path/to/this/playbook/assets/install.sh codex
+/path/to/this/playbook/assets/install.sh gemini
+/path/to/this/playbook/assets/install.sh cursor
+
+## Or install for all four at once:
+/path/to/this/playbook/assets/install.sh all
+```
+
+If you downloaded the playbook as a zip, the path is relative to the extracted directory:
+
+```bash
+station-ai-skills/assets/install.sh claude ~/your-project
+```
+
+The installer is additive for skill directories (won't clobber existing skills you've written) and refuses to overwrite an existing context file (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`) unless you pass `--force`.
+
+**Resulting layout** (per harness):
+
+```text
+your-project/
+  AGENTS.md   or  CLAUDE.md   or  GEMINI.md      # context file (named for your agent)
+  .claude/skills/<name>/SKILL.md                  # claude
+  .codex/prompts/<name>.md                        # codex
+  .gemini/commands/<name>.md                      # gemini
+  .cursor/rules/<name>.mdc                        # cursor
+```
+
+Where `<name>` is each of `vllm-setup`, `sglang-setup`, `mig-configure`, `dgx-diagnose`.
+
+> [!NOTE]
+> Every supported agent automatically reads the context file from the working directory at startup. Skills/prompts/rules in the harness-specific directory are discovered automatically — no additional configuration needed.
+
+## Step 3. Verify the setup
+
+Start your agent in the project directory and ask a question that requires constraint knowledge:
+
+```text
+Can I use --gpus all to run my CUDA workload on DGX Station?
+```
+
+The agent should immediately warn about the mixed-coherency constraint and recommend `--gpus '"device=N"'` targeting. If you don't get the warning, the context file isn't being loaded — see Troubleshooting.
+
+Then verify the skills are discoverable:
+
+| Agent | How to check |
+|-------|--------------|
+| Claude Code | Type `/` — `vllm-setup`, `sglang-setup`, `mig-configure`, `dgx-diagnose` should appear in the autocomplete |
+| Codex CLI | Type `/prompts:` — same four names appear |
+| Gemini CLI | Type `/` — same four names appear |
+| Cursor | Open the Rules panel — same four rules appear |
+
+## Step 4. Use vllm-setup to deploy an inference server
+
+Invoke the skill in your agent:
+
+| Agent | Invocation |
+|-------|-----------|
+| Claude Code | `/vllm-setup` (slash command) or just describe the task ("deploy vllm with Qwen3-8B") |
+| Codex CLI | `/prompts:vllm-setup` |
+| Gemini CLI | `/vllm-setup` |
+| Cursor | In chat: "use the vllm-setup rule to deploy a vllm server" |
+
+The agent will walk you through deploying a vLLM server with a validated container image, correct GPU targeting, and recommended parameters. It will check your GPU index, ask which model you want to serve, and generate the full `docker run` command.
+
+## Step 5. Use sglang-setup to deploy SGLang
+
+Same invocation pattern, but for SGLang with the `cu130` container, RadixAttention prefix caching, and structured JSON output support.
+
+## Step 6. Use mig-configure to partition the GB300
+
+The agent will query your current MIG state, show available profiles, help you choose a layout for your workloads, and execute the partitioning commands.
+
+## Step 7. Use dgx-diagnose to troubleshoot issues
+
+If you encounter problems, invoke `dgx-diagnose`. The agent will check GPU status, driver version, running processes, MIG state, and Fabric Manager to identify the issue.
+
+## Step 8. Customize
+
+Both the `AGENTS.md` and the skills are plain markdown — extend them freely.
+
+**Add project-specific constraints to `AGENTS.md`** (or your harness-specific context file):
+
+```markdown
+### Project-specific
+
+- Our production MIG layout is 3g.139gb + 2g.70gb + 2g.70gb
+- Always use port 8080 for inference (nginx proxy on 443)
+- Model weights are cached at /data/models, mount with -v /data/models:/root/.cache/huggingface/hub
+```
+
+**Create new skills** by adding a directory and `SKILL.md` to `assets/skills/`, then re-run `install.sh`:
+
+```bash
+mkdir -p assets/skills/run-benchmarks
+cat > assets/skills/run-benchmarks/SKILL.md << 'EOF'
+---
+name: run-benchmarks
+description: Run our standard inference benchmark suite against the running vLLM or SGLang server and compare against the baseline.
+---
+
+## Run benchmarks
+
+1. Check which inference server is running (vLLM on port 8000 or SGLang on port 30000)
+2. Run the appropriate benchmark script from ./benchmarks/
+3. Report throughput (tokens/sec), latency (TTFT, ITL), and memory utilization
+4. Compare against the baseline in ./benchmarks/baseline.json
+EOF
+```
+
+> [!TIP]
+> Keep `AGENTS.md` focused on constraints and pitfalls (things that break). Put procedural workflows in skills (things you do step-by-step).
+
+## Troubleshooting
+
+## Skills don't appear in autocomplete / aren't discoverable
+
+Each agent discovers skills from a harness-specific directory in the current directory (or a parent). Check the right one:
+
+| Agent | Expected location |
+|-------|-------------------|
+| Claude Code | `.claude/skills/<name>/SKILL.md` |
+| Codex CLI | `.codex/prompts/<name>.md` |
+| Gemini CLI | `.gemini/commands/<name>.md` |
+| Cursor | `.cursor/rules/<name>.mdc` |
+
+```bash
+## Examples — check the directory for your agent
+ls -la .claude/skills/
+ls -la .codex/prompts/
+ls -la .gemini/commands/
+ls -la .cursor/rules/
+```
+
+You should see entries for `vllm-setup`, `sglang-setup`, `mig-configure`, and `dgx-diagnose`.
+
+**Check you're in the right directory:**
+
+```bash
+pwd
+```
+
+The agent must be started from the directory containing the harness directory, or a subdirectory of it.
+
+## Context file not loaded
+
+If the agent gives generic answers without DGX Station awareness, the context file isn't being picked up. Each agent reads a different filename — verify the one for your agent exists:
+
+| Agent | Expected filename |
+|-------|-------------------|
+| Claude Code | `CLAUDE.md` (also reads `AGENTS.md` as fallback) |
+| Codex CLI | `AGENTS.md` |
+| Gemini CLI | `GEMINI.md` |
+| Cursor | `AGENTS.md` |
+
+```bash
+## Verify the file exists for your agent
+cat AGENTS.md | head -5
+cat CLAUDE.md | head -5
+cat GEMINI.md | head -5
+
+## Restart the agent in the correct directory
+cd ~/your-project
+claude    # or codex, gemini, etc.
+```
+
+All four agents read the context file from the working directory (and parent directories up to the project root).
+
+## Skill gives outdated information
+
+The skills contain validated container versions and parameters as of the publication date. If a newer container is available, edit the canonical source and re-install:
+
+```bash
+nano /path/to/playbook/assets/skills/vllm-setup/SKILL.md
+/path/to/playbook/assets/install.sh all --force
+```
+
+Or edit the installed copy directly:
+
+```bash
+## Claude Code
+nano .claude/skills/vllm-setup/SKILL.md
+## Codex
+nano .codex/prompts/vllm-setup.md
+## Gemini CLI
+nano .gemini/commands/vllm-setup.md
+## Cursor
+nano .cursor/rules/vllm-setup.mdc
+```
+
+> [!TIP]
+> Skills are plain markdown — you can version them in git alongside your project code.
+
+## "Both GPUs cannot be used" errors
+
+This is the mixed-coherency constraint working as intended. If you see CUDA errors when using `--gpus all`:
+
+```bash
+## Find the GB300 index
+nvidia-smi --query-gpu=index,name --format=csv,noheader
+
+## Use device-specific targeting
+docker run --gpus '"device=1"' ...
+```
+
+The `AGENTS.md` covers this constraint, but if you removed that section, add it back — it's the most important piece of DGX Station knowledge.
+
+## Skills conflict with existing project directory
+
+If your project already has a `.claude/`, `.codex/`, `.gemini/`, or `.cursor/` directory with its own contents, `install.sh` is **additive** for skill directories — it adds the new skill files alongside whatever you already have and warns on collision rather than overwriting.
+
+For context files (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`), the installer **refuses** to overwrite an existing file. Pass `--force` to override, or merge the new content manually:
+
+```bash
+## See what would be written
+diff /path/to/playbook/assets/AGENTS.md ./AGENTS.md
+
+## Force overwrite
+/path/to/playbook/assets/install.sh claude . --force
+```
+
+## Installer reports "WROTE" for some files but "SKIP" for others
+
+That's the safe-by-default behavior. The installer skips any file that already exists, prints a warning, and continues with the rest. To get a clean install, either:
+
+1. Delete the existing files first: `rm -rf .claude/skills/{vllm-setup,sglang-setup,mig-configure,dgx-diagnose}`
+2. Or pass `--force` (only affects context files; skill files are still skipped if present)

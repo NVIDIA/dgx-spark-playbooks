@@ -1,4 +1,4 @@
-# Station Register to Brev
+# Register DGX Station to Brev
 
 > Link your DGX Station to Brev for remote access and sharing
 
@@ -27,7 +27,7 @@ You’ll register your DGX Station with Brev and it will be visible as a healthy
 While Brev automates the complex configuration, understanding a few key concepts when establishing the initial connection will be useful:
 
 * **Terminal Basics**:
-  * Familiarity with the command line to run a few simple setup commands
+  * Familiarity with command-line use to run a few simple setup commands.
 
 ## Prerequisites
 
@@ -45,22 +45,27 @@ You will also need the following:
 * **Estimated time:** 5-10 minutes
 * **Risk level:** Low - Registration configures the Station for secure remote access without altering your existing workloads
 * **Rollback:** The Brev configuration can be removed through the UI and CLI
+* **Last Updated:** 05/29/2026
+  * First Publication
 
 ## Instructions
 
-## Step 1. Login to Brev
+## Step 1. Log in to Brev
 
-Go to the [Brev UI](https://brev.nvidia.com), log in, and confirm you’re in the correct org (by clicking the org button on the top right hand side of the page). Once logged in, go to the [Registered Compute](https://brev.nvidia.com/org/environments?tab=registered-compute) section under the "GPU" tab in the main navigation.
+Go to the [Brev UI](https://brev.nvidia.com), log in, and confirm you’re in the correct org (by clicking the org button on the top right-hand side of the page). Once logged in, go to the [Registered Compute](https://brev.nvidia.com/org/environments?tab=registered-compute) section under the "GPU" tab in the main navigation.
 
 Click the “Register Compute” button and follow the instructions in the pop-up window.
 
-## Step 2. Complete Popup Instructions
+## Step 2. Complete Pop-up Instructions
 
 * Install the Brev CLI
 * Configure your compute
     * Add a name for compute
-    * To configure ssh, ensure the “Enable SSH access” toggle is on
+    * To configure SSH, ensure the “Enable SSH access” toggle is on
 * Run the registration command
+
+> [!IMPORTANT]
+> Run the Brev CLI install command **without `sudo`**. Prefixing the installer with `sudo` writes the `brev` binary into root's home directory, which is not on your user shell's `PATH` — the next command will fail with `brev: command not found`. Copy the install command from the pop-up and run it as your normal user.
 
 ## Step 3. Follow Registration Flow
 
@@ -70,7 +75,7 @@ In the CLI, you’ll be walked through registration. Go through the flow until r
 
 * Go to the [Brev UI](https://brev.nvidia.com)
 * Navigate to the [Registered Compute](https://brev.nvidia.com/org/environments?tab=registered-compute)
-* Confirm that the DGX Station appears as a registered node with an **Available** status 
+* Confirm that the DGX Station appears as a registered node with a **Connected** status 
 
 ## Step 5. Next Steps
 
@@ -78,7 +83,14 @@ Your DGX Station is now integrated into Brev as a secure, remotely accessible GP
 
 Now that your hardware is connected, you can:
 
-* **Share Access Anywhere:** Access your machine from anywhere and share access with others through the Brev UI under [Registered Compute](https://brev.nvidia.com/org/environments?tab=registered-compute).
+* **Access your machine from anywhere:** Open the [Brev UI](https://brev.nvidia.com) and launch a session from [Registered Compute](https://brev.nvidia.com/org/environments?tab=registered-compute).
+* **Share access with others:** Invite teammates to your DGX Station from the Brev UI:
+    * Go to the [Brev UI](https://brev.nvidia.com) and open [Registered Compute](https://brev.nvidia.com/org/environments?tab=registered-compute).
+    * Find your DGX Station in the list and open the row's three-dot (⋯) menu.
+    * Select **Share Access**.
+    * Enter the email address of the person you want to share with.
+    * Choose their role / permission level.
+    * Confirm to send the invitation.
 
 ## Step 6. Cleanup
 
@@ -93,12 +105,12 @@ brev deregister
 In the UI:
 * Go to the [Brev UI](https://brev.nvidia.com)
 * Navigate to the section listing “GPU Environments” and look under “Registered Compute”
-* Click the “Deregister” menu item on the device you wish to delete from Brev
-* Confirm your selection
+* Click the “Remove” menu item on the device you wish to delete from Brev.
+* Confirm your selection.
 
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| Your DGX Station is showing up in the wrong org | It was registered to the wrong org | Run `brev set <my-org>` and then redo the registration process |
-| Unable to `brev shell <name>` | Need to refresh | `brev refresh` |
+| Your DGX Station is showing up in the wrong org | It was registered to the wrong org | Run `brev set <my-org>` and then redo the registration process. |
+| Unable to `brev shell <name>` | Need to refresh | `brev refresh`. |
