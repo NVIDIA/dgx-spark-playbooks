@@ -370,7 +370,7 @@ docker run \
   -e HF_TOKEN="$HF_TOKEN" \
   -e MODEL_HANDLE="$MODEL_HANDLE" \
   -v "$HOME/.cache/huggingface:/root/.cache/huggingface" \
-  nvcr.io/nvidia/sglang:25.12-py3 \
+  lmsysorg/sglang:latest-cu130 \
   bash -lc '
 python3 -m sglang.bench_offline_throughput \
   --model-path "$MODEL_HANDLE" \
@@ -394,7 +394,7 @@ docker run \
   -e HF_TOKEN="$HF_TOKEN" \
   -e MODEL_HANDLE="$MODEL_HANDLE" \
   -v "$HOME/.cache/huggingface:/root/.cache/huggingface" \
-  nvcr.io/nvidia/sglang:25.12-py3 \
+  lmsysorg/sglang:latest-cu130 \
   bash -lc '
 python3 -m sglang.launch_server \
   --model-path "$MODEL_HANDLE" \
@@ -417,7 +417,7 @@ docker run \
   --network host \
   -e HF_TOKEN="$HF_TOKEN" \
   -e MODEL_HANDLE="$MODEL_HANDLE" \
-  nvcr.io/nvidia/sglang:25.12-py3 \
+  lmsysorg/sglang:latest-cu130 \
   bash -lc '
 python3 -m sglang.bench_serving \
   --backend sglang \

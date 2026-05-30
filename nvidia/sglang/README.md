@@ -17,7 +17,7 @@
 
 SGLang is a fast serving framework for large language models and vision language models that makes
 your interaction with models faster and more controllable by co-designing the backend runtime and
-frontend language. This setup uses the optimized NVIDIA SGLang NGC Container on a single NVIDIA
+frontend language. This setup uses the optimized SGLang CUDA container on a single NVIDIA
 Spark device with Blackwell architecture, providing GPU-accelerated inference with all dependencies
 pre-installed.
 
@@ -39,9 +39,9 @@ vision-language tasks using models like DeepSeek-V2-Lite.
 - NVIDIA Spark device with Blackwell architecture
 - Docker Engine installed and running: `docker --version`
 - NVIDIA GPU drivers installed: `nvidia-smi`
-- NVIDIA Container Toolkit configured: `docker run --rm --gpus all nvcr.io/nvidia/sglang:26.02-py3 nvidia-smi`
+- NVIDIA Container Toolkit configured: `docker run --rm --gpus all lmsysorg/sglang@sha256:ceaf8b16e02d165143633ac228bbb994a05fe77d7e0526cf035ae4bbf4eacc36 nvidia-smi`
 - Sufficient disk space (>20GB available): `df -h`
-- Network connectivity for pulling NGC containers: `ping nvcr.io`
+- Network connectivity for pulling containers: `docker pull lmsysorg/sglang@sha256:ceaf8b16e02d165143633ac228bbb994a05fe77d7e0526cf035ae4bbf4eacc36`
 
 ## Ancillary files
 
@@ -103,7 +103,7 @@ docker --version
 nvidia-smi
 
 ## Verify Docker GPU support
-docker run --rm --gpus all nvcr.io/nvidia/sglang:26.02-py3 nvidia-smi
+docker run --rm --gpus all lmsysorg/sglang@sha256:ceaf8b16e02d165143633ac228bbb994a05fe77d7e0526cf035ae4bbf4eacc36 nvidia-smi
 
 ## Check available disk space
 df -h /
@@ -124,7 +124,7 @@ several minutes depending on your network connection.
 
 ```bash
 ## Pull the SGLang container
-docker pull nvcr.io/nvidia/sglang:26.02-py3
+docker pull lmsysorg/sglang@sha256:ceaf8b16e02d165143633ac228bbb994a05fe77d7e0526cf035ae4bbf4eacc36
 
 ## Verify the image was downloaded
 docker images | grep sglang
@@ -140,7 +140,7 @@ server inside the container, exposing it on port 30000 for client connections.
 docker run --gpus all -it --rm \
   -p 30000:30000 \
   -v /tmp:/tmp \
-  nvcr.io/nvidia/sglang:26.02-py3 \
+  lmsysorg/sglang@sha256:ceaf8b16e02d165143633ac228bbb994a05fe77d7e0526cf035ae4bbf4eacc36 \
   bash
 ```
 
@@ -237,7 +237,7 @@ docker ps | grep sglang | awk '{print $1}' | xargs docker stop
 docker container prune -f
 
 ## Remove SGLang images (optional)
-docker rmi nvcr.io/nvidia/sglang:26.02-py3
+docker rmi lmsysorg/sglang@sha256:ceaf8b16e02d165143633ac228bbb994a05fe77d7e0526cf035ae4bbf4eacc36
 ```
 
 ## Step 10. Next steps

@@ -40,7 +40,7 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 - [Connect Multiple DGX Spark through a Switch](nvidia/multi-sparks-through-switch/)
 - [NCCL for Two Sparks](nvidia/nccl/)
 - [Fine-tune with NeMo](nvidia/nemo-fine-tune/)
-- [NemoClaw with Nemotron 3 Super and Telegram on DGX Spark](nvidia/nemoclaw/)
+- [Run NemoClaw with a Local LLM](nvidia/nemoclaw/)
 - [Nemotron-3-Nano with llama.cpp](nvidia/nemotron/)
 - [NIM on Spark](nvidia/nim-llm/)
 - [NVFP4 Quantization](nvidia/nvfp4-quantization/)

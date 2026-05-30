@@ -1,13 +1,11 @@
-# NemoClaw with Nemotron 3 Super and Telegram on DGX Spark
+# Run NemoClaw with a Local LLM
 
-> Install NemoClaw on DGX Spark with local Ollama inference and Telegram bot integration
+> Build your first local AI assistant on DGX Spark using NemoClaw and Ollama in a secure sandbox, with optional Telegram.
 
 
 ## Table of Contents
 
 - [Overview](#overview)
-  - [Overview](#overview)
-  - [Basic idea](#basic-idea)
   - [What you'll accomplish](#what-youll-accomplish)
   - [Notice and disclaimers](#notice-and-disclaimers)
   - [Isolation layers (OpenShell)](#isolation-layers-openshell)
@@ -17,40 +15,33 @@
   - [Ancillary files](#ancillary-files)
   - [Time and risk](#time-and-risk)
 - [Instructions](#instructions)
-  - [Step 1. Configure Docker and the NVIDIA container runtime](#step-1-configure-docker-and-the-nvidia-container-runtime)
-  - [Step 2. Install Ollama](#step-2-install-ollama)
-  - [Step 3. Pull the Nemotron 3 Super model](#step-3-pull-the-nemotron-3-super-model)
-  - [Step 4. Install NemoClaw](#step-4-install-nemoclaw)
-  - [Step 5. Connect to the sandbox and verify inference](#step-5-connect-to-the-sandbox-and-verify-inference)
-  - [Step 6. Talk to the agent (CLI)](#step-6-talk-to-the-agent-cli)
-  - [Step 7. Interactive TUI](#step-7-interactive-tui)
-  - [Step 8. Exit the sandbox and access the Web UI](#step-8-exit-the-sandbox-and-access-the-web-ui)
-  - [Step 9. Create a Telegram bot](#step-9-create-a-telegram-bot)
-  - [Step 10. Install cloudflared and start the Telegram bridge](#step-10-install-cloudflared-and-start-the-telegram-bridge)
-  - [Step 11. Stop services](#step-11-stop-services)
-  - [Step 12. Uninstall NemoClaw](#step-12-uninstall-nemoclaw)
+  - [Step 1. Install NemoClaw](#step-1-install-nemoclaw)
+  - [Step 2. NemoClaw Onboarding](#step-2-nemoclaw-onboarding)
+  - [Step 3. Interact with OpenClaw](#step-3-interact-with-openclaw)
+  - [Step 4. Enable Brave Search in sandbox](#step-4-enable-brave-search-in-sandbox)
+  - [Step 5. Set up Messaging Channel (Telegram Bot as an example)](#step-5-set-up-messaging-channel-telegram-bot-as-an-example)
+  - [Step 6. Set Up NemoClaw Agents](#step-6-set-up-nemoclaw-agents)
+  - [Step 7. Stop services](#step-7-stop-services)
+  - [Step 8. Uninstall NemoClaw](#step-8-uninstall-nemoclaw)
 - [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Overview
 
-### Overview
+## Basic idea
 
-### Basic idea
+**NVIDIA NemoClaw** is an open-source reference stack that simplifies running OpenClaw always-on assistants more safely. It installs the **NVIDIA OpenShell** runtime — an environment designed for executing agents with additional security — and connects them to **local Ollama** inference on your DGX Spark. A single installer command (`nemoclaw.sh`) handles Node.js, OpenShell, and the NemoClaw CLI; the **onboard** wizard then creates a sandboxed agent, optional **Brave Search**, optional **messaging channels** (Telegram, Discord, or Slack), and a **policy tier** with network presets.
 
-**NVIDIA NemoClaw** is an open-source reference stack that simplifies running OpenClaw always-on assistants more safely. It installs the **NVIDIA OpenShell** runtime -- an environment designed for executing agents with additional security -- and open-source models like NVIDIA Nemotron. A single installer command handles Node.js, OpenShell, and the NemoClaw CLI, then walks you through an onboard wizard to create a sandboxed agent on your DGX Spark using Ollama with Nemotron 3 Super.
-
-By the end of this playbook you will have a working AI agent inside an OpenShell sandbox, accessible via a web dashboard and a Telegram bot, with inference routed to a local Nemotron 3 Super 120B model on your Spark -- all without exposing your host filesystem or network to the agent.
+By the end of this playbook you will have a working AI agent inside an OpenShell sandbox, reachable through the **Web UI** or **terminal TUI**, with inference routed to **local Ollama** on the Spark. You can optionally add **Telegram** (with **cloudflared** for a public webhook URL) and optional **web search** — all without exposing your host filesystem or network beyond what you explicitly allow in policy.
 
 ### What you'll accomplish
 
-- Configure Docker and the NVIDIA container runtime for OpenShell on DGX Spark
-- Install Ollama, pull Nemotron 3 Super 120B, and configure it for sandbox access
-- Install NemoClaw with a single command (handles Node.js, OpenShell, and the CLI)
-- Run the onboard wizard to create a sandbox and configure local inference
-- Chat with the agent via the CLI, TUI, and web UI
-- Set up a Telegram bot that forwards messages to your sandboxed agent
+- Install **NemoClaw** with one command (`nemoclaw.sh`), which pulls Node.js, OpenShell, and the CLI as needed
+- Walk through `nemoclaw onboard` wizard with recommended settings
+- Open the **Web UI** to interact with agent
+- Optionally enable **Brave Search** or **Telegram** after onboarding
+- **Cleanup and uninstall** with the documented `uninstall.sh` flags when finished
 
 ### Notice and disclaimers
 
@@ -64,14 +55,14 @@ By installing this demo, you accept responsibility for all third-party component
 
 #### What you're getting
 
-This experience is provided "AS IS" for demonstration purposes only -- no warranties, no guarantees. This is a demo, not a production-ready solution. You will need to implement appropriate security controls for your environment and use case.
+This experience is provided "AS IS" for demonstration purposes only — no warranties, no guarantees. This is a demo, not a production-ready solution. You will need to implement appropriate security controls for your environment and use case.
 
 #### Key risks with AI agents
 
-- **Data leakage** -- Any materials the agent accesses could be exposed, leaked, or stolen.
-- **Malicious code execution** -- The agent or its connected tools could expose your system to malicious code or cyber-attacks.
-- **Unintended actions** -- The agent might modify or delete files, send messages, or access services without explicit approval.
-- **Prompt injection and manipulation** -- External inputs or connected content could hijack the agent's behavior in unexpected ways.
+- **Data leakage** — Any materials the agent accesses could be exposed, leaked, or stolen.
+- **Malicious code execution** — The agent or its connected tools could expose your system to malicious code or cyber-attacks.
+- **Unintended actions** — The agent might modify or delete files, send messages, or access services without explicit approval.
+- **Prompt injection and manipulation** — External inputs or connected content could hijack the agent's behavior in unexpected ways.
 
 #### Participant acknowledgement
 
@@ -81,23 +72,22 @@ By participating in this demo, you acknowledge that you are solely responsible f
 
 | Layer      | What it protects                                   | When it applies             |
 |------------|----------------------------------------------------|-----------------------------|
-| Filesystem | Prevents reads/writes outside allowed paths.       | Locked at sandbox creation.  |
+| Filesystem | Prevents reads/writes outside allowed paths.       | Locked at sandbox creation. |
 | Network    | Blocks unauthorized outbound connections.          | Hot-reloadable at runtime.  |
-| Process    | Blocks privilege escalation and dangerous syscalls.| Locked at sandbox creation.  |
+| Process    | Blocks privilege escalation and dangerous syscalls.| Locked at sandbox creation. |
 | Inference  | Reroutes model API calls to controlled backends.   | Hot-reloadable at runtime.  |
 
 ### What to know before starting
 
 - Basic use of the Linux terminal and SSH
-- Familiarity with Docker (permissions, `docker run`)
+- Familiarity with Docker (permissions, `docker run`, optional `docker` group membership)
 - Awareness of the security and risk sections above
 
 ### Prerequisites
 
-**Hardware and access:**
+**Hardware:**
 
 - A DGX Spark (GB10) with keyboard and monitor, or SSH access
-- A **Telegram bot token** from [@BotFather](https://t.me/BotFather) (create one with `/newbot`) -- only needed if you want the Telegram bot. Have it ready *before* running the installer; the onboard wizard prompts for it.
 
 **Software:**
 
@@ -115,9 +105,10 @@ Expected: Ubuntu 24.04, NVIDIA GB10 GPU, Docker 28.x+.
 
 ### Have ready before you begin
 
-| Item | Where to get it |
-|------|----------------|
-| Telegram bot token (optional) | [@BotFather](https://t.me/BotFather) on Telegram -- create with `/newbot`. Required only for the Telegram bot; have it ready before running the installer. |
+| Item | When you need it |
+|------|------------------|
+| **Telegram bot token** (optional) | Create with [@BotFather](https://t.me/BotFather) (`/newbot`). You can paste it during **onboarding** (Step 3) **or** when you run **`nemoclaw <sandbox> channels add telegram`** later. |
+| **Brave Search API key** (optional) | From [Brave Search API](https://brave.com/search/api/) if you enable web search during onboarding or via **`nemoclaw onboard --fresh --gpu`** (`--fresh` re-prompts every onboarding question, including features you previously skipped; without `--fresh` the wizard resumes the previous session and will not re-prompt). |
 
 ### Ancillary files
 
@@ -125,143 +116,51 @@ All required assets are handled by the NemoClaw installer. No manual cloning is 
 
 ### Time and risk
 
-- **Estimated time:** 20--30 minutes (with Ollama and model already downloaded). First-time model download adds ~15--30 minutes depending on network speed.
-- **Risk level:** Medium -- you are running an AI agent in a sandbox; risks are reduced by isolation but not eliminated. Use a clean environment and do not connect sensitive data or production accounts.
-- **Last Updated:** 04/28/2026
-  * Updated for NemoClaw v0.0.22+: revised Telegram setup, renamed tunnel commands, refreshed uninstall instructions.
+- **Estimated time:** About 30–60 minutes for a first full pass (install, onboard, model download depending on choice and network). Optional Brave, Telegram, and cloudflared steps add time if you do them in a second session.
+- **Risk level:** Medium — you are running an AI agent in a sandbox; risks are reduced by isolation but not eliminated. Use a clean environment and do not connect sensitive data or production accounts.
+- **Last Updated:** 05/29/2026
+  - Update to latest nemoclaw installer instructions
 
 ## Instructions
 
-## Phase 1: Prerequisites
+## Phase 1: Install and Run NemoClaw
 
-These steps prepare a fresh DGX Spark for NemoClaw. If Docker, the NVIDIA runtime, and Ollama are already configured, skip to Phase 2.
+### Step 1. Install NemoClaw
 
-### Step 1. Configure Docker and the NVIDIA container runtime
-
-OpenShell's gateway runs k3s inside Docker. On DGX Spark (Ubuntu 24.04, cgroup v2), Docker must be configured with the NVIDIA runtime and host cgroup namespace mode.
-
-Configure the NVIDIA container runtime for Docker:
+This single command handles everything: installs Node.js (if needed), installs OpenShell, clones the pinned NemoClaw **v0.55** release (set via `NEMOCLAW_VERSION`; v0.55 is the version the NemoClaw team currently recommends as the most stable), builds the CLI, and runs the onboard wizard to create a sandbox.
 
 ```bash
-sudo nvidia-ctk runtime configure --runtime=docker
+curl -fsSL https://www.nvidia.com/nemoclaw.sh | NEMOCLAW_VERSION=v0.55 bash
 ```
 
-Set the cgroup namespace mode required by OpenShell on DGX Spark:
+The installation wizard walks you through setup:
 
-```bash
-sudo python3 -c "
-import json, os
-path = '/etc/docker/daemon.json'
-d = json.load(open(path)) if os.path.exists(path) else {}
-d['default-cgroupns-mode'] = 'host'
-json.dump(d, open(path, 'w'), indent=2)
-"
-```
+1. **Accept NemoClaw license** -- Confirm by entering `yes`
+2. **Run express install** -- Confirm by entering `Y`
 
-Restart Docker:
+The installer requires **Node.js 22.16+** (installed automatically if missing). It walks you through Node.js, NemoClaw CLI and Onboarding phases. See more details of Onboarding configuration in the next step.
 
-```bash
-sudo systemctl restart docker
-```
-
-Verify the NVIDIA runtime works:
-
-```bash
-docker run --rm --runtime=nvidia --gpus all ubuntu nvidia-smi
-```
-
-If you get a permission denied error on `docker`, add your user to the Docker group and activate the new group in your current session:
-
-```bash
-sudo usermod -aG docker $USER
-newgrp docker
-```
-
-This applies the group change immediately. Alternatively, you can log out and back in instead of running `newgrp docker`.
+### Step 2. NemoClaw Onboarding
 
 > [!NOTE]
-> DGX Spark uses cgroup v2. OpenShell's gateway embeds k3s inside Docker and needs host cgroup namespace access. Without `default-cgroupns-mode: host`, the gateway can fail with "Failed to start ContainerManager" errors.
+> If you chose **express install** in Step 1, all settings are auto-configured with recommended defaults. Skip to Step 3.
 
-### Step 2. Install Ollama
+During custom setup, the onboard wizard walks you through:
 
-Install Ollama:
-
-```bash
-curl -fsSL https://ollama.com/install.sh | sh
-```
-
-Configure Ollama to listen on all interfaces so the sandbox container can reach it:
-
-```bash
-sudo mkdir -p /etc/systemd/system/ollama.service.d
-printf '[Service]\nEnvironment="OLLAMA_HOST=0.0.0.0"\n' | sudo tee /etc/systemd/system/ollama.service.d/override.conf
-sudo systemctl daemon-reload
-sudo systemctl restart ollama
-```
-
-Verify it is running and reachable on all interfaces:
-
-```bash
-curl http://0.0.0.0:11434
-```
-
-Expected: `Ollama is running`. If not, start it with `sudo systemctl start ollama`.
-
-> [!IMPORTANT]
-> Always start Ollama via systemd (`sudo systemctl restart ollama`) — do not use `ollama serve &`. A manually started Ollama process does not pick up the `OLLAMA_HOST=0.0.0.0` setting above, and the NemoClaw sandbox will not be able to reach the inference server.
-
-### Step 3. Pull the Nemotron 3 Super model
-
-Download Nemotron 3 Super 120B (~87 GB; may take 15--30 minutes depending on network speed):
-
-```bash
-ollama pull nemotron-3-super:120b
-```
-
-Run it briefly to pre-load weights into memory (type `/bye` to exit):
-
-```bash
-ollama run nemotron-3-super:120b
-```
-
-Verify the model is available:
-
-```bash
-ollama list
-```
-
-You should see `nemotron-3-super:120b` in the output.
-
----
-
-## Phase 2: Install and Run NemoClaw
-
-### Step 4. Install NemoClaw
-
-This single command handles everything: installs Node.js (if needed), installs OpenShell, clones the latest stable NemoClaw release, builds the CLI, and runs the onboard wizard to create a sandbox.
-
-```bash
-curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash
-```
-
-The onboard wizard walks you through setup:
-
-1. **Sandbox name** -- Pick a name (e.g. `my-assistant`). Names must be lowercase alphanumeric with hyphens only.
-2. **Inference provider** -- Select **Local Ollama**.
-3. **Model** -- Select **nemotron-3-super:120b**.
-4. **Messaging channels** -- If you want a Telegram bot, select `telegram` here and paste your bot token when prompted. Create the bot first via [@BotFather](https://t.me/BotFather) in Telegram (see Step 9). If you skip this, you can re-run the installer later to recreate the sandbox with Telegram enabled.
-5. **Policy presets** -- Accept the suggested presets when prompted (hit **Y**).
-
-> [!IMPORTANT]
-> Telegram must be configured at this step. The channel plugin and bot token are wired into the sandbox container during onboarding — they cannot be added to an existing sandbox by exporting environment variables on the host.
+1. **Configuring inference** -- Choose to set up local inference on your Spark by selecting **`7) Local Ollama`**.
+2. **Ollama models** -- Choose desired inference model. If no model is present locally, the installer will download **`qwen3:30b`** automatically.
+3. **Sandbox name** -- Pick a name (e.g. my-assistant). Each sandbox requires a unique name.
+4. **Apply this configuration** -- Enter `Y` to confirm setting up local inference.
+5. **Enable Brave Web Search** -- Optional. If you enable it, paste a [Brave Search API](https://brave.com/search/api/) key when prompted.
+6. **Messaging channels** -- Optional. If you enable it, choose your desired bot (`telegram`, `discord` or `slack`) and paste your bot token when prompted.
+7. **Policy presets** -- Choose desired Policy tier (`Balanced` recommended) and accept/edit the suggested presets when prompted (confirm with **Enter**).
 
 When complete you will see output like:
 
 ```text
 ──────────────────────────────────────────────────
-Dashboard    http://localhost:18789/
 Sandbox      my-assistant (Landlock + seccomp + netns)
-Model        nemotron-3-super:120b (Local Ollama)
+Model        <your-selected-model> (Local Ollama)
 ──────────────────────────────────────────────────
 Run:         nemoclaw my-assistant connect
 Status:      nemoclaw my-assistant status
@@ -269,68 +168,40 @@ Logs:        nemoclaw my-assistant logs --follow
 ──────────────────────────────────────────────────
 ```
 
-> [!IMPORTANT]
-> Save the tokenized Web UI URL printed at the end -- you will need it in Step 8. It looks like:
-> `http://127.0.0.1:18789/#token=<long-token-here>`
-
 > [!NOTE]
-> If `nemoclaw` is not found after install, run `source ~/.bashrc` to reload your shell path.
+> - If `nemoclaw` is not found after install, run `source ~/.bashrc` to reload your shell path.
+> - Time to finish **Onboarding** can vary, depending on the model choice and internet speed.
 
-### Step 5. Connect to the sandbox and verify inference
-
-Connect to the sandbox:
-
-```bash
-nemoclaw my-assistant connect
-```
-
-You will see `sandbox@my-assistant:~$` -- you are now inside the sandboxed environment.
-
-Verify that the inference route is working:
+NemoClaw Onboarding can be run repeatedly to create multiple sandboxes for independent usecases. Use `--name <new-name>` to create an additional sandbox alongside any existing ones:
 
 ```bash
-curl -sf https://inference.local/v1/models
+nemoclaw onboard --gpu --name <new-name>
 ```
 
-Expected: JSON listing `nemotron-3-super:120b`.
+> [!IMPORTANT]
+> Use `--name <new-name>` to create an additional sandbox without affecting existing ones. The `--fresh` flag is a destructive option reserved for starting a completely new onboard session — if a sandbox with the same name already exists, `--fresh` will **destroy and recreate it**. Only use `--fresh` when you intend to wipe and re-onboard (see Step 4 for an example where re-prompting is required).
 
-### Step 6. Talk to the agent (CLI)
+### Step 3. Interact with OpenClaw
 
-Still inside the sandbox, send a test message:
+There are two ways to interact with your OpenClaw, Web UI or terminal UI. 
+
+#### Option 1. Web UI
+
+Get the full dashboard URL (includes the auto-assigned port and token):
 
 ```bash
-openclaw agent --agent main -m "hello" --session-id test
+nemoclaw my-assistant dashboard-url --quiet
 ```
 
-The agent will respond using Nemotron 3 Super. First responses may take 30--90 seconds for a 120B parameter model running locally.
+This prints a URL like `http://127.0.0.1:18790/#token=<token>`. The port is auto-assigned (commonly 18789 or 18790) and may differ between installs.
 
-### Step 7. Interactive TUI
+**If accessing the Web UI directly on the Spark** (keyboard and monitor attached), open the dashboard URL in a browser.
 
-Launch the terminal UI for an interactive chat session:
+**If accessing the Web UI from a remote machine**, you need to set up an SSH tunnel.
 
-```bash
-openclaw tui
-```
+First, note the port number from the dashboard URL above (e.g. `18790`).
 
-Press **Ctrl+C** to exit the TUI.
-
-### Step 8. Exit the sandbox and access the Web UI
-
-Exit the sandbox to return to the host:
-
-```bash
-exit
-```
-
-**If accessing the Web UI directly on the Spark** (keyboard and monitor attached), open a browser and navigate to the tokenized URL from Step 4:
-
-```text
-http://127.0.0.1:18789/#token=<long-token-here>
-```
-
-**If accessing the Web UI from a remote machine**, you need to set up an SSH tunnel. The NemoClaw onboard wizard already created the port 18789 forward on the Spark, so you only need to tunnel from your remote machine.
-
-First, find your Spark's IP address. On the Spark, run:
+Find your Spark's IP address:
 
 ```bash
 hostname -I | awk '{print $1}'
@@ -338,46 +209,120 @@ hostname -I | awk '{print $1}'
 
 This prints the primary IP address (e.g. `192.168.1.42`). You can also find it in **Settings > Wi-Fi** or **Settings > Network** on the Spark's desktop, or check your router's connected-devices list.
 
-From your remote machine, create an SSH tunnel to the Spark (replace `<your-spark-ip>` with the IP address from above):
+From your remote machine, create an SSH tunnel using the port from above (replace `<port>` and `<your-spark-ip>`):
 
 ```bash
-ssh -L 18789:127.0.0.1:18789 <your-user>@<your-spark-ip>
+ssh -L <port>:127.0.0.1:<port> <your-user>@<your-spark-ip>
 ```
 
-Now open the tokenized URL in your remote machine's browser:
-
-```text
-http://127.0.0.1:18789/#token=<long-token-here>
-```
+Now open the dashboard URL in your remote machine's browser.
 
 > [!IMPORTANT]
 > Use `127.0.0.1`, not `localhost` -- the gateway origin check requires an exact match.
 
 > [!NOTE]
-> If the Web UI fails to load and the port forward may be stale, reset it on the Spark host:
+> If the Web UI fails to load and the port forward may be stale, get the port from `nemoclaw my-assistant dashboard-url --quiet` and reset:
 > ```bash
-> openshell forward stop 18789 my-assistant || true
-> openshell forward start 18789 my-assistant --background
+> openshell forward stop <port> my-assistant || true
+> openshell forward start <port> my-assistant --background
 > ```
+
+#### Option 2. Terminal UI
+
+Connect to the sandbox:
+
+```bash
+nemoclaw my-assistant connect
+```
+
+Then launch the terminal UI inside the sandbox:
+
+```bash
+openclaw tui
+```
+
+You can start chatting with OpenClaw. Press **Ctrl+C** to exit the terminal UI.
+
+To exit the sandbox:
+
+```bash
+exit
+```
 
 ---
 
-## Phase 3: Telegram Bot
+## Phase 2: Modify NemoClaw Policy
 
-> [!IMPORTANT]
-> Telegram must be enabled in the **NemoClaw onboard wizard** (Step 4 → Messaging channels). The channel plugin and bot token are wired into the sandbox container at sandbox creation time — `policy-add` only opens network egress and is not enough on its own. If you skipped Telegram during onboard, re-run the installer to recreate the sandbox with Telegram enabled.
+### Step 4. Enable Brave Search in sandbox
 
-### Step 9. Create a Telegram bot
+To add Brave Web Search to an existing sandbox, re-run the onboard wizard with `--fresh` to start a new session that re-prompts all options (including previously skipped features):
 
-Do this **before** running the NemoClaw installer in Step 4 so you have your bot token ready when the wizard prompts for it.
+```bash
+nemoclaw onboard --fresh --gpu
+```
 
-Open Telegram, find [@BotFather](https://t.me/BotFather), send `/newbot`, and follow the prompts. Copy the bot token it gives you and paste it into the wizard when you reach the **Messaging channels** step.
+> [!NOTE]
+> Without `--fresh`, the onboard wizard **resumes** the previous session and will not re-prompt for features you already skipped.
 
-### Step 10. Install cloudflared and start the Telegram bridge
+When you reach **Enable Brave Web Search**, choose **yes** and paste the key from the [Brave Search API](https://brave.com/search/api/) console. Confirm the same sandbox name and inference choices where prompted. The wizard will **rebuild** the sandbox so the key is applied.
 
-The Telegram bridge needs a public webhook URL so Telegram can deliver messages to your bot. NemoClaw uses [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) to create a free `trycloudflare.com` tunnel.
+> [!NOTE]
+> Alternatively, set `BRAVE_API_KEY` in your environment before running the installer and Brave Search will be enabled automatically during onboard.
 
-Make sure you are on the **host** (not inside the sandbox). If you are inside the sandbox, run `exit` first.
+To confirm web search is enabled, relaunch your OpenClaw WebUI or terminal UI. Ask the agent for something that needs **live web search**. If requests still fail, recheck **`policy-list`** and re-read the onboard output for Brave/API errors.
+
+### Step 5. Set up Messaging Channel (Telegram Bot as an example)
+
+These steps apply when your sandbox exists but **Telegram was never configured** (you skipped **Messaging channels** in Step 2, or the sandbox policy tier never included Telegram-related egress). Replace `<sandbox-name>` with your sandbox (for example `my-assistant`).
+
+#### 1. Create a Telegram bot
+
+In Telegram, open [@BotFather](https://t.me/BotFather), send `/newbot`, and complete the prompts. Copy the **bot token** BotFather returns and keep it ready for the next step.
+
+#### 2. Register Telegram with NemoClaw and rebuild the sandbox
+
+```bash
+nemoclaw <sandbox-name> channels add telegram
+```
+
+Paste the token when prompted. NemoClaw persists credentials and **rebuilds** the sandbox so OpenClaw can use Telegram as a messaging channel.
+
+#### 3. (If needed) Allow Telegram egress in the sandbox policy
+
+If messages fail with network or policy errors after the channel is registered, inspect presets and add Telegram-related egress if your tier omitted it:
+
+```bash
+nemoclaw <sandbox-name> policy-list
+nemoclaw <sandbox-name> policy-add telegram
+```
+
+Preset names follow your selected tier; confirm against [Network policies](https://docs.nvidia.com/nemoclaw/latest/reference/network-policies.html).
+
+#### 4. Verify Telegram
+
+Telegram uses long-polling (`getUpdates`) — the sandbox actively pulls messages from Telegram servers. **No public URL or cloudflared tunnel is required for Telegram to work.**
+
+Open Telegram, find your bot, and send a message. The bot should forward traffic to the agent in your NemoClaw sandbox and reply.
+
+> [!NOTE]
+> The first response may take longer depending on model size (30B models respond in a few seconds; larger models may take longer on first inference).
+
+> [!NOTE]
+> If the bot does not respond:
+> - Run `nemoclaw <sandbox-name> status` to confirm the sandbox is running and inference is healthy.
+> - Run `nemoclaw <sandbox-name> logs --follow` and look for Telegram-related errors.
+> - If Telegram egress is missing, run `nemoclaw <sandbox-name> policy-add` and select `telegram`.
+> - If the channel was never registered, run `nemoclaw <sandbox-name> channels add telegram`.
+
+> [!NOTE]
+> The `channels add telegram` wizard also prompts for an optional **Telegram User ID** to restrict who can DM the bot. Send `/start` to [@userinfobot](https://t.me/userinfobot) on Telegram to get your numeric user ID. If you skip this, the bot will require device pairing (a terminal-based code confirmation) before responding to messages.
+
+> [!NOTE]
+> For details on restricting which Telegram chats can interact with the agent, see the [NemoClaw Telegram bridge documentation](https://docs.nvidia.com/nemoclaw/latest/deployment/set-up-telegram-bridge.html).
+
+#### 5. (Optional) Install cloudflared for remote Web UI access
+
+The cloudflared tunnel provides a **public URL for the Web UI dashboard** — it is not related to Telegram messaging.
 
 Install cloudflared (DGX Spark is arm64):
 
@@ -393,36 +338,29 @@ Start the tunnel:
 nemoclaw tunnel start
 ```
 
-Verify the public URL is live:
+Verify:
 
 ```bash
 nemoclaw status
 ```
 
-You should see `● cloudflared` with a `trycloudflare.com` public URL (e.g. `https://assembled-peer-persian-kitty.trycloudflare.com`).
+You should see `● cloudflared` with a `trycloudflare.com` public URL.
 
-Open Telegram, find your bot, and send it a message. The bot forwards it to the agent and replies.
+---
 
-> [!NOTE]
-> If `nemoclaw tunnel start` prints `cloudflared not found — no public URL`, the cloudflared install above did not complete successfully. Re-run the install, then restart the tunnel:
-> ```bash
-> nemoclaw tunnel stop && nemoclaw tunnel start
-> ```
+## Phase 3: Set Up NemoClaw Agent
 
-> [!NOTE]
-> The first response may take 30--90 seconds for a 120B parameter model running locally.
+### Step 6. Set Up NemoClaw Agents
 
-> [!NOTE]
-> If sending a message returns `Error: Channel is unavailable: telegram`, the channel was not enabled during onboard. Re-run the installer to recreate the sandbox with Telegram selected at the **Messaging channels** step.
+Set up NemoClaw Agents in general require three steps: Configure NemoClaw security policy, Run Agent Workflow Prompt, Personalize the Workflow for your own use case.
 
-> [!NOTE]
-> For details on restricting which Telegram chats can interact with the agent, see the [NemoClaw Telegram bridge documentation](https://docs.nvidia.com/nemoclaw/latest/deployment/set-up-telegram-bridge.html).
+Checkout these [Example NemoClaw Agents](https://build.nvidia.com/spark/nemoclaw-applications) for reference. Consider sharing your NemoClaw agent setup with the community at [DGX Spark Developer Forum](https://forums.developer.nvidia.com/c/accelerated-computing/dgx-spark-gb10)
 
 ---
 
 ## Phase 4: Cleanup and Uninstall
 
-### Step 11. Stop services
+### Step 7. Stop services
 
 Stop the cloudflared tunnel:
 
@@ -433,19 +371,25 @@ nemoclaw tunnel stop
 Stop the port forward:
 
 ```bash
-openshell forward list          # find active forwards
-openshell forward stop 18789    # stop the dashboard forward
+openshell forward list          # find active forwards and their ports
+openshell forward stop <port>   # stop the dashboard forward (use the port shown above)
 ```
 
-### Step 12. Uninstall NemoClaw
+### Step 8. Uninstall NemoClaw
 
-Run the uninstaller via curl (matches the [NemoClaw README](https://github.com/NVIDIA/NemoClaw)). It removes all sandboxes, the OpenShell gateway, Docker containers/images/volumes, the CLI, and all state files. Docker, Node.js, npm, and Ollama are preserved.
+The NemoClaw CLI includes a built-in uninstaller. It removes all sandboxes, the OpenShell gateway, Docker containers/images/volumes, the CLI, and all state files. Docker, Node.js, npm, and Ollama are preserved.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/NVIDIA/NemoClaw/refs/heads/main/uninstall.sh | bash
+nemoclaw uninstall --yes
 ```
 
-**Uninstaller flags** (pass via `bash -s -- <flags>`):
+To remove everything including the Ollama model:
+
+```bash
+nemoclaw uninstall --yes --delete-models
+```
+
+**Uninstaller flags:**
 
 | Flag | Effect |
 |------|--------|
@@ -453,11 +397,11 @@ curl -fsSL https://raw.githubusercontent.com/NVIDIA/NemoClaw/refs/heads/main/uni
 | `--keep-openshell` | Leave the `openshell` binary in place |
 | `--delete-models` | Also remove the Ollama models pulled by NemoClaw |
 
-To remove everything including the Ollama model, non-interactively:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/NVIDIA/NemoClaw/refs/heads/main/uninstall.sh | bash -s -- --yes --delete-models
-```
+> [!NOTE]
+> If the `nemoclaw` CLI is not available (e.g. install failed partway), use the remote uninstaller as a fallback:
+> ```bash
+> curl -fsSL https://raw.githubusercontent.com/NVIDIA/NemoClaw/refs/heads/main/uninstall.sh | bash -s -- --yes
+> ```
 
 The uninstaller runs 6 steps:
 1. Stop NemoClaw helper services and port-forward processes
@@ -478,35 +422,84 @@ The uninstaller runs 6 steps:
 | `nemoclaw my-assistant status` | Show sandbox status and inference config |
 | `nemoclaw my-assistant logs --follow` | Stream sandbox logs in real time |
 | `nemoclaw list` | List all registered sandboxes |
-| `nemoclaw tunnel start` | Start cloudflared tunnel (public URL for Telegram webhooks) |
+| `nemoclaw tunnel start` | Start cloudflared tunnel (public URL for remote Web UI access) |
 | `nemoclaw tunnel stop` | Stop the cloudflared tunnel |
+| `nemoclaw my-assistant dashboard-url --quiet` | Print the full tokenized Web UI URL (includes auto-assigned port) |
 | `openshell term` | Open the monitoring TUI on the host |
 | `openshell forward list` | List active port forwards |
-| `openshell forward start 18789 my-assistant --background` | Restart port forwarding for Web UI |
-| `curl -fsSL https://raw.githubusercontent.com/NVIDIA/NemoClaw/refs/heads/main/uninstall.sh \| bash` | Remove NemoClaw (preserves Docker, Node.js, Ollama) |
-| `curl -fsSL https://raw.githubusercontent.com/NVIDIA/NemoClaw/refs/heads/main/uninstall.sh \| bash -s -- --delete-models` | Remove NemoClaw and Ollama models |
+| `nemoclaw uninstall --yes` | Remove NemoClaw (preserves Docker, Node.js, Ollama) |
+| `nemoclaw uninstall --yes --delete-models` | Remove NemoClaw and Ollama models |
 
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | `nemoclaw: command not found` after install | Shell PATH not updated | Run `source ~/.bashrc` (or `source ~/.zshrc` for zsh), or open a new terminal window. |
-| Installer fails with Node.js version error | Node.js version below 20 | Install Node.js 20+: `curl -fsSL https://deb.nodesource.com/setup_22.x \| sudo -E bash - && sudo apt-get install -y nodejs` then re-run the installer. |
+| Installer fails with Node.js version error | Node.js version below 22.16 | Install Node.js 22.16+: `curl -fsSL https://deb.nodesource.com/setup_22.x \| sudo -E bash - && sudo apt-get install -y nodejs` then re-run the installer. |
 | npm install fails with `EACCES` permission error | npm global directory not writable | `mkdir -p ~/.npm-global && npm config set prefix ~/.npm-global && export PATH=~/.npm-global/bin:$PATH` then re-run the installer. Add the `export` line to `~/.bashrc` to make it permanent. |
 | Docker permission denied | User not in docker group | `sudo usermod -aG docker $USER`, then log out and back in. |
-| Gateway fails with cgroup / "Failed to start ContainerManager" errors | Docker not configured for host cgroup namespace on DGX Spark | Run the cgroup fix: `sudo python3 -c "import json, os; path='/etc/docker/daemon.json'; d=json.load(open(path)) if os.path.exists(path) else {}; d['default-cgroupns-mode']='host'; json.dump(d, open(path,'w'), indent=2)"` then `sudo systemctl restart docker`. Alternatively, run `sudo nemoclaw setup-spark` which applies this fix automatically. |
+| Gateway fails with cgroup / "Failed to start ContainerManager" errors | Older OpenShell or Docker still using a **private** cgroup namespace for the gateway so kubelet cannot see cgroup v2 controllers | First **upgrade OpenShell** (re-run the Phase 1 `nemoclaw.sh` install so you get a build that sets host cgroupns on the gateway container). If it still fails, force Docker's default to host mode by running the [daemon.json cgroup fix](#daemonjson-cgroup-fix) below, then run `sudo systemctl restart docker`. |
 | Gateway fails with "port 8080 is held by container..." | Another OpenShell gateway or container is using port 8080 | Stop the conflicting container: `openshell gateway destroy -g <old-gateway-name>` or `docker stop <container-name> && docker rm <container-name>`, then retry `nemoclaw onboard`. |
 | Sandbox creation fails | Stale gateway state or DNS not propagated | Run `openshell gateway destroy && openshell gateway start`, then re-run the installer or `nemoclaw onboard`. |
-| CoreDNS crash loop | Known issue on some DGX Spark configurations | Run `sudo ./scripts/fix-coredns.sh` from the NemoClaw repo directory. |
+| CoreDNS crash loop | Known issue on some DGX Spark configurations | Re-run the NemoClaw installer (`curl -fsSL https://www.nvidia.com/nemoclaw.sh \| bash`) which includes the CoreDNS fix. If the issue persists, see [NemoClaw troubleshooting](https://docs.nvidia.com/nemoclaw/latest/reference/troubleshooting.html). |
 | "No GPU detected" during onboard | DGX Spark GB10 reports unified memory differently | Expected on DGX Spark. The wizard still works and uses Ollama for inference. |
-| Inference timeout or hangs | Ollama not running or not reachable | Check Ollama: `curl http://localhost:11434`. If not running: `ollama serve &`. If running but unreachable from sandbox, ensure Ollama is configured to listen on `0.0.0.0` (see Step 2 in Instructions). |
-| Agent gives no response or is very slow | Normal for 120B model running locally | Nemotron 3 Super 120B can take 30--90 seconds per response. Verify inference route: `nemoclaw my-assistant status`. |
+| Inference timeout or hangs | Ollama not running or not reachable | Check Ollama: `curl http://127.0.0.1:11434`. If not running: `sudo systemctl restart ollama`. Verify the NemoClaw auth proxy is healthy: `curl http://127.0.0.1:11435/api/tags`. If both respond, check `nemoclaw my-assistant status` for the Inference health line. |
+| Agent gives no response or is very slow | First response can be slow, especially with larger models | Response time depends on model size (30B: a few seconds, 120B: 30–90 seconds). Verify inference route: `nemoclaw my-assistant status`. |
 | Port 18789 already in use | Another process is bound to the port | `lsof -i :18789` then `kill <PID>`. If needed, `kill -9 <PID>` to force-terminate. |
 | Web UI port forward dies or dashboard unreachable | Port forward not active | `openshell forward stop 18789 my-assistant` then `openshell forward start 18789 my-assistant --background`. |
 | Web UI shows `origin not allowed` | Accessing via `localhost` instead of `127.0.0.1` | Use `http://127.0.0.1:18789/#token=...` in the browser. The gateway origin check requires `127.0.0.1` exactly. |
-| Telegram bridge does not start | Missing environment variables | Ensure `TELEGRAM_BOT_TOKEN` and `SANDBOX_NAME` are set on the host. `SANDBOX_NAME` must match the sandbox name from onboarding. |
-| Telegram bridge needs restart but `nemoclaw stop` does not work | Known bug in `nemoclaw stop` | Find the PID from the `nemoclaw start` output, force-kill with `kill -9 <PID>`, then run `nemoclaw start` again. |
-| Telegram bot receives messages but does not reply | Telegram policy not added to sandbox | Run `nemoclaw my-assistant policy-add`, type `telegram`, hit Y. Then restart the bridge with `nemoclaw start`. |
+| Telegram bridge does not start | Telegram channel not registered with sandbox | Run `nemoclaw <sandbox-name> channels add telegram` to register the bot token and rebuild the sandbox. Verify with `nemoclaw <sandbox-name> status`. |
+| Telegram stops responding after sandbox rebuild | Telegram long-polling session stale after rebuild | Run `nemoclaw <sandbox-name> recover` to restart the gateway. If still unresponsive, run `nemoclaw <sandbox-name> channels add telegram` to re-register and rebuild. |
+| Telegram bot receives messages but does not reply | Telegram network egress policy not added | Run `nemoclaw <sandbox-name> policy-add`, select `telegram`, and confirm. This is a hot-reload — no rebuild needed. |
+
+#### daemon.json cgroup fix
+
+Use this script as the fallback for the cgroup / "Failed to start ContainerManager" row above. It validates any existing `/etc/docker/daemon.json`, writes a `.bak` backup, sets `default-cgroupns-mode` to `host`, and atomically replaces the file. It exits non-zero with an error on stderr if anything fails, leaving the original `daemon.json` untouched.
+
+```bash
+sudo python3 - <<'PY'
+import json, os, shutil, sys, tempfile
+
+path = '/etc/docker/daemon.json'
+try:
+    if os.path.exists(path):
+        with open(path) as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            raise ValueError(f'{path} is not a JSON object')
+    else:
+        data = {}
+except (json.JSONDecodeError, ValueError, OSError) as e:
+    print(f'error: failed to read {path}: {e}', file=sys.stderr)
+    sys.exit(1)
+
+if os.path.exists(path):
+    try:
+        shutil.copy2(path, path + '.bak')
+    except OSError as e:
+        print(f'error: failed to back up {path}: {e}', file=sys.stderr)
+        sys.exit(1)
+
+data['default-cgroupns-mode'] = 'host'
+
+target_dir = os.path.dirname(path) or '/'
+fd, tmp = tempfile.mkstemp(prefix='daemon.json.', dir=target_dir)
+try:
+    with os.fdopen(fd, 'w') as f:
+        json.dump(data, f, indent=2)
+        f.write('\n')
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, path)
+except OSError as e:
+    if os.path.exists(tmp):
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+    print(f'error: failed to write {path}: {e}', file=sys.stderr)
+    sys.exit(1)
+PY
+```
 
 > [!NOTE]
 > DGX Spark uses a Unified Memory Architecture (UMA), which enables dynamic memory sharing between the GPU and CPU. With many applications still updating to take advantage of UMA, you may encounter memory issues even when within the memory capacity of DGX Spark. If that happens, manually flush the buffer cache with:
