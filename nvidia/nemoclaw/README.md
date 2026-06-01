@@ -118,8 +118,8 @@ All required assets are handled by the NemoClaw installer. No manual cloning is 
 
 - **Estimated time:** About 30–60 minutes for a first full pass (install, onboard, model download depending on choice and network). Optional Brave, Telegram, and cloudflared steps add time if you do them in a second session.
 - **Risk level:** Medium — you are running an AI agent in a sandbox; risks are reduced by isolation but not eliminated. Use a clean environment and do not connect sensitive data or production accounts.
-- **Last Updated:** 05/29/2026
-  - Update to latest nemoclaw installer instructions
+- **Last Updated:** 06/01/2026
+  - Pin nemoclaw installer to v0.0.55, the latest stable version
 
 ## Instructions
 
@@ -127,10 +127,10 @@ All required assets are handled by the NemoClaw installer. No manual cloning is 
 
 ### Step 1. Install NemoClaw
 
-This single command handles everything: installs Node.js (if needed), installs OpenShell, clones the pinned NemoClaw **v0.55** release (set via `NEMOCLAW_VERSION`; v0.55 is the version the NemoClaw team currently recommends as the most stable), builds the CLI, and runs the onboard wizard to create a sandbox.
+This single command handles everything: installs Node.js (if needed), installs OpenShell, clones the pinned NemoClaw **v0.0.55** release (set via `NEMOCLAW_INSTALL_TAG`; v0.0.55 is the version the NemoClaw team currently recommends as the most stable), builds the CLI, and runs the onboard wizard to create a sandbox.
 
 ```bash
-curl -fsSL https://www.nvidia.com/nemoclaw.sh | NEMOCLAW_VERSION=v0.55 bash
+curl -fsSL https://www.nvidia.com/nemoclaw.sh | NEMOCLAW_INSTALL_TAG=v0.0.55 bash
 ```
 
 The installation wizard walks you through setup:
@@ -148,7 +148,7 @@ The installer requires **Node.js 22.16+** (installed automatically if missing). 
 During custom setup, the onboard wizard walks you through:
 
 1. **Configuring inference** -- Choose to set up local inference on your Spark by selecting **`7) Local Ollama`**.
-2. **Ollama models** -- Choose desired inference model. If no model is present locally, the installer will download **`qwen3:30b`** automatically.
+2. **Ollama models** -- Choose desired inference model. If no model is present locally, the installer will download **`qwen3.6:35b`** automatically.
 3. **Sandbox name** -- Pick a name (e.g. my-assistant). Each sandbox requires a unique name.
 4. **Apply this configuration** -- Enter `Y` to confirm setting up local inference.
 5. **Enable Brave Web Search** -- Optional. If you enable it, paste a [Brave Search API](https://brave.com/search/api/) key when prompted.
