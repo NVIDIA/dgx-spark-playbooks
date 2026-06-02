@@ -10,6 +10,8 @@ RUN pip install \
     psutil \
     files-to-prompt \
     uvicorn \
+    fastapi \
+    regex \
     rustbpe
 
 CMD ["/bin/bash"]

@@ -77,7 +77,7 @@ All required assets are in `nvidia/station-nanochat/assets/`:
 
 ## Time & risk
 
-- **Estimated time:** ~30 minutes for setup. Full d24 training takes on the order of 16+ hours on a single GB300 Ultra.
+- **Estimated time:** ~30 minutes for setup. Full d24 training takes on the order of 12+ hours on a single GB300 Ultra.
 - **Risk level:** Medium
   - Large downloads (FineWeb) can be slow; ensure stable network and disk space.
   - API keys (W&B, HF) must be set or `launch.sh` will exit immediately.
@@ -149,7 +149,7 @@ The training runs inside the `nanochat` container and executes the full pipeline
 3. **SFT** — downloads synthetic identity conversations, fine-tunes for chat
 4. **Report generation** — produces `report.md` with metrics and samples
 
-Training on a single GB300 Ultra takes on the order of 16+ hours for the full d24 run.
+Training on a single GB300 Ultra takes on the order of 12+ hours for the full d24 run.
 
 ## Step 4. Monitor training
 
