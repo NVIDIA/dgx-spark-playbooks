@@ -118,8 +118,8 @@ All required assets are handled by the NemoClaw installer. No manual cloning is 
 
 - **Estimated time:** About 30–60 minutes for a first full pass (install, onboard, model download depending on choice and network). Optional Brave, Telegram, and cloudflared steps add time if you do them in a second session.
 - **Risk level:** Medium — you are running an AI agent in a sandbox; risks are reduced by isolation but not eliminated. Use a clean environment and do not connect sensitive data or production accounts.
-- **Last Updated:** 05/29/2026
-  - Update to latest nemoclaw installer instructions
+- **Last Updated:** 06/01/2026
+  - Pin nemoclaw installer to v0.0.55, the latest stable version
 
 ## Instructions
 
@@ -127,10 +127,10 @@ All required assets are handled by the NemoClaw installer. No manual cloning is 
 
 ### Step 1. Install NemoClaw
 
-This single command handles everything: installs Node.js (if needed), installs OpenShell, clones the pinned NemoClaw **v0.55** release (set via `NEMOCLAW_VERSION`; v0.55 is the version the NemoClaw team currently recommends as the most stable), builds the CLI, and runs the onboard wizard to create a sandbox.
+This single command handles everything: installs Node.js (if needed), installs OpenShell, clones the pinned NemoClaw **v0.0.55** release (set via `NEMOCLAW_INSTALL_TAG`; v0.0.55 is the version the NemoClaw team currently recommends as the most stable), builds the CLI, and runs the onboard wizard to create a sandbox.
 
 ```bash
-curl -fsSL https://www.nvidia.com/nemoclaw.sh | NEMOCLAW_VERSION=v0.55 bash
+curl -fsSL https://www.nvidia.com/nemoclaw.sh | NEMOCLAW_INSTALL_TAG=v0.0.55 bash
 ```
 
 The installation wizard walks you through setup:
@@ -148,7 +148,7 @@ The installer requires **Node.js 22.16+** (installed automatically if missing). 
 During custom setup, the onboard wizard walks you through:
 
 1. **Configuring inference** -- Choose to set up local inference on your DGX Station by selecting **`7) Local Ollama`**.
-2. **Ollama models** -- Choose desired inference model. If no model is present locally, the installer will provide options to download models to start.
+2. **Ollama models** -- Choose desired inference model. If no model is present locally, the installer will download **`qwen3.6:35b`** automatically.
 3. **Sandbox name** -- Pick a name (e.g. my-assistant). Each sandbox requires a unique name.
 4. **Apply this configuration** -- Enter `Y` to confirm setting up local inference.
 5. **Enable Brave Web Search** -- Optional. If you enable it, paste a [Brave Search API](https://brave.com/search/api/) key when prompted.
@@ -324,7 +324,7 @@ Open Telegram, find your bot, and send a message. The bot should forward traffic
 
 The cloudflared tunnel provides a **public URL for the Web UI dashboard** — it is not related to Telegram messaging.
 
-Install cloudflared (DGX Station is arm64):
+Install cloudflared (DGX Station is aarch64):
 
 ```bash
 curl -L --output cloudflared.deb \
@@ -354,7 +354,7 @@ You should see `● cloudflared` with a `trycloudflare.com` public URL.
 
 Set up NemoClaw Agents in general require three steps: Configure NemoClaw security policy, Run Agent Workflow Prompt, Personalize the Workflow for your own use case.
 
-Checkout these [Example NemoClaw Agents](https://build.nvidia.com/station/nemoclaw-applications) for reference. Consider sharing your NemoClaw agent setup with the community at [DGX Station Developer Forum](https://forums.developer.nvidia.com/c/accelerated-computing/dgx-station-gb300)
+Checkout these [Example NemoClaw Agents](https://build.nvidia.com/spark/nemoclaw-applications) for reference.
 
 ---
 

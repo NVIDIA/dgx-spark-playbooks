@@ -1,8 +1,8 @@
 kind: Playbook
 metadata:
   name: station-nemoclaw
-  displayName: NemoClaw with Nemotron-3-Super and vLLM on DGX Station
-  shortDescription: Install NemoClaw on DGX Station with local vLLM inference and Telegram bot integration
+  displayName: Run NemoClaw with a Local LLM
+  shortDescription: Build your first local AI assistant on DGX Station using NemoClaw in a secure sandbox, with optional Telegram.
 
   publisher: nvidia
   description: |
@@ -11,19 +11,15 @@ metadata:
     
   labelsV2:
   - gpuType:playbook:gpu_type_station
-  - DGX
   - DGX Station
-  - GB300
-  - AI Agent
+  - Agentic Workflow
   - OpenShell
-  - vLLM
-  - Nemotron-3-Super
   - NemoClaw
   - Telegram
   
   attributes:
   - key: DURATION
-    value: 30 MINS
+    value: 30 MIN
   
 spec:
   artifactName: station-nemoclaw
@@ -45,22 +41,19 @@ spec:
       
       label: Overview
       content: |
-        ## Overview
+        # Basic idea
         
-        ## Basic idea
+        **NVIDIA NemoClaw** is an open-source reference stack that simplifies running OpenClaw always-on assistants more safely. It installs the **NVIDIA OpenShell** runtime — an environment designed for executing agents with additional security — and connects them to local inference on your DGX Station. A single installer command (`nemoclaw.sh`) handles Node.js, OpenShell, and the NemoClaw CLI; the **onboard** wizard then creates a sandboxed agent, optional **Brave Search**, optional **messaging channels** (Telegram, Discord, or Slack), and a **policy tier** with network presets.
         
-        **NVIDIA NemoClaw** is an open-source reference stack that simplifies running OpenClaw always-on assistants more safely. It installs the **NVIDIA OpenShell** runtime -- an environment designed for executing agents with additional security -- and open-source models like NVIDIA Nemotron. A single installer command handles Node.js, OpenShell, and the NemoClaw CLI, then walks you through an onboard wizard to create a sandboxed agent on your DGX Station using vLLM with Nemotron 3 Super.
-        
-        By the end of this playbook you will have a working AI agent inside an OpenShell sandbox, accessible via a web dashboard and a Telegram bot, with inference routed to a local Nemotron 3 Super 120B model served by vLLM on your DGX Station -- all without exposing your host filesystem or network to the agent.
+        By the end of this playbook you will have a working AI agent inside an OpenShell sandbox, reachable through the **Web UI** or **terminal TUI**, with inference routed to local inference on the DGX Station. You can optionally add **Telegram** (with **cloudflared** for a public webhook URL) and optional **web search** — all without exposing your host filesystem or network beyond what you explicitly allow in policy.
         
         ## What you'll accomplish
         
-        - Configure Docker and the NVIDIA container runtime for OpenShell on DGX Station
-        - Pull Nemotron 3 Super 120B (NVFP4) from Hugging Face and serve it with vLLM
-        - Install NemoClaw with a single command (handles Node.js, OpenShell, and the CLI)
-        - Run the onboard wizard to create a sandbox and configure local vLLM inference
-        - Chat with the agent via the CLI, TUI, and web UI
-        - Set up a Telegram bot that forwards messages to your sandboxed agent
+        - Install **NemoClaw** with one command (`nemoclaw.sh`), which pulls Node.js, OpenShell, and the CLI as needed
+        - Walk through `nemoclaw onboard` wizard with recommended settings
+        - Open the **Web UI** to interact with agent
+        - Optionally enable **Brave Search** or **Telegram** after onboarding
+        - **Cleanup and uninstall** with the documented `uninstall.sh` flags when finished
         
         ## Notice and disclaimers
         
@@ -74,14 +67,14 @@ spec:
         
         ### What you're getting
         
-        This experience is provided "AS IS" for demonstration purposes only -- no warranties, no guarantees. This is a demo, not a production-ready solution. You will need to implement appropriate security controls for your environment and use case.
+        This experience is provided "AS IS" for demonstration purposes only — no warranties, no guarantees. This is a demo, not a production-ready solution. You will need to implement appropriate security controls for your environment and use case.
         
         ### Key risks with AI agents
         
-        - **Data leakage** -- Any materials the agent accesses could be exposed, leaked, or stolen.
-        - **Malicious code execution** -- The agent or its connected tools could expose your system to malicious code or cyber-attacks.
-        - **Unintended actions** -- The agent might modify or delete files, send messages, or access services without explicit approval.
-        - **Prompt injection and manipulation** -- External inputs or connected content could hijack the agent's behavior in unexpected ways.
+        - **Data leakage** — Any materials the agent accesses could be exposed, leaked, or stolen.
+        - **Malicious code execution** — The agent or its connected tools could expose your system to malicious code or cyber-attacks.
+        - **Unintended actions** — The agent might modify or delete files, send messages, or access services without explicit approval.
+        - **Prompt injection and manipulation** — External inputs or connected content could hijack the agent's behavior in unexpected ways.
         
         ### Participant acknowledgement
         
@@ -91,23 +84,22 @@ spec:
         
         | Layer      | What it protects                                   | When it applies             |
         |------------|----------------------------------------------------|-----------------------------|
-        | Filesystem | Prevents reads/writes outside allowed paths.       | Locked at sandbox creation.  |
+        | Filesystem | Prevents reads/writes outside allowed paths.       | Locked at sandbox creation. |
         | Network    | Blocks unauthorized outbound connections.          | Hot-reloadable at runtime.  |
-        | Process    | Blocks privilege escalation and dangerous syscalls.| Locked at sandbox creation.  |
+        | Process    | Blocks privilege escalation and dangerous syscalls.| Locked at sandbox creation. |
         | Inference  | Reroutes model API calls to controlled backends.   | Hot-reloadable at runtime.  |
         
         ## What to know before starting
         
         - Basic use of the Linux terminal and SSH
-        - Familiarity with Docker (permissions, `docker run`)
+        - Familiarity with Docker (permissions, `docker run`, optional `docker` group membership)
         - Awareness of the security and risk sections above
         
         ## Prerequisites
         
-        **Hardware and access:**
+        **Hardware:**
         
         - A DGX Station (GB300) with keyboard and monitor, or SSH access
-        - A **Telegram bot token** from [@BotFather](https://t.me/BotFather) (create one with `/newbot`) -- optional, for Phase 3
         
         **Software:**
         
@@ -119,16 +111,16 @@ spec:
         head -n 2 /etc/os-release
         nvidia-smi
         docker info --format '{{.ServerVersion}}'
-        df -h / /var/lib/docker 2>/dev/null | head -20
         ```
         
-        Expected: Ubuntu 24.04, NVIDIA GB300 GPU(s), Docker 28.x+, and **enough free disk** for Docker layers, the NemoClaw sandbox image, and Hugging Face cache (treat **~40 GB free** on the Docker data filesystem as a practical minimum; very low free space can surface as cryptic onboard errors such as “K8s namespace not ready”).
+        Expected: Ubuntu 24.04, NVIDIA GB300 GPU, Docker 28.x+.
         
         ## Have ready before you begin
         
-        | Item | Where to get it |
-        |------|----------------|
-        | Telegram bot token (optional) | [@BotFather](https://t.me/BotFather) on Telegram -- create with `/newbot` |
+        | Item | When you need it |
+        |------|------------------|
+        | **Telegram bot token** (optional) | Create with [@BotFather](https://t.me/BotFather) (`/newbot`). You can paste it during **onboarding** (Step 3) **or** when you run **`nemoclaw <sandbox> channels add telegram`** later. |
+        | **Brave Search API key** (optional) | From [Brave Search API](https://brave.com/search/api/) if you enable web search during onboarding or via **`nemoclaw onboard --fresh --gpu`** (`--fresh` re-prompts every onboarding question, including features you previously skipped; without `--fresh` the wizard resumes the previous session and will not re-prompt). |
         
         ## Ancillary files
         
@@ -136,10 +128,10 @@ spec:
         
         ## Time and risk
         
-        - **Estimated time:** 20--30 minutes (with model already downloaded). First-time model download adds ~10--20 minutes depending on network speed.
-        - **Risk level:** Medium -- you are running an AI agent in a sandbox; risks are reduced by isolation but not eliminated. Use a clean environment and do not connect sensitive data or production accounts.
-        - **Last Updated:** 04/27/2026
-          * First publication for DGX Station with vLLM
+        - **Estimated time:** About 30–60 minutes for a first full pass (install, onboard, model download depending on choice and network). Optional Brave, Telegram, and cloudflared steps add time if you do them in a second session.
+        - **Risk level:** Medium — you are running an AI agent in a sandbox; risks are reduced by isolation but not eliminated. Use a clean environment and do not connect sensitive data or production accounts.
+        - **Last Updated:** 05/29/2026
+          - Update to latest nemoclaw installer instructions
         
       
 
@@ -148,355 +140,111 @@ spec:
       
       label: Instructions
       content: |
-        # Phase 1: Prerequisites
+        # Phase 1: Install and Run NemoClaw
         
-        These steps prepare a fresh DGX Station for NemoClaw. If Docker, the NVIDIA runtime, and vLLM are already configured, skip to Phase 2.
+        ## Step 1. Install NemoClaw
         
-        > [!IMPORTANT]
-        > **Disk space:** NemoClaw’s onboard flow pulls a multi-gigabyte sandbox image and runs Docker, k3s, and the gateway together. If root or Docker’s data disk is nearly full (for example only a few gigabytes free), onboarding can fail with generic errors such as **“K8s namespace not ready”** with no clear hint about storage. Before you start, check free space: `df -h / /var/lib/docker`. NVIDIA recommends **at least 40 GB free** on the filesystem that holds Docker layers (often `/` or `/var/lib/docker`); treat **under ~15 GB** as high risk for first-time onboard failures.
-        
-        ## Step 1. Configure Docker and the NVIDIA container runtime
-        
-        OpenShell's gateway runs k3s inside Docker. On DGX Station (Ubuntu 24.04, cgroup v2), Docker must be configured with the NVIDIA runtime and host cgroup namespace mode.
-        
-        Configure the NVIDIA container runtime for Docker:
+        This single command handles everything: installs Node.js (if needed), installs OpenShell, clones the pinned NemoClaw **v0.55** release (set via `NEMOCLAW_VERSION`; v0.55 is the version the NemoClaw team currently recommends as the most stable), builds the CLI, and runs the onboard wizard to create a sandbox.
         
         ```bash
-        sudo nvidia-ctk runtime configure --runtime=docker
+        curl -fsSL https://www.nvidia.com/nemoclaw.sh | NEMOCLAW_VERSION=v0.55 bash
         ```
         
-        Expected:
+        The installation wizard walks you through setup:
         
-        ```text
-        INFO Loading config from /etc/docker/daemon.json
-        INFO Wrote updated config to /etc/docker/daemon.json
-        INFO It is recommended that docker daemon be restarted.
-        ```
+        1. **Accept NemoClaw license** -- Confirm by entering `yes`
+        2. **Run express install** -- Confirm by entering `Y`
         
-        Set the cgroup namespace mode required by OpenShell on DGX Station:
+        The installer requires **Node.js 22.16+** (installed automatically if missing). It walks you through Node.js, NemoClaw CLI and Onboarding phases. See more details of Onboarding configuration in the next step.
         
-        ```bash
-        sudo python3 -c "
-        import json, os
-        path = '/etc/docker/daemon.json'
-        d = json.load(open(path)) if os.path.exists(path) else {}
-        d['default-cgroupns-mode'] = 'host'
-        json.dump(d, open(path, 'w'), indent=2)
-        "
-        ```
-        
-        Restart Docker:
-        
-        ```bash
-        sudo systemctl restart docker
-        ```
-        
-        Verify the NVIDIA runtime works:
-        
-        ```bash
-        docker run --rm --runtime=nvidia --gpus all ubuntu nvidia-smi
-        ```
-        
-        Expected:
-        
-        ```text
-        +-----------------------------------------------------------------------------------------+
-        | NVIDIA-SMI 590.48.01              Driver Version: 590.48.01      CUDA Version: 13.1     |
-        +-----------------------------------------+------------------------+----------------------+
-        |   0  NVIDIA GB300                   On  |   00000009:06:00.0 Off |                    0 |
-        | N/A   46C    P0            215W / 1300W |   18661MiB / 256703MiB |      0%      Default |
-        +-----------------------------------------+------------------------+----------------------+
-        ```
-        
-        If you get a permission denied error on `docker`, add your user to the Docker group and activate the new group in your current session:
-        
-        ```bash
-        sudo usermod -aG docker $USER
-        newgrp docker
-        ```
-        
-        This applies the group change immediately. Alternatively, you can log out and back in instead of running `newgrp docker`.
+        ## Step 2. NemoClaw Onboarding
         
         > [!NOTE]
-        > DGX Station uses cgroup v2. OpenShell's gateway embeds k3s inside Docker and needs host cgroup namespace access. Without `default-cgroupns-mode: host`, the gateway can fail with "Failed to start ContainerManager" errors.
+        > If you chose **express install** in Step 1, all settings are auto-configured with recommended defaults. Skip to Step 3.
         
-        ## Step 2. Pull the Nemotron-3-Super model
+        During custom setup, the onboard wizard walks you through:
         
-        Install pip and the Hugging Face CLI (if not already installed):
+        1. **Configuring inference** -- Choose to set up local inference on your DGX Station by selecting **`7) Local Ollama`**.
+        2. **Ollama models** -- Choose desired inference model. If no model is present locally, the installer will provide options to download models to start.
+        3. **Sandbox name** -- Pick a name (e.g. my-assistant). Each sandbox requires a unique name.
+        4. **Apply this configuration** -- Enter `Y` to confirm setting up local inference.
+        5. **Enable Brave Web Search** -- Optional. If you enable it, paste a [Brave Search API](https://brave.com/search/api/) key when prompted.
+        6. **Messaging channels** -- Optional. If you enable it, choose your desired bot (`telegram`, `discord` or `slack`) and paste your bot token when prompted.
+        7. **Policy presets** -- Choose desired Policy tier (`Balanced` recommended) and accept/edit the suggested presets when prompted (confirm with **Enter**).
         
-        ```bash
-        sudo apt install -y python3-pip
-        pip3 install --break-system-packages huggingface-hub
-        ```
-        
-        Download Nemotron 3 Super 120B in NVFP4 quantization (~60 GB; may take 10--20 minutes depending on network speed):
-        
-        ```bash
-        hf download nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4
-        ```
-        
-        Expected (on a fresh download; cached downloads complete instantly):
-        
-        ```text
-        Fetching 36 files: 100%|██████████| 36/36 [15:42<00:00, 26.18s/it]
-        /home/nvidia/.cache/huggingface/hub/models--nvidia--NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4/snapshots/0d6fa3ecad422a...
-        ```
-        
-        Verify the download completed:
-        
-        ```bash
-        ls ~/.cache/huggingface/hub/models--nvidia--NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4/
-        ```
-        
-        Expected:
-        
-        ```text
-        blobs  refs  snapshots
-        ```
-        
-        > [!NOTE]
-        > The NVFP4 quantization is chosen because it fits entirely in **one** GB300 GPU’s 256 GB HBM3e with room for KV cache. On a **two-GPU** station you can still use NVFP4 with `--tensor-parallel-size 1` and a single visible GPU, or shard with `--tensor-parallel-size 2`. For other quantization variants, see [Troubleshooting](troubleshooting.md).
-        
-        ## Step 3. Start the vLLM inference server
-        
-        Launch vLLM using the NVIDIA-optimized container image.
-        
-        **Single GPU (default on one-GPU systems, or pin to one GPU on multi-GPU stations):** vLLM can emit **mixed device** warnings if several GPUs are visible but the model is only meant to use one. Pinning avoids accidentally placing weights on an unexpected device.
-        
-        ```bash
-        docker run -d --name vllm-nemotron \
-          --runtime nvidia --gpus '"device=0"' \
-          -e CUDA_VISIBLE_DEVICES=0 \
-          -v ~/.cache/huggingface:/root/.cache/huggingface \
-          -p 8000:8000 \
-          --restart unless-stopped \
-          nvcr.io/nvidia/vllm:26.03-py3 \
-          python3 -m vllm.entrypoints.openai.api_server \
-            --model nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4 \
-            --host 0.0.0.0 \
-            --port 8000 \
-            --tensor-parallel-size 1 \
-            --trust-remote-code \
-            --max-model-len 32768 \
-            --enable-auto-tool-choice \
-            --tool-call-parser qwen3_xml \
-            --reasoning-parser nemotron_v3
-        ```
-        
-        **Two GPUs (tensor parallel):** If your DGX Station has two Blackwell GPUs and you want Nemotron sharded across both, use both devices and set tensor parallel size to `2` (VRAM is summed across the GPUs):
-        
-        ```bash
-        docker run -d --name vllm-nemotron \
-          --runtime nvidia --gpus all \
-          -e CUDA_VISIBLE_DEVICES=0,1 \
-          -v ~/.cache/huggingface:/root/.cache/huggingface \
-          -p 8000:8000 \
-          --restart unless-stopped \
-          nvcr.io/nvidia/vllm:26.03-py3 \
-          python3 -m vllm.entrypoints.openai.api_server \
-            --model nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4 \
-            --host 0.0.0.0 \
-            --port 8000 \
-            --tensor-parallel-size 2 \
-            --trust-remote-code \
-            --max-model-len 32768 \
-            --enable-auto-tool-choice \
-            --tool-call-parser qwen3_xml \
-            --reasoning-parser nemotron_v3
-        ```
-        
-        **Pick a GPU index by name (optional one-liner):** To print the device index of the first GPU whose name contains `GB300` (adjust the pattern if your `nvidia-smi` name string differs), run on the host:
-        
-        ```bash
-        nvidia-smi --query-gpu=index,name --format=csv,noheader | awk -F', ' '/GB300/ { gsub(/^ +/,"",$1); print $1; exit }'
-        ```
-        
-        Use that index in Docker as `--gpus '"device=N"'` (replace `N` with the printed index).
-        
-        > [!NOTE]
-        > **`--tool-call-parser qwen3_xml`:** Nemotron’s tool-call wire format is exposed through vLLM’s **Qwen3-compatible XML tool parser** — the name refers to the parser implementation, not the base model. This pairing is what vLLM expects for correct function/tool calling with this checkpoint.
-        
-        The first startup loads ~70 GB of weights into GPU memory. Watch the logs until you see the model is ready:
-        
-        ```bash
-        docker logs -f vllm-nemotron
-        ```
-        
-        Wait until you see the following in the logs (typically 3--5 minutes):
-        
-        ```text
-        INFO Loading weights took 55.47 seconds
-        INFO Model loading took 69.39 GiB memory and 71.31 seconds
-        INFO:     Started server process [1]
-        INFO:     Waiting for application startup.
-        INFO:     Application startup complete.
-        ```
-        
-        Then verify the API is responding:
-        
-        ```bash
-        curl -s http://localhost:8000/v1/models
-        ```
-        
-        Expected:
-        
-        ```json
-        {"object":"list","data":[{"id":"nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4","object":"model",...}]}
-        ```
-        
-        Send a test request to warm up the model before proceeding to Step 4. The first inference request compiles CUDA graphs and can take 30--90 seconds:
-        
-        ```bash
-        curl -s --max-time 120 http://localhost:8000/v1/chat/completions \
-          -H "Content-Type: application/json" \
-          -d '{"model":"nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4","messages":[{"role":"user","content":"Say hello."}],"max_tokens":10}'
-        ```
-        
-        Expected (the first request may take 30--90 seconds; subsequent requests are much faster):
-        
-        ```json
-        {"id":"chatcmpl-...","object":"chat.completion","model":"nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4","choices":[{"index":0,"message":{"role":"assistant","content":"..."},"finish_reason":"length"}],...}
-        ```
-        
-        > [!IMPORTANT]
-        > Warm up the model before running the NemoClaw installer. The onboard wizard validates the vLLM endpoint with a short timeout. If the model has not served at least one request, this validation will time out and the install will fail.
-        
-        > [!IMPORTANT]
-        > Always start vLLM via the Docker container -- do not run `vllm serve` directly on the host. The NVIDIA container image (`nvcr.io/nvidia/vllm:26.03-py3`) includes optimized kernels for the GB300's Blackwell architecture that are not available in the pip-installed version.
-        
-        > [!NOTE]
-        > Key flags explained:
-        > - `--tensor-parallel-size` -- `1` for a single visible GPU; `2` when you expose two GPUs for tensor-parallel sharding (see Step 3).
-        > - `--trust-remote-code` -- required for the Mamba2-Transformer hybrid architecture
-        > - `--max-model-len 32768` -- maximum context length (increase up to 1M if VRAM allows)
-        > - `--enable-auto-tool-choice --tool-call-parser qwen3_xml` -- enables function/tool calling for the agent (see the note above on the parser name).
-        > - `--reasoning-parser nemotron_v3` -- separates chain-of-thought reasoning from the response so the TUI/Web UI can display them cleanly
-        
-        ---
-        
-        # Phase 2: Install and Run NemoClaw
-        
-        ## Step 4. Install NemoClaw
-        
-        The installer script installs Node.js (if needed), OpenShell, the NemoClaw CLI, and runs onboarding to create a sandbox. The vLLM provider requires the **experimental** flag and an **extended inference timeout** (the default 15-second validation timeout is too short for a 120B model).
-        
-        ### Recommended: non-interactive install (copy-paste friendly)
-        
-        This path is best for SSH sessions, automation, and documentation — no arrow-key TUI in the terminal.
-        
-        ```bash
-        NEMOCLAW_EXPERIMENTAL=1 \
-        NEMOCLAW_NON_INTERACTIVE=1 \
-        NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1 \
-        NEMOCLAW_SANDBOX_NAME=my-assistant \
-        NEMOCLAW_PROVIDER=vllm \
-        NEMOCLAW_MODEL="nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4" \
-        NEMOCLAW_LOCAL_INFERENCE_TIMEOUT=300 \
-        bash -c "$(curl -fsSL https://www.nvidia.com/nemoclaw.sh)"
-        ```
-        
-        Optional: include **Telegram** in the first onboard without typing the token over SSH — export credentials on the host **before** running the installer (same variables the [NemoClaw Telegram bridge guide](https://docs.nvidia.com/nemoclaw/latest/deployment/set-up-telegram-bridge.html) documents):
-        
-        ```bash
-        export TELEGRAM_BOT_TOKEN='<paste-token-here>'
-        # Optional DM allowlist (comma-separated Telegram user IDs):
-        # export TELEGRAM_ALLOWED_IDS='123456789,987654321'
-        ```
-        
-        Use [Telegram Desktop](https://desktop.telegram.org/) or [web.telegram.org](https://web.telegram.org/) on a laptop to copy the token from [@BotFather](https://t.me/BotFather) and paste into your SSH session (or into a small env file you `source`). Typing a 46+ character token on a phone keyboard into a remote shell is error-prone.
-        
-        To **persist** `TELEGRAM_BOT_TOKEN` across reboots, keep it in a root-owned or user-only file and source it from your shell profile (example — adjust path and permissions):
-        
-        ```bash
-        install -m 600 /dev/null ~/.nemoclaw/telegram.env
-        nano ~/.nemoclaw/telegram.env   # add: export TELEGRAM_BOT_TOKEN='...'
-        grep -q 'nemoclaw/telegram.env' ~/.bashrc || echo 'source ~/.nemoclaw/telegram.env 2>/dev/null' >> ~/.bashrc
-        ```
-        
-        NemoClaw also stores messaging credentials in its credential store when you onboard or run `nemoclaw … channels add telegram`; the file above is mainly for **re-running scripts** or **non-interactive** flows that read the environment.
-        
-        ### Alternative: interactive installer
-        
-        If you prefer the wizard:
-        
-        ```bash
-        NEMOCLAW_EXPERIMENTAL=1 \
-        NEMOCLAW_LOCAL_INFERENCE_TIMEOUT=300 \
-        bash -c "$(curl -fsSL https://www.nvidia.com/nemoclaw.sh)"
-        ```
-        
-        The wizard asks **six** high-level prompts (third-party notice, inference provider, Brave Search, messaging channels, sandbox name, policy presets). In parallel, the installer prints **eight** numbered onboard sub-phases, `[1/8]` … `[8/8]` (preflight, gateway, inference detection, inference route, messaging channels, sandbox creation, OpenClaw inside sandbox, policy presets). **Those two numberings are different on purpose** — the `[n/8]` lines are internal progress steps; the numbered list above is what you answer in the TUI.
-        
-        1. **Third-party software notice** -- Type `yes` to accept and continue.
-        2. **Inference provider** -- The wizard detects vLLM running locally. Select option **8** (`Local vLLM [experimental] — running`).
-        3. **Brave Web Search** -- Optional. Type `skip` if you don't have a Brave Search API key.
-        4. **Messaging channels** -- Optional. Press **Enter** to skip, or toggle Telegram/Discord/Slack if desired (this is the step that corresponds to onboard phase **[5/8]** in the log).
-        5. **Sandbox name** -- Pick a name (e.g. `my-assistant`). Names must be lowercase alphanumeric with hyphens only.
-        6. **Policy presets** -- Use arrow keys to toggle presets. `pypi` and `npm` are selected by default. Press **Enter** to confirm.
-        
-        The install takes approximately 3 minutes. Example milestones in the output (wording may vary slightly by release):
-        
-        ```text
-        [1/3] Node.js
-          Node.js found: v22.22.2
-        
-        [2/3] NemoClaw CLI
-          Installing NemoClaw from GitHub...
-          Verified: nemoclaw is available at /home/nvidia/.local/bin/nemoclaw
-        
-        [3/3] Onboarding
-          [1/8] Preflight checks
-            ✓ Docker is running
-            ✓ NVIDIA GPU detected: 2 GPU(s), 256703 MB VRAM   # example on a two-GPU system
-          [2/8] Starting OpenShell gateway
-            ✓ Gateway is healthy
-          [3/8] Configuring inference (NIM)
-            ✓ Using existing vLLM on localhost:8000
-            Detected model: nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4
-          [4/8] Setting up inference provider
-            ✓ Inference route set: vllm-local / nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4
-          [5/8] Messaging channels
-            (example) Telegram disabled — skipped
-            # or: Telegram enabled; token stored in credential store
-          [6/8] Creating sandbox
-            ✓ Sandbox 'my-assistant' created
-          [7/8] Setting up OpenClaw inside sandbox
-            ✓ OpenClaw gateway launched inside sandbox
-          [8/8] Policy presets
-            Applied preset: pypi
-            Applied preset: npm
-        ```
-        
-        When complete you will see:
+        When complete you will see output like:
         
         ```text
         ──────────────────────────────────────────────────
         Sandbox      my-assistant (Landlock + seccomp + netns)
-        Model        nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4 (Local vLLM)
+        Model        <your-selected-model> (Local Ollama)
         ──────────────────────────────────────────────────
         Run:         nemoclaw my-assistant connect
         Status:      nemoclaw my-assistant status
         Logs:        nemoclaw my-assistant logs --follow
-        
-        OpenClaw UI (tokenized URL; treat it like a password)
-        http://127.0.0.1:18789/#token=<long-token-here>
         ──────────────────────────────────────────────────
         ```
         
-        > [!IMPORTANT]
-        > Save the tokenized Web UI URL printed at the end -- you will need it in Step 8. It looks like:
-        > `http://127.0.0.1:18789/#token=<long-token-here>`
+        > [!NOTE]
+        > - If `nemoclaw` is not found after install, run `source ~/.bashrc` to reload your shell path.
+        > - Time to finish **Onboarding** can vary, depending on the model choice and internet speed.
+        
+        NemoClaw Onboarding can be run repeatedly to create multiple sandboxes for independent usecases. Use `--name <new-name>` to create an additional sandbox alongside any existing ones:
+        
+        ```bash
+        nemoclaw onboard --gpu --name <new-name>
+        ```
         
         > [!IMPORTANT]
-        > `NEMOCLAW_EXPERIMENTAL=1` is required for the vLLM provider. Without it, the installer will report "Requested provider 'vllm' is not available in this environment."
+        > Use `--name <new-name>` to create an additional sandbox without affecting existing ones. The `--fresh` flag is a destructive option reserved for starting a completely new onboard session — if a sandbox with the same name already exists, `--fresh` will **destroy and recreate it**. Only use `--fresh` when you intend to wipe and re-onboard (see Step 4 for an example where re-prompting is required).
+        
+        ## Step 3. Interact with OpenClaw
+        
+        There are two ways to interact with your OpenClaw, Web UI or terminal UI. 
+        
+        ### Option 1. Web UI
+        
+        Get the full dashboard URL (includes the auto-assigned port and token):
+        
+        ```bash
+        nemoclaw my-assistant dashboard-url --quiet
+        ```
+        
+        This prints a URL like `http://127.0.0.1:18790/#token=<token>`. The port is auto-assigned (commonly 18789 or 18790) and may differ between installs.
+        
+        **If accessing the Web UI directly on the DGX Station** (keyboard and monitor attached), open the dashboard URL in a browser.
+        
+        **If accessing the Web UI from a remote machine**, you need to set up an SSH tunnel.
+        
+        First, note the port number from the dashboard URL above (e.g. `18790`).
+        
+        Find your DGX Station's IP address:
+        
+        ```bash
+        hostname -I | awk '{print $1}'
+        ```
+        
+        This prints the primary IP address (e.g. `192.168.1.42`). You can also find it in **Settings > Wi-Fi** or **Settings > Network** on the DGX Station's desktop, or check your router's connected-devices list.
+        
+        From your remote machine, create an SSH tunnel using the port from above (replace `<port>` and `<your-station-ip>`):
+        
+        ```bash
+        ssh -L <port>:127.0.0.1:<port> <your-user>@<your-station-ip>
+        ```
+        
+        Now open the dashboard URL in your remote machine's browser.
         
         > [!IMPORTANT]
-        > `NEMOCLAW_LOCAL_INFERENCE_TIMEOUT=300` extends the validation timeout from the default 15 seconds to 300 seconds. Without this, the endpoint validation will fail on a cold 120B model, even if you warmed it up in Step 3 -- the installer sends its own test prompt which may be slower.
+        > Use `127.0.0.1`, not `localhost` -- the gateway origin check requires an exact match.
         
         > [!NOTE]
-        > If `nemoclaw` is not found after install, run `source ~/.bashrc` to reload your shell path.
+        > If the Web UI fails to load and the port forward may be stale, get the port from `nemoclaw my-assistant dashboard-url --quiet` and reset:
+        > ```bash
+        > openshell forward stop <port> my-assistant || true
+        > openshell forward start <port> my-assistant --background
+        > ```
         
-        ## Step 5. Connect to the sandbox and verify inference
+        ### Option 2. Terminal UI
         
         Connect to the sandbox:
         
@@ -504,207 +252,158 @@ spec:
         nemoclaw my-assistant connect
         ```
         
-        Expected:
-        
-        ```text
-        sandbox@my-assistant:~$
-        ```
-        
-        You are now inside the sandboxed environment. Verify that the inference route is working:
-        
-        ```bash
-        curl -sf https://inference.local/v1/models
-        ```
-        
-        Expected:
-        
-        ```json
-        {"object":"list","data":[{"id":"nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4","object":"model",...}]}
-        ```
-        
-        ## Step 6. Talk to the agent (CLI)
-        
-        Still inside the sandbox, send a test message **through the OpenClaw gateway** (the default path). The `--local` flag is **intentionally blocked** inside the NemoClaw OpenShell sandbox — it would bypass gateway controls — so the command you may see in generic OpenClaw quickstarts will fail here.
-        
-        ```bash
-        openclaw agent --agent main -m "hello" --session-id test
-        ```
-        
-        Expected (the agent will think, then respond -- first response may take 30--90 seconds): streaming or printed assistant text ending with a normal reply.
-        
-        If you see a response from the agent, inference is working end-to-end.
-        
-        ## Step 7. Interactive TUI
-        
-        Launch the terminal UI for an interactive chat session:
+        Then launch the terminal UI inside the sandbox:
         
         ```bash
         openclaw tui
         ```
         
-        Press **Ctrl+C** to exit the TUI.
+        You can start chatting with OpenClaw. Press **Ctrl+C** to exit the terminal UI.
         
-        ## Step 8. Exit the sandbox and access the Web UI
-        
-        Exit the sandbox to return to the host:
+        To exit the sandbox:
         
         ```bash
         exit
         ```
         
-        **If accessing the Web UI directly on the DGX Station** (keyboard and monitor attached), open a browser and navigate to the tokenized URL from Step 4. Prefer **`127.0.0.1`** in the URL bar (not `localhost`) so it matches strict gateway origin checks:
-        
-        ```text
-        http://127.0.0.1:18789/#token=<long-token-here>
-        ```
-        
-        **If accessing the Web UI from a remote machine**, you need to set up port forwarding.
-        
-        First, find your DGX Station's IP address. On the Station, run:
-        
-        ```bash
-        hostname -I | awk '{print $1}'
-        ```
-        
-        Start the port forward on the DGX Station host:
-        
-        ```bash
-        openshell forward start 18789 my-assistant --background
-        ```
-        
-        Expected:
-        
-        ```text
-        Forwarding 127.0.0.1:18789 -> my-assistant:18789 (background)
-        ```
-        
-        If the forward was already started during onboarding, you will see:
-        
-        ```text
-        Error: Port 18789 is already forwarded to sandbox 'my-assistant'.
-        ```
-        
-        This is fine -- the forward is already running.
-        
-        Then from your remote machine, create an SSH tunnel to the Station (replace `<your-station-ip>` with the IP address from above):
-        
-        ```bash
-        ssh -L 18789:127.0.0.1:18789 <your-user>@<your-station-ip>
-        ```
-        
-        Now open the tokenized URL in your remote machine's browser. Either of these usually works on the **client** side because both bind to your loopback through the tunnel:
-        
-        ```text
-        http://127.0.0.1:18789/#token=<long-token-here>
-        ```
-        
-        > [!IMPORTANT]
-        > Use `127.0.0.1`, not `localhost` -- the gateway origin check requires an exact match.
-        
         ---
         
-        # Phase 3: Telegram Bot
+        # Phase 2: Modify NemoClaw Policy
         
-        Messaging (Telegram, Discord, Slack) is **wired during onboarding** — credentials are stored, OpenShell providers are created, and channel configuration is **baked into the sandbox image**. Runtime config under `/sandbox/.openclaw/` is not safely patchable from inside the running sandbox.
+        ## Step 4. Enable Brave Search in sandbox
         
-        **`nemoclaw start` does not start the Telegram bridge.** In current NemoClaw releases it starts **optional host services** such as the **cloudflared** tunnel when installed; Telegram delivery stays under OpenShell. See [NemoClaw commands](https://docs.nvidia.com/nemoclaw/latest/reference/commands.html) and [Set up Telegram bridge](https://docs.nvidia.com/nemoclaw/latest/deployment/set-up-telegram-bridge.html).
-        
-        ## Step 9. Create a Telegram bot
-        
-        Open Telegram, find [@BotFather](https://t.me/BotFather), send `/newbot`, and follow the prompts. Copy the bot token.
-        
-        **Tip:** Use [Telegram Desktop](https://desktop.telegram.org/) or [web.telegram.org](https://web.telegram.org/) so you can **copy-paste** the token into your terminal or env file instead of typing 46+ characters from your phone into SSH.
-        
-        ## Step 10. Enable Telegram (first time or after skipping it)
-        
-        ### Path A — You have not installed yet, or you can re-run onboard
-        
-        Export the token on the **host**, then run the installer / onboard again (non-interactive variables from Step 4, plus `TELEGRAM_BOT_TOKEN`). The wizard’s **Messaging channels** step (installer phase **[5/8]**) is the right time to toggle Telegram interactively.
-        
-        Re-onboarding after a sandbox exists is supported; NemoClaw can detect token changes and rebuild the sandbox — see the official [Telegram bridge](https://docs.nvidia.com/nemoclaw/latest/deployment/set-up-telegram-bridge.html) page.
-        
-        ### Path B — NemoClaw is already installed (recommended host command)
-        
-        On the **host** (run `exit` if you are inside `nemoclaw … connect`):
-        
-        1. **Allow outbound access to the Telegram API** if you have not already — add the `telegram` network preset:
+        To add Brave Web Search to an existing sandbox, re-run the onboard wizard with `--fresh` to start a new session that re-prompts all options (including previously skipped features):
         
         ```bash
-        nemoclaw my-assistant policy-add
+        nemoclaw onboard --fresh --gpu
         ```
         
-        When prompted, select `telegram` and confirm.
+        > [!NOTE]
+        > Without `--fresh`, the onboard wizard **resumes** the previous session and will not re-prompt for features you already skipped.
         
-        2. **Register the bot token and rebuild** the sandbox image so Telegram is included:
+        When you reach **Enable Brave Web Search**, choose **yes** and paste the key from the [Brave Search API](https://brave.com/search/api/) console. Confirm the same sandbox name and inference choices where prompted. The wizard will **rebuild** the sandbox so the key is applied.
+        
+        > [!NOTE]
+        > Alternatively, set `BRAVE_API_KEY` in your environment before running the installer and Brave Search will be enabled automatically during onboard.
+        
+        To confirm web search is enabled, relaunch your OpenClaw WebUI or terminal UI. Ask the agent for something that needs **live web search**. If requests still fail, recheck **`policy-list`** and re-read the onboard output for Brave/API errors.
+        
+        ## Step 5. Set up Messaging Channel (Telegram Bot as an example)
+        
+        These steps apply when your sandbox exists but **Telegram was never configured** (you skipped **Messaging channels** in Step 2, or the sandbox policy tier never included Telegram-related egress). Replace `<sandbox-name>` with your sandbox (for example `my-assistant`).
+        
+        ### 1. Create a Telegram bot
+        
+        In Telegram, open [@BotFather](https://t.me/BotFather), send `/newbot`, and complete the prompts. Copy the **bot token** BotFather returns and keep it ready for the next step.
+        
+        ### 2. Register Telegram with NemoClaw and rebuild the sandbox
         
         ```bash
-        export TELEGRAM_BOT_TOKEN='<your-bot-token>'
-        nemoclaw my-assistant channels add telegram
+        nemoclaw <sandbox-name> channels add telegram
         ```
         
-        Follow the prompts to rebuild when asked (or run `nemoclaw my-assistant rebuild --yes` afterward if non-interactive mode queued a rebuild — see `NEMOCLAW_NON_INTERACTIVE=1` behavior in the [commands reference](https://docs.nvidia.com/nemoclaw/latest/reference/commands.html)).
+        Paste the token when prompted. NemoClaw persists credentials and **rebuilds** the sandbox so OpenClaw can use Telegram as a messaging channel.
         
-        3. **Pause or resume** Telegram delivery without changing credentials: use the **`nemoclaw channels stop`** / **`nemoclaw channels start`** patterns for the `telegram` channel described in [Set up Telegram bridge](https://docs.nvidia.com/nemoclaw/latest/deployment/set-up-telegram-bridge.html) (exact subcommand spelling may vary slightly by NemoClaw version; use `nemoclaw --help` if in doubt).
+        ### 3. (If needed) Allow Telegram egress in the sandbox policy
         
-        Check overall status:
+        If messages fail with network or policy errors after the channel is registered, inspect presets and add Telegram-related egress if your tier omitted it:
+        
+        ```bash
+        nemoclaw <sandbox-name> policy-list
+        nemoclaw <sandbox-name> policy-add telegram
+        ```
+        
+        Preset names follow your selected tier; confirm against [Network policies](https://docs.nvidia.com/nemoclaw/latest/reference/network-policies.html).
+        
+        ### 4. Verify Telegram
+        
+        Telegram uses long-polling (`getUpdates`) — the sandbox actively pulls messages from Telegram servers. **No public URL or cloudflared tunnel is required for Telegram to work.**
+        
+        Open Telegram, find your bot, and send a message. The bot should forward traffic to the agent in your NemoClaw sandbox and reply.
+        
+        > [!NOTE]
+        > The first response may take longer depending on model size (30B models respond in a few seconds; larger models may take longer on first inference).
+        
+        > [!NOTE]
+        > If the bot does not respond:
+        > - Run `nemoclaw <sandbox-name> status` to confirm the sandbox is running and inference is healthy.
+        > - Run `nemoclaw <sandbox-name> logs --follow` and look for Telegram-related errors.
+        > - If Telegram egress is missing, run `nemoclaw <sandbox-name> policy-add` and select `telegram`.
+        > - If the channel was never registered, run `nemoclaw <sandbox-name> channels add telegram`.
+        
+        > [!NOTE]
+        > The `channels add telegram` wizard also prompts for an optional **Telegram User ID** to restrict who can DM the bot. Send `/start` to [@userinfobot](https://t.me/userinfobot) on Telegram to get your numeric user ID. If you skip this, the bot will require device pairing (a terminal-based code confirmation) before responding to messages.
+        
+        > [!NOTE]
+        > For details on restricting which Telegram chats can interact with the agent, see the [NemoClaw Telegram bridge documentation](https://docs.nvidia.com/nemoclaw/latest/deployment/set-up-telegram-bridge.html).
+        
+        ### 5. (Optional) Install cloudflared for remote Web UI access
+        
+        The cloudflared tunnel provides a **public URL for the Web UI dashboard** — it is not related to Telegram messaging.
+        
+        Install cloudflared (DGX Station is arm64):
+        
+        ```bash
+        curl -L --output cloudflared.deb \
+          https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64.deb
+        sudo dpkg -i cloudflared.deb
+        ```
+        
+        Start the tunnel:
+        
+        ```bash
+        nemoclaw tunnel start
+        ```
+        
+        Verify:
         
         ```bash
         nemoclaw status
         ```
         
-        Open Telegram, find your bot, and send it a message.
+        You should see `● cloudflared` with a `trycloudflare.com` public URL.
         
-        > [!NOTE]
-        > The first response may take 30--90 seconds for a 120B parameter model running locally.
+        ---
         
-        > [!NOTE]
-        > To **persist** `TELEGRAM_BOT_TOKEN` for shell-based flows, use a `chmod 600` env file and `source` it from `~/.bashrc` as shown in Step 4.
+        # Phase 3: Set Up NemoClaw Agent
         
-        > [!NOTE]
-        > For chat allowlists and advanced Telegram behavior, see [NemoClaw Telegram bridge documentation](https://docs.nvidia.com/nemoclaw/latest/deployment/set-up-telegram-bridge.html).
+        ## Step 6. Set Up NemoClaw Agents
+        
+        Set up NemoClaw Agents in general require three steps: Configure NemoClaw security policy, Run Agent Workflow Prompt, Personalize the Workflow for your own use case.
+        
+        Checkout these [Example NemoClaw Agents](https://build.nvidia.com/station/nemoclaw-applications) for reference. Consider sharing your NemoClaw agent setup with the community at [DGX Station Developer Forum](https://forums.developer.nvidia.com/c/accelerated-computing/dgx-station-gb300)
         
         ---
         
         # Phase 4: Cleanup and Uninstall
         
-        ## Step 11. Stop services
+        ## Step 7. Stop services
         
-        Stop any running auxiliary services (Telegram bridge, cloudflared tunnel):
-        
-        ```bash
-        nemoclaw stop
-        ```
-        
-        Expected:
-        
-        ```text
-        [services] All services stopped.
-        ```
-        
-        Stop the port forward (always pass **port** and **sandbox name**):
+        Stop the cloudflared tunnel:
         
         ```bash
-        openshell forward list
-        openshell forward stop 18789 my-assistant
+        nemoclaw tunnel stop
         ```
         
-        Stop and **remove** the vLLM container so the name `vllm-nemotron` is free for a future run. The playbook created the container with **`--restart unless-stopped`**, so `docker stop` alone is not enough: Docker would **restart it after reboot** and the container would keep reserving GPU memory.
+        Stop the port forward:
         
         ```bash
-        docker update --restart=no vllm-nemotron 2>/dev/null || true
-        docker stop vllm-nemotron
-        docker rm vllm-nemotron
+        openshell forward list          # find active forwards and their ports
+        openshell forward stop <port>   # stop the dashboard forward (use the port shown above)
         ```
         
-        To remove the container in one step even if it is running: `docker rm -f vllm-nemotron`.
+        ## Step 8. Uninstall NemoClaw
         
-        ## Step 12. Uninstall NemoClaw
-        
-        Run the uninstaller from the cloned source directory. It removes all sandboxes, the OpenShell gateway, Docker containers/images/volumes, the CLI, and all state files. Docker, Node.js, npm, and vLLM are preserved.
+        The NemoClaw CLI includes a built-in uninstaller. It removes all sandboxes, the OpenShell gateway, Docker containers/images/volumes, the CLI, and all state files. Docker, Node.js, npm, and Ollama are preserved.
         
         ```bash
-        cd ~/.nemoclaw/source
-        ./uninstall.sh
+        nemoclaw uninstall --yes
+        ```
+        
+        To remove everything including the Ollama model:
+        
+        ```bash
+        nemoclaw uninstall --yes --delete-models
         ```
         
         **Uninstaller flags:**
@@ -713,15 +412,13 @@ spec:
         |------|--------|
         | `--yes` | Skip the confirmation prompt |
         | `--keep-openshell` | Leave the `openshell` binary in place |
-        | `--delete-models` | Removes **local inference models pulled by older NemoClaw flows** (the upstream flag name still references **Ollama**). It does **not** remove Hugging Face weights used by this playbook’s **vLLM** container — delete those separately (below). |
+        | `--delete-models` | Also remove the Ollama models pulled by NemoClaw |
         
-        To also remove the vLLM container and cached model weights:
-        
-        ```bash
-        ./uninstall.sh --yes
-        docker rm -f vllm-nemotron 2>/dev/null || true
-        rm -rf ~/.cache/huggingface/hub/models--nvidia--NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4/
-        ```
+        > [!NOTE]
+        > If the `nemoclaw` CLI is not available (e.g. install failed partway), use the remote uninstaller as a fallback:
+        > ```bash
+        > curl -fsSL https://raw.githubusercontent.com/NVIDIA/NemoClaw/refs/heads/main/uninstall.sh | bash -s -- --yes
+        > ```
         
         The uninstaller runs 6 steps:
         1. Stop NemoClaw helper services and port-forward processes
@@ -732,7 +429,7 @@ spec:
         6. Remove state directories (`~/.nemoclaw`, `~/.config/openshell`, `~/.config/nemoclaw`) and the OpenShell binary
         
         > [!NOTE]
-        > The source clone at `~/.nemoclaw/source` is removed as part of state cleanup in step 6. If you want to keep a local copy, move or back it up before running the uninstaller.
+        > If you have a local clone at `~/.nemoclaw/source` you want to keep, move or back it up before running the uninstaller — it is removed as part of state cleanup in step 6.
         
         # Useful commands
         
@@ -742,18 +439,13 @@ spec:
         | `nemoclaw my-assistant status` | Show sandbox status and inference config |
         | `nemoclaw my-assistant logs --follow` | Stream sandbox logs in real time |
         | `nemoclaw list` | List all registered sandboxes |
-        | `nemoclaw tunnel start` | Start optional host services such as **cloudflared** (public dashboard URL when installed); does **not** start Telegram |
-        | `nemoclaw start` | Deprecated alias for tunnel/aux host services — **not** for Telegram |
-        | `nemoclaw stop` | Stop host auxiliary services started by `nemoclaw tunnel start` / `nemoclaw start` |
-        | `nemoclaw <sandbox> channels add telegram` | Store Telegram token and rebuild sandbox (host) |
+        | `nemoclaw tunnel start` | Start cloudflared tunnel (public URL for remote Web UI access) |
+        | `nemoclaw tunnel stop` | Stop the cloudflared tunnel |
+        | `nemoclaw my-assistant dashboard-url --quiet` | Print the full tokenized Web UI URL (includes auto-assigned port) |
         | `openshell term` | Open the monitoring TUI on the host |
         | `openshell forward list` | List active port forwards |
-        | `openshell forward start 18789 my-assistant --background` | Start port forwarding for Web UI |
-        | `openshell forward stop 18789 my-assistant` | Stop Web UI port forward |
-        | `docker logs -f vllm-nemotron` | Stream vLLM inference server logs |
-        | `docker restart vllm-nemotron` | Restart the vLLM inference server |
-        | `curl http://localhost:8000/v1/models` | Check vLLM API status |
-        | `cd ~/.nemoclaw/source && ./uninstall.sh` | Remove NemoClaw (preserves Docker, Node.js, vLLM image) |
+        | `nemoclaw uninstall --yes` | Remove NemoClaw (preserves Docker, Node.js, Ollama) |
+        | `nemoclaw uninstall --yes --delete-models` | Remove NemoClaw and Ollama models |
         
       
 
@@ -765,38 +457,72 @@ spec:
         
         | Symptom | Cause | Fix |
         |---------|-------|-----|
-        | `openclaw agent --local` fails or is blocked inside the sandbox | `--local` bypasses the NemoClaw gateway and is disallowed in the OpenShell sandbox | Use gateway mode: `openclaw agent --agent main -m "hello" --session-id test` (no `--local`). |
-        | Onboard fails with **“K8s namespace not ready”** (or similar) with no clear reason | Often **low disk space** on `/` or Docker’s data root; image push / k3s need headroom | Run `df -h / /var/lib/docker`. Free **at least ~40 GB** (see [NemoClaw quickstart prerequisites](https://docs.nvidia.com/nemoclaw/latest/get-started/quickstart.html)); prune Docker (`docker system prune`) or expand disk, then retry onboard. |
-        | vLLM warns about **mixed devices** or loads on an unexpected GPU | Multiple GPUs visible; default visibility does not match intent | Pin one GPU: `--gpus '"device=0"'` and `-e CUDA_VISIBLE_DEVICES=0` with `--tensor-parallel-size 1`, or use two GPUs explicitly with `--tensor-parallel-size 2` and `-e CUDA_VISIBLE_DEVICES=0,1` (see Step 3 in instructions). |
         | `nemoclaw: command not found` after install | Shell PATH not updated | Run `source ~/.bashrc` (or `source ~/.zshrc` for zsh), or open a new terminal window. |
-        | `pip: command not found` | pip not installed on DGX Station by default | Install pip: `sudo apt install -y python3-pip`. Then use `pip3 install --break-system-packages huggingface-hub`. |
-        | `huggingface-cli` is deprecated | Hugging Face CLI was renamed | Use `hf download` instead of `huggingface-cli download`. |
-        | vLLM container won't start or crashes | GPU memory issue or wrong image | Check logs: `docker logs vllm-nemotron`. If CUDA OOM, reduce context: recreate the container with `--max-model-len 8192`. Ensure you are using the NVIDIA container image (`nvcr.io/nvidia/vllm:26.03-py3`), not the community `vllm/vllm-openai` image. |
-        | vLLM logs show `Application startup complete.` but `curl` times out | vLLM still compiling CUDA graphs after startup | Wait 1--2 minutes after `Application startup complete.` before sending requests. The first request compiles CUDA graphs and may take 30--90 seconds. |
-        | NemoClaw onboard fails with "endpoint validation failed" | vLLM model not warmed up or validation timeout too short | Warm up the model first: `curl -s --max-time 120 http://localhost:8000/v1/chat/completions -H "Content-Type: application/json" -d '{"model":"nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4","messages":[{"role":"user","content":"hello"}],"max_tokens":10}'`. Then re-run with `NEMOCLAW_EXPERIMENTAL=1 NEMOCLAW_LOCAL_INFERENCE_TIMEOUT=300 nemoclaw onboard`. |
-        | NemoClaw reports "provider 'vllm' is not available" | Missing experimental flag | Set `NEMOCLAW_EXPERIMENTAL=1` before running the installer or `nemoclaw onboard`. The vLLM provider is currently an experimental feature. |
+        | Installer fails with Node.js version error | Node.js version below 22.16 | Install Node.js 22.16+: `curl -fsSL https://deb.nodesource.com/setup_22.x \| sudo -E bash - && sudo apt-get install -y nodejs` then re-run the installer. |
+        | npm install fails with `EACCES` permission error | npm global directory not writable | `mkdir -p ~/.npm-global && npm config set prefix ~/.npm-global && export PATH=~/.npm-global/bin:$PATH` then re-run the installer. Add the `export` line to `~/.bashrc` to make it permanent. |
         | Docker permission denied | User not in docker group | `sudo usermod -aG docker $USER`, then log out and back in. |
-        | Gateway fails with cgroup / "Failed to start ContainerManager" errors | Docker not configured for host cgroup namespace on DGX Station | Run the cgroup fix: `sudo python3 -c "import json, os; path='/etc/docker/daemon.json'; d=json.load(open(path)) if os.path.exists(path) else {}; d['default-cgroupns-mode']='host'; json.dump(d, open(path,'w'), indent=2)"` then `sudo systemctl restart docker`. |
+        | Gateway fails with cgroup / "Failed to start ContainerManager" errors | Older OpenShell or Docker still using a **private** cgroup namespace for the gateway so kubelet cannot see cgroup v2 controllers | First **upgrade OpenShell** (re-run the Phase 1 `nemoclaw.sh` install so you get a build that sets host cgroupns on the gateway container). If it still fails, force Docker's default to host mode by running the [daemon.json cgroup fix](#daemonjson-cgroup-fix) below, then run `sudo systemctl restart docker`. |
         | Gateway fails with "port 8080 is held by container..." | Another OpenShell gateway or container is using port 8080 | Stop the conflicting container: `openshell gateway destroy -g <old-gateway-name>` or `docker stop <container-name> && docker rm <container-name>`, then retry `nemoclaw onboard`. |
-        | Sandbox cannot reach the inference server | Using `localhost` instead of `host.openshell.internal` in endpoint URL | Inside the sandbox, `localhost` refers to the sandbox container, not the host. The onboard wizard configures `host.openshell.internal` automatically. Verify from inside the sandbox: `curl -sf https://inference.local/v1/models`. If this fails, check that vLLM is reachable from the host: `curl -s http://localhost:8000/v1/models`. |
-        | Agent gives no response or is very slow | Normal for 120B model running locally | Nemotron 3 Super 120B can take 30--90 seconds per response. Verify inference route: `nemoclaw my-assistant status`. |
-        | vLLM API returns empty or errors on tool calls | Missing tool-call flags | Verify that `--enable-auto-tool-choice` and `--tool-call-parser qwen3_xml` are set: `docker inspect vllm-nemotron --format '{{.Config.Cmd}}'`. |
+        | Sandbox creation fails | Stale gateway state or DNS not propagated | Run `openshell gateway destroy && openshell gateway start`, then re-run the installer or `nemoclaw onboard`. |
+        | CoreDNS crash loop | Known issue on some DGX Station configurations | Re-run the NemoClaw installer (`curl -fsSL https://www.nvidia.com/nemoclaw.sh \| bash`) which includes the CoreDNS fix. If the issue persists, see [NemoClaw troubleshooting](https://docs.nvidia.com/nemoclaw/latest/reference/troubleshooting.html). |
+        | "No GPU detected" during onboard | DGX Station GB300 reports unified memory differently | Expected on DGX Station. The wizard still works and uses Ollama for inference. |
+        | Inference timeout or hangs | Ollama not running or not reachable | Check Ollama: `curl http://127.0.0.1:11434`. If not running: `sudo systemctl restart ollama`. Verify the NemoClaw auth proxy is healthy: `curl http://127.0.0.1:11435/api/tags`. If both respond, check `nemoclaw my-assistant status` for the Inference health line. |
+        | Agent gives no response or is very slow | First response can be slow, especially with larger models | Response time depends on model size (30B: a few seconds, 120B: 30–90 seconds). Verify inference route: `nemoclaw my-assistant status`. |
         | Port 18789 already in use | Another process is bound to the port | `lsof -i :18789` then `kill <PID>`. If needed, `kill -9 <PID>` to force-terminate. |
-        | Web UI port forward dies or dashboard unreachable | Port forward not active | `openshell forward stop 18789 my-assistant` then `openshell forward start 18789 my-assistant --background`. Always pass **port** and **sandbox name** to `openshell forward stop`. |
-        | Web UI shows `origin not allowed` | Browser origin does not match what the gateway expects | On the **DGX Station local desktop**, open `http://127.0.0.1:18789/#token=...` (not `localhost`). Through an **SSH tunnel** on another machine, `localhost` vs `127.0.0.1` in the client browser usually both work because the check applies to how you reach the forwarded port locally. |
-        | Telegram does not work after install; `nemoclaw start` does nothing for Telegram | **`nemoclaw start` starts optional host services (e.g. cloudflared), not the Telegram bridge** | Configure Telegram during onboard, or on the host run `nemoclaw my-assistant channels add telegram` (and rebuild), after `policy-add` for the `telegram` preset. See [Set up Telegram bridge](https://docs.nvidia.com/nemoclaw/latest/deployment/set-up-telegram-bridge.html). |
-        | Telegram bot receives messages but does not reply | Telegram policy not added to sandbox | Run `nemoclaw my-assistant policy-add`, type `telegram`, hit Y. Ensure the channel was added with `nemoclaw my-assistant channels add telegram` so the image includes Telegram. |
-        | `docker: Error response from daemon: Conflict. The container name "/vllm-nemotron" is already in use` | Previous cleanup used `docker stop` only | `docker rm -f vllm-nemotron` (or `docker update --restart=no` then `docker stop` and `docker rm`). The playbook uses `--restart unless-stopped`; stopping alone leaves a restart policy and reserved name. |
+        | Web UI port forward dies or dashboard unreachable | Port forward not active | `openshell forward stop 18789 my-assistant` then `openshell forward start 18789 my-assistant --background`. |
+        | Web UI shows `origin not allowed` | Accessing via `localhost` instead of `127.0.0.1` | Use `http://127.0.0.1:18789/#token=...` in the browser. The gateway origin check requires `127.0.0.1` exactly. |
+        | Telegram bridge does not start | Telegram channel not registered with sandbox | Run `nemoclaw <sandbox-name> channels add telegram` to register the bot token and rebuild the sandbox. Verify with `nemoclaw <sandbox-name> status`. |
+        | Telegram stops responding after sandbox rebuild | Telegram long-polling session stale after rebuild | Run `nemoclaw <sandbox-name> recover` to restart the gateway. If still unresponsive, run `nemoclaw <sandbox-name> channels add telegram` to re-register and rebuild. |
+        | Telegram bot receives messages but does not reply | Telegram network egress policy not added | Run `nemoclaw <sandbox-name> policy-add`, select `telegram`, and confirm. This is a hot-reload — no rebuild needed. |
         
-        **Model variant guidance:**
+        ### daemon.json cgroup fix
         
-        | Variant | Size | VRAM Required | When to Use |
-        |---------|------|---------------|-------------|
-        | `NVFP4` | ~60 GB | ~80 GB | Default for DGX Station (GB300). Fits on single GPU with room for large KV cache. |
-        | `FP8` | ~120 GB | ~140 GB | Higher accuracy, still fits on GB300. Add `--kv-cache-dtype fp8` to the vLLM command. |
-        | `BF16` | ~240 GB | ~260 GB | Highest accuracy. Fits on GB300 but leaves little room for KV cache. Reduce `--max-model-len`. |
+        Use this script as the fallback for the cgroup / "Failed to start ContainerManager" row above. It validates any existing `/etc/docker/daemon.json`, writes a `.bak` backup, sets `default-cgroupns-mode` to `host`, and atomically replaces the file. It exits non-zero with an error on stderr if anything fails, leaving the original `daemon.json` untouched.
         
-        For the latest known issues, see [DGX Station documentation](https://docs.nvidia.com/dgx/dgx-station-user-guide/index.html).
+        ```bash
+        sudo python3 - <<'PY'
+        import json, os, shutil, sys, tempfile
+        
+        path = '/etc/docker/daemon.json'
+        try:
+            if os.path.exists(path):
+                with open(path) as f:
+                    data = json.load(f)
+                if not isinstance(data, dict):
+                    raise ValueError(f'{path} is not a JSON object')
+            else:
+                data = {}
+        except (json.JSONDecodeError, ValueError, OSError) as e:
+            print(f'error: failed to read {path}: {e}', file=sys.stderr)
+            sys.exit(1)
+        
+        if os.path.exists(path):
+            try:
+                shutil.copy2(path, path + '.bak')
+            except OSError as e:
+                print(f'error: failed to back up {path}: {e}', file=sys.stderr)
+                sys.exit(1)
+        
+        data['default-cgroupns-mode'] = 'host'
+        
+        target_dir = os.path.dirname(path) or '/'
+        fd, tmp = tempfile.mkstemp(prefix='daemon.json.', dir=target_dir)
+        try:
+            with os.fdopen(fd, 'w') as f:
+                json.dump(data, f, indent=2)
+                f.write('\n')
+            os.chmod(tmp, 0o644)
+            os.replace(tmp, path)
+        except OSError as e:
+            if os.path.exists(tmp):
+                try:
+                    os.unlink(tmp)
+                except OSError:
+                    pass
+            print(f'error: failed to write {path}: {e}', file=sys.stderr)
+            sys.exit(1)
+        PY
+        ```
         
       
 
@@ -812,21 +538,5 @@ spec:
 
     - name: OpenClaw Documentation
       url: https://docs.openclaw.ai
-      
-
-    - name: vLLM Documentation
-      url: https://docs.vllm.ai
-      
-
-    - name: Nemotron-3-Super on Hugging Face
-      url: https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4
-      
-
-    - name: DGX Station Documentation
-      url: https://docs.nvidia.com/dgx/dgx-station-user-guide/index.html
-      
-
-    - name: DGX Station Forum
-      url: https://forums.developer.nvidia.com
       
 
