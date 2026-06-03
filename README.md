@@ -21,11 +21,13 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 
 ### NVIDIA
 
+- [CLI Coding Agent](nvidia/cli-coding-agent/)
 - [Comfy UI](nvidia/comfy-ui/)
 - [Connect Three DGX Spark in a Ring Topology](nvidia/connect-three-sparks/)
 - [Set Up Local Network Access](nvidia/connect-to-your-spark/)
 - [Connect Two Sparks](nvidia/connect-two-sparks/)
 - [CUDA-X Data Science](nvidia/cuda-x-data-science/)
+- [cuTile Kernels](nvidia/cutile-kernels/)
 - [DGX Dashboard](nvidia/dgx-dashboard/)
 - [FLUX.1 Dreambooth LoRA Fine-tuning](nvidia/flux-finetuning/)
 - [Run Hermes Agent with Local Models](nvidia/hermes-agent/)
@@ -41,6 +43,7 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 - [NCCL for Two Sparks](nvidia/nccl/)
 - [Fine-tune with NeMo](nvidia/nemo-fine-tune/)
 - [Run NemoClaw with a Local LLM](nvidia/nemoclaw/)
+- [🦞 Set Up Example NemoClaw Agents 🦞](nvidia/nemoclaw-applications/)
 - [Nemotron-3-Nano with llama.cpp](nvidia/nemotron/)
 - [NIM on Spark](nvidia/nim-llm/)
 - [NVFP4 Quantization](nvidia/nvfp4-quantization/)
@@ -52,6 +55,7 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 - [Fine-tune with Pytorch](nvidia/pytorch-fine-tune/)
 - [RAG Application in AI Workbench](nvidia/rag-ai-workbench/)
 - [Spark & Reachy Photo Booth](nvidia/reachy-photo-booth/)
+- [Register DGX Spark to Brev](nvidia/register-to-brev/)
 - [SGLang for Inference](nvidia/sglang/)
 - [Single-cell RNA Sequencing](nvidia/single-cell/)
 - [Speculative Decoding](nvidia/speculative-decoding/)
