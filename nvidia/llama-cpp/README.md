@@ -1,7 +1,6 @@
 # Run models with llama.cpp on DGX Spark
 
-> Build llama.cpp with CUDA and serve models via an OpenAI-compatible API (Nemotron 3 Nano Omni as example)
-
+> Build llama.cpp with CUDA and serve models via an OpenAI-compatible API
 
 ## Table of Contents
 
