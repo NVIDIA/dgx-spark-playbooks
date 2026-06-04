@@ -69,7 +69,7 @@ In the CLI, you’ll be walked through registration. Go through the flow until r
 
 * Go to the [Brev UI](https://brev.nvidia.com)
 * Navigate to the [Registered Compute](https://brev.nvidia.com/org/environments?tab=registered-compute)
-* Confirm that the DGX Spark appears as a registered node with an **Available** status 
+* Confirm that the DGX Spark appears as a registered node with a **Connected** status 
 
 ## Step 5. Next Steps
 
@@ -77,7 +77,10 @@ Your Spark is now integrated into Brev as a secure, remotely accessible GPU envi
 
 Now that your hardware is connected, you can:
 
-* **Share Access Anywhere:** Access your machine from anywhere and share access with others through the Brev UI under [Registered Compute](https://brev.nvidia.com/org/environments?tab=registered-compute).
+* **Share Access Anywhere:** Access your machine from anywhere and share access with others through the Brev UI by:
+    * Adding the user to your [Team](https://brev.nvidia.com/org/team)
+    * Navigating to your instance in the [Registered Compute](https://brev.nvidia.com/org/environments?tab=registered-compute) section
+    * In **SSH Access** section of the instance, search for the user you wish to add and click **Modify Access** to enable access
 
 ## Step 6. Cleanup
 
@@ -92,7 +95,7 @@ brev deregister
 In the UI:
 * Go to the [Brev UI](https://brev.nvidia.com)
 * Navigate to the section listing “GPU Environments” and look under “Registered Compute”
-* Click the “Deregister” menu item on the Spark you wish to delete from Brev.
+* Click the “Remove” menu item on the Spark you wish to delete from Brev.
 * Confirm your selection.
 
 ## Troubleshooting

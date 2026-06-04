@@ -15,167 +15,148 @@
 
 ## Basic idea
 
-[llama.cpp](https://github.com/ggml-org/llama.cpp) is a lightweight C/C++ inference stack for large language models. You build it with CUDA so tensor work runs on the DGX Spark GB10 GPU, then load GGUF weights and expose chat through `llama-server`’s OpenAI-compatible HTTP API.
+[llama.cpp](https://github.com/ggml-org/llama.cpp) is a lightweight C/C++ inference stack for large language models. You build it with CUDA so it fully utilizes the DGX Spark GB10 GPU, then load GGUF weights and expose chat through `llama-server`’s OpenAI-compatible HTTP API.
 
-This playbook walks through that stack end to end using **Nemotron 3 Nano Omni** as the hands-on example: an NVIDIA MoE family that runs well from quantized GGUF on Spark. Checkpoint choices and paths for all supported models are summarized in the matrix below; commands are in the instructions.
+This playbook walks through that stack end to end using MTP-enabled **Qwen3.6-35B-A3B** as the hands-on example. Checkpoint choices and paths for all supported models are summarized in the matrix below; commands are in the instructions.
 
 ## What you'll accomplish
 
-You will build llama.cpp with CUDA for GB10, download a **Nemotron 3 Nano Omni** example checkpoint, and run **`llama-server`** with GPU offload. You get:
+You will build llama.cpp with CUDA for GB10, download a **Qwen3.6-35B-A3B** checkpoint, and run **`llama-server`** with GPU offload. You get:
 
-- Local inference through llama.cpp (no separate Python inference framework required)
-- An OpenAI-compatible `/v1/chat/completions` endpoint for tools and apps
-- A concrete validation that the **Nemotron 3 Nano Omni** example runs on this stack on DGX Spark
+- Local inference through llama.cpp (no separate Python inference framework required)  
+- An OpenAI-compatible `/v1/chat/completions` endpoint for tools and apps  
+- A concrete validation that the **Qwen3.6-35B-A3B** example runs on this stack on DGX Spark with MTP support.
 
 ## What to know before starting
 
-- Basic familiarity with Linux command line and terminal commands
-- Understanding of git and building from source with CMake
+- Basic familiarity with Linux command line and terminal commands  
+- Understanding of git and building from source with CMake  
 - Basic knowledge of REST APIs and cURL for testing
-- Familiarity with Hugging Face Hub for downloading GGUF files
 
 ## Prerequisites
 
 **Hardware requirements**
 
-- NVIDIA DGX Spark with GB10 GPU
-- Sufficient unified memory for the example **Q8_0** checkpoint (weights on the order of **~35GB**, plus KV cache and runtime overhead—scale up if you pick a larger quant or longer context)
-- At least **~40GB** free disk for the example download plus build artifacts (more if you keep multiple GGUFs)
+- NVIDIA DGX Spark with GB10 GPU  
+- Sufficient unified memory for the model and the KV-Cache being utilized (about 30GB free RAM for the model in the example)  
+- At least **\~40GB** free disk for the example download plus build artifacts (more if you keep multiple GGUFs)
 
 **Software requirements**
 
-- NVIDIA DGX OS
-- Git: `git --version`
-- CMake (3.14+): `cmake --version`
-- CUDA Toolkit: `nvcc --version`
+- NVIDIA DGX OS  
+- Git: `git --version`  
+- CMake (3.14+): `cmake --version`  
+- CUDA Toolkit: `nvcc --version`  
 - Network access to GitHub and Hugging Face
 
 ## Model support matrix
 
-The following models are supported with llama.cpp on Spark. The instructions use the **Nemotron 3 Nano Omni** example row by default.
-
-| Model | Support Status | HF Handle |
-|-------|----------------|-----------|
-| **Nemotron 3 Nano Omni** (example walkthrough) | ✅ | `ggml-org/NVIDIA-Nemotron-3-Nano-Omni` |
-| **Qwen3.6-35B-A3B** | ✅ | `unsloth/Qwen3.6-35B-A3B-GGUF` |
-| **Qwen3.6-27B** | ✅ | `unsloth/Qwen3.6-27B-GGUF` |
-| **Gemma 4 31B IT** | ✅ | `ggml-org/gemma-4-31B-it-GGUF` |
-| **Gemma 4 26B A4B IT** | ✅ | `ggml-org/gemma-4-26B-A4B-it-GGUF` |
-| **Gemma 4 E4B IT** | ✅ | `ggml-org/gemma-4-E4B-it-GGUF` |
-| **Gemma 4 E2B IT** | ✅ | `ggml-org/gemma-4-E2B-it-GGUF` |
-| **Nemotron-3-Nano** | ✅ | `unsloth/Nemotron-3-Nano-30B-A3B-GGUF` |
+DGX Spark supports any GGUF  format model checkpoint with llama.cpp, as long as the system has memory available to host and run the checkpoint.
 
 ## Time & risk
 
-* **Estimated time:** About 30 minutes, plus downloading the example GGUF (~35GB order of magnitude for the default quant)
-* **Risk level:** Low — build is local to your clone; no system-wide installs required for the steps below
-* **Rollback:** Remove the `llama.cpp` clone and the model directory under `~/models/` to reclaim disk space
-* **Last updated:** 04/28/2026
-  * Walkthrough now uses Nemotron Omni; other model rows stay available
+* **Estimated time:** About 30 minutes, plus downloading the example GGUF (\~35GB order of magnitude for the default quant)  
+* **Risk level:** Low — build is local to your clone; no system-wide installs required for the steps below  
+* **Rollback:** Remove the `llama.cpp` clone and the model directory under `~/.cache/huggingface/hub/` to reclaim disk space  
+* **Last updated:** 06/03/2026  
+  * Walkthrough now uses Qwen3.6-35B-A3B as an example
 
 ## Instructions
 
-## Step 1. Verify prerequisites
+## Step 1. Install the dependencies
 
-The **example** checkpoint is **`nemotron-3-nano-omni-ga_v1.0-Q8_0.gguf`** from Hugging Face repo **`ggml-org/NVIDIA-Nemotron-3-Nano-Omni`** (full handle: `ggml-org/NVIDIA-Nemotron-3-Nano-Omni/nemotron-3-nano-omni-ga_v1.0-Q8_0.gguf`). Other supported GGUFs—including Qwen3.6, Gemma, and alternate Nemotron Omni builds—use the same build and server steps; change `hf download` and `--model` paths (see the [overview model matrix](overview.md)).
+Install the required dependencies:
 
-Ensure the required tools are installed:
-
-```bash
-git --version
-cmake --version
-nvcc --version
-```
-
-All commands should return version information. If any are missing, install them before continuing.
-
-Install the Hugging Face CLI:
-
-```bash
-python3 -m venv llama-cpp-venv
-source llama-cpp-venv/bin/activate
-pip install -U "huggingface_hub[cli]"
-```
-
-Verify installation:
-
-```bash
-hf version
+```shell
+sudo apt install -y git clang cmake libcurl4-openssl-dev libssl-dev
 ```
 
 ## Step 2. Clone the llama.cpp repository
 
 Clone upstream llama.cpp—the framework you are building:
 
-```bash
+```shell
 git clone https://github.com/ggml-org/llama.cpp
 cd llama.cpp
 ```
 
 ## Step 3. Build llama.cpp with CUDA
 
-Configure CMake with CUDA and GB10’s **sm_121** architecture so GGML’s CUDA backend matches your GPU:
+Configure CMake with CUDA and GB10’s **sm\_121** architecture so GGML’s CUDA backend matches your GPU:
 
-```bash
-mkdir build && cd build
-cmake .. -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES="121" -DLLAMA_CURL=OFF
-make -j8
+```shell
+cmake -B build -DGGML_NATIVE=ON -DGGML_CUDA=ON -DGGML_CURL=ON -DGGML_RPC=ON -DCMAKE_CUDA_ARCHITECTURES=121a-real
+cmake --build build --config Release -j
 ```
 
 The build usually takes on the order of 5–10 minutes. When it finishes, binaries such as `llama-server` appear under `build/bin/`.
 
-## Step 4. Download example Nemotron 3 Nano Omni GGUF
+## Step 4. Start llama-server with a model
 
-llama.cpp loads models in **GGUF** format. This playbook uses the **Q8_0** checkpoint from `ggml-org/NVIDIA-Nemotron-3-Nano-Omni`, which balances quality and memory on DGX Spark GB10 unified memory.
+llama.cpp loads models in **GGUF** format. This playbook uses the **Q4\_K\_XL** checkpoint from `unsloth/Qwen3.6-35B-A3B-MTP-GGUF`, which provides a good balance between quality and speed on DGX Spark.
 
-```bash
-hf download ggml-org/NVIDIA-Nemotron-3-Nano-Omni \
-  nemotron-3-nano-omni-ga_v1.0-Q8_0.gguf \
-  --local-dir ~/models/NVIDIA-Nemotron-3-Nano-Omni
+From your `llama.cpp/build` directory, launch the OpenAI-compatible server with GPU offload. It will load the model from HuggingFace first if it hasn’t been downloaded before or if there are any updates. 
+
+All models are saved in the default HuggingFace cache directory in \~/.cache/huggingface/hub. For instance, this model will be saved into \~/.cache/huggingface/hub/models--unsloth--Qwen3.6-35B-A3B-MTP-GGUF
+
+It will also automatically load mmproj file to enable vision capabilities if supported by the model. By default, llama-server will try to fit full model context with ability to serve 4 concurrent requests, but it will adjust parameters automatically if needed.
+
+```shell
+./bin/llama-server \
+  -hf unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_XL \
+  --host 0.0.0.0 \
+  --port 30000
 ```
 
-The file is on the order of **~35GB** (exact size may vary). The download can be resumed if interrupted.
+To run with MTP speculative decoding, provide additional parameters as shown in the example below. MTP requires a compatible model, like `unsloth/Qwen3.6-35B-A3B-MTP-GGUF` used in this example. The following example also sets “preserve\_thinking” flag that allows Qwen models to use so-called “interleaved thinking” by preserving all prior thinking blocks in the history which can be useful for agentic workflows.
 
-## Step 5. Start llama-server with Nemotron 3 Nano Omni
-
-From your `llama.cpp/build` directory, launch the OpenAI-compatible server with GPU offload:
-
-```bash
+```shell
 ./bin/llama-server \
-  --model ~/models/NVIDIA-Nemotron-3-Nano-Omni/nemotron-3-nano-omni-ga_v1.0-Q8_0.gguf \
+  -hf unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_XL \
   --host 0.0.0.0 \
   --port 30000 \
-  --n-gpu-layers 99 \
-  --ctx-size 8192 \
-  --threads 8
+  --chat-template-kwargs '{"preserve_thinking": true}' \
+  --spec-type draft-mtp \
+  --spec-draft-n-max 3 
 ```
 
 **Parameters (short):**
 
-- `--host` / `--port`: bind address and port for the HTTP API
-- `--n-gpu-layers 99`: offload layers to the GPU (adjust if you use a different model)
-- `--ctx-size`: context length (can be increased up to model/server limits; uses more memory)
-- `--threads`: CPU threads for non-GPU work
+- `--host` / `--port`: bind address and port for the HTTP API  
+- `--chat-template-kwargs`: sets additional params for the json template parser, must be a valid json object string  
+- `--spec-type`: comma-separated list of types of speculative decoding to use (default: none, most MTP-compatible models will use “draft-mtp”, but you need to check the model card first)  
+- `--spec-draft-n-max`: number of tokens to draft for speculative decoding (default: 3\)
 
 You should see log lines similar to:
 
 ```
-llama_new_context_with_model: n_ctx = 8192
+0.14.322.968 I srv    load_model: speculative decoding context initialized
+0.14.322.970 I slot   load_model: id  0 | task -1 | new slot, n_ctx = 262144
+0.14.322.972 I slot   load_model: id  1 | task -1 | new slot, n_ctx = 262144
+0.14.322.972 I slot   load_model: id  2 | task -1 | new slot, n_ctx = 262144
+0.14.322.973 I slot   load_model: id  3 | task -1 | new slot, n_ctx = 262144
+0.14.323.063 I srv    load_model: prompt cache is enabled, size limit: 8192 MiB
+
 ...
-main: server is listening on 0.0.0.0:30000
+0.14.342.935 I srv  llama_server: model loaded
+0.14.342.939 I srv  llama_server: server is listening on http://0.0.0.0:30000
+0.14.342.944 I srv  update_slots: all slots are idle
+
 ```
 
-**Keep this terminal open** while testing. Large GGUFs can take a minute or more to load; until you see `server is listening`, nothing accepts connections on port 30000 (see Troubleshooting if `curl` reports connection refused).
+**Keep this terminal open** while testing. Large GGUFs can take a minute or more to load, and initial model download can take a while if the model is not downloaded yet. You will see a progress bar when model is being downloaded.
 
-## Step 6. Test the API
+The server is only ready to accept incoming connections on port 30000 after you see `server is listening` message (see Troubleshooting if `curl` reports connection refused).
 
-Use a **second terminal on the same machine** that runs `llama-server` (for example another SSH session into DGX Spark). If you run `curl` on your laptop while the server runs only on Spark, use the Spark hostname or IP instead of `localhost`.
+## Step 5. Test the API
 
-```bash
+Use a **second terminal on the same machine** that runs `llama-server` (for example another SSH session into DGX Spark). If you run `curl` on your laptop while the server runs only on Spark, use the Spark hostname or IP instead of `localhost`. 
+
+```shell
 curl -X POST http://127.0.0.1:30000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "nemotron",
+    "model": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_XL",
     "messages": [{"role": "user", "content": "New York is a great city because..."}],
     "max_tokens": 100
   }'
@@ -198,7 +179,7 @@ Example shape of the response (fields vary by llama.cpp version; `message` may i
     }
   ],
   "created": 1765916539,
-  "model": "nemotron-3-nano-omni-ga_v1.0-Q8_0.gguf",
+  "model": "$MODEL_PATH",
   "object": "chat.completion",
   "usage": {
     "completion_tokens": 100,
@@ -212,41 +193,35 @@ Example shape of the response (fields vary by llama.cpp version; `message` may i
 }
 ```
 
-## Step 7. Longer completion (with Nemotron 3 Nano Omni)
+## Step 6. Longer completion (with Qwen3.6-35B-A3B)
 
-Try a slightly longer prompt to confirm stable generation with **Nemotron 3 Nano Omni**:
+Try a slightly longer prompt to confirm stable generation with **Qwen3.6-35B-A3B**:
 
-```bash
+```shell
 curl -X POST http://127.0.0.1:30000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "nemotron",
+    "model": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_XL",
     "messages": [{"role": "user", "content": "Solve this step by step: If a train travels 120 miles in 2 hours, what is its average speed?"}],
     "max_tokens": 500
   }'
 ```
 
-## Step 8. Cleanup
+## Step 7. Cleanup
 
 Stop the server with `Ctrl+C` in the terminal where it is running.
 
 To remove this tutorial’s artifacts:
 
-```bash
+```shell
 rm -rf ~/llama.cpp
-rm -rf ~/models/NVIDIA-Nemotron-3-Nano-Omni
+rm -rf ~/.cache/huggingface/hub/models--unsloth--Qwen3.6-35B-A3B-MTP-GGUF
 ```
 
-Deactivate the Python venv if you no longer need `hf`:
+## Step 8. Next steps
 
-```bash
-deactivate
-```
-
-## Step 9. Next steps
-
-1. **Context length:** Increase `--ctx-size` for longer chats (watch memory; 1M-token class contexts are possible only when the build, model, and hardware allow).
-2. **Other models:** Point `--model` at any compatible GGUF; the llama.cpp server API stays the same.
+1. **Context length:** By default, llama.cpp tries to allocate maximum context size supported for the model if possible, but you can also set it manually using `--ctx-size` (or `-c`) to adjust for your needs. For agentic or coding needs you need a minimum of 32768 tokens, preferably 100000 or more.  
+2. **Other models:** You can use `--model` to load any compatible GGUF downloaded locally; the llama.cpp server API stays the same. Use `-hf` to let llama.cpp automatically manage downloads/updates. Please note that if you use `--model` with multi-modal models, you need to provide a path to .mmproj file using `--mmproj` parameter. If you use `-hf` it will load the mmproj file automatically.  
 3. **Integrations:** Point Open WebUI, Continue.dev, or custom clients at `http://<spark-host>:30000/v1` using the OpenAI client pattern.
 
 The server implements the usual OpenAI-style chat features your llama.cpp build enables (including streaming and tool-related flows where supported).
