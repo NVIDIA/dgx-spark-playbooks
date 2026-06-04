@@ -82,20 +82,17 @@ spec:
       content: |
         # Step 1. Log in to Brev
         
-        Go to the [Brev UI](https://brev.nvidia.com), log in, and confirm you’re in the correct org (by clicking the org button on the top right-hand side of the page). Once logged in, go to the [Registered Compute](https://brev.nvidia.com/org/environments?tab=registered-compute) section under the "GPU" tab in the main navigation.
+        Go to the [Brev UI](https://brev.nvidia.com), log in, and confirm you’re in the correct org (by clicking the org button on the top right hand side of the page). Once logged in, go to the [Registered Compute](https://brev.nvidia.com/org/environments?tab=registered-compute) section under the "GPU" tab in the main navigation.
         
         Click the “Register Compute” button and follow the instructions in the pop-up window.
         
-        # Step 2. Complete Pop-up Instructions
+        # Step 2. Complete Popup Instructions
         
         * Install the Brev CLI
         * Configure your compute
             * Add a name for compute
-            * To configure SSH, ensure the “Enable SSH access” toggle is on
+            * To configure ssh, ensure the “Enable SSH access” toggle is on
         * Run the registration command
-        
-        > [!IMPORTANT]
-        > Run the Brev CLI install command **without `sudo`**. Prefixing the installer with `sudo` writes the `brev` binary into root's home directory, which is not on your user shell's `PATH` — the next command will fail with `brev: command not found`. Copy the install command from the pop-up and run it as your normal user.
         
         # Step 3. Follow Registration Flow
         
@@ -113,14 +110,10 @@ spec:
         
         Now that your hardware is connected, you can:
         
-        * **Access your machine from anywhere:** Open the [Brev UI](https://brev.nvidia.com) and launch a session from [Registered Compute](https://brev.nvidia.com/org/environments?tab=registered-compute).
-        * **Share access with others:** Invite teammates to your DGX Station from the Brev UI:
-            * Go to the [Brev UI](https://brev.nvidia.com) and open [Registered Compute](https://brev.nvidia.com/org/environments?tab=registered-compute).
-            * Find your DGX Station in the list and open the row's three-dot (⋯) menu.
-            * Select **Share Access**.
-            * Enter the email address of the person you want to share with.
-            * Choose their role / permission level.
-            * Confirm to send the invitation.
+        * **Share Access Anywhere:** Access your machine from anywhere and share access with others through the Brev UI by:
+            * Adding the user to your [Team](https://brev.nvidia.com/org/team)
+            * Navigating to your instance in the [Registered Compute](https://brev.nvidia.com/org/environments?tab=registered-compute) section
+            * In **SSH Access** section of the instance, search for the user you wish to add and click **Modify Access** to enable access
         
         # Step 6. Cleanup
         
@@ -135,7 +128,7 @@ spec:
         In the UI:
         * Go to the [Brev UI](https://brev.nvidia.com)
         * Navigate to the section listing “GPU Environments” and look under “Registered Compute”
-        * Click the “Remove” menu item on the device you wish to delete from Brev.
+        * Click the “Remove” menu item on the DGX Station you wish to delete from Brev.
         * Confirm your selection.
         
       
