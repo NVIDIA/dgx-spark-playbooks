@@ -153,6 +153,16 @@ export class QdrantService {
         return true;
       }
 
+      const collectionsResponse = await fetch(`${this.hostUrl}/collections`, {
+        method: 'GET'
+      });
+
+      if (collectionsResponse.ok) {
+        console.log(`Qdrant server is reachable`);
+        this.isQdrantRunningCheck = false;
+        return true;
+      }
+
       console.log('Qdrant health check failed - server might not be running');
       this.isQdrantRunningCheck = false;
       return false;
@@ -534,6 +544,21 @@ export class QdrantService {
   public async getStats(): Promise<any> {
     try {
       console.log('Getting stats from Qdrant...');
+      const isRunning = await this.isQdrantRunning();
+      if (!isRunning) {
+        return {
+          totalVectorCount: 0,
+          source: 'qdrant',
+          httpHealthy: false,
+          url: this.hostUrl,
+          error: `Qdrant is not reachable at ${this.hostUrl}. Start vector search with ./start.sh --vector-search if you need Vector DB features.`
+        };
+      }
+
+      if (!this.initialized) {
+        await this.initialize();
+      }
+
       const response = await this.makeRequest(`/collections/${this.collectionName}`, 'GET');
 
       if (response && response.result) {
@@ -554,17 +579,19 @@ export class QdrantService {
         console.log(`Qdrant stats request failed`);
         return {
           totalVectorCount: 0,
-          source: 'error',
-          httpHealthy: false,
-          error: 'Failed to get stats'
+          source: 'qdrant',
+          httpHealthy: true,
+          url: this.hostUrl,
+          error: `Qdrant is reachable, but collection '${this.collectionName}' is not available.`
         };
       }
     } catch (error) {
       console.log('Qdrant connection failed - server may not be running');
       return {
         totalVectorCount: 0,
-        source: 'error',
+        source: 'qdrant',
         httpHealthy: false,
+        url: this.hostUrl,
         error: error instanceof Error ? error.message : String(error)
       };
     }

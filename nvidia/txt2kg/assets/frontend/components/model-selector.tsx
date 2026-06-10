@@ -151,7 +151,9 @@ export function ModelSelector() {
       
       // Default to first available local model (vLLM or Ollama)
       const localModel = availableModels.find(m => m.provider === "vllm" || m.provider === "ollama")
-      setSelectedModel(localModel || availableModels[0])
+      const defaultModel = localModel || availableModels[0]
+      setSelectedModel(defaultModel)
+      localStorage.setItem("selectedModel", JSON.stringify(defaultModel))
     }
     
     setIsLoading(false)

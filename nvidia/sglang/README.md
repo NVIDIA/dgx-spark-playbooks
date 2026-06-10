@@ -39,9 +39,9 @@ vision-language tasks using models like DeepSeek-V2-Lite.
 - NVIDIA Spark device with Blackwell architecture
 - Docker Engine installed and running: `docker --version`
 - NVIDIA GPU drivers installed: `nvidia-smi`
-- NVIDIA Container Toolkit configured: `docker run --rm --gpus all lmsysorg/sglang@sha256:ceaf8b16e02d165143633ac228bbb994a05fe77d7e0526cf035ae4bbf4eacc36 nvidia-smi`
+- NVIDIA Container Toolkit configured: `docker run --rm --gpus all lmsysorg/sglang:latest-cu130 nvidia-smi`
 - Sufficient disk space (>20GB available): `df -h`
-- Network connectivity for pulling containers: `docker pull lmsysorg/sglang@sha256:ceaf8b16e02d165143633ac228bbb994a05fe77d7e0526cf035ae4bbf4eacc36`
+- Network connectivity for pulling containers: `docker pull lmsysorg/sglang:latest-cu130`
 
 ## Ancillary files
 
@@ -103,7 +103,7 @@ docker --version
 nvidia-smi
 
 ## Verify Docker GPU support
-docker run --rm --gpus all lmsysorg/sglang@sha256:ceaf8b16e02d165143633ac228bbb994a05fe77d7e0526cf035ae4bbf4eacc36 nvidia-smi
+docker run --rm --gpus all lmsysorg/sglang:latest-cu130 nvidia-smi
 
 ## Check available disk space
 df -h /
@@ -124,7 +124,7 @@ several minutes depending on your network connection.
 
 ```bash
 ## Pull the SGLang container
-docker pull lmsysorg/sglang@sha256:ceaf8b16e02d165143633ac228bbb994a05fe77d7e0526cf035ae4bbf4eacc36
+docker pull lmsysorg/sglang:latest-cu130
 
 ## Verify the image was downloaded
 docker images | grep sglang
@@ -140,7 +140,7 @@ server inside the container, exposing it on port 30000 for client connections.
 docker run --gpus all -it --rm \
   -p 30000:30000 \
   -v /tmp:/tmp \
-  lmsysorg/sglang@sha256:ceaf8b16e02d165143633ac228bbb994a05fe77d7e0526cf035ae4bbf4eacc36 \
+  lmsysorg/sglang:latest-cu130 \
   bash
 ```
 
@@ -237,7 +237,7 @@ docker ps | grep sglang | awk '{print $1}' | xargs docker stop
 docker container prune -f
 
 ## Remove SGLang images (optional)
-docker rmi lmsysorg/sglang@sha256:ceaf8b16e02d165143633ac228bbb994a05fe77d7e0526cf035ae4bbf4eacc36
+docker rmi lmsysorg/sglang:latest-cu130
 ```
 
 ## Step 10. Next steps

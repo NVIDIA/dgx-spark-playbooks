@@ -226,6 +226,8 @@ export function EmbeddingsGenerator({ showTripleExtraction = false }: Embeddings
           const model = JSON.parse(selectedModel);
           if (model.provider === "ollama") {
             processingMethod = `Ollama ${model.model || 'qwen3:1.7b'}`;
+          } else if (model.provider === "vllm") {
+            processingMethod = `vLLM ${model.model || 'local model'}`;
           } else if (model.id?.startsWith("nvidia-")) {
             processingMethod = 'NVIDIA Nemotron';
           }
@@ -242,14 +244,36 @@ export function EmbeddingsGenerator({ showTripleExtraction = false }: Embeddings
       
       // Call processDocuments with the selected document IDs and processing options
       const useGraphTransformer = useLangChain && langChainMethod === 'graphtransformer';
-      await processDocuments(selectedDocs, {
+      const processingOptions: Parameters<typeof processDocuments>[1] = {
         useLangChain,
         useGraphTransformer,
         promptConfigs: options || undefined,
         chunkSize: options?.chunkSize,
         overlapSize: options?.overlapSize,
         chunkingMethod: options?.chunkingMethod
-      });
+      };
+
+      try {
+        const selectedModel = localStorage.getItem("selectedModel");
+        if (selectedModel) {
+          const model = JSON.parse(selectedModel);
+          if (model.provider === "ollama") {
+            processingOptions.llmProvider = "ollama";
+            processingOptions.ollamaModel = model.model || "qwen3:1.7b";
+            processingOptions.ollamaBaseUrl = model.baseURL || "http://localhost:11434/v1";
+          } else if (model.provider === "vllm") {
+            processingOptions.llmProvider = "vllm";
+            processingOptions.vllmModel = model.model;
+            processingOptions.vllmBaseUrl = model.baseURL || "http://localhost:8001/v1";
+          } else if (model.provider === "nvidia" || model.id?.startsWith("nvidia-")) {
+            processingOptions.llmProvider = "nvidia";
+          }
+        }
+      } catch (e) {
+        console.log("Could not parse selected model, using default extraction provider");
+      }
+
+      await processDocuments(selectedDocs, processingOptions);
       
       // Navigate to the edit tab after processing is complete
       setTimeout(() => {
@@ -1265,4 +1289,4 @@ function InfoIcon(props: React.SVGProps<SVGSVGElement>) {
       <path d="M12 8h.01" />
     </svg>
   )
-} 
+}

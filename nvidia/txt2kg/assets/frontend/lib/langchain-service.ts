@@ -290,9 +290,6 @@ export class LangChainService {
         configuration: {
           baseURL: baseURL,
           timeout: 120000, // 2 minute timeout for vLLM inference
-        },
-        modelKwargs: {
-          "response_format": { "type": "text" }
         }
       });
       
@@ -320,4 +317,4 @@ export class LangChainService {
 }
 
 // Export a singleton instance for convenience
-export const langChainService = LangChainService.getInstance(); 
+export const langChainService = LangChainService.getInstance();

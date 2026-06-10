@@ -49,7 +49,7 @@ export type Document = {
   }
 }
 
-export type LLMProvider = 'nvidia' | 'ollama';
+export type LLMProvider = 'nvidia' | 'ollama' | 'vllm';
 
 export type ProcessingOptions = {
   useLangChain?: boolean;
@@ -58,6 +58,8 @@ export type ProcessingOptions = {
   llmProvider?: LLMProvider;
   ollamaModel?: string;
   ollamaBaseUrl?: string;
+  vllmModel?: string;
+  vllmBaseUrl?: string;
   chunkSize?: number;
   overlapSize?: number;
   chunkingMethod?: 'optimized' | 'pyg';
@@ -451,6 +453,8 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
       llmProvider = 'ollama',
       ollamaModel = 'qwen3:1.7b',
       ollamaBaseUrl = 'http://localhost:11434/v1',
+      vllmModel,
+      vllmBaseUrl,
       chunkSize = 64000,
       overlapSize = 2000,
       chunkingMethod = 'optimized'
@@ -460,6 +464,8 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
       llmProvider,
       ollamaModel,
       ollamaBaseUrl,
+      vllmModel,
+      vllmBaseUrl,
       chunkSize,
       overlapSize,
       chunkingMethod
@@ -485,6 +491,8 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
       llmProvider?: LLMProvider;
       ollamaModel?: string;
       ollamaBaseUrl?: string;
+      vllmModel?: string;
+      vllmBaseUrl?: string;
       chunkSize?: number;
       overlapSize?: number;
       chunkingMethod?: 'optimized' | 'pyg';
@@ -672,6 +680,12 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
                 }
                 if (llmOptions.ollamaBaseUrl) {
                   requestBody.ollamaBaseUrl = llmOptions.ollamaBaseUrl;
+                }
+                if (llmOptions.vllmModel) {
+                  requestBody.vllmModel = llmOptions.vllmModel;
+                }
+                if (llmOptions.vllmBaseUrl) {
+                  requestBody.vllmBaseUrl = llmOptions.vllmBaseUrl;
                 }
               }
               

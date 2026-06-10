@@ -176,6 +176,10 @@ if [ "$USE_VECTOR_SEARCH" = true ]; then
   echo "  • Qdrant: http://localhost:6333"
   echo "  • Sentence Transformers: http://localhost:8000"
   echo ""
+else
+  echo "Vector Search Services: disabled"
+  echo "  • Start with --vector-search to enable Vector DB status and embedding search"
+  echo ""
 fi
 
 echo "Next steps:"
