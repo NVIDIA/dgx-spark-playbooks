@@ -54,6 +54,8 @@ The following models are supported with vLLM on Spark. All listed models are ava
 
 | Model | Quantization | Support Status | HF Handle |
 |-------|-------------|----------------|-----------|
+| **DiffusionGemma 26B A4B IT** | BF16 | ✅ | [`google/diffusiongemma-26B-A4B-it`](https://huggingface.co/google/diffusiongemma-26B-A4B-it) |
+| **DiffusionGemma 26B A4B IT** | NVFP4 | ✅ | [`nvidia/diffusiongemma-26B-A4B-it-NVFP4`](https://huggingface.co/nvidia/diffusiongemma-26B-A4B-it-NVFP4) |
 | **Nemotron-3-Nano-Omni-30B-A3B-Reasoning** | BF16 | ✅ | [`nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-BF16`](https://huggingface.co/nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-BF16) |
 | **Nemotron-3-Nano-Omni-30B-A3B-Reasoning** | FP8 | ✅ | [`nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-FP8`](https://huggingface.co/nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-FP8) |
 | **Nemotron-3-Nano-Omni-30B-A3B-Reasoning** | NVFP4 | ✅ | [`nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-NVFP4`](https://huggingface.co/nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-NVFP4) |
@@ -97,8 +99,8 @@ Reminder: not all model architectures are supported for NVFP4 quantization.
 * **Duration:** 30 minutes for Docker approach
 * **Risks:** Container registry access requires internal credentials
 * **Rollback:** Container approach is non-destructive.
-* **Last Updated:** 04/28/2026
-  * Add support for Nemotron-3-Nano-Omni reasoning BF16, FP8, NVFP4
+* **Last Updated:** 06/10/2026
+  * Add models
 
 ## Instructions
 
@@ -133,9 +135,13 @@ newgrp docker
 Find the latest container build from https://catalog.ngc.nvidia.com/orgs/nvidia/containers/vllm
 
 ```bash
+## HuggingFace token (required)
+## Get a token from https://huggingface.co/settings/tokens
+export HF_TOKEN="your_huggingface_token"
+
 export LATEST_VLLM_VERSION=<latest_container_version>
 ## example
-## export LATEST_VLLM_VERSION=26.02-py3
+## export LATEST_VLLM_VERSION=26.05.post1-py3
 
 export HF_MODEL_HANDLE=<HF_HANDLE>
 ## example
@@ -144,7 +150,12 @@ export HF_MODEL_HANDLE=<HF_HANDLE>
 docker pull nvcr.io/nvidia/vllm:${LATEST_VLLM_VERSION}
 ```
 
-For Gemma 4 model family, use vLLM custom containers:
+For DiffusionGemma models, use vLLM custom container:
+```bash
+docker pull vllm/vllm-openai:gemma
+```
+
+For Gemma 4 model family, use vLLM custom container:
 ```bash
 docker pull vllm/vllm-openai:gemma4-cu130
 ```
@@ -157,6 +168,31 @@ Launch the container and start vLLM server with a test model to verify basic fun
 docker run -it --gpus all -p 8000:8000 \
 nvcr.io/nvidia/vllm:${LATEST_VLLM_VERSION} \
 vllm serve ${HF_MODEL_HANDLE}
+```
+
+To run DiffusionGemma models (e.g. `google/diffusiongemma-26B-A4B-it`):
+```bash
+docker run -it \
+  -p 8000:8000 \
+  --gpus all \
+  --shm-size=16g \
+  -e HF_TOKEN="$HF_TOKEN" \
+  -e VLLM_USE_V2_MODEL_RUNNER=1 \
+  vllm/vllm-openai:gemma ${HF_MODEL_HANDLE} \
+  --gpu-memory-utilization 0.8 \
+  --max-model-len 262144 \
+  --attention-backend TRITON_ATTN \
+  --max-num-seqs 10 \
+  --diffusion-config '{"canvas_length":256}' \
+  --override-generation-config '{"max_new_tokens": null}' \
+  --enable-auto-tool-choice \
+  --tool-call-parser gemma4 \
+  --reasoning-parser gemma4 \
+  --enable-prefix-caching \
+  --default-chat-template-kwargs '{"enable_thinking": true}' \
+  --load-format fastsafetensors
+
+## For BF16 checkpoint add "--moe-backend triton" for better performance
 ```
 
 To run models from Gemma 4 model family, (e.g. `google/gemma-4-31B-it`):
@@ -188,9 +224,17 @@ Expected response should contain `"content": "204"` or similar mathematical calc
 
 For container approach (non-destructive):
 
+NGC Container:
 ```bash
 docker rm $(docker ps -aq --filter ancestor=nvcr.io/nvidia/vllm:${LATEST_VLLM_VERSION})
 docker rmi nvcr.io/nvidia/vllm
+```
+
+Upstream Container:
+```bash
+docker stop "<container name>"
+docker rm "<container name>"
+docker rmi "<container image name>"
 ```
 
 ## Step 6. Next steps
@@ -623,6 +667,7 @@ http://<head-node-ip>:8265
 | CUDA version mismatch errors | Wrong CUDA toolkit version | Reinstall CUDA 12.9 using exact installer |
 | Container registry authentication fails | Invalid or expired GitLab token | Generate new auth token |
 | SM_121a architecture not recognized | Missing LLVM patches | Verify SM_121a patches applied to LLVM source |
+| CUDA out of memory | Insufficient GPU memory | Reduce --max-model-len and --max-num-seqs parameters |
 
 ## Common Issues for running on two Sparks
 | Symptom | Cause | Fix |
@@ -631,7 +676,7 @@ http://<head-node-ip>:8265
 | Cannot access gated repo for URL | Certain HuggingFace models have restricted access | Regenerate your [HuggingFace token](https://huggingface.co/docs/hub/en/security-tokens); and request access to the [gated model](https://huggingface.co/docs/hub/en/models-gated#customize-requested-information) on your web browser |
 | Model download fails | Authentication or network issue | Re-run `huggingface-cli login`, check internet access |
 | Cannot access gated repo for URL | Certain HuggingFace models have restricted access | Regenerate your HuggingFace token; and request access to the gated model on your web browser |
-| CUDA out of memory with 405B | Insufficient GPU memory | Use 70B model or reduce max_model_len parameter |
+| CUDA out of memory | Insufficient GPU memory | Reduce --max-model-len and --max-num-seqs parameters |
 | Container startup fails | Missing ARM64 image | Rebuild vLLM image following ARM64 instructions |
 
 > [!NOTE]
