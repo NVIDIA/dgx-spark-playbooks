@@ -19,9 +19,7 @@
 #   --local    Bind gateway to 0.0.0.0 for local browser access (no SSH tunnel needed)
 #              Default: loopback only (requires SSH tunnel from remote machine)
 #
-# Machine differences:
-#   GB300:       Docker bridge 172.18.0.1, no sg docker prefix
-#   New Station: Docker bridge 172.17.0.1, needs sg docker prefix
+# The Docker bridge IP is auto-detected via 'ip -4 addr show docker0' below.
 set -euo pipefail
 
 BIND_MODE="loopback"
@@ -129,6 +127,20 @@ if openshell sandbox list 2>/dev/null | grep -q "$SANDBOX_NAME"; then
     sleep 3
 fi
 
+# Stop any host-level service that owns $PORT (e.g. openclaw-gateway.service
+# installed by the NemoClaw playbook as a systemd --user service). systemd
+# will respawn the process if only the PID is killed, so stop the unit first.
+if ss -tlnp 2>/dev/null | grep -qE "[: ]${PORT}[^0-9]"; then
+    echo "Detected listener on host :$PORT — stopping before forwarding..."
+    systemctl --user stop  openclaw-gateway.service 2>/dev/null || true
+    systemctl --user disable openclaw-gateway.service 2>/dev/null || true
+    # Kill any remaining listener not managed by systemd (e.g. stale PID)
+    if ss -tlnp 2>/dev/null | grep -qE "[: ]${PORT}[^0-9]"; then
+        fuser -k "${PORT}/tcp" 2>/dev/null || true
+        sleep 1
+    fi
+fi
+
 # Stop any stale port forwards on $PORT from prior (possibly deleted) sandboxes.
 # Stale forwards block re-creation with a cryptic error like
 # "× Port 18789 is already forwarded to sandbox 'dgx-demo'."
@@ -202,13 +214,37 @@ done
 echo ""
 
 # --- Step 4: Upload repo into sandbox ---
+# Note: openshell sandbox upload (>= 0.0.44) copies the source *directory itself*
+# (like `cp -r src/ dest/` creates dest/src/), not just its contents. We therefore
+# upload to /sandbox/ so that the source directory `clinical-intelligence` lands at
+# /sandbox/clinical-intelligence/ rather than /sandbox/clinical-intelligence/clinical-intelligence/.
 echo "--- Step 4: Upload repo ---"
-openshell sandbox upload "$SANDBOX_NAME" "$REPO_DIR" /sandbox/clinical-intelligence
+openshell sandbox upload "$SANDBOX_NAME" "$REPO_DIR" /sandbox/
 
 # Fix nested directories caused by upload (analysis-methods/analysis-methods/)
+
+# Resolve the active gateway name for the ssh-proxy ProxyCommand.
+# Precedence: OPENSHELL_GATEWAY env var (set by the CLI for all subcommands) →
+# active gateway from `openshell status` → fallback to 'openshell'.
+# This prevents a failure when the user previously ran the NemoClaw playbook
+# (which registers its gateway as 'nemoclaw' instead of 'openshell').
+_gw_name() {
+    if [ -n "${OPENSHELL_GATEWAY:-}" ]; then
+        printf '%s' "$OPENSHELL_GATEWAY"
+        return
+    fi
+    local name
+    name=$(openshell status 2>/dev/null \
+        | grep -oE 'Gateway:[[:space:]]+[A-Za-z0-9_-]+' \
+        | awk '{print $NF}' | head -1)
+    printf '%s' "${name:-openshell}"
+}
+GW_NAME="$(_gw_name)"
+
 _sandbox() {
     ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR \
-        -o "ProxyCommand=openshell ssh-proxy --gateway-name openshell --name $SANDBOX_NAME" \
+        -o ConnectTimeout=10 \
+        -o "ProxyCommand=openshell ssh-proxy --gateway-name $GW_NAME --name $SANDBOX_NAME" \
         "sandbox@openshell-$SANDBOX_NAME" "$@"
 }
 

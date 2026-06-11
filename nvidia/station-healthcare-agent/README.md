@@ -174,7 +174,7 @@ openshell --version
 df -h /
 ```
 
-Expected: Blackwell Ultra GPU, Docker >= 23.0.1, **Node.js v22.x** (the DGX Station ships with v18 — see below), OpenShell >= 0.0.33, and **at least 200 GB free** on `/` (86 GB model + Docker images + working space).
+Expected: Blackwell Ultra GPU, Docker >= 23.0.1, **Node.js v22.x**, OpenShell >= 0.0.33, and **at least 200 GB free** on `/` (86 GB model + Docker images + working space).
 
 > [!WARNING]
 > If `openshell --version` says `command not found`, the binary is at `~/.local/bin/openshell` but isn't on PATH. Run the `export PATH=...` line above and re-source `~/.bashrc`. Without this, every `openshell` and `make` command in later steps fails.
@@ -182,10 +182,14 @@ Expected: Blackwell Ultra GPU, Docker >= 23.0.1, **Node.js v22.x** (the DGX Stat
 > [!TIP]
 > `make prereq` (run from `~/clinical-intelligence` after Step 2) bundles all of the checks below — Docker, Node version, OpenShell, disk space, GPU, port 11434, and NGC auth — into one command.
 
-**If `node --version` reports v18.x or older**, install Node.js v22 before continuing:
+**If `node --version` reports v18.x, older, or `command not found`**, install Node.js v22 before continuing:
 
 ```bash
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+## Download the NodeSource setup script first, then run it with sudo.
+## Running it inline with `| sudo bash` does not work — the sudo context
+## needs to own the entire script execution.
+curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh
+sudo bash /tmp/nodesource_setup.sh
 sudo apt-get install -y nodejs
 node --version   # should now show v22.x
 ```
@@ -204,10 +208,20 @@ ss -tlnp 2>/dev/null | grep 11434 || echo 'port 11434 free'
 
 Expected: `port 11434 free`. If the line still shows a listener, something else (an old `ollama serve`, another container, etc.) owns the port — stop it, or change `OLLAMA_PORT` in `.env` (Step 2) to a free port such as `11435`. `make setup` sources `.env` and configures the sandbox provider against the override.
 
-**Stale OpenShell gateway?** If you previously ran the NemoClaw playbook, an existing gateway will be silently reused under the new name. To start clean:
+**Stale OpenShell gateway?** If you previously ran a playbook that started `openshell-gateway`, kill the process and remove the registration:
 
 ```bash
-openshell gateway destroy 2>/dev/null || true
+pkill -f openshell-gateway 2>/dev/null || true
+openshell gateway remove openshell 2>/dev/null || true
+```
+
+**Previously ran the NemoClaw playbook?** NemoClaw installs `openclaw-gateway.service` as a systemd user service that binds port 18789. If it is still running, `make setup` fails with "Port 18789 is already in use". Stop and disable it before proceeding — `make setup` will also do this automatically, but stopping it here avoids a confusing error:
+
+```bash
+systemctl --user stop    openclaw-gateway.service 2>/dev/null || true
+systemctl --user disable openclaw-gateway.service 2>/dev/null || true
+## Verify the port is free
+ss -tlnp | grep 18789 || echo 'port 18789 free'
 ```
 
 ## Step 2. Copy the assets and configure
@@ -290,8 +304,8 @@ make status
 Expected:
 
 ```
-  Ollama:    ✓ healthy
-  OpenFold3: ✓ healthy
+  Ollama (port 11434):     ✓ healthy
+  OpenFold3 (port 8000):  ✓ healthy
 ```
 
 OpenFold3 takes ~3 minutes to load model weights on startup. If it shows "down (may still be loading)", wait and check again.
@@ -301,26 +315,30 @@ OpenFold3 takes ~3 minutes to load model weights on startup. If it shows "down (
 
 ## Step 4. Start the OpenShell gateway
 
-The OpenShell gateway runs a lightweight k3s Kubernetes cluster inside Docker to manage sandboxes. On DGX Station, the kernel uses cgroup v2 with the systemd driver, but k3s defaults to cgroupfs. The flag below tells k3s to match the host:
+OpenShell >= 0.0.40 ships `openshell-gateway`, a standalone server binary installed alongside the CLI. Start it with the Docker driver (no Kubernetes required), then register it with the CLI:
 
 ```bash
-OPENSHELL_K3S_ARGS='--kubelet-arg=cgroup-driver=systemd' openshell gateway start
+## Start the gateway server in the background using the Docker compute driver.
+## --disable-tls is safe for local-only use (loopback-bound).
+nohup openshell-gateway \
+    --disable-tls \
+    --drivers docker \
+    --bind-address 127.0.0.1 \
+    --port 17670 \
+    > /tmp/openshell-gateway.log 2>&1 &
+echo "Gateway PID: $!"
+
+## Register the gateway with the CLI and set it as active.
+openshell gateway add http://127.0.0.1:17670 --name openshell
 ```
 
-Wait for the gateway's embedded k3s cluster to finish initializing (10–15 seconds after `gateway start` returns), then verify:
+Verify the gateway is connected:
 
 ```bash
-## Wait until the gateway accepts connections, fail after 60s
-for i in $(seq 1 30); do
-    if openshell status 2>/dev/null | grep -q "Connected"; then
-        echo "Gateway: Connected"; break
-    fi
-    sleep 2
-done
 openshell status
 ```
 
-Expected: `Status: Connected`. If the first `openshell status` immediately after `gateway start` reports `Connection reset by peer`, that is normal — k3s is still warming up. The loop above polls until it is ready.
+Expected: `Status: Connected`. If not connected, check `/tmp/openshell-gateway.log` for errors. The gateway typically starts in under 1 second.
 
 > [!NOTE]
 > Step 4 configures OpenShell infrastructure (gateway). Step 5 deploys the healthcare agent into this infrastructure.
@@ -457,7 +475,8 @@ Skill files are Markdown. Edit a threshold or drug classification — it takes e
 ```bash
 openshell sandbox delete clinical-sandbox
 make down
-openshell gateway destroy
+pkill -f openshell-gateway 2>/dev/null || true
+openshell gateway remove openshell 2>/dev/null || true
 ```
 
 To also remove downloaded models and volumes:

@@ -130,7 +130,8 @@ test-docker: ## Run tests inside a container
 teardown: ## Tear down sandbox, services, and gateway
 	openshell sandbox delete $${SANDBOX_NAME:-clinical-sandbox} 2>/dev/null || true
 	$(COMPOSE) down
-	openshell gateway destroy 2>/dev/null || true
+	pkill -f openshell-gateway 2>/dev/null || true
+	openshell gateway remove openshell 2>/dev/null || true
 	@echo "Teardown complete."
 
 clean: ## Remove test results, PDB caches, and dangling images

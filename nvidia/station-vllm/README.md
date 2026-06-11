@@ -45,6 +45,8 @@ The following models are supported with vLLM on DGX Station. All listed models a
 
 | Model | Quantization | Support Status | HF Handle |
 |-------|-------------|----------------|-----------|
+| **DiffusionGemma 26B A4B IT** | BF16 | ✅ | [`google/diffusiongemma-26B-A4B-it`](https://huggingface.co/google/diffusiongemma-26B-A4B-it) |
+| **DiffusionGemma 26B A4B IT** | NVFP4 | ✅ | [`nvidia/diffusiongemma-26B-A4B-it-NVFP4`](https://huggingface.co/nvidia/diffusiongemma-26B-A4B-it-NVFP4) |
 | **Step-3.7-Flash-FP8** | FP8 | ✅ | [`stepfun-ai/Step-3.7-Flash-FP8`](https://huggingface.co/stepfun-ai/Step-3.7-Flash-FP8) |
 | **Step-3.7-Flash-NVFP4** | NVFP4 | ✅ | [`stepfun-ai/Step-3.7-Flash-NVFP4`](https://huggingface.co/stepfun-ai/Step-3.7-Flash-NVFP4) |
 | **Qwen3-235B-A22B-NVFP4** | NVFP4 | ✅ | [`nvidia/Qwen3-235B-A22B-NVFP4`](https://huggingface.co/nvidia/Qwen3-235B-A22B-NVFP4) |
@@ -54,7 +56,7 @@ The following models are supported with vLLM on DGX Station. All listed models a
 * **Duration:** 30 minutes (longer on first run due to model download)
 * **Risks:** Model download requires HuggingFace authentication
 * **Rollback:** Stop and remove the container to restore state
-* **Last Updated:** 05/28/2026
+* **Last Updated:** 06/10/2026
   * Update models
 
 ## Instructions
@@ -92,6 +94,12 @@ Pull the vLLM container from NGC. Use the **26.01** image on DGX Station; the 25
 docker pull nvcr.io/nvidia/vllm:26.01-py3
 ```
 
+For DiffusionGemma, use the vLLM custom container:
+
+```bash
+docker pull vllm/vllm-openai:gemma
+```
+
 For Step-3.7-Flash models, pull the custom VLLM container
 ```bash
 docker pull vllm/vllm-openai:stepfun37
@@ -117,6 +125,34 @@ docker run -d \
   vllm serve "$MODEL_HANDLE" \
     --max-model-len $MAX_MODEL_LEN \
     --gpu-memory-utilization 0.9
+```
+
+For DiffusionGemma models (e.g. `google/diffusiongemma-26B-A4B-it`), run with custom VLLM container.
+
+```bash
+docker run -d \
+  --name vllm-server \
+  -p 8000:8000 \
+  --gpus all \
+  --shm-size=16g \
+  --ulimit memlock=-1 \
+  --ulimit stack=67108864 \
+  -e VLLM_USE_V2_MODEL_RUNNER=1 \
+  -e HF_TOKEN="$HF_TOKEN" \
+  vllm/vllm-openai:gemma ${MODEL_HANDLE} \
+  --gpu-memory-utilization 0.85 \
+  --attention-backend TRITON_ATTN \
+  --max-num-seqs 16 \
+  --diffusion-config '{"canvas_length":256}' \
+  --override-generation-config '{"max_new_tokens": null}' \
+  --load-format fastsafetensors \
+  --enable-prefix-caching \
+  --reasoning-parser gemma4 \
+  --default-chat-template-kwargs '{"enable_thinking": true}' \
+  --enable-auto-tool-choice \
+  --tool-call-parser gemma4
+
+## For BF16 checkpoint add "--moe-backend triton" for better performance
 ```
 
 For Step-3.7-Flash models, run with the custom VLLM container. The FP8 and the NVFP4 versions fit entirely in VRAM on the GB300.
