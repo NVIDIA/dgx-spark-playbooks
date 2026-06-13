@@ -1,6 +1,6 @@
 # Run NemoClaw with a Local LLM
 
-> Build your first local AI assistant on DGX Spark using NemoClaw and Ollama in a secure sandbox, with optional Telegram.
+> Build your first local AI assistant on DGX Spark using NemoClaw and vLLM in a secure sandbox, with optional Telegram.
 
 
 ## Table of Contents
@@ -31,9 +31,9 @@
 
 ## Basic idea
 
-**NVIDIA NemoClaw** is an open-source reference stack that simplifies running OpenClaw always-on assistants more safely. It installs the **NVIDIA OpenShell** runtime — an environment designed for executing agents with additional security — and connects them to **local Ollama** inference on your DGX Spark. A single installer command (`nemoclaw.sh`) handles Node.js, OpenShell, and the NemoClaw CLI; the **onboard** wizard then creates a sandboxed agent, optional **Brave Search**, optional **messaging channels** (Telegram, Discord, or Slack), and a **policy tier** with network presets.
+**NVIDIA NemoClaw** is an open-source reference stack that simplifies running OpenClaw always-on assistants more safely. It installs the **NVIDIA OpenShell** runtime — an environment designed for executing agents with additional security — and connects them to **local vLLM** inference on your DGX Spark. A single installer command (`nemoclaw.sh`) handles Node.js, OpenShell, and the NemoClaw CLI; the **onboard** wizard then creates a sandboxed agent, optional **Brave Search**, optional **messaging channels** (Telegram, Discord, or Slack), and a **policy tier** with network presets.
 
-By the end of this playbook you will have a working AI agent inside an OpenShell sandbox, reachable through the **Web UI** or **terminal TUI**, with inference routed to **local Ollama** on the Spark. You can optionally add **Telegram** (with **cloudflared** for a public webhook URL) and optional **web search** — all without exposing your host filesystem or network beyond what you explicitly allow in policy.
+By the end of this playbook you will have a working AI agent inside an OpenShell sandbox, reachable through the **Web UI** or **terminal TUI**, with inference routed to **local vLLM** on the Spark. You can optionally add **Telegram** (with **cloudflared** for a public webhook URL) and optional **web search** — all without exposing your host filesystem or network beyond what you explicitly allow in policy.
 
 ### What you'll accomplish
 
@@ -118,7 +118,8 @@ All required assets are handled by the NemoClaw installer. No manual cloning is 
 
 - **Estimated time:** About 30–60 minutes for a first full pass (install, onboard, model download depending on choice and network). Optional Brave, Telegram, and cloudflared steps add time if you do them in a second session.
 - **Risk level:** Medium — you are running an AI agent in a sandbox; risks are reduced by isolation but not eliminated. Use a clean environment and do not connect sensitive data or production accounts.
-- **Last Updated:** 06/01/2026
+- **Last Updated:** 06/12/2026
+  - Switch local inference backend to vLLM (agent-ready Qwen3.6 35B recipe)
   - Pin nemoclaw installer to v0.0.55, the latest stable version
 
 ## Instructions
@@ -147,8 +148,8 @@ The installer requires **Node.js 22.16+** (installed automatically if missing). 
 
 During custom setup, the onboard wizard walks you through:
 
-1. **Configuring inference** -- Choose to set up local inference on your Spark by selecting **`7) Local Ollama`**.
-2. **Ollama models** -- Choose desired inference model. If no model is present locally, the installer will download **`qwen3.6:35b`** automatically.
+1. **Configuring inference** -- Choose to set up local inference on your Spark by selecting **`Local vLLM`** (the default).
+2. **vLLM models** -- Choose desired inference model. If no model is present locally, the installer will download **`nvidia/Qwen3.6-35B-A3B-NVFP4`** automatically.
 3. **Sandbox name** -- Pick a name (e.g. my-assistant). Each sandbox requires a unique name.
 4. **Apply this configuration** -- Enter `Y` to confirm setting up local inference.
 5. **Enable Brave Web Search** -- Optional. If you enable it, paste a [Brave Search API](https://brave.com/search/api/) key when prompted.
@@ -160,7 +161,7 @@ When complete you will see output like:
 ```text
 ──────────────────────────────────────────────────
 Sandbox      my-assistant (Landlock + seccomp + netns)
-Model        <your-selected-model> (Local Ollama)
+Model        <your-selected-model> (Local vLLM)
 ──────────────────────────────────────────────────
 Run:         nemoclaw my-assistant connect
 Status:      nemoclaw my-assistant status
@@ -377,13 +378,13 @@ openshell forward stop <port>   # stop the dashboard forward (use the port shown
 
 ### Step 8. Uninstall NemoClaw
 
-The NemoClaw CLI includes a built-in uninstaller. It removes all sandboxes, the OpenShell gateway, Docker containers/images/volumes, the CLI, and all state files. Docker, Node.js, npm, and Ollama are preserved.
+The NemoClaw CLI includes a built-in uninstaller. It removes all sandboxes, the OpenShell gateway, Docker containers/images/volumes, the CLI, and all state files. Docker, Node.js, npm, and the vLLM container image are preserved.
 
 ```bash
 nemoclaw uninstall --yes
 ```
 
-To remove everything including the Ollama model:
+To remove everything including the downloaded model weights:
 
 ```bash
 nemoclaw uninstall --yes --delete-models
@@ -395,7 +396,7 @@ nemoclaw uninstall --yes --delete-models
 |------|--------|
 | `--yes` | Skip the confirmation prompt |
 | `--keep-openshell` | Leave the `openshell` binary in place |
-| `--delete-models` | Also remove the Ollama models pulled by NemoClaw |
+| `--delete-models` | Also remove the model weights pulled by NemoClaw |
 
 > [!NOTE]
 > If the `nemoclaw` CLI is not available (e.g. install failed partway), use the remote uninstaller as a fallback:
@@ -408,7 +409,7 @@ The uninstaller runs 6 steps:
 2. Delete all OpenShell sandboxes, the NemoClaw gateway, and providers
 3. Remove the global `nemoclaw` npm package
 4. Remove NemoClaw/OpenShell Docker containers, images, and volumes
-5. Remove Ollama models (only with `--delete-models`)
+5. Remove downloaded model weights (only with `--delete-models`)
 6. Remove state directories (`~/.nemoclaw`, `~/.config/openshell`, `~/.config/nemoclaw`) and the OpenShell binary
 
 > [!NOTE]
@@ -427,8 +428,8 @@ The uninstaller runs 6 steps:
 | `nemoclaw my-assistant dashboard-url --quiet` | Print the full tokenized Web UI URL (includes auto-assigned port) |
 | `openshell term` | Open the monitoring TUI on the host |
 | `openshell forward list` | List active port forwards |
-| `nemoclaw uninstall --yes` | Remove NemoClaw (preserves Docker, Node.js, Ollama) |
-| `nemoclaw uninstall --yes --delete-models` | Remove NemoClaw and Ollama models |
+| `nemoclaw uninstall --yes` | Remove NemoClaw (preserves Docker, Node.js, vLLM image) |
+| `nemoclaw uninstall --yes --delete-models` | Remove NemoClaw and downloaded model weights |
 
 ## Troubleshooting
 
@@ -442,8 +443,8 @@ The uninstaller runs 6 steps:
 | Gateway fails with "port 8080 is held by container..." | Another OpenShell gateway or container is using port 8080 | Stop the conflicting container: `openshell gateway destroy -g <old-gateway-name>` or `docker stop <container-name> && docker rm <container-name>`, then retry `nemoclaw onboard`. |
 | Sandbox creation fails | Stale gateway state or DNS not propagated | Run `openshell gateway destroy && openshell gateway start`, then re-run the installer or `nemoclaw onboard`. |
 | CoreDNS crash loop | Known issue on some DGX Spark configurations | Re-run the NemoClaw installer (`curl -fsSL https://www.nvidia.com/nemoclaw.sh \| bash`) which includes the CoreDNS fix. If the issue persists, see [NemoClaw troubleshooting](https://docs.nvidia.com/nemoclaw/latest/reference/troubleshooting.html). |
-| "No GPU detected" during onboard | DGX Spark GB10 reports unified memory differently | Expected on DGX Spark. The wizard still works and uses Ollama for inference. |
-| Inference timeout or hangs | Ollama not running or not reachable | Check Ollama: `curl http://127.0.0.1:11434`. If not running: `sudo systemctl restart ollama`. Verify the NemoClaw auth proxy is healthy: `curl http://127.0.0.1:11435/api/tags`. If both respond, check `nemoclaw my-assistant status` for the Inference health line. |
+| "No GPU detected" during onboard | DGX Spark GB10 reports unified memory differently | Expected on DGX Spark. The wizard still works and uses vLLM for inference. |
+| Inference timeout or hangs | vLLM not running or not reachable | Check the vLLM server: `curl http://127.0.0.1:8000/v1/models` should list `nvidia/Qwen3.6-35B-A3B-NVFP4`. If it hangs, the model may still be loading — wait for `Application startup complete`. Then check `nemoclaw my-assistant status` for the Inference health line. |
 | Agent gives no response or is very slow | First response can be slow, especially with larger models | Response time depends on model size (30B: a few seconds, 120B: 30–90 seconds). Verify inference route: `nemoclaw my-assistant status`. |
 | Port 18789 already in use | Another process is bound to the port | `lsof -i :18789` then `kill <PID>`. If needed, `kill -9 <PID>` to force-terminate. |
 | Web UI port forward dies or dashboard unreachable | Port forward not active | `openshell forward stop 18789 my-assistant` then `openshell forward start 18789 my-assistant --background`. |

@@ -9,6 +9,7 @@
 - [Run on two Sparks](#run-on-two-sparks)
   - [Step 11. (Optional) Launch 405B inference server](#step-11-optional-launch-405b-inference-server)
 - [Run on multiple Sparks through a switch](#run-on-multiple-sparks-through-a-switch)
+- [Run Agent Ready Qwen3.6 35B Model with vLLM](#run-agent-ready-qwen36-35b-model-with-vllm)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -99,8 +100,8 @@ Reminder: not all model architectures are supported for NVFP4 quantization.
 * **Duration:** 30 minutes for Docker approach
 * **Risks:** Container registry access requires internal credentials
 * **Rollback:** Container approach is non-destructive.
-* **Last Updated:** 06/10/2026
-  * Add models
+* **Last Updated:** 06/12/2026
+  * Add Agent ready model recipe for Qwen3.6 35B
 
 ## Instructions
 
@@ -656,6 +657,96 @@ http://<head-node-ip>:8265
 ## - Log rotation for long-running services
 ## - Persistent model caching across restarts
 ## - Other models which can fit on the cluster with different quantization methods (FP8, NVFP4)
+```
+
+## Run Agent Ready Qwen3.6 35B Model with vLLM
+
+## Step 1. Configure Docker permissions
+
+To easily manage containers without sudo, you must be in the `docker` group. If you choose to skip this step, you will need to run Docker commands with sudo.
+
+Open a new terminal and test Docker access. In the terminal, run:
+```bash
+docker ps
+```
+
+If you see a permission denied error (something like permission denied while trying to connect to the Docker daemon socket), add your user to the docker group so that you don't need to run the command with sudo .
+
+```bash
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+## Step 2. Pull vLLM container image
+
+```bash
+docker pull vllm/vllm-openai:nightly-aarch64
+```
+
+## Step 3. Launch the Agent Ready Qwen3.6 35B server
+
+Launch the container and start the vLLM server with the agent-ready
+`nvidia/Qwen3.6-35B-A3B-NVFP4` recipe. The `vllm/vllm-openai` image entrypoint is
+`vllm serve`, so the model handle and flags are passed directly as container arguments.
+
+```bash
+## HuggingFace token (required to download the model)
+## Get a token from https://huggingface.co/settings/tokens
+export HF_TOKEN="your_huggingface_token"
+
+docker run -it --gpus all -p 8000:8000 \
+  -e HF_TOKEN="$HF_TOKEN" \
+  -v ~/.cache/huggingface:/root/.cache/huggingface \
+  vllm/vllm-openai:nightly-aarch64 \
+  nvidia/Qwen3.6-35B-A3B-NVFP4 \
+  --host 0.0.0.0 \
+  --port 8000 \
+  --tensor-parallel-size 1 \
+  --trust-remote-code \
+  --kv-cache-dtype fp8 \
+  --attention-backend flashinfer \
+  --moe-backend marlin \
+  --gpu-memory-utilization 0.4 \
+  --max-model-len 262144 \
+  --max-num-seqs 4 \
+  --max-num-batched-tokens 8192 \
+  --enable-chunked-prefill \
+  --async-scheduling \
+  --enable-prefix-caching \
+  --speculative-config '{"method":"mtp","num_speculative_tokens":3,"moe_backend":"triton"}' \
+  --load-format fastsafetensors \
+  --reasoning-parser qwen3 \
+  --tool-call-parser qwen3_xml \
+  --enable-auto-tool-choice
+```
+
+Expected output should include:
+- Model loading confirmation
+- Server startup on port 8000
+- GPU memory allocation details
+
+In another terminal, test the server:
+
+```bash
+curl http://localhost:8000/v1/chat/completions \
+-H "Content-Type: application/json" \
+-d '{
+    "model": "nvidia/Qwen3.6-35B-A3B-NVFP4",
+    "messages": [{"role": "user", "content": "12*17"}],
+    "max_tokens": 500
+}'
+```
+
+Expected response should contain `"content": "204"` or similar mathematical calculation.
+
+
+## Step 4. Cleanup and rollback
+
+For container approach (non-destructive):
+
+```bash
+docker rm $(docker ps -aq --filter ancestor=vllm/vllm-openai:nightly-aarch64)
+docker rmi vllm/vllm-openai:nightly-aarch64
 ```
 
 ## Troubleshooting

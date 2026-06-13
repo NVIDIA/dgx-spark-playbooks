@@ -83,22 +83,22 @@ You will install the OpenShell CLI (`openshell`), deploy a gateway on your DGX S
 
 - Comfort with the Linux terminal and SSH
 - Basic understanding of Docker (OpenShell runs a k3s cluster inside Docker)
-- Familiarity with Ollama for local model serving
+- Familiarity with Docker and vLLM for local model serving
 - Awareness of the security model: OpenShell reduces risk through isolation but cannot eliminate all risk. Review the [OpenShell documentation](https://pypi.org/project/openshell/) and [OpenClaw security guidance](https://docs.openclaw.ai/gateway/security).
 
 ## Prerequisites
 
 **Hardware Requirements:**
 - NVIDIA DGX Spark with 128GB unified memory
-- At least 70GB available memory for a large local model (e.g., gpt-oss:120b at ~65GB plus overhead), or 25GB+ for a smaller model (e.g., gpt-oss-20b)
+- Enough unified memory for the served model plus KV cache (the playbook serves `nvidia/Qwen3.6-35B-A3B-NVFP4` with vLLM at `--gpu-memory-utilization 0.4`)
 
 **Software Requirements:**
 - NVIDIA DGX OS (Ubuntu 24.04 base)
 - Docker Desktop or Docker Engine running: `docker info`
 - Python 3.12 or later: `python3 --version`
 - `uv` package manager: `uv --version` (install with `curl -LsSf https://astral.sh/uv/install.sh | sh`)
-- Ollama 0.17.0 or newer (latest recommended for gpt-oss MXFP4 support): `ollama --version`
-- Network access to download Python packages from PyPI and model weights from Ollama
+- NVIDIA Container Toolkit configured for Docker, plus a HuggingFace token to download the model
+- Network access to download Python packages from PyPI and model weights from HuggingFace
 - Have [NVIDIA Sync](https://build.nvidia.com/spark/connect-to-your-spark) installed and configured for your DGX Spark
 
 ## Time & risk
@@ -109,8 +109,9 @@ You will install the OpenShell CLI (`openshell`), deploy a gateway on your DGX S
   * OpenShell sandboxes enforce kernel-level isolation, significantly reducing the risk compared to running OpenClaw directly on the host.
   * The sandbox default policy denies all outbound traffic not explicitly allowed. Misconfigured policies may block legitimate agent traffic; use `openshell logs` to diagnose.
   * Large model downloads may fail on unstable networks.
-* **Rollback:** Delete the sandbox with `openshell sandbox delete <sandbox-name>`, stop the gateway with `openshell gateway stop`, and optionally destroy it with `openshell gateway destroy`. Ollama models can be removed with `ollama rm <model>`.
-* **Last Updated:** 03/13/2026
+* **Rollback:** Delete the sandbox with `openshell sandbox delete <sandbox-name>`, stop the gateway with `openshell gateway stop`, and optionally destroy it with `openshell gateway destroy`. The vLLM container can be removed with `docker rm`/`docker rmi`.
+* **Last Updated:** 06/12/2026
+  * Switch local inference backend to vLLM (agent-ready Qwen3.6 35B recipe)
 
 ## Instructions
 
@@ -191,63 +192,26 @@ openshell status
 > [!TIP]
 > If you want to manage the Spark gateway from a separate workstation, run `openshell gateway start --remote <username>@<spark-ssid>.local` from that workstation instead. All subsequent commands will route through the SSH tunnel.
 
-## Step 5. Install Ollama and pull a model
+## Step 5. Serve a model with vLLM
 
-Install Ollama (if not already present) and download a model for local inference.
+Serve a model with **vLLM** for local inference. This playbook uses the agent-ready `nvidia/Qwen3.6-35B-A3B-NVFP4` recipe — the same one documented in the vLLM playbook's [Run Agent Ready Qwen3.6 35B Model with vLLM](https://build.nvidia.com/spark/vllm/agent-ready-qwen35b) tab.
 
-```bash
-curl -fsSL https://ollama.com/install.sh | sh
-ollama --version
-```
+Follow that tab to launch the server in a **separate terminal**. It serves `nvidia/Qwen3.6-35B-A3B-NVFP4` on an OpenAI-compatible API at port `8000`.
 
-DGX Spark's 128GB memory can run large models:
+> [!IMPORTANT]
+> The recipe binds `--host 0.0.0.0`, which is required here: the OpenShell gateway runs inside Docker and reaches the server over the Spark's IP address, not `localhost`. Keep the `--host 0.0.0.0` flag when you launch it.
 
-| GPU memory available | Suggested model          | Model size | Notes |
-|---------------------|---------------------------|-----------|-------|
-| 25–48 GB            | nemotron-3-nano           | ~24GB     | Lower latency, good for interactive use |
-| 48–80 GB            | gpt-oss:120b              | ~65GB     | Good balance of quality and speed |
-| 128 GB              | nemotron-3-super:120b     | ~86GB     | Best quality on DGX Spark |
-
-Verify Ollama is running (it auto-starts as a service after installation). If not, start it manually:
+Once the server reports `Application startup complete`, verify it is reachable on all interfaces:
 
 ```bash
-ollama serve &
+curl http://0.0.0.0:8000/v1/models
 ```
 
-Configure Ollama to listen on all interfaces so the OpenShell gateway container can reach it:
-
-```bash
-sudo mkdir -p /etc/systemd/system/ollama.service.d
-printf '[Service]\nEnvironment="OLLAMA_HOST=0.0.0.0"\n' | sudo tee /etc/systemd/system/ollama.service.d/override.conf
-sudo systemctl daemon-reload
-sudo systemctl restart ollama
-```
-
-Verify Ollama is running and reachable on all interfaces:
-
-```bash
-curl http://0.0.0.0:11434
-```
-
-Expected: `Ollama is running`. If not, start it with `sudo systemctl start ollama`.
-
-Next, run a model from Ollama (adjust the model name to match your choice from [the Ollama model library](https://ollama.com/library)). The `ollama run` command will pull the model automatically if it is not already present. Running the model here ensures it is loaded and ready when you use it with OpenClaw, reducing the chance of timeouts later. Example for nemotron-3-super:
-
-```bash
-ollama run nemotron-3-super:120b
-```
-
-Type `/bye` to exit.
-
-Verify the model is available:
-
-```bash
-ollama list
-```
+Expected: a JSON `"data"` array listing `nvidia/Qwen3.6-35B-A3B-NVFP4`. If the request hangs, the model is likely still loading — wait for the startup line and retry.
 
 ## Step 6. Create an inference provider
 
-We are going to create an OpenShell provider that points to your local Ollama server. This lets OpenShell route inference requests to your Spark-hosted model.
+We are going to create an OpenShell provider that points to your local vLLM server. This lets OpenShell route inference requests to your Spark-hosted model.
 
 First, find the IP address of your DGX Spark:
 
@@ -255,14 +219,14 @@ First, find the IP address of your DGX Spark:
 hostname -I | awk '{print $1}'
 ```
 
-Then create the provider, replacing `{Machine_IP}` with the IP address from the command above (e.g. `10.110.106.169`):
+Then create the provider, replacing `{Machine_IP}` with the IP address from the command above (e.g. `10.110.106.169`). vLLM does not require an API key, so any non-empty placeholder works:
 
 ```bash
 openshell provider create \
-    --name local-ollama \
+    --name local-vllm \
     --type openai \
     --credential OPENAI_API_KEY=not-needed \
-    --config OPENAI_BASE_URL=http://{Machine_IP}:11434/v1
+    --config OPENAI_BASE_URL=http://{Machine_IP}:8000/v1
 ```
 
 > [!IMPORTANT]
@@ -276,18 +240,18 @@ openshell provider list
 
 ## Step 7. Configure inference routing
 
-Point the `inference.local` endpoint (available inside every sandbox) at your Ollama model. Replace the model name with your choice from Step 5:
+Point the `inference.local` endpoint (available inside every sandbox) at your vLLM model. The model name must match the handle served in Step 5:
 
 ```bash
 openshell inference set \
-    --provider local-ollama \
-    --model nemotron-3-super:120b
+    --provider local-vllm \
+    --model nvidia/Qwen3.6-35B-A3B-NVFP4
 ```
 
-The output should confirm the route and show a validated endpoint URL, for example: `http://10.110.106.169:11434/v1/chat/completions (openai_chat_completions)`.
+The output should confirm the route and show a validated endpoint URL, for example: `http://10.110.106.169:8000/v1/chat/completions (openai_chat_completions)`.
 
 > [!NOTE]
-> If you see `failed to verify inference endpoint` or `failed to connect` (for example because the gateway cannot reach the host IP from inside its container), add `--no-verify` to skip endpoint verification: `openshell inference set --provider local-ollama --model nemotron-3-super:120b --no-verify`. Ensure Ollama is running and listening on all interfaces (see Step 5).
+> If you see `failed to verify inference endpoint` or `failed to connect` (for example because the gateway cannot reach the host IP from inside its container), add `--no-verify` to skip endpoint verification: `openshell inference set --provider local-vllm --model nvidia/Qwen3.6-35B-A3B-NVFP4 --no-verify`. Ensure the vLLM server is running and reachable on the Spark's IP (see Step 5).
 
 Verify the configuration:
 
@@ -295,7 +259,7 @@ Verify the configuration:
 openshell inference get
 ```
 
-Expected output should show `provider: local-ollama` and `model: nemotron-3-super:120b` (or whichever model you chose).
+Expected output should show `provider: local-vllm` and `model: nvidia/Qwen3.6-35B-A3B-NVFP4`.
 
 ## Step 8. Deploy OpenShell Sandbox
 
@@ -339,10 +303,10 @@ Use the arrow keys and Enter key to interact with the installation.
 - Model/auth Provider: Select **Custom Provider**, the second-to-last option.
 - API Base URL: update to https://inference.local/v1
 - How do you want to provide this API key?: Paste API key for now.
-- API key: please enter "ollama".
+- API key: please enter "vllm" (vLLM does not validate the key; any non-empty value works).
 - Endpoint compatibility: select **OpenAI-compatible** and press Enter.
-- Model ID: enter the model name you chose in Step 5 (e.g. `nemotron-3-super:120b`).
-	- This may take 1-2 minutes as the Ollama model is spun up in the background.
+- Model ID: enter the model handle you served in Step 5: `nvidia/Qwen3.6-35B-A3B-NVFP4`.
+	- The first request may take a moment while vLLM warms up.
 - Endpoint ID: leave the default value.
 - Alias: enter the same model name (this is optional).
 - Channel: Select **Skip for now**.
@@ -454,13 +418,13 @@ Now that OpenClaw has been configured within the OpenShell protected runtime, yo
 openshell sandbox connect $SANDBOX_NAME
 ```
 
-Once loaded into the sandbox terminal, you can test connectivity to the Ollama model with this command:
+Once loaded into the sandbox terminal, you can test connectivity to the vLLM model with this command:
 ``` bash
-curl https://inference.local/v1/responses \
+curl https://inference.local/v1/chat/completions \
           -H "Content-Type: application/json" \
           -d '{
-        "instructions": "You are a helpful assistant.",
-        "input": "Hello!"
+        "model": "nvidia/Qwen3.6-35B-A3B-NVFP4",
+        "messages": [{"role": "user", "content": "Hello!"}]
       }'
 ```
 
@@ -511,7 +475,7 @@ openshell sandbox delete $SANDBOX_NAME
 Remove the inference provider you created in Step 6:
 
 ```bash
-openshell provider delete local-ollama
+openshell provider delete local-vllm
 ```
 
 Stop the gateway (preserves state for later):
@@ -527,10 +491,11 @@ openshell gateway stop
 openshell gateway destroy
 ```
 
-To also remove the Ollama model:
+To also stop and remove the vLLM container and image:
 
 ```bash
-ollama rm nemotron-3-super:120b
+docker rm $(docker ps -aq --filter ancestor=vllm/vllm-openai:nightly-aarch64)
+docker rmi vllm/vllm-openai:nightly-aarch64
 ```
 
 ## Step 14. Next steps
@@ -548,11 +513,11 @@ ollama rm nemotron-3-super:120b
 | `openshell status` shows gateway as unhealthy | Gateway container crashed or failed to initialize | Run `openshell gateway destroy` and then `openshell gateway start` to recreate it. Check Docker logs with `docker ps -a` and `docker logs <container-id>` for details |
 | `openshell sandbox create --from openclaw` fails to build | Network issue pulling the community sandbox or Dockerfile build failure | Check internet connectivity. Retry the command. If the build fails on a specific package, check if the base image is compatible with your Docker version |
 | Sandbox is in `Error` phase after creation | Policy validation failed or container startup crashed | Run `openshell logs <sandbox-name>` to see error details. Common causes: invalid policy YAML, missing provider credentials, or port conflicts |
-| Agent cannot reach `inference.local` inside the sandbox | Inference routing not configured or provider unreachable | Run `openshell inference get` to verify the provider and model are set. Test Ollama is accessible from the host: `curl http://localhost:11434/api/tags`. Ensure the provider URL uses `host.docker.internal` instead of `localhost` |
-| 503 verification failed or timeout when gateway/sandbox accesses Ollama on the host | Ollama bound only to localhost, or host firewall blocking port 11434 | Make Ollama listen on all interfaces so the gateway container (e.g. on Docker network 172.17.x.x) can reach it: `OLLAMA_HOST=0.0.0.0 ollama serve &`. Allow port 11434 through the host firewall: `sudo ufw allow 11434/tcp comment 'Ollama for OpenShell Gateway'` (then `sudo ufw reload` if needed). |
+| Agent cannot reach `inference.local` inside the sandbox | Inference routing not configured or provider unreachable | Run `openshell inference get` to verify the provider and model are set. Test the vLLM server from the host: `curl http://localhost:8000/v1/models`. Ensure the provider `OPENAI_BASE_URL` uses the Spark's IP address (not `localhost`), since the gateway runs inside Docker |
+| 503 verification failed or timeout when gateway/sandbox accesses vLLM on the host | Provider URL points at `localhost`, or host firewall blocking port 8000 | The recipe already binds vLLM to all interfaces (`--host 0.0.0.0`). Confirm the provider `OPENAI_BASE_URL` uses the Spark's IP (from `hostname -I`) so the gateway container (e.g. on Docker network 172.17.x.x) can reach it. Allow port 8000 through the host firewall: `sudo ufw allow 8000/tcp comment 'vLLM for OpenShell Gateway'` (then `sudo ufw reload` if needed). |
 | Agent's outbound connections are all denied | Default policy does not include the required endpoints | Monitor denials with `openshell logs <sandbox-name> --tail --source sandbox`. Pull the current policy with `openshell policy get <sandbox-name> --full`, add the needed host/port under `network_policies`, and push with `openshell policy set <sandbox-name> --policy <file> --wait` |
 | "Permission denied" or Landlock errors inside the sandbox | Agent trying to access a path not in `read_only` or `read_write` filesystem policy | Pull the current policy and add the path to `read_write` (or `read_only` if read access is sufficient). Push the updated policy. Note: filesystem policy is static and requires sandbox recreation |
-| Ollama OOM or very slow inference | Model too large for available memory or GPU contention | Free GPU memory (close other GPU workloads), try a smaller model (e.g., `gpt-oss:20b`), or reduce context length. Monitor with `nvidia-smi` |
+| vLLM OOM or very slow inference | Model too large for available memory or GPU contention | Free GPU memory (close other GPU workloads), or relaunch vLLM with a lower `--gpu-memory-utilization` / `--max-model-len` (or a smaller model handle). Monitor with `nvidia-smi` |
 | `openshell sandbox connect` hangs or times out | Sandbox not in `Ready` phase | Run `openshell sandbox get <sandbox-name>` to check the phase. If stuck in `Provisioning`, wait or check logs. If in `Error`, delete and recreate the sandbox |
 | Policy push returns exit code 1 (validation failed) | Malformed YAML or invalid policy fields | Check the YAML syntax. Common issues: paths not starting with `/`, `..` traversal in paths, `root` as `run_as_user`, or endpoints missing required `host`/`port` fields. Fix and re-push |
 | `openshell gateway start` fails with "K8s namespace not ready" / timed out waiting for namespace | The k3s cluster inside the Docker container takes longer to bootstrap than the CLI timeout allows. The internal components (TLS secrets, Helm chart, namespace creation) may need extra time, especially on first run when images are pulled inside the container. | First, check whether the container is still running and progressing: `docker ps --filter name=openshell` (look for `health: starting`). Inspect k3s state inside the container: `docker exec <container> sh -c "KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl get ns"` and `kubectl get pods -A`. If pods are in `ContainerCreating` and TLS secrets are missing (`navigator-server-tls`, `openshell-server-tls`), the cluster is still bootstrapping — wait a few minutes and run `openshell status` again. If it does not recover, destroy with `openshell gateway destroy` (and `docker rm -f <container>` if needed) and retry `openshell gateway start`. Ensure Docker has enough resources (memory and disk) for the k3s cluster. |

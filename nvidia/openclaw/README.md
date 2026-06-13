@@ -1,6 +1,6 @@
 # OpenClaw 🦞
 
-> Run OpenClaw locally on DGX Spark with LM Studio or Ollama
+> Run OpenClaw locally on DGX Spark with a vLLM-served local model
 
 ## Table of Contents
 
@@ -20,7 +20,7 @@ Running OpenClaw and its LLMs **fully on your DGX Spark** keeps your data privat
 
 ## What you'll accomplish
 
-You will have OpenClaw installed on your DGX Spark and connected to a local LLM (via LM Studio or Ollama). You can use the OpenClaw web UI to chat with your agent, and optionally connect communication channels and skills. The agent and models run entirely on your Spark—no data leaves your machine unless you add cloud or external integrations.
+You will have OpenClaw installed on your DGX Spark and connected to a local LLM served by **vLLM** (the agent-ready `nvidia/Qwen3.6-35B-A3B-NVFP4` recipe). You can use the OpenClaw web UI to chat with your agent, and optionally connect communication channels and skills. The agent and models run entirely on your Spark—no data leaves your machine unless you add cloud or external integrations.
 
 ## Popular use cases
 
@@ -32,7 +32,7 @@ You will have OpenClaw installed on your DGX Spark and connected to a local LLM 
 ## What to know before starting
 
 - Basic use of the Linux terminal and a text editor
-- Optional: familiarity with Ollama or LM Studio if you plan to use a local model
+- Optional: familiarity with Docker and vLLM if you plan to use a local model
 - Awareness of the security considerations below
 
 ## Important: security and risks
@@ -61,10 +61,11 @@ You cannot eliminate all risk; proceed at your own risk. **Critical security mea
 
 ## Time and risk
 
-- **Duration**: About 30 minutes for install and first-time model setup; model download time depends on size and network (gpt-oss-120b is ~65GB and may take longer on slower connections).
+- **Duration**: About 30 minutes for install and first-time model setup; model download time depends on size and network (the NVFP4 checkpoint is downloaded once and cached for later launches).
 - **Risk level**: **Medium to High**—the agent has access to whatever files, tools, and channels you configure. Risk increases significantly if you enable terminal/command execution skills or connect external accounts. Without proper isolation, this setup could expose sensitive data or allow code execution. **Always follow the security measures above.**
-- **Rollback**: You can stop the OpenClaw gateway and uninstall via the same install script or by removing its directory; uninstall Ollama or LM Studio separately if desired.
-- **Last Updated**: 03/11/2026
+- **Rollback**: You can stop the OpenClaw gateway and uninstall via the same install script or by removing its directory; stop the vLLM container separately (`docker rm`/`docker rmi`) if desired.
+- **Last Updated**: 06/12/2026
+  - Switch local inference backend to vLLM (agent-ready Qwen3.6 35B recipe)
   - First Publication
 
 ## Instructions
@@ -106,85 +107,21 @@ Work through the prompts as follows.
 
 You can now open the OpenClaw dashboard in a browser using the URL and token from the installer.
 
-## Step 3. Choose and install a local LLM backend
+## Step 3. Serve the model with vLLM on your DGX Spark
 
-OpenClaw can use a local LLM via **LM Studio** (best raw performance, uses Llama.cpp) or **Ollama** (simpler and good for deployment). Use a **separate terminal** on your DGX Spark for the backend so the gateway and the model server can run side by side.
+OpenClaw will connect to a local, OpenAI-compatible endpoint served by **vLLM**. This playbook uses the agent-ready `nvidia/Qwen3.6-35B-A3B-NVFP4` recipe — the same one documented in the vLLM playbook's [Run Agent Ready Qwen3.6 35B Model with vLLM](https://build.nvidia.com/spark/vllm/agent-ready-qwen35b) tab. The NVFP4 quantization and speculative decoding give strong tool-calling and reasoning quality while leaving headroom on DGX Spark's 128GB unified memory.
 
-**Install one of the following:**
+In a **separate terminal** on your DGX Spark, follow the vLLM playbook's [Run Agent Ready Qwen3.6 35B Model with vLLM](https://build.nvidia.com/spark/vllm/agent-ready-qwen35b) tab to launch the server. Run it on its own terminal so the gateway and the model server can run side by side. That tab serves `nvidia/Qwen3.6-35B-A3B-NVFP4` on an OpenAI-compatible API at `http://localhost:8000/v1`.
 
-**Option A – LM Studio**
-
-```bash
-curl -fsSL https://lmstudio.ai/install.sh | bash
-```
-
-**Option B – Ollama**
+Once the server reports `Application startup complete`, verify it from another terminal before continuing:
 
 ```bash
-curl -fsSL https://ollama.com/install.sh | sh
+curl http://localhost:8000/v1/models
 ```
 
-## Step 4. Select and download a model
+You should see `nvidia/Qwen3.6-35B-A3B-NVFP4` in the returned list.
 
-Model quality and capability scale with size. Free as much GPU memory as possible (avoid other GPU workloads, enable only the skills you need). DGX Spark has **128GB unified memory**, so you can run large models with room to spare.
-
-**Suggested models by GPU memory:**
-
-| GPU memory   | Suggested model                    | Model size | Notes |
-|-------------|-------------------------------------|-----------|-------|
-| 8–12 GB     | qwen3-4B-Thinking-2507             | ~5GB      | —     |
-| 16 GB       | gpt-oss-20b                        | ~12GB     | Lower latency, good for interactive use |
-| 24–48 GB    | Nemotron-3-Nano-30B-A3B            | ~20GB     | —     |
-| 128 GB      | gpt-oss-120b                       | ~65GB     | **Best quality on DGX Spark** (quantized); leaves ~63GB for context window and other processes; use 20B/30B if you prefer faster responses |
-
-**Quality vs. latency:** The 120B model gives the best accuracy and capability but has higher per-token latency. If you prefer snappier replies, use **gpt-oss-20b** (or a 30B model) instead; both run comfortably on DGX Spark with plenty of memory headroom.
-
-**Download the model:**
-
-**LM Studio**
-
-```bash
-lms get openai/gpt-oss-120b
-```
-
-**Ollama**
-
-```bash
-ollama pull gpt-oss:120b
-```
-
-(Use the model name that matches your choice from the table; adjust the `lms get` or `ollama pull` command accordingly.)
-
-## Step 5. Run the model with a large context window
-
-OpenClaw works best with a context window of **32K tokens or more**.
-
-**LM Studio**
-
-```bash
-lms load openai/gpt-oss-120b --context-length 32768
-```
-
-**Ollama**
-
-```bash
-ollama run gpt-oss:120b
-```
-
-Once the interactive prompt appears, set the context window (type the following at the Ollama prompt; do not include any `>>>` prefix):
-
-```
-/set parameter num_ctx 32768
-```
-
-Keep this terminal (or process) running so the model stays loaded. You can now chat with the model or press Ctrl+D to exit the interactive mode while keeping the model server running.
-
-> [!TIP]
-> **If you see out-of-memory (OOM) errors:** Try a smaller context (e.g. `16384`) or switch to a smaller model (e.g. gpt-oss-20b). Monitor memory with `nvidia-smi` while the model is loaded.
-
-## Step 6. Configure OpenClaw to use your local model
-
-**If you use LM Studio:**
+## Step 4. Configure OpenClaw to use the vLLM server
 
 1. Open the OpenClaw config file in your preferred editor (e.g. `nano`, `vim`, or a graphical editor). The config path is:
    ```bash
@@ -195,21 +132,21 @@ Keep this terminal (or process) running so the model stays loaded. You can now c
    nano ~/.openclaw/openclaw.json
    ```
 
-2. Add or update the `models` section so it includes the LM Studio provider. Example for **gpt-oss-120b** (DGX Spark):
+2. Add or update the `models` section so it includes the vLLM provider pointing at the endpoint from Step 3. vLLM does not require an API key, so any non-empty placeholder works:
 
 ```json
 "models": {
   "mode": "merge",
   "providers": {
-    "lmstudio": {
-      "baseUrl": "http://localhost:1234/v1",
-      "apiKey": "lmstudio",
+    "vllm": {
+      "baseUrl": "http://localhost:8000/v1",
+      "apiKey": "vllm",
       "api": "openai-responses",
       "models": [
         {
-          "id": "openai/gpt-oss-120b",
-          "name": "openai/gpt-oss-120b",
-          "reasoning": false,
+          "id": "nvidia/Qwen3.6-35B-A3B-NVFP4",
+          "name": "nvidia/Qwen3.6-35B-A3B-NVFP4",
+          "reasoning": true,
           "input": ["text"],
           "cost": {
             "input": 0,
@@ -217,8 +154,8 @@ Keep this terminal (or process) running so the model stays loaded. You can now c
             "cacheRead": 0,
             "cacheWrite": 0
           },
-          "contextWindow": 32768,
-          "maxTokens": 4096
+          "contextWindow": 262144,
+          "maxTokens": 8192
         }
       ]
     }
@@ -226,30 +163,22 @@ Keep this terminal (or process) running so the model stays loaded. You can now c
 }
 ```
 
-For **gpt-oss-20b** or another model, use the same structure but set `id` and `name` to match the model you loaded (e.g. `openai/gpt-oss-20b`). Adjust `contextWindow` and `maxTokens` if needed.
-
-**If you use Ollama:**
+The `id` and `name` must match the model handle served by vLLM (`nvidia/Qwen3.6-35B-A3B-NVFP4`). `contextWindow` matches the `--max-model-len` from Step 3.
 
 > [!NOTE]
-> `ollama launch openclaw` requires **Ollama v0.15 or later**. If you see an "unknown command" error, upgrade Ollama (`ollama --version`) and retry.
+> If OpenClaw reports an unsupported-endpoint error against the Responses API, change `"api": "openai-responses"` to the OpenAI chat-completions variant for your OpenClaw version — vLLM always exposes `/v1/chat/completions`.
 
-Run:
+3. If the OpenClaw gateway is already running, restart it so it reloads `~/.openclaw/openclaw.json` and picks up the new provider.
 
-```bash
-ollama launch openclaw
-```
-
-If the OpenClaw gateway is already running, it should pick up the new configuration automatically. You can add `--config` to configure without launching the gateway yet.
-
-## Step 7. Verify the setup
+## Step 5. Verify the setup
 
 1. In a browser, open the **OpenClaw dashboard URL** (and use the access token if required).
 2. Start a **new** conversation and send a short message.
 3. If you get a reply from the agent, the setup is working.
 
-You can also ask OpenClaw which model it’s using. In the gateway chat UI you can switch models by typing: **`/model MODEL_NAME`**.
+You can also ask OpenClaw which model it’s using. In the gateway chat UI you can switch models by typing: **`/model MODEL_NAME`** (e.g. `/model nvidia/Qwen3.6-35B-A3B-NVFP4`).
 
-## Step 8. Optional: add skills and learn more
+## Step 6. Optional: add skills and learn more
 
 - **Skills** add capabilities but also risk; only enable skills you trust (e.g., community-vetted ones). To add a skill:
   - Ask OpenClaw to configure a skill, or
@@ -262,9 +191,9 @@ You can also ask OpenClaw which model it’s using. In the gateway chat UI you c
 
 | Symptom | Cause | Fix |
 |---------|--------|-----|
-| OpenClaw dashboard URL not loading | Gateway not running or wrong host/port | **Restart the OpenClaw gateway:** For Ollama, run `ollama launch openclaw` to restart an already-configured gateway. For LM Studio, restart the OpenClaw gateway via the LM Studio UI or restart the OpenClaw service/container. **Verify:** Check that the gateway process is running with `pgrep -f openclaw` or `ps aux \| grep openclaw`. **Find URL/token:** Check the original installer output (scroll up in your terminal) or look in gateway logs (typically `~/.openclaw/logs/`) for the dashboard URL and access token |
-| "Connection refused" to model (e.g. localhost:1234 or Ollama port) | LM Studio or Ollama not running, or wrong port | Start the model in a separate terminal (`lms load ...` or `ollama run ...`) and ensure the port in `openclaw.json` matches (1234 for LM Studio, 11434 for Ollama) |
-| OpenClaw says no model available | Model provider not configured or model not loaded | Add the `models` section to `~/.openclaw/openclaw.json` for LM Studio, or run `ollama launch openclaw` for Ollama; ensure the model is loaded/running |
-| Out-of-memory or very slow inference on DGX Spark | Model too large for available GPU memory or other GPU workloads | Free GPU memory (close other apps), choose a smaller model, or check usage with `nvidia-smi` |
+| OpenClaw dashboard URL not loading | Gateway not running or wrong host/port | **Restart the OpenClaw gateway** so it reloads `~/.openclaw/openclaw.json`. **Verify:** Check that the gateway process is running with `pgrep -f openclaw` or `ps aux \| grep openclaw`. **Find URL/token:** Check the original installer output (scroll up in your terminal) or look in gateway logs (typically `~/.openclaw/logs/`) for the dashboard URL and access token |
+| "Connection refused" to model (e.g. localhost:8000) | vLLM server not running, still loading, or wrong port | Confirm the vLLM container is up and finished loading (`curl http://localhost:8000/v1/models` lists the model) and that `baseUrl` in `openclaw.json` is `http://localhost:8000/v1` |
+| OpenClaw says no model available | Provider not configured or model handle mismatch | Add the `vllm` provider to `~/.openclaw/openclaw.json` and ensure `id`/`name` exactly match the served handle (`nvidia/Qwen3.6-35B-A3B-NVFP4`) |
+| Out-of-memory or very slow inference on DGX Spark | Model too large for available GPU memory or other GPU workloads | Lower `--gpu-memory-utilization` or `--max-model-len` when launching vLLM, free GPU memory (close other apps), or check usage with `nvidia-smi` |
 | Install script fails or dependencies missing | Missing system packages on Linux | Install curl and any required build tools; see [OpenClaw documentation](https://docs.openclaw.ai) for current requirements |
 | Config changes not applied | Gateway not reloaded | Restart the OpenClaw gateway so it reloads `~/.openclaw/openclaw.json` |
