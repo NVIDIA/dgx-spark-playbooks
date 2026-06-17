@@ -241,6 +241,9 @@ sudo netplan apply
 
 #### Option 3: Manual IP Assignment with the netplan configuration file
 
+> [!NOTE]
+> `enp1s0f1np1` and `enP2p1s0f1np1` are assigned to **different subnets** (`192.168.100.x/24` and `192.168.101.x/24` respectively). This is required — assigning two distinct network interfaces to the same subnet causes networking and software conflicts (e.g., routing ambiguity and NCCL communication failures).
+
 On node 1:
 ```bash
 ## Create the netplan configuration file
@@ -250,11 +253,11 @@ network:
   ethernets:
     enp1s0f1np1:
       addresses:
-        - 192.168.100.10/24
+        - 192.168.100.1/24
       dhcp4: no
     enP2p1s0f1np1:
       addresses:
-        - 192.168.100.11/24
+        - 192.168.101.1/24
       dhcp4: no
 EOF
 
@@ -274,11 +277,11 @@ network:
   ethernets:
     enp1s0f1np1:
       addresses:
-        - 192.168.100.12/24
+        - 192.168.100.2/24
       dhcp4: no
     enP2p1s0f1np1:
       addresses:
-        - 192.168.100.13/24
+        - 192.168.101.2/24
       dhcp4: no
 EOF
 
@@ -298,11 +301,11 @@ network:
   ethernets:
     enp1s0f1np1:
       addresses:
-        - 192.168.100.14/24
+        - 192.168.100.3/24
       dhcp4: no
     enP2p1s0f1np1:
       addresses:
-        - 192.168.100.15/24
+        - 192.168.101.3/24
       dhcp4: no
 EOF
 
@@ -322,11 +325,11 @@ network:
   ethernets:
     enp1s0f1np1:
       addresses:
-        - 192.168.100.16/24
+        - 192.168.100.4/24
       dhcp4: no
     enP2p1s0f1np1:
       addresses:
-        - 192.168.100.17/24
+        - 192.168.101.4/24
       dhcp4: no
 EOF
 
