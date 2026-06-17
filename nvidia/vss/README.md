@@ -51,10 +51,10 @@ You will deploy NVIDIA's VSS AI Blueprint on NVIDIA Spark hardware with Blackwel
   * Container startup can be resource-intensive and time-consuming with large model downloads
   * Network configuration conflicts if shared network already exists
   * Remote API endpoints may have rate limits or connectivity issues (hybrid deployment)
-* **Rollback:** Stop all containers with `scripts/dev-profile.sh down`
-* **Last Updated:** 3/16/2026
+* **Rollback:** Stop all containers with `deploy/docker/scripts/dev-profile.sh down`
+* **Last Updated:** 06/17/2026
   * Update required OS and Driver versions
-  * Support for VSS 3.1.0 with Cosmos Reason 2 VLM
+  * Support for VSS 3.2.0 with Cosmos Reason 2 VLM
 
 ## Instructions
 
@@ -65,7 +65,7 @@ Check that your system meets the hardware and software [prerequisites](https://d
 ```bash
 ## Verify driver version
 nvidia-smi | grep "Driver Version"
-## Expected output: Driver Version: 580.126.09 or higher
+## Expected output: Driver Version: 580.95.05 or higher
 
 ## Verify CUDA version
 nvcc --version
@@ -106,10 +106,19 @@ sudo docker run --rm --runtime=nvidia --gpus all ubuntu nvidia-smi
 
 Clone the Video Search and Summarization repository from NVIDIA's public GitHub.
 
+**Note** Install Git LFS if not already present on the system
+
+```bash
+sudo apt-get install -y git-lfs && git lfs install
+```
+
 ```bash
 ## Clone the VSS AI Blueprint repository
 git clone https://github.com/NVIDIA-AI-Blueprints/video-search-and-summarization.git
 cd video-search-and-summarization
+git checkout tags/v3.2.0
+git lfs install
+git lfs pull
 ```
 
 ## Step 4. Run the cache cleaner script
@@ -148,12 +157,11 @@ sudo -b /usr/local/bin/sys-cache-cleaner.sh
 ```
 
 > [!NOTE]
-+> The above runs the cache cleaner in the current session only; it does not persist across reboots. To have the cache cleaner run across reboots, create a systemd service instead.
-+> 
-+> To stop the background cache cleaner:
-+> ```bash
-+> sudo pkill -f sys-cache-cleaner.sh
-+> ```
+The above runs the cache cleaner in the current session only; it does not persist across reboots. To have the cache cleaner run across reboots, create a systemd service instead. 
+To stop the background cache cleaner:
+```bash
+sudo pkill -f sys-cache-cleaner.sh
+```
 
 
 ## Step 5. Authenticate with NVIDIA Container Registry
@@ -172,13 +180,13 @@ docker login nvcr.io
 
 ## Step 6. Choose deployment scenario
 
-Choose between two deployment options based on your requirements:
+Choose the deployment options based on your requirements:
 
 | Deployment Scenario                       | VLM (Cosmos-Reason2-8B)| LLM                           | 
 |-------------------------------------------|------------------------|-------------------------------|
-| Standard VSS (Base)                       | Local           | Remote                               |
-| Standard VSS (Alert Verification)         | Local           | Remote                               |
-| Standard VSS deployment (Real-Time Alerts)| Local           | Remote                               |
+| Standard VSS (Base)                       | Local                  | Remote                        |
+| Standard VSS (Alert Verification)         | Local                  | Remote                        |
+| Standard VSS deployment (Real-Time Alerts)| Local                  | Remote                        |
 
 
 ## Step 7. Standard VSS 
@@ -202,19 +210,21 @@ In this hybrid deployment, we would use NIMs from [build.nvidia.com](https://bui
 
 ```bash
 ## Start Standard VSS (Base)
+## Set NGC CLI API key and Hugging Face token (required for VA-MCP)
 export NGC_CLI_API_KEY='your_ngc_api_key'
+export HF_TOKEN='hf_your_token_here'
 export LLM_ENDPOINT_URL=https://your-llm-endpoint.com
-scripts/dev-profile.sh up -p base -H DGX-SPARK --use-remote-llm --llm <REMOTE LLM MODEL NAME>
+deploy/docker/scripts/dev-profile.sh up -p base -H DGX-SPARK --use-remote-llm --llm <REMOTE LLM MODEL NAME>
 
 ## Start Standard VSS (Alert Verification)
 export NGC_CLI_API_KEY='your_ngc_api_key'
 export LLM_ENDPOINT_URL=https://your-llm-endpoint.com
-scripts/dev-profile.sh up -p alerts -m verification -H DGX-SPARK --use-remote-llm --llm <REMOTE LLM MODEL NAME>
+deploy/docker/scripts/dev-profile.sh up -p alerts -m verification -H DGX-SPARK --use-remote-llm --llm <REMOTE LLM MODEL NAME>
 
 ## Start Standard VSS (Real-Time Alerts)
 export NGC_CLI_API_KEY='your_ngc_api_key'
 export LLM_ENDPOINT_URL=https://your-llm-endpoint.com
-scripts/dev-profile.sh up -p alerts -m real-time -H DGX-SPARK --use-remote-llm --llm <REMOTE LLM MODEL NAME>
+deploy/docker/scripts/dev-profile.sh up -p alerts -m real-time -H DGX-SPARK --use-remote-llm --llm <REMOTE LLM MODEL NAME>
 ```
 
 > [!NOTE]
@@ -226,11 +236,11 @@ scripts/dev-profile.sh up -p alerts -m real-time -H DGX-SPARK --use-remote-llm -
 > • **OPENAI_API_KEY** — (optional) For remote LLM/VLM endpoints that require it
 > • **VLM_CUSTOM_WEIGHTS** — (optional) Absolute path to a custom weights directory
 >
-> Pass these additional flags to **`scripts/dev-profile.sh`** for remote LLM mode:
+> Pass these additional flags to **`deploy/docker/scripts/dev-profile.sh`** for remote LLM mode:
 > • **`--use-remote-llm`** — (required) Use a remote LLM, the base URL is read from **`LLM_ENDPOINT_URL`** in the environment
 > • **`--llm`** — (required) Remote LLM model name (for example: `nvidia/nvidia-nemotron-nano-9b-v2`). **Strongly recommended** for alert workflows (verification and real-time): use `nvidia/nvidia-nemotron-nano-9b-v2`. Omitting `--llm` may cause the script to use whatever model is returned by the remote endpoint.
 >
-> Run **`scripts/dev-profile.sh -h`** for a full list of supported arguments.
+> Run **`deploy/docker/scripts/dev-profile.sh --help`** for a full list of supported arguments.
 
 
 **7.3 Validate Standard VSS deployment**
@@ -241,7 +251,7 @@ Access the VSS UI to confirm successful deployment.
 ```bash
 ## Test Agent UI accessibility
 ## If running locally on your Spark device, use localhost:
-curl -I http://localhost:3000
+curl -I http://localhost:7777
 ## Expected: HTTP 200 response
 
 ## If your Spark is running in Remote/Accessory mode, replace 'localhost' with the IP address or hostname of your Spark device.
@@ -250,20 +260,23 @@ hostname -I
 ## Or to get the hostname:
 hostname
 ## Then test accessibility (replace <SPARK_IP_OR_HOSTNAME> with the actual value):
-curl -I http://<SPARK_IP_OR_HOSTNAME>:3000
+curl -I http://<SPARK_IP_OR_HOSTNAME>:7777
 ```
 
-Open `http://localhost:3000` or `http://<SPARK_IP_OR_HOSTNAME>:3000` in your browser to access the Agent interface.
+Open `http://localhost:7777` or `http://<SPARK_IP_OR_HOSTNAME>:7777` in your browser to access the Agent interface.
 
 ## Step 8. Test video processing workflow
 
-Run a basic test to verify the video analysis pipeline is functioning based on your deployment. The UI comes with a few example videos pre-populated for uploading and testing
+Run a basic test to verify the video analysis pipeline is functioning based on your deployment.
 
 **For Standard VSS deployment**
 
 Follow the steps [here](https://docs.nvidia.com/vss/latest/quickstart.html#deploy) to navigate VSS Agent UI.
-- Access VSS Agent interface at `http://localhost:3000`
-- Download the sample data from NGC [here](https://docs.nvidia.com/vss/latest/quickstart.html#download-sample-data-from-ngc) and upload videos and test features [here](https://docs.nvidia.com/vss/latest/quickstart.html#download-sample-data-from-ngc)
+- Access VSS Agent interface at `http://localhost:7777`
+- Download the sample data from NGC [here](https://docs.nvidia.com/vss/latest/quickstart.html#download-sample-data-from-ngc) and upload videos and test features 
+- Test Standard VSS deployment (Base) [here](https://docs.nvidia.com/vss/latest/quickstart.html#step-2-upload-a-video)
+- Test Standard VSS deployment (Alert Verification) [here](https://docs.nvidia.com/vss/latest/agent-workflow-alert-verification.html#step-2-add-a-video-stream)
+- Test Standard VSS deployment (Real-Time Alerts) [here](https://docs.nvidia.com/vss/latest/agent-workflow-rt-alert.html#step-2-add-a-video-stream)
   
 
 ## Step 9. Cleanup and rollback
@@ -275,7 +288,7 @@ To completely remove the VSS deployment and free up system resources [Follow](ht
 
 ```bash
 ## For Standard VSS deployment
-scripts/dev-profile.sh down
+deploy/docker/scripts/dev-profile.sh down
 ```
 
 ## Step 10. Next steps
@@ -283,8 +296,8 @@ scripts/dev-profile.sh down
 With VSS deployed, you can now:
 
 **Standard VSS deployment:**
-- Access full VSS capabilities at port 3000
-- Test video summarization and Q&A features
+- Access full VSS capabilities at port 7777
+- Test video and Q&A features
 - Configure knowledge graphs and graph databases
 - Integrate with existing video processing workflows
 

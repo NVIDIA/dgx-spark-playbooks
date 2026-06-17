@@ -125,12 +125,23 @@ Write a short README checklist for a Python project.
 
 Expected output should show the model responding in the terminal. When you are done, type `/bye` or press `Ctrl+D` to exit the interactive session before continuing.
 
-## Step 5. Launch Claude Code with Ollama
+## Step 5. Install and launch Claude Code with Ollama
 
-**Description**: Use Ollama's built-in [launch method](https://ollama.com/blog/launch) to start [Claude Code](https://docs.claude.com/en/docs/claude-code) against your local model. No environment variables or config files are required.
+**Description**: Install [Claude Code](https://docs.claude.com/en/docs/claude-code), then use Ollama's built-in [launch method](https://ollama.com/blog/launch) to start Claude Code against your local model. No environment variables or config files are required.
 
 ```bash
-ollama launch claude
+curl -fsSL https://claude.ai/install.sh | bash
+claude --version
+```
+
+If Claude Code is already installed, just verify the version:
+
+```bash
+claude --version
+```
+
+```bash
+ollama launch claude --model qwen3.6
 ```
 
 Expected output should show Claude Code starting and using the local Qwen3.6 model. Qwen3.6 ships with a 256K context window by default; adjust context length through Ollama's settings if you need to tune it further.
@@ -150,6 +161,8 @@ printf 'import math_utils\n\n\ndef test_add():\n    assert math_utils.add(1, 2) 
 If you do not already have pytest installed:
 
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 python3 -m pip install -U pytest
 ```
 
@@ -165,7 +178,7 @@ Run the test:
 python3 -m pytest -q
 ```
 
-Expected output should show the test passing.
+Expected output should show the test passing. When you are done, run `deactivate` to exit the virtual environment.
 
 ## Step 7. Cleanup and rollback
 
@@ -259,7 +272,7 @@ Expected output should show the model responding. When you are done, type `/bye`
 **Description**: Use Ollama's built-in [launch method](https://ollama.com/blog/launch) to start [OpenCode](https://opencode.ai) against your local model. No [`opencode.json`](https://opencode.ai/docs/config/) provider configuration is required.
 
 ```bash
-ollama launch opencode
+ollama launch opencode --model qwen3.6
 ```
 
 If you want to pre-configure OpenCode without launching immediately:
@@ -285,6 +298,8 @@ printf 'import math_utils\n\n\ndef test_add():\n    assert math_utils.add(1, 2) 
 If you do not already have pytest installed:
 
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 python3 -m pip install -U pytest
 ```
 
@@ -300,7 +315,7 @@ Run the test:
 python3 -m pytest -q
 ```
 
-Expected output should show the test passing.
+Expected output should show the test passing. When you are done, run `deactivate` to exit the virtual environment.
 
 ## Step 7. Cleanup and rollback
 
@@ -394,7 +409,7 @@ Expected output should show the model responding. When you are done, type `/bye`
 **Description**: Use Ollama's built-in [launch method](https://ollama.com/blog/launch) to start [Codex CLI](https://github.com/openai/codex) against your local model. No `~/.codex/config.toml` and no manual `npm install -g @openai/codex` are required — Ollama handles the Codex integration.
 
 ```bash
-ollama launch codex
+ollama launch codex --model qwen3.6
 ```
 
 Expected output should show Codex CLI starting with Ollama as the provider and Qwen3.6 as the model. Qwen3.6 ships with a 256K context window by default, which is well suited to Codex's agentic workflows.
@@ -414,6 +429,8 @@ printf 'import math_utils\n\n\ndef test_add():\n    assert math_utils.add(1, 2) 
 If you do not already have pytest installed:
 
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 python3 -m pip install -U pytest
 ```
 
@@ -429,7 +446,7 @@ Run the test:
 python3 -m pytest -q
 ```
 
-Expected output should show the test passing.
+Expected output should show the test passing. When you are done, run `deactivate` to exit the virtual environment.
 
 ## Step 7. Cleanup and rollback
 
@@ -465,6 +482,10 @@ ollama rm qwen3.6
 | `connection refused` to localhost:11434 | Ollama service not running | Start with `ollama serve` or `sudo systemctl start ollama` |
 | `ollama launch <agent>` exits immediately | Agent integration failed to initialize | Re-run `ollama launch <agent>`; if it persists, check `journalctl -u ollama` |
 | Slow responses or OOM errors | Model variant too large for GPU memory | Switch to `qwen3.6:35b-a3b-nvfp4` or close other GPU workloads |
+| `python3 -m pip install -U pytest` reports `externally-managed-environment` | Ubuntu 24.04 protects the system Python environment | Create and activate a virtual environment first: `python3 -m venv .venv && source .venv/bin/activate` |
+| `ollama pull` reports that a model tag is a sharded GGUF | The selected model tag is not supported by Ollama | Use the Qwen3.6 commands in Step 3 instead of sharded GGUF tags |
+| `ollama run` fails with `CUDA error: context is destroyed` on a multi-GPU system | Ollama is initializing across a mixed-GPU topology | Pin Ollama to one GPU. For a foreground test, run `CUDA_VISIBLE_DEVICES=0 ollama serve`; for a system service, add `Environment="CUDA_VISIBLE_DEVICES=0"` to an Ollama systemd drop-in and restart Ollama |
+| A direct Claude Code setup using an Anthropic-compatible Ollama endpoint produces prose but does not edit files | Some model/server combinations do not emit tool calls reliably | Use `ollama launch claude` with Qwen3.6 as shown in this playbook |
 
 > [!NOTE]
 > DGX Spark uses a Unified Memory Architecture (UMA), which enables dynamic memory sharing
