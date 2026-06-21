@@ -1,6 +1,6 @@
 # Corporate Bullshit Agentic Generator (CBAG)
 
-> Generate a lip-synced talking-head video of someone delivering AI-written corporate buzzword nonsense — 100% locally on your DGX Spark.
+> Generate a lip-synced talking-head video of someone delivering AI-written corporate buzzword nonsense — 100% locally on your DGX Spark. It's a remake of the old known project with an AI skew and demostrate voice cloning and fake video also for cybersecurity purposes.
 
 ## Table of Contents
 
