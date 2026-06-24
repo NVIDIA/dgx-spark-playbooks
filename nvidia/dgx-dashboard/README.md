@@ -118,7 +118,7 @@ Create and start a JupyterLab environment:
 3. Wait for the status to show "Running" (this may take several minutes on the first launch)
 4. Once "Running", if JupyterLab does not automatically open in your browser (a pop-up was blocked), you can click the "Open In Browser" button
 
-When starting, a default working directory (/home/<USERNAME>/jupyterlab) is created and a virtual environment is set up automatically. You can
+When starting, a default working directory (`/home/<USERNAME>/jupyterlab`) is created and a virtual environment is set up automatically. You can
 review the packages installed by looking at the `requirements.txt` file that is created in the working directory.
 
 In the future, you can change the working directory, creating a new isolated environment, by clicking the "Stop" button, changing the path to the new working directory and then clicking the "Start" button again.
