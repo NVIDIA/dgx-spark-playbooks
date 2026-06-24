@@ -2,7 +2,7 @@ kind: Playbook
 metadata:
   name: station-local-coding-agent
   displayName: Local Coding Agent
-  shortDescription: Run local CLI coding agents with Ollama on DGX Station (GB300 Ultra) using GLM-4.7 and GLM-4.7-Flash
+  shortDescription: Run local CLI coding agents with Claude Code and Ollama on DGX Station (NVIDIA GB300) using qwen3.6:27b
 
   publisher: nvidia
   description: |
@@ -17,8 +17,6 @@ metadata:
   - LLM
   - Ollama
   - Claude Code
-  - OpenCode
-  - Codex
   
   attributes:
   - key: DURATION
@@ -41,24 +39,18 @@ spec:
       content: |
         # Basic idea
         
-        Use Ollama on **DGX Station with GB300 Ultra** to run local coding models and connect a CLI coding agent. This
-        playbook supports three options: **Claude Code**, **OpenCode**, and **Codex CLI**. Each
-        agent talks to Ollama for local inference, so you can work without external cloud APIs.
+        Use Ollama on **DGX Station (NVIDIA GB300)** to run a local coding model and connect a CLI coding agent. This
+        playbook uses **Claude Code** with `ollama launch` so you can work without external cloud APIs.
         
-        The GB300 Ultra’s massive GPU memory lets you run **GLM-4.7** and **GLM-4.7-Flash** in high-quality variants (e.g. bf16, q8_0) for the best coding-assistant quality directly on the Station.
+        The DGX Station GPU (reported as **NVIDIA GB300** in `nvidia-smi`) provides ample memory to run **qwen3.6:27b** with Ollama for local coding-agent workflows.
         
-        # Choose your CLI agent
+        # CLI agent
         
-        Pick the tab that matches the CLI agent you want to use:
-        
-        - **Claude Code**: Fastest path to a working CLI agent with a local Ollama model.
-        - **OpenCode**: Open-source CLI with provider configuration; this guide targets Ollama.
-        - **Codex CLI**: OpenAI Codex CLI configured to run against Ollama locally.
+        This playbook uses **Claude Code** as the CLI agent, connected to a local Ollama model for inference.
         
         # What you'll accomplish
         
-        You will run a local coding model on your **DGX Station (GB300 Ultra)** with Ollama, connect it to your
-        chosen CLI agent, and complete a small coding task end-to-end. You can use **GLM-4.7** or **GLM-4.7-Flash** (including high-quality variants) to take full advantage of the Station’s memory.
+        You will run **qwen3.6:27b** on your **DGX Station (NVIDIA GB300)** with Ollama, connect Claude Code to it, and complete a small coding task end-to-end.
         
         # What to know before starting
         
@@ -68,13 +60,11 @@ spec:
         
         # Prerequisites
         
-        - **DGX Station** with **GB300 Ultra** (Grace Blackwell) and NVIDIA driver
+        - **DGX Station** with **NVIDIA GB300** (Grace Blackwell) and NVIDIA driver; `nvidia-smi` typically shows "NVIDIA GB300"
         - Internet access to download model weights
-        - Ollama 0.14.3 or newer
-        - **GPU memory** on GB300 Ultra supports GLM-4.7 and high-quality variants:
-          - **GLM-4.7-Flash** (30B): ~19GB (latest) to ~60GB (bf16) — recommended default for coding
-          - **GLM-4.7** (full): use `ollama pull glm-4.7` for higher quality when available
-          - High-quality variants (e.g. `glm-4.7-flash:bf16`, `glm-4.7-flash:q8_0`) fit comfortably on GB300 Ultra
+        - **Ollama 0.15.0 or newer**
+        - **GPU memory** on GB300 supports the recommended `qwen3.6:27b` model
+        - **Disk space** for the `qwen3.6:27b` model download
         
         # Time & risk
         
@@ -83,8 +73,8 @@ spec:
           * Large model downloads can fail if network connectivity is unstable
           * Older Ollama versions will not load newer models
         * **Rollback**: Stop Ollama and delete the downloaded model from `~/.ollama/models`
-        * **Last Updated:** February 2025
-          * Tailored for DGX Station with GB300 Ultra; added large-model recommendations
+        * **Last Updated:** 06/12/2026
+          * Model path set to qwen3.6:27b with `ollama launch`; Python task now uses a virtual environment
         
       
 
@@ -101,51 +91,71 @@ spec:
         nvidia-smi
         ```
         
-        Expected output should show a detected GPU (e.g. GB300 Ultra).
+        **Expected output** (example): A table showing driver version and GPU(s). On DGX Station, the GPU name may appear as **NVIDIA GB300** (without "Ultra"):
+        
+        ```text
+        +-----------------------------------------------------------------------------+
+        | NVIDIA-SMI 5xx.xx    Driver Version: 5xx.xx    CUDA Version: 12.x          |
+        |-------------------------------+----------------------+----------------------+
+        | GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |
+        |   0  NVIDIA GB300        On   | 00000000:06:00.0 Off |                    0 |
+        ...
+        ```
         
         # Step 2. Install or update Ollama
         
         **Description**: Install Ollama or ensure it is recent enough for modern coding models.
         
         ```bash
-        curl -fsSL https://ollama.com/install.sh | OLLAMA_VERSION=0.14.3 sh
+        curl -fsSL https://ollama.com/install.sh | sh
         ollama --version
         ```
         
-        If the ollama is already present and the version is 0.14.3 or newer, simply run:
+        To install a specific version if needed:
+        
+        ```bash
+        curl -fsSL https://ollama.com/install.sh | OLLAMA_VERSION=0.15.0 sh
+        ```
+        
+        If Ollama is already present, simply run:
         
         ```bash
         ollama --version
         ```
         
-        Expected output should show `ollama --version` as 0.14.3 or newer.
+        **Expected output** (example):
+        
+        ```text
+        ollama version is 0.15.0
+        ```
         
         # Step 3. Pull a coding model
         
-        **Description**: Download the model weights to your DGX Station. This playbook uses **GLM-4.7** where available.
+        **Description**: Download the model weights to your DGX Station.
         
-        **Recommended: GLM-4.7**:
-        
-        ```bash
-        ollama pull glm-4.7
-        ```
-        
-        
-        **High-quality variants** on GB300 Ultra (use more GPU memory for better quality):
+        This playbook uses **qwen3.6:27b** with Claude Code through Ollama:
         
         ```bash
-        ollama pull glm-4.7-flash:q8_0
-        ollama pull glm-4.7-flash:bf16
+        ollama pull qwen3.6:27b
         ```
         
-        Expected output should show your model in `ollama list`.
+        **Expected output** (example): Progress lines followed by "success" and the model in `ollama list`:
+        
+        ```bash
+        ollama list
+        ```
+        
+        ```text
+        NAME                                ID              SIZE    MODIFIED
+        qwen3.6:27b                         abc123...       ...     1 minute ago
+        ```
         
         # Step 4. Test local inference
         
-        **Description**: Run a quick prompt to confirm the model loads. Use the same model name you pulled (e.g. `glm-4.7`).
+        **Description**: Run a quick prompt to confirm the model loads.
         
         ```bash
-        ollama run glm-4.7
+        ollama run qwen3.6:27b
         ```
         
         Try a prompt like:
@@ -154,26 +164,36 @@ spec:
         Write a short README checklist for a Python project.
         ```
         
-        Expected output should show the model responding in the terminal.
+        **Expected output**: The model replies with a short README checklist.
+        
+        **Exit the Ollama REPL** when done: type `/bye` or press **Ctrl+D**.
         
         # Step 5. Install Claude Code
         
         **Description**: Install the CLI tool that will drive the local model.
         
         ```bash
-        curl -fsSL https://claude.ai/install.sh | sh
+        curl -fsSL https://claude.ai/install.sh | bash
         ```
+        
+        **Verify the installation**:
+        
+        ```bash
+        claude --version
+        ```
+        
+        **Expected output** (example): A version string such as `claude 0.x.x` or similar. If you see `claude: command not found`, ensure the install script added the CLI to your PATH (e.g. restart the terminal or source your shell profile); see [Troubleshooting](troubleshooting.md).
         
         # Step 6. Increase context length (optional)
         
         **Description**: Ollama defaults to a 4096 token context length. For coding agents and
         larger codebases, set it to 64K tokens. This increases memory usage.
-        For more details on configuring context length, see the [Ollama documentation](https://ollama.com/docs/faq#how-can-i-increase-the-context-length).
+        For more details on configuring context length and other parameters, see the Ollama documentation (context window and runtime options).
         
         Set the context length per session in the Ollama REPL:
         
         ```bash
-        ollama run glm-4.7
+        ollama run qwen3.6:27b
         ```
         
         Then, in the Ollama prompt:
@@ -182,6 +202,8 @@ spec:
         /set parameter num_ctx 64000
         
         ```
+        
+        **Exit when done**: type `/bye` or press **Ctrl+D**.
         
         Optional method (set globally when serving Ollama):
         
@@ -194,16 +216,15 @@ spec:
         
         # Step 7. Connect Claude Code to Ollama
         
-        **Description**: Point Claude Code to the local Ollama server and launch it. Use the model you pulled (e.g. GLM-4.7 or GLM-4.7-Flash).
+        **Description**: Launch Claude Code through Ollama with the model you pulled.
         
         ```bash
-        export ANTHROPIC_AUTH_TOKEN=ollama
-        export ANTHROPIC_BASE_URL=http://localhost:11434
-        
-        claude --model glm-4.7
+        ollama launch claude --model qwen3.6:27b
         ```
         
-        Expected output should show Claude Code starting and using the local model.
+        **Expected output**: Claude Code starts and uses the local Ollama model.
+        
+        **Exit Claude Code** when done: type `/exit` or press **Ctrl+C**.
         
         # Step 8. Complete a small coding task
         
@@ -212,53 +233,58 @@ spec:
         ```bash
         mkdir -p ~/cli-agent-demo
         cd ~/cli-agent-demo
+        python3 -m venv .venv
+        source .venv/bin/activate
+        python3 -m pip install -U pytest
         
         printf 'def add(a, b):\n    """Return the sum of a and b."""\n    pass\n' > math_utils.py
         printf 'import math_utils\n\n\ndef test_add():\n    assert math_utils.add(1, 2) == 3\n' > test_math_utils.py
         ```
         
-        If you do not already have pytest installed:
+        If Claude Code is not already running, launch it:
         
         ```bash
-        python -m pip install -U pytest
+        ollama launch claude --model qwen3.6:27b
         ```
         
-        In Claude Code:
+        In Claude Code, enter:
         
         ```text
         Please implement add() in math_utils.py and make sure the test passes.
         ```
         
-        Run the test:
+        **Exit Claude Code** when finished: type `/exit` or press **Ctrl+C**, then run the test:
         
         ```bash
-        python -m pytest -q
+        python3 -m pytest -q
+        deactivate
         ```
         
         Expected output should show the test passing.
         
         # Step 9. Cleanup and rollback
         
-        **Description**: Remove the model and stop services if you no longer need them.
+        **Description**: Remove the model and stop the Ollama service if you no longer need them. **Remove the model first** (while the Ollama server is running), then stop the service.
         
-        To stop the service:
+        > [!WARNING]
+        > The following removes the downloaded model files from disk.
+        
+        **1. Remove the model** (Ollama must be running). Use the same name you pulled:
+        
+        ```bash
+        ollama rm qwen3.6:27b
+        ```
+        
+        **2. Stop the Ollama service**:
         
         ```bash
         sudo systemctl stop ollama
         ```
         
-        > [!WARNING]
-        > This will delete the downloaded model files.
-        
-        ```bash
-        ollama rm glm-4.7
-        ```
-        
         # Step 10. Next steps
         
-        - Use **GLM-4.7** or high-quality variants (`glm-4.7-flash:bf16`, `glm-4.7-flash:q8_0`) on GB300 Ultra for best quality
-        - Use larger context (e.g. 64K–198K) for big codebases
-        - Use Claude Code on multi-file refactors or test-generation tasks
+        - Use larger context (e.g. 64K–198K) for big codebases.
+        - Use Claude Code on multi-file refactors or test-generation tasks.
         
       
 
@@ -270,18 +296,19 @@ spec:
         | Symptom | Cause | Fix |
         |---------|-------|-----|
         | `ollama: command not found` | Ollama not installed or PATH not updated | Rerun `curl -fsSL https://ollama.com/install.sh | sh` and open a new shell |
-        | Model load fails with version error | Ollama is older than 0.14.3 | Update Ollama to 0.14.3 or newer |
-        | `model not found` in Claude Code | Model was not pulled | Run `ollama pull glm-4.7-flash` or `ollama pull glm-4.7` and retry |
-        | `opencode: command not found` | OpenCode not installed or PATH not updated | Install OpenCode and open a new shell |
-        | OpenCode cannot reach Ollama | `baseURL` misconfigured or Ollama not running | Set `baseURL` to `http://localhost:11434/v1` and start Ollama |
-        | `codex: command not found` | Codex CLI not installed or PATH not updated | Install Codex CLI and open a new shell |
-        | Codex CLI uses the wrong model/provider | `~/.codex/config.toml` not pointing to Ollama | Set `model_provider = "ollama"` and `base_url = "http://localhost:11434/v1"` |
-        | `connection refused` to localhost:11434 | Ollama service not running | Start with `ollama serve` or `systemctl start ollama` |
-        | Slow responses or OOM | Insufficient GPU memory or fragmentation | On DGX Station GB300 Ultra, ensure no other heavy GPU workloads. If OOM persists, use a smaller variant (e.g. `glm-4.7-flash:q8_0` or `glm-4.7-flash:q4_K_M`) or `OLLAMA_MAX_LOADED_MODELS=1`. |
+        | Model load fails with version error | Ollama is older than the model requires | Update Ollama to a current stable release. Do not pin to older versions. |
+        | `model not found` in Claude Code | Model was not pulled | Run `ollama pull qwen3.6:27b` and retry with `ollama launch claude --model qwen3.6:27b`. |
+        | `connection refused` to localhost:11434 | Ollama service not running | Start with `ollama serve` or `sudo systemctl start ollama` |
+        | Sharded GGUF model pull fails with HTTP 400 | Ollama does not support pulling sharded GGUF models from Hugging Face | Use the documented `qwen3.6:27b` model instead: `ollama pull qwen3.6:27b`. |
+        | `CUDA error: context is destroyed` on a dual-GPU Station | Ollama may fail when both the GB300 and RTX PRO 6000 GPUs are visible | Run Ollama with one visible GPU. For example, set `CUDA_VISIBLE_DEVICES=1` in the Ollama service environment, restart Ollama, and rerun the playbook. |
+        | Claude Code edit task fails through the direct Ollama endpoint | Direct endpoint wiring can fail with some Ollama/model combinations | Launch Claude Code through Ollama instead: `ollama launch claude --model qwen3.6:27b`. |
+        | `externally-managed-environment` or Python package install fails | System Python blocks direct package installs | Create and activate a virtual environment, then install pytest inside it: `python3 -m venv .venv`, `source .venv/bin/activate`, `python3 -m pip install -U pytest`. |
+        | Slow responses or OOM | Insufficient GPU memory or fragmentation | On DGX Station (NVIDIA GB300), ensure no other heavy GPU workloads. If OOM persists, unload other models or set `OLLAMA_MAX_LOADED_MODELS=1`. |
+        | `claude: command not found` after install | CLI not on PATH or install script did not complete | Restart the terminal or run `source ~/.bashrc` (or your shell profile). Check the install script output for the install path and add it to PATH. |
+        | Claude Code install fails (Node.js / network) | Node.js missing or install script cannot download | Ensure Node.js is installed (`node --version`). Run the installer with Bash: `curl -fsSL https://claude.ai/install.sh | bash`. If the install script fails with a network error, retry from a stable connection or download the Claude Code CLI from the official site. See [Claude Code documentation](https://claude.ai/docs) for alternatives. |
         
         > [!NOTE]
-        > DGX Station with GB300 Ultra provides ample GPU memory for **GLM-4.7** and **GLM-4.7-Flash** in high-quality
-        > variants (e.g. `glm-4.7-flash:bf16`). Use `OLLAMA_MAX_LOADED_MODELS=1` if you hit memory limits with multiple models.
+        > DGX Station with **NVIDIA GB300** provides ample GPU memory for the documented `qwen3.6:27b` workflow. Use `OLLAMA_MAX_LOADED_MODELS=1` if you hit memory limits with multiple models.
         
       
 
@@ -291,31 +318,11 @@ spec:
       url: https://ollama.com/docs
       
 
-    - name: GLM-4.7-Flash (Ollama)
-      url: https://ollama.com/library/glm-4.7-flash
-      
-
-    - name: GLM-4.7 (Ollama)
-      url: https://ollama.com/library/glm-4.7
+    - name: Qwen3.6 27B
+      url: https://ollama.com/library/qwen3.6
       
 
     - name: Claude Code + Ollama Guide
       url: https://ollama.com/blog/claude
-      
-
-    - name: OpenCode Ollama Provider
-      url: https://opencode.ai/docs/providers/#ollama
-      
-
-    - name: Codex + Ollama Guide
-      url: https://ollama.com/blog/codex
-      
-
-    - name: DGX Station Documentation
-      url: https://docs.nvidia.com/dgx/dgx-station
-      
-
-    - name: DGX Station Forum
-      url: https://forums.developer.nvidia.com/c/accelerated-computing/dgx-station
       
 
