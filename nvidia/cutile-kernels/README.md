@@ -122,15 +122,18 @@ All required assets can be found in the [TileGym repository](https://github.com/
   * Large downloads may fail due to network issues
   * First run includes JIT compilation overhead
 * **Rollback:** Remove Docker container to undo all changes
-* **Last Updated:** February 2026
-  * First Publication
+* **Last Updated:** 06/16/2026
+  * Upgrade CUDA container to 13.2.0-devel-ubuntu22.04
+  * Upgrade Nsight Systems to 2025.1.3
+  * Add docker preparation steps for TileGym
+  * Pin TileGym to v1.3.0
 
 ## Kernel Benchmarks
 
 ## Step 1. Pull CUDA NGC container with CTK 13.x
 
 ```bash
-docker pull nvcr.io/nvidia/cuda:13.1-devel-ubuntu24.04
+docker pull nvcr.io/nvidia/cuda:13.2.0-devel-ubuntu22.04
 ```
 
 Launch an interactive session with GPU access:
@@ -138,18 +141,26 @@ Launch an interactive session with GPU access:
 ```bash
 docker run --gpus all -it --rm \
   -v ~/TileGym:/workspace/TileGym \
-  nvcr.io/nvidia/cuda:13.1-devel-ubuntu24.04 \
+  nvcr.io/nvidia/cuda:13.2.0-devel-ubuntu22.04 \
   /bin/bash
 ```
 
 > [!NOTE]
 > The `-v` flag mounts a local directory to persist the TileGym repository. The `--rm` flag automatically removes the container when you exit; omit it if you want to keep the container for later use.
 
-Or if running outside a container, install Tile IR directly:
+Prepare the docker for installing TileGym.
 
 ```bash
-## Requires root privileges - run with sudo or as root
-sudo apt-get install cuda-tile-ir-13-1 cuda-compiler-13-1
+apt-get update && apt-get install -y --no-install-recommends \
+    python3-pip python3-dev python-is-python3 \
+    git wget curl build-essential nsight-systems-2025.1.3
+update-alternatives --install /usr/bin/nsys nsys /opt/nvidia/nsight-systems/2025.1.3/bin/nsys 100 && hash -r
+python -m pip install --upgrade pip setuptools wheel
+
+pip install --no-cache-dir --pre "torch==2.9.1" --index-url https://download.pytorch.org/whl/cu130
+
+pip install --no-cache-dir --no-deps accelerate==1.13.0 && \
+    pip install --no-cache-dir sentencepiece protobuf
 ```
 
 ## Step 2. Clone TileGym repository
@@ -157,18 +168,32 @@ sudo apt-get install cuda-tile-ir-13-1 cuda-compiler-13-1
 ```bash
 git clone https://github.com/NVIDIA/TileGym
 cd TileGym
+git checkout v1.3.0
 pip install .
 ```
 
-## Step 3. Run benchmark suite
+## Step 3. Run individual benchmarks
+
+To run specific kernel benchmarks:
 
 ```bash
 cd tests/benchmark/
-bash run_all.sh
-```
 
-> [!NOTE]
-> The benchmark runs sequentially to ensure accurate timing results. This may take 10-15 minutes to complete all kernels.
+## Flash Multi-Head Attention
+python bench_fused_attention.py
+
+## Matrix Multiplication
+python bench_matrix_multiplication.py
+
+## RMSNorm
+python bench_rmsnorm.py
+
+## RoPE
+python bench_rope.py
+
+## SwiGLU
+python bench_swiglu.py
+```
 
 ## Step 4. View results
 
@@ -190,26 +215,16 @@ fused-attention-batch4-head32-d128-fwd-causal=True-float16-TFLOPS:
 ✓ PASSED: bench_fused_attention.py
 ```
 
-## Step 5. Run individual benchmarks
-
-To run specific kernel benchmarks:
+## Step 5. Run benchmark suite
 
 ```bash
-## Flash Multi-Head Attention
-python bench_fused_attention.py
-
-## Matrix Multiplication
-python bench_matrix_multiplication.py
-
-## RMSNorm
-python bench_rmsnorm.py
-
-## RoPE
-python bench_rope.py
-
-## SwiGLU
-python bench_swiglu.py
+cd tests/benchmark/
+bash run_all.sh
 ```
+
+> [!NOTE]
+> NOT RECOMMENDED: The benchmark runs sequentially to ensure accurate timing results. This may take 40-60 minutes to complete all kernels.
+
 
 ## Step 6. Clean up
 
@@ -223,7 +238,7 @@ Remove this workflow's containers (if you ran without `--rm`):
 
 ```bash
 ## Preferred: remove only containers from this workflow's image
-docker rm $(docker ps -a --filter ancestor=nvcr.io/nvidia/cuda:13.1-devel-ubuntu24.04 --format '{{.ID}}')
+docker ps -a --filter ancestor=nvcr.io/nvidia/cuda:13.2.0-devel-ubuntu22.04 -q | xargs -r docker rm
 
 ## Alternative: prune all stopped containers (will prompt for confirmation)
 ## docker container prune
@@ -232,7 +247,7 @@ docker rm $(docker ps -a --filter ancestor=nvcr.io/nvidia/cuda:13.1-devel-ubuntu
 Remove the image (optional):
 
 ```bash
-docker rmi nvcr.io/nvidia/cuda:13.1-devel-ubuntu24.04
+docker rmi nvcr.io/nvidia/cuda:13.2.0-devel-ubuntu22.04
 ```
 
 ## Step 7. Repeat on B300
@@ -250,6 +265,8 @@ First, clone TileGym on the host:
 ```bash
 mkdir -p ~/TileGym
 git clone https://github.com/NVIDIA/TileGym ~/TileGym
+cd ~/TileGym
+git checkout v1.3.0
 ```
 
 Then launch the container with the repository mounted:
@@ -258,12 +275,27 @@ Then launch the container with the repository mounted:
 docker run --gpus all -it --rm \
   -v ~/TileGym:/workspace/TileGym \
   -v ~/.cache/huggingface:/root/.cache/huggingface \
-  nvcr.io/nvidia/cuda:13.1-devel-ubuntu24.04 \
+  nvcr.io/nvidia/cuda:13.2.0-devel-ubuntu22.04 \
   /bin/bash
 ```
 
 > [!NOTE]
 > The `-v ~/.cache/huggingface:/root/.cache/huggingface` mounts your HuggingFace cache to avoid re-downloading models.
+
+Prepare the container for installing TileGym:
+
+```bash
+apt-get update && apt-get install -y --no-install-recommends \
+    python3-pip python3-dev python-is-python3 \
+    git wget curl build-essential nsight-systems-2025.1.3
+update-alternatives --install /usr/bin/nsys nsys /opt/nvidia/nsight-systems/2025.1.3/bin/nsys 100 && hash -r
+python -m pip install --upgrade pip setuptools wheel
+
+pip install --no-cache-dir --pre "torch==2.9.1" --index-url https://download.pytorch.org/whl/cu130
+
+pip install --no-cache-dir --no-deps accelerate==1.13.0 && \
+    pip install --no-cache-dir sentencepiece protobuf
+```
 
 Install TileGym inside the container:
 
@@ -286,7 +318,7 @@ export HF_TOKEN=<your_huggingface_token>
 Navigate to the transformers benchmark directory:
 
 ```bash
-cd modeling/transformers
+cd /workspace/TileGym/modeling/transformers
 ```
 
 **Option A: Run Qwen2-7B benchmark**
@@ -841,7 +873,7 @@ Use the ratios below as a reference for how kernel performance scales from DGX S
 | Slow first run | JIT compilation | Normal - cuTile compiles kernels on first run |
 | `FileNotFoundError: input_prompt_small.txt` | Missing input file | Run from `modeling/transformers` directory |
 | `torch.cuda.OutOfMemoryError` | Insufficient GPU memory | Reduce `--batch_size` parameter |
-| `ImportError: cuda.tile` | Missing Tile IR | Install: `apt-get install cuda-tile-ir-13-1` |
+| `ImportError: cuda.tile` | Missing Tile IR | Install: `apt-get install cuda-tile-ir-13-2` |
 | Benchmark hangs | GPU busy or locked | Check `nvidia-smi` for other processes |
 
 > [!NOTE] 

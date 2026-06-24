@@ -7,7 +7,6 @@
 - [Overview](#overview)
 - [Instructions](#instructions)
 - [Run on two Sparks](#run-on-two-sparks)
-  - [Step 11. (Optional) Launch 405B inference server](#step-11-optional-launch-405b-inference-server)
 - [Run on multiple Sparks through a switch](#run-on-multiple-sparks-through-a-switch)
 - [Run Agent Ready Qwen3.6 35B Model with vLLM](#run-agent-ready-qwen36-35b-model-with-vllm)
 - [Troubleshooting](#troubleshooting)
@@ -257,46 +256,56 @@ This includes:
 - Passwordless SSH setup
 - Network connectivity verification
 
+> **Heads up:** the `discover-sparks` script in the linked playbook writes its SSH key to `~/.ssh/` and fails if the directory does not exist yet. Run `mkdir -p ~/.ssh && chmod 700 ~/.ssh` on both nodes first if you have never used SSH on them.
+
 ## Step 2. Download cluster deployment script
 
 Obtain the vLLM cluster deployment script on both nodes. This script orchestrates the Ray cluster setup required for distributed inference.
 
 ```bash
-## Download on both nodes
-wget https://raw.githubusercontent.com/vllm-project/vllm/refs/heads/main/examples/ray_serving/run_cluster.sh
+## Download on both nodes — pinned to a known-good commit so upstream changes
+## can't silently break this playbook against the 26.05-py3 image.
+wget https://raw.githubusercontent.com/vllm-project/vllm/51c1ee9b7c8acbba4899a8ebffd390685d171946/examples/ray_serving/run_cluster.sh
+
+## Patch the script to pip-install ray inside the container before ray starts.
+## The 26.05-py3 NGC image ships without ray (upstream made it an optional CUDA dep);
+## the install takes ~10s on first container launch.
+sed -i 's|^RAY_START_CMD="ray start|RAY_START_CMD="pip install -q --root-user-action=ignore '\''ray[default]>=2.9'\'' \&\& ray start|' run_cluster.sh
+
 chmod +x run_cluster.sh
 ```
 
-## Step 3. Pull the NVIDIA vLLM Image from NGC
+## Step 3. Pull the NVIDIA vLLM image from NGC
 
-First, you will need to configure docker to pull from NGC
-If this is your first time using docker run:
+First, configure docker. If this is your first time using docker, run:
 ```bash
 sudo groupadd docker
 sudo usermod -aG docker $USER
 newgrp docker
 ```
 
-After this, you should be able to run docker commands without using `sudo`.
+After this, you should be able to run docker commands without `sudo`.
 
+Pull the image **on both nodes**:
 
 ```bash
-docker pull nvcr.io/nvidia/vllm:25.11-py3
-export VLLM_IMAGE=nvcr.io/nvidia/vllm:25.11-py3
+docker pull nvcr.io/nvidia/vllm:26.05-py3
+export VLLM_IMAGE=nvcr.io/nvidia/vllm:26.05-py3
 ```
-
 
 ## Step 4. Start Ray head node
 
 Launch the Ray cluster head node on Node 1. This node coordinates the distributed inference and serves the API endpoint.
 
 ```bash
-## On Node 1, start head node
+## On Node 1, start head node. Run inside tmux/screen so an SSH drop doesn't
+## tear down the cluster (run_cluster.sh has an EXIT trap that stops the container).
 
 ## Get the IP address of the high-speed interface
 ## Use the interface that shows "(Up)" from ibdev2netdev (enp1s0f0np0 or enp1s0f1np1)
 export MN_IF_NAME=enp1s0f1np1
 export VLLM_HOST_IP=$(ip -4 addr show $MN_IF_NAME | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
+export VLLM_IMAGE=nvcr.io/nvidia/vllm:26.05-py3
 
 echo "Using interface $MN_IF_NAME with IP $VLLM_HOST_IP"
 
@@ -311,10 +320,11 @@ bash run_cluster.sh $VLLM_IMAGE $VLLM_HOST_IP --head ~/.cache/huggingface \
   -e MASTER_ADDR=$VLLM_HOST_IP
 ```
 
+Leave this terminal open — closing it stops the head node and tears down the cluster.
 
 ## Step 5. Start Ray worker node
 
-Connect Node 2 to the Ray cluster as a worker node. This provides additional GPU resources for tensor parallelism.
+Open a second terminal, SSH to Node 2 (`ssh user@<NODE_2_IP>`), and join the Ray cluster as a worker. Replace `<NODE_1_IP_ADDRESS>` below with the QSFP-side IP from Node 1 (run `echo $VLLM_HOST_IP` on Node 1 to print it). Run inside tmux/screen on Node 2 as well.
 
 ```bash
 ## On Node 2, join as worker
@@ -325,9 +335,11 @@ export MN_IF_NAME=enp1s0f1np1
 ## Get Node 2's own IP address
 export VLLM_HOST_IP=$(ip -4 addr show $MN_IF_NAME | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
 
-## IMPORTANT: Set HEAD_NODE_IP to Node 1's IP address
-## You must get this value from Node 1 (run: echo $VLLM_HOST_IP on Node 1)
+## Set this to Node 1's QSFP IP (see step header)
 export HEAD_NODE_IP=<NODE_1_IP_ADDRESS>
+
+## Set the image tag (same as Step 3)
+export VLLM_IMAGE=nvcr.io/nvidia/vllm:26.05-py3
 
 echo "Worker IP: $VLLM_HOST_IP, connecting to head node at: $HEAD_NODE_IP"
 
@@ -341,7 +353,6 @@ bash run_cluster.sh $VLLM_IMAGE $HEAD_NODE_IP --worker ~/.cache/huggingface \
   -e RAY_memory_monitor_refresh_ms=0 \
   -e MASTER_ADDR=$HEAD_NODE_IP
 ```
-> **Note:** Replace `<NODE_1_IP_ADDRESS>` with the actual IP address from Node 1, specifically the QSFP interface nep1s0f1np1 configured in the [Connect two Sparks](https://build.nvidia.com/spark/connect-two-sparks) playbook.
 
 ## Step 6. Verify cluster status
 
@@ -360,12 +371,12 @@ Expected output shows 2 nodes with available GPU resources.
 
 ## Step 7. Download Llama 3.3 70B model
 
-Authenticate with Hugging Face and download the recommended production-ready model.
+Llama 3.3 70B is a gated model — first accept its license at <https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct> and create an HF access token with read permission. Then authenticate inside the container so the cache lands at `/root/.cache/huggingface` (mounted from `~/.cache/huggingface`).
 
 ```bash
-## From within the same container where `ray status` ran, run the following
-hf auth login
-hf download meta-llama/Llama-3.3-70B-Instruct
+docker exec -it $VLLM_CONTAINER /bin/bash -c '
+  hf auth login
+  hf download meta-llama/Llama-3.3-70B-Instruct'
 ```
 
 ## Step 8. Launch inference server for Llama 3.3 70B
@@ -374,18 +385,17 @@ Start the vLLM inference server with tensor parallelism across both nodes.
 
 ```bash
 ## On Node 1, enter container and start server
-export VLLM_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '^node-[0-9]+$')
 docker exec -it $VLLM_CONTAINER /bin/bash -c '
   vllm serve meta-llama/Llama-3.3-70B-Instruct \
-    --tensor-parallel-size 2 --max_model_len 2048'
+    --tensor-parallel-size 2 --max-model-len 2048 \
+    --distributed-executor-backend ray'
 ```
 
 ## Step 9. Test 70B model inference
 
-Verify the deployment with a sample inference request.
+Verify the deployment with a sample inference request. Run this on Node 1 itself; from an external client, replace `localhost` with Node 1's reachable IP.
 
 ```bash
-## Test from Node 1 or external client
 curl http://localhost:8000/v1/completions \
   -H "Content-Type: application/json" \
   -d '{
@@ -403,29 +413,36 @@ Expected output includes a generated haiku response.
 > [!WARNING]
 > 405B model has insufficient memory headroom for production use.
 
-Download the quantized 405B model for testing purposes only.
+Download the quantized 405B model for testing purposes only. Runs inside the head container so the cache lands in the mounted HF directory.
 
 ```bash
-## On Node 1, download quantized model
-huggingface-cli download hugging-quants/Meta-Llama-3.1-405B-Instruct-AWQ-INT4
+docker exec -it $VLLM_CONTAINER /bin/bash -c '
+  hf download hugging-quants/Meta-Llama-3.1-405B-Instruct-AWQ-INT4'
 ```
 
-### Step 11. (Optional) Launch 405B inference server
+## Step 11. (Optional) Launch 405B inference server
 
 Start the server with memory-constrained parameters for the large model.
 
 ```bash
 ## On Node 1, launch with restricted parameters
-export VLLM_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '^node-[0-9]+$')
 docker exec -it $VLLM_CONTAINER /bin/bash -c '
   vllm serve hugging-quants/Meta-Llama-3.1-405B-Instruct-AWQ-INT4 \
     --tensor-parallel-size 2 --max-model-len 64 --gpu-memory-utilization 0.9 \
-    --max-num-seqs 1 --max_num_batched_tokens 64'
+    --max-num-seqs 1 --max-num-batched-tokens 64 \
+    --distributed-executor-backend ray'
+```
+
+Startup is slow for 405B — expect several minutes of model-loading logs across both nodes. The server is ready to take traffic once you see:
+
+```
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
 ```
 
 ## Step 12. (Optional) Test 405B model inference
 
-Verify the 405B deployment with constrained parameters.
+Verify the 405B deployment with constrained parameters. As in Step 9, run on Node 1 or replace `localhost` with Node 1's reachable IP from an external client.
 
 ```bash
 curl http://localhost:8000/v1/completions \
@@ -444,32 +461,31 @@ Perform comprehensive validation of the distributed inference system.
 
 ```bash
 ## Check Ray cluster health
-export VLLM_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '^node-[0-9]+$')
 docker exec $VLLM_CONTAINER ray status
 
 ## Verify server health endpoint
-curl http://192.168.100.10:8000/health
+curl http://localhost:8000/health
 
-## Monitor GPU utilization on both nodes
+## Monitor GPU utilization on both nodes (DGX Spark has unified memory,
+## so the --query-gpu memory fields report N/A; use raw nvidia-smi instead).
 nvidia-smi
-export VLLM_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '^node-[0-9]+$')
-docker exec $VLLM_CONTAINER nvidia-smi --query-gpu=memory.used,memory.total --format=csv
 ```
 
 ## Step 14. Next steps
 
-Access the Ray dashboard for cluster monitoring and explore additional features:
+The Ray dashboard runs on port 8265 of the head node. It binds to the container's network (host networking), so it is only directly reachable from Node 1 itself. From an external workstation, tunnel it over SSH:
 
 ```bash
-## Ray dashboard available at:
-http://<head-node-ip>:8265
-
-## Consider implementing for production:
-## - Health checks and automatic restarts
-## - Log rotation for long-running services
-## - Persistent model caching across restarts
-## - Alternative quantization methods (FP8, INT4)
+## From your workstation:
+ssh -L 8265:localhost:8265 nvidia@<NODE_1_IP>
+## then open http://localhost:8265 in a local browser
 ```
+
+Consider for production:
+- Health checks and automatic restarts
+- Log rotation for long-running services
+- Persistent model caching across restarts
+- Alternative quantization methods (FP8, INT4)
 
 ## Run on multiple Sparks through a switch
 
@@ -640,8 +656,6 @@ curl http://localhost:8000/health
 
 ## Monitor GPU utilization on all nodes
 nvidia-smi
-export VLLM_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '^node-[0-9]+$')
-docker exec $VLLM_CONTAINER nvidia-smi --query-gpu=memory.used,memory.total --format=csv
 ```
 
 ## Step 11. Next steps
