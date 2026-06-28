@@ -101,7 +101,7 @@ Build llama.cpp with CUDA enabled and targeting the GB10's sm_121 compute archit
 
 ```bash
 mkdir build && cd build
-cmake .. -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES="121" -DLLAMA_CURL=OFF
+cmake .. -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES="121" -DLLAMA_CURL=OFF -DGGML_CUDA_FA_ALL_QUANTS=ON 
 make -j8
 ```
 
@@ -128,6 +128,7 @@ Launch the inference server with the Nemotron model. The server provides an Open
   --model ~/models/nemotron3-gguf/Nemotron-3-Nano-30B-A3B-UD-Q8_K_XL.gguf \
   --host 0.0.0.0 \
   --port 30000 \
+  --flash-attn 1 \
   --n-gpu-layers 99 \
   --ctx-size 8192 \
   --threads 8
@@ -136,6 +137,7 @@ Launch the inference server with the Nemotron model. The server provides an Open
 **Parameter explanation:**
 - `--host 0.0.0.0`: Listen on all network interfaces
 - `--port 30000`: API server port
+- `--flash-attn 1`: Enables Flash Attention
 - `--n-gpu-layers 99`: Offload all layers to GPU
 - `--ctx-size 8192`: Context window size (can increase up to 1M)
 - `--threads 8`: CPU threads for non-GPU operations
