@@ -44,7 +44,7 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 - [Fine-tune with NeMo](nvidia/nemo-fine-tune/)
 - [Run NemoClaw with a Local LLM](nvidia/nemoclaw/)
 - [🦞 Set Up Example NemoClaw Agents 🦞](nvidia/nemoclaw-applications/)
-- [Nemotron-3-Nano with llama.cpp](nvidia/nemotron/)
+- [Nemotron Model Family on DGX Spark](nvidia/nemotron/)
 - [NIM on Spark](nvidia/nim-llm/)
 - [NVFP4 Quantization](nvidia/nvfp4-quantization/)
 - [Ollama](nvidia/ollama/)

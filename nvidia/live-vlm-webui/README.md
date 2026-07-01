@@ -35,7 +35,7 @@ You'll set up a complete real-time vision AI testing environment on your DGX Spa
 ## What to know before starting
 
 - Basic familiarity with Linux command line and terminal operations
-- Basic knowledge of Python package installation with pip
+- Basic knowledge of Python application installation with pipx
 - Basic knowledge of REST APIs and how services communicate via HTTP
 - Familiarity with web browsers and network access (IP addresses, ports)
 - Optional: Knowledge of Vision Language Models and their capabilities (helpful but not required)
@@ -49,7 +49,7 @@ You'll set up a complete real-time vision AI testing environment on your DGX Spa
 **Software Requirements:**
 - DGX Spark with DGX OS installed
 - Python 3.10 or later (verify with `python3 --version`)
-- pip package manager (verify with `pip --version`)
+- pipx (installed in Step 2)
 - Network access to download Python packages from PyPI
 - A VLM backend running locally (Ollama being easiest) or cloud API access
 - Web browser access to `https://<SPARK_IP>:8090`
@@ -65,22 +65,22 @@ You'll set up a complete real-time vision AI testing environment on your DGX Spa
 
 All source code and documentation can be found at the [Live VLM WebUI GitHub repository](https://github.com/NVIDIA-AI-IOT/live-vlm-webui).
 
-The package will be installed directly via pip, so no additional files are required for basic installation.
+The package will be installed in an isolated environment via pipx, so no additional files are required for basic installation.
 
 ## Time & risk
 
 * **Estimated time:** 20-30 minutes (including Ollama installation and model download)
-  * 5 minutes to install Live VLM WebUI via pip
+  * 5 minutes to install Live VLM WebUI via pipx
   * 10-15 minutes to install Ollama and download a model (varies by model size)
   * 5 minutes to configure and test
 * **Risk level:** Low
-  * Python packages installed in user space, isolated from system
+  * Python packages installed in a pipx-managed environment, isolated from the system Python environment
   * No system-level changes required
   * Port 8090 must be accessible for web interface functionality
   * Self-signed SSL certificate requires browser security exception
-* **Rollback:** Uninstall the Python package with `pip uninstall live-vlm-webui`. Ollama can be uninstalled with standard package removal. No persistent changes to DGX Spark configuration.
-* **Last Updated:** 01/02/2026
-  * First Publication
+* **Rollback:** Uninstall the Python application with `pipx uninstall live-vlm-webui`. Ollama can be uninstalled with standard package removal. No persistent changes to DGX Spark configuration.
+* **Last Updated:** 07/01/2026
+  * Updated Live VLM WebUI installation to use pipx
 
 ## Instructions
 
@@ -122,10 +122,15 @@ Expected output should show a JSON response listing your downloaded models.
 
 ## Step 2. Install Live VLM WebUI
 
-Install Live VLM WebUI using pip:
+Install `pipx`, which creates an isolated Python environment for Live VLM WebUI and avoids modifying the system Python environment:
 
 ```bash
-pip install live-vlm-webui
+sudo apt update
+sudo apt install -y pipx
+pipx ensurepath
+source ~/.bashrc
+
+pipx install live-vlm-webui
 ```
 
 The installation will download all required Python dependencies and install the `live-vlm-webui` command.
@@ -317,7 +322,7 @@ When you're done, stop the server with `Ctrl+C` in the terminal where it's runni
 To completely remove Live VLM WebUI:
 
 ```bash
-pip uninstall live-vlm-webui
+pipx uninstall live-vlm-webui
 ```
 
 Your Ollama installation and downloaded models remain available for future use.
@@ -377,7 +382,7 @@ For latest known issues, please review the [DGX Spark User Guide](https://docs.n
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| pip install shows "error: externally-managed-environment" | Python 3.12+ prevents system-wide pip installs | Use virtual environment: `python3 -m venv live-vlm-env && source live-vlm-env/bin/activate && pip install live-vlm-webui` |
+| pip install shows "error: externally-managed-environment" | Ubuntu protects the system Python environment according to PEP 668 | Install the application in an isolated environment with `pipx install live-vlm-webui` as shown in Step 2 |
 | Browser shows "Your connection is not private" warning | Application uses self-signed SSL certificate | Click "Advanced" → "Proceed to \<IP\> (unsafe)" - this is safe and expected behavior |
 | Camera not accessible or "Permission Denied" | Browser requires HTTPS for webcam access | Ensure you're using `https://` (not `http://`). Accept self-signed certificate warning and grant camera permissions when prompted |
 | "Failed to connect to VLM" or "Connection refused" | Ollama or VLM backend not running | Verify Ollama is running with `curl http://localhost:11434/v1/models`. If not running, start with `sudo systemctl start ollama` |
@@ -388,6 +393,6 @@ For latest known issues, please review the [DGX Spark User Guide](https://docs.n
 | Cannot access from remote browser on network | Firewall blocking port 8090 or wrong IP address | Verify firewall allows port 8090: `sudo ufw allow 8090`. Use correct IP from `hostname -I` command |
 | Video stream is laggy or frozen | Network issues or browser performance | Use Chrome or Edge browser. Access from a separate PC on the network rather than locally. Check network bandwidth |
 | Analysis results in unexpected language | Model supports multilingual and detected language in prompt | Explicitly specify output language in prompt: "Answer in English: describe what you see" |
-| pip install fails with dependency errors | Conflicting Python package versions | Try installing with `--user` flag: `pip install --user live-vlm-webui` |
-| Command `live-vlm-webui` not found after install | Binary path not in PATH | Add `~/.local/bin` to PATH: `export PATH="$HOME/.local/bin:$PATH"` then run `source ~/.bashrc` |
+| pipx install fails with dependency errors | The existing pipx environment may be incomplete or outdated | Recreate the isolated environment with `pipx uninstall live-vlm-webui && pipx install live-vlm-webui` |
+| Command `live-vlm-webui` not found after install | The pipx application directory is not in PATH | Run `pipx ensurepath`, then start a new terminal or run `source ~/.bashrc` |
 | Camera works but no VLM analysis results appear, browser shows InvalidStateError | Accessing via SSH port forwarding from remote machine | WebRTC requires direct network connectivity and doesn't work through SSH tunnels (SSH only forwards TCP, WebRTC needs UDP). **Solution 1**: Access the web UI directly from a browser on the same network as the server. **Solution 2**: Use the server machine's browser directly. **Solution 3**: Use X11 forwarding (`ssh -X`) to display the browser remotely |

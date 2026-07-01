@@ -21,8 +21,9 @@
   - [Step 4. Enable Brave Search in sandbox](#step-4-enable-brave-search-in-sandbox)
   - [Step 5. Set up Messaging Channel (Telegram Bot as an example)](#step-5-set-up-messaging-channel-telegram-bot-as-an-example)
   - [Step 6. Set Up NemoClaw Agents](#step-6-set-up-nemoclaw-agents)
-  - [Step 7. Stop services](#step-7-stop-services)
-  - [Step 8. Uninstall NemoClaw](#step-8-uninstall-nemoclaw)
+  - [Step 7. Update NemoClaw](#step-7-update-nemoclaw)
+  - [Step 8. Stop services](#step-8-stop-services)
+  - [Step 9. Uninstall NemoClaw](#step-9-uninstall-nemoclaw)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -108,7 +109,7 @@ Expected: Ubuntu 24.04, NVIDIA GB10 GPU, Docker 28.x+.
 | Item | When you need it |
 |------|------------------|
 | **Telegram bot token** (optional) | Create with [@BotFather](https://t.me/BotFather) (`/newbot`). You can paste it during **onboarding** (Step 3) **or** when you run **`nemoclaw <sandbox> channels add telegram`** later. |
-| **Brave Search API key** (optional) | From [Brave Search API](https://brave.com/search/api/) if you enable web search during onboarding or via **`nemoclaw onboard --fresh --gpu`** (`--fresh` re-prompts every onboarding question, including features you previously skipped; without `--fresh` the wizard resumes the previous session and will not re-prompt). |
+| **Brave Search API key** (optional) | From [Brave Search API](https://brave.com/search/api/) if you enable web search during onboarding, or to add it later by re-running onboarding with `BRAVE_API_KEY` set (see Step 4). |
 
 ### Ancillary files
 
@@ -118,9 +119,8 @@ All required assets are handled by the NemoClaw installer. No manual cloning is 
 
 - **Estimated time:** About 30–60 minutes for a first full pass (install, onboard, model download depending on choice and network). Optional Brave, Telegram, and cloudflared steps add time if you do them in a second session.
 - **Risk level:** Medium — you are running an AI agent in a sandbox; risks are reduced by isolation but not eliminated. Use a clean environment and do not connect sensitive data or production accounts.
-- **Last Updated:** 06/12/2026
+- **Last Updated:** 06/30/2026
   - Switch local inference backend to vLLM (agent-ready Qwen3.6 35B recipe)
-  - Pin nemoclaw installer to v0.0.55, the latest stable version
 
 ## Instructions
 
@@ -128,10 +128,10 @@ All required assets are handled by the NemoClaw installer. No manual cloning is 
 
 ### Step 1. Install NemoClaw
 
-This single command handles everything: installs Node.js (if needed), installs OpenShell, clones the pinned NemoClaw **v0.0.55** release (set via `NEMOCLAW_INSTALL_TAG`; v0.0.55 is the version the NemoClaw team currently recommends as the most stable), builds the CLI, and runs the onboard wizard to create a sandbox.
+This single command handles everything: installs Node.js (if needed), installs OpenShell, clones the last known good (LKG) NemoClaw release automatically, builds the CLI, and runs the onboard wizard to create a sandbox.
 
 ```bash
-curl -fsSL https://www.nvidia.com/nemoclaw.sh | NEMOCLAW_INSTALL_TAG=v0.0.55 bash
+curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash
 ```
 
 The installation wizard walks you through setup:
@@ -139,17 +139,20 @@ The installation wizard walks you through setup:
 1. **Accept NemoClaw license** -- Confirm by entering `yes`
 2. **Run express install** -- Confirm by entering `Y`
 
+> [!NOTE]
+> Express install uses the recommended default settings. If you want to customize your configuration afterward, run `nemoclaw onboard`.
+
 The installer requires **Node.js 22.16+** (installed automatically if missing). It walks you through Node.js, NemoClaw CLI and Onboarding phases. See more details of Onboarding configuration in the next step.
 
 ### Step 2. NemoClaw Onboarding
 
 > [!NOTE]
-> If you chose **express install** in Step 1, all settings are auto-configured with recommended defaults. Skip to Step 3.
+> If you chose **express install** in Step 1, all settings are auto-configured with recommended defaults. Skip to Step 3 unless you need more customization. To customize, run `nemoclaw onboard` and follow the wizard below.
 
 During custom setup, the onboard wizard walks you through:
 
-1. **Configuring inference** -- Choose to set up local inference on your Spark by selecting **`Local vLLM`** (the default).
-2. **vLLM models** -- Choose desired inference model. If no model is present locally, the installer will download **`nvidia/Qwen3.6-35B-A3B-NVFP4`** automatically.
+1. **Configuring inference** -- Choose a local inference option to run models on your DGX Spark.
+2. **Inference models** -- Select a model from the installer prompts. NemoClaw will prepare any required local model artifacts when needed.
 3. **Sandbox name** -- Pick a name (e.g. my-assistant). Each sandbox requires a unique name.
 4. **Apply this configuration** -- Enter `Y` to confirm setting up local inference.
 5. **Enable Brave Web Search** -- Optional. If you enable it, paste a [Brave Search API](https://brave.com/search/api/) key when prompted.
@@ -256,25 +259,32 @@ exit
 
 ### Step 4. Enable Brave Search in sandbox
 
-To add Brave Web Search to an existing sandbox, re-run the onboard wizard with `--fresh` to start a new session that re-prompts all options (including previously skipped features):
+To add Brave Web Search to an existing sandbox, re-run onboarding with `BRAVE_API_KEY` set. Get a key from the [Brave Search API](https://brave.com/search/api/) console:
 
 ```bash
-nemoclaw onboard --fresh --gpu
+BRAVE_API_KEY=<your-brave-search-api-key> nemoclaw onboard --name <sandbox-name>
+```
+
+If the sandbox already exists without web search enabled, NemoClaw needs to **recreate** the sandbox so the Brave configuration is baked into the agent runtime. Accept the recreate prompt when it appears.
+
+For scripted (non-interactive) runs, pass `--recreate-sandbox` to perform the rebuild without prompting:
+
+```bash
+BRAVE_API_KEY=<your-brave-search-api-key> \
+  nemoclaw onboard --name <sandbox-name> --recreate-sandbox --non-interactive
 ```
 
 > [!NOTE]
-> Without `--fresh`, the onboard wizard **resumes** the previous session and will not re-prompt for features you already skipped.
+> `--recreate-sandbox` clearly describes the intentional rebuild needed to add web search. Reserve `--fresh` for recovery from a failed or interrupted onboarding session — it discards the wizard state and starts over, which is not the right tool for adding a feature to an already-created sandbox.
 
-When you reach **Enable Brave Web Search**, choose **yes** and paste the key from the [Brave Search API](https://brave.com/search/api/) console. Confirm the same sandbox name and inference choices where prompted. The wizard will **rebuild** the sandbox so the key is applied.
-
-> [!NOTE]
-> Alternatively, set `BRAVE_API_KEY` in your environment before running the installer and Brave Search will be enabled automatically during onboard.
-
-To confirm web search is enabled, relaunch your OpenClaw WebUI or terminal UI. Ask the agent for something that needs **live web search**. If requests still fail, recheck **`policy-list`** and re-read the onboard output for Brave/API errors.
+To confirm web search is enabled, relaunch your OpenClaw WebUI or terminal UI. Ask the agent for something that needs **live web search**. If requests still fail, run **`nemoclaw <sandbox-name> policy-list`** and re-read the onboard output for Brave/API errors.
 
 ### Step 5. Set up Messaging Channel (Telegram Bot as an example)
 
 These steps apply when your sandbox exists but **Telegram was never configured** (you skipped **Messaging channels** in Step 2, or the sandbox policy tier never included Telegram-related egress). Replace `<sandbox-name>` with your sandbox (for example `my-assistant`).
+
+> [!IMPORTANT]
+> Telegram does **not** require cloudflared. The bot uses long-polling to pull messages from Telegram servers, so no public URL or tunnel is needed. cloudflared is only for exposing the dashboard/Web UI remotely (Step 5.5) and is unrelated to messaging.
 
 #### 1. Create a Telegram bot
 
@@ -298,6 +308,9 @@ nemoclaw <sandbox-name> policy-add telegram
 ```
 
 Preset names follow your selected tier; confirm against [Network policies](https://docs.nvidia.com/nemoclaw/latest/reference/network-policies.html).
+
+> [!NOTE]
+> To approve blocked network requests for new endpoints at runtime, use the OpenShell TUI. See [Approve or Deny Agent Network Requests](https://docs.nvidia.com/nemoclaw/latest/user-guide/openclaw/network-policy/approve-network-requests).
 
 #### 4. Verify Telegram
 
@@ -359,9 +372,37 @@ Checkout these [Example NemoClaw Agents](https://build.nvidia.com/spark/nemoclaw
 
 ---
 
-## Phase 4: Cleanup and Uninstall
+## Phase 4: Update NemoClaw
 
-### Step 7. Stop services
+### Step 7. Update NemoClaw
+
+To check whether a newer NemoClaw LKG release is available, run:
+
+```bash
+nemoclaw update --check
+```
+
+To update the host-side NemoClaw CLI to the current LKG release without prompts, run:
+
+```bash
+nemoclaw update --yes
+```
+
+This updates the host CLI only; it does not rebuild existing sandboxes. After updating, check whether any sandboxes need to be rebuilt:
+
+```bash
+nemoclaw upgrade-sandboxes --check
+```
+
+If stale sandboxes are reported, follow the command output to rebuild them.
+
+For details, see the official NemoClaw [command reference](https://docs.nvidia.com/nemoclaw/latest/reference/commands.html).
+
+---
+
+## Phase 5: Cleanup and Uninstall
+
+### Step 8. Stop services
 
 Stop the cloudflared tunnel:
 
@@ -376,7 +417,7 @@ openshell forward list          # find active forwards and their ports
 openshell forward stop <port>   # stop the dashboard forward (use the port shown above)
 ```
 
-### Step 8. Uninstall NemoClaw
+### Step 9. Uninstall NemoClaw
 
 The NemoClaw CLI includes a built-in uninstaller. It removes all sandboxes, the OpenShell gateway, Docker containers/images/volumes, the CLI, and all state files. Docker, Node.js, npm, and the vLLM container image are preserved.
 
@@ -440,8 +481,8 @@ The uninstaller runs 6 steps:
 | npm install fails with `EACCES` permission error | npm global directory not writable | `mkdir -p ~/.npm-global && npm config set prefix ~/.npm-global && export PATH=~/.npm-global/bin:$PATH` then re-run the installer. Add the `export` line to `~/.bashrc` to make it permanent. |
 | Docker permission denied | User not in docker group | `sudo usermod -aG docker $USER`, then log out and back in. |
 | Gateway fails with cgroup / "Failed to start ContainerManager" errors | Older OpenShell or Docker still using a **private** cgroup namespace for the gateway so kubelet cannot see cgroup v2 controllers | First **upgrade OpenShell** (re-run the Phase 1 `nemoclaw.sh` install so you get a build that sets host cgroupns on the gateway container). If it still fails, force Docker's default to host mode by running the [daemon.json cgroup fix](#daemonjson-cgroup-fix) below, then run `sudo systemctl restart docker`. |
-| Gateway fails with "port 8080 is held by container..." | Another OpenShell gateway or container is using port 8080 | Stop the conflicting container: `openshell gateway destroy -g <old-gateway-name>` or `docker stop <container-name> && docker rm <container-name>`, then retry `nemoclaw onboard`. |
-| Sandbox creation fails | Stale gateway state or DNS not propagated | Run `openshell gateway destroy && openshell gateway start`, then re-run the installer or `nemoclaw onboard`. |
+| Gateway fails with "port 8080 is held by container..." | Another OpenShell gateway or container is using port 8080 | Run `nemoclaw onboard` (or `nemoclaw onboard --resume`) again. NemoClaw probes the existing managed gateway, reuses it if healthy, and recreates stale gateway state when it can do so safely. See the [NemoClaw commands documentation](https://docs.nvidia.com/nemoclaw/latest/reference/commands.html). |
+| Sandbox creation fails | Stale gateway state or DNS not propagated | Run `nemoclaw onboard` (or `nemoclaw onboard --resume`) again. NemoClaw probes the existing managed gateway, reuses it if healthy, and recreates stale gateway state when it can do so safely. See the [NemoClaw commands documentation](https://docs.nvidia.com/nemoclaw/latest/reference/commands.html). |
 | CoreDNS crash loop | Known issue on some DGX Spark configurations | Re-run the NemoClaw installer (`curl -fsSL https://www.nvidia.com/nemoclaw.sh \| bash`) which includes the CoreDNS fix. If the issue persists, see [NemoClaw troubleshooting](https://docs.nvidia.com/nemoclaw/latest/reference/troubleshooting.html). |
 | "No GPU detected" during onboard | DGX Spark GB10 reports unified memory differently | Expected on DGX Spark. The wizard still works and uses vLLM for inference. |
 | Inference timeout or hangs | vLLM not running or not reachable | Check the vLLM server: `curl http://127.0.0.1:8000/v1/models` should list `nvidia/Qwen3.6-35B-A3B-NVFP4`. If it hangs, the model may still be loading — wait for `Application startup complete`. Then check `nemoclaw my-assistant status` for the Inference health line. |
@@ -449,9 +490,9 @@ The uninstaller runs 6 steps:
 | Port 18789 already in use | Another process is bound to the port | `lsof -i :18789` then `kill <PID>`. If needed, `kill -9 <PID>` to force-terminate. |
 | Web UI port forward dies or dashboard unreachable | Port forward not active | `openshell forward stop 18789 my-assistant` then `openshell forward start 18789 my-assistant --background`. |
 | Web UI shows `origin not allowed` | Accessing via `localhost` instead of `127.0.0.1` | Use `http://127.0.0.1:18789/#token=...` in the browser. The gateway origin check requires `127.0.0.1` exactly. |
-| Telegram bridge does not start | Telegram channel not registered with sandbox | Run `nemoclaw <sandbox-name> channels add telegram` to register the bot token and rebuild the sandbox. Verify with `nemoclaw <sandbox-name> status`. |
-| Telegram stops responding after sandbox rebuild | Telegram long-polling session stale after rebuild | Run `nemoclaw <sandbox-name> recover` to restart the gateway. If still unresponsive, run `nemoclaw <sandbox-name> channels add telegram` to re-register and rebuild. |
-| Telegram bot receives messages but does not reply | Telegram network egress policy not added | Run `nemoclaw <sandbox-name> policy-add`, select `telegram`, and confirm. This is a hot-reload — no rebuild needed. |
+| Telegram bridge does not start | Telegram channel is not configured, the sandbox gateway is unhealthy, or Telegram startup/config failed | Run `nemoclaw <name> status` and `nemoclaw <name> logs` to confirm the failure. If the sandbox gateway is unhealthy, run `nemoclaw <name> recover`. If Telegram is not configured, rerun `nemoclaw onboard` and enable Telegram during onboarding. See the [NemoClaw Troubleshooting guide](https://docs.nvidia.com/nemoclaw/latest/reference/troubleshooting.html). |
+| Telegram stops responding after sandbox rebuild | Duplicate bot-token consumer, missing DM allowlist, BotFather group privacy mode, inference failure, policy denial, or rebuilt channel config issue | Run `nemoclaw <name> status` and `nemoclaw <name> logs`. Look for Telegram 409 Conflict, allowlist warnings, privacy-mode issues, inference errors, or policy denials. If configuration needs to change, rerun `nemoclaw onboard`. See the [NemoClaw Troubleshooting guide](https://docs.nvidia.com/nemoclaw/latest/reference/troubleshooting.html). |
+| Telegram bot receives messages but does not reply | Inbound Telegram delivery works, but the agent turn, inference call, policy check, allowlist/mention gate, or outbound reply failed | Run `nemoclaw <name> status` and `nemoclaw <name> logs`. Check for inbound Telegram update, outbound send, inference, and policy-denial messages. Fix the logged cause; run `nemoclaw <name> recover` only if the sandbox gateway is unhealthy. For Telegram configuration changes, rerun `nemoclaw onboard`. See the [NemoClaw Troubleshooting guide](https://docs.nvidia.com/nemoclaw/latest/reference/troubleshooting.html). |
 
 #### daemon.json cgroup fix
 
