@@ -48,20 +48,33 @@ Configure MIG (Multi-Instance GPU) partitions on the DGX Station GB300.
 
    Common GB300 MIG profiles:
 
-   | Profile | ID | Memory | Use case |
-   |---------|----|--------|----------|
-   | 1g.35gb | 19 | ~35 GB | Small models (7-8B), dev/test |
-   | 1g.35gb+me | 20 | ~35 GB | Same + media extensions |
-   | 1g.70gb | 15 | ~70 GB | Slightly larger inference |
-   | 2g.70gb | 14 | ~70 GB | Medium models (14-30B) |
-   | 3g.139gb | 9 | ~139 GB | Large models (70B quantized) |
-   | 4g.139gb | 5 | ~139 GB | Large models, more compute |
-   | 7g.278gb | 0 | ~278 GB | Full GPU as single instance |
+   | ID | Profile name (driver-dependent) | Approx. memory | Use case |
+   |----|----------------------------------|----------------|----------|
+   | 19 | `1g.35gb` (59x) · `1g.31gb` (61x) | ~30 GB | Small models (7-8B), dev/test |
+   | 20 | `1g.35gb+me` · `1g.31gb+me` | ~30 GB | Same + media extensions |
+   | 15 | `1g.70gb` | ~68 GB | Slightly larger inference |
+   | 14 | `2g.70gb` | ~68 GB | Medium models (14-30B) |
+   | 9  | `3g.139gb` (59x) · `3g.126gb` (61x) | ~137 GB | Large models (70B quantized) |
+   | 5  | `4g.139gb` · `4g.126gb` | ~137 GB | Large models, more compute |
+   | 0  | `7g.278gb` (59x) · `7g.251gb` (61x) | ~276 GB | Full GPU as single instance |
 
-   Suggest layouts based on the user's workload. Examples:
-   - **Two models (70B + 8B):** `3g.139gb + 2g.70gb + 2g.70gb` → IDs `9,14,14`
-   - **Many small models:** `7 × 1g.35gb` → IDs `19,19,19,19,19,19,19`
-   - **One large model with isolation:** `7g.278gb` → ID `0`
+   > **Profile names depend on your driver version; the profile IDs do not.** Always read the exact
+   > names and sizes on your box with `nvidia-smi mig -lgip -i <GB300_INDEX>`, and create instances by
+   > **ID**. (Driver 59x reports the `…35gb/139gb/278gb` names; 61x reports `…31gb/126gb/251gb` for the
+   > same IDs.)
+
+   Suggest layouts based on the user's workload (use the stable IDs). Examples:
+   - **Two models (70B + smaller):** one `3g` + two `1g.70gb` → IDs `9,15,15`
+   - **Many small models:** three `1g` → IDs `19,19,19`
+   - **One large model with isolation:** the full `7g` → ID `0`
+
+   > **MIG layouts are constrained by fixed memory-slice placement, not just total memory** — never
+   > sum nominal GB and assume any combination fits. A `3g + 2g + 2g` layout (`9,14,14`) is **not**
+   > realizable, for example, because the second `2g` has no legal placement after a `3g`. And
+   > `nvidia-smi mig -lgip` `Free/Total` tracks **compute** (GPC) slices, so it overstates the number
+   > of instances you can actually create (QA observed only 3 creatable `1g` instances on a 61x
+   > Station even though `Free/Total` reported 7). Always validate a specific layout with
+   > `nvidia-smi mig -lgipp` before relying on it.
 
    Ask the user what models they want to run before suggesting a layout.
 
@@ -104,7 +117,9 @@ If the user wants to return to full-GPU mode:
 sudo nvidia-smi mig -dci -i <GB300_INDEX>
 sudo nvidia-smi mig -dgi -i <GB300_INDEX>
 sudo nvidia-smi -i <GB300_INDEX> -mig 0
-
-# Ensure Fabric Manager is running for NVLink re-initialization
-sudo systemctl start nvidia-fabricmanager
 ```
+
+> **Do not run `nvidia-fabricmanager` on DGX Station.** It has a single GB300 over NVLink-C2C (no
+> NVSwitch fabric), so Fabric Manager is not installed and `systemctl start nvidia-fabricmanager`
+> fails with "Unit not found." NVLink-C2C re-initializes automatically after MIG is disabled. If MIG
+> mode is stuck in a "pending" state, reset the GPU instead: `sudo nvidia-smi -i <GB300_INDEX> --gpu-reset`.

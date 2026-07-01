@@ -33,13 +33,15 @@ cleanup() {
 
 trap cleanup SIGINT SIGTERM
 
+GPU_DEVICE=${GPU_DEVICE:-all}
+
 # Launch Nanochat training
 cmd="mkdir -p $NANOCHAT_CACHE $HF_CACHE && \
 chmod u+rwx $NANOCHAT_CACHE $HF_CACHE && \
 docker run \
     --rm \
     --runtime=nvidia \
-    --gpus all \
+    --gpus $GPU_DEVICE \
     --ipc=host \
     --net=host \
     --ulimit memlock=-1 \
@@ -52,8 +54,16 @@ docker run \
     -v $HF_CACHE:/root/.cache/huggingface \
     -w /workspace/nanochat \
     nanochat \
-    bash runs/speedrun.sh"
+    bash -c 'git config --global --add safe.directory /workspace/nanochat && bash runs/speedrun.sh'"
 sh -c "$cmd" &
+training_pid=$!
 
-wait
-echo -e "\nTraining complete!"
+wait $training_pid
+training_status=$?
+
+if [ $training_status -eq 0 ]; then
+    echo -e "\nTraining complete!"
+else
+    echo -e "\nTraining failed (exit $training_status)." >&2
+    exit $training_status
+fi

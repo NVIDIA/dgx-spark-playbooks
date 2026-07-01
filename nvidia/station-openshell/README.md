@@ -144,46 +144,54 @@ Run a sample workload to verify the setup:
 docker run --rm --runtime=nvidia --gpus all ubuntu nvidia-smi
 ```
 
-## Step 3. Install the OpenShell CLI
+## Step 3. Install OpenShell
 
-Create a virtual environment and install the `openshell` CLI.
+Run the official installer, which installs both the `openshell` CLI and the `openshell-gateway` daemon as a systemd user service.
 
 ```bash
-cd ~
-uv venv openshell-env && source openshell-env/bin/activate
-uv pip install openshell 
+curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh
+```
+
+After installation, open a new shell (or `source ~/.bashrc`) so the `openshell` binary is on your `PATH`, then verify:
+
+```bash
 openshell --help
 ```
 
-If you don't have `uv` installed yet:
+Expected output should show the `openshell` command tree with subcommands like `sandbox`, `provider`, and `inference`.
+
+## Step 4. Verify the OpenShell gateway
+
+As of OpenShell v0.0.37, the gateway is managed as a systemd user service installed automatically in Step 3. Confirm the service is running and the CLI can reach it:
 
 ```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-Expected output should show the `openshell` command tree with subcommands like `gateway`, `sandbox`, `provider`, and `inference`.
-
-## Step 4. Deploy the OpenShell gateway on DGX Station
-
-The gateway is the control plane that manages sandboxes. Since you are running directly on the DGX Station, it deploys locally inside Docker.
-
-```bash
-openshell gateway start
+systemctl --user status --no-pager openshell-gateway
 openshell status
 ```
 
-`openshell status` should report the gateway as **Connected**. The first run may take a few minutes while Docker pulls the required images and the internal k3s cluster bootstraps.
+`openshell status` should report the gateway as **Connected**. If the service is not running, start it manually:
 
-> [!NOTE]
-> Remote gateway deployment requires passwordless SSH access. Ensure your SSH public key is added to `~/.ssh/authorized_keys` on the DGX Station before using the `--remote` flag.
+```bash
+systemctl --user start openshell-gateway
+```
 
-> [!TIP]
-> If you want to manage the DGX Station gateway from a separate workstation, run `openshell gateway start --remote <username>@<dgx-station-ip-or-hostname>` from that workstation instead. All subsequent commands will route through the SSH tunnel.
+To ensure the gateway persists after you log out:
+
+```bash
+sudo loginctl enable-linger $USER
+```
+
+To follow gateway logs in real time (streams continuously — press `Ctrl+C` to exit):
+
+```bash
+journalctl --user -u openshell-gateway -f
+```
 
 ## Step 5. Run vLLM with Nemotron 3 Super (recommended)
 
-vLLM path only.
+OpenShell's inference routing requires an OpenAI-compatible API endpoint on the host — any inference server compatible with the `/v1/chat/completions` protocol will work. This guide uses vLLM, which is the recommended path for DGX Station. It ships as an NVIDIA-maintained container, supports the NVFP4 quantization format used by Nemotron 3 Super, and exposes an OpenAI-compatible server out of the box.
+
+Pull the vLLM container image first (this may take a few minutes):
 
 ```bash
 docker pull nvcr.io/nvidia/vllm:26.03-py3
@@ -201,7 +209,18 @@ export HF_TOKEN=your_actual_token_here
 
 Replace `your_actual_token_here` with your real token value. If you do not need Hugging Face authentication for this model, skip the `export` and remove the `-e HF_TOKEN="$HF_TOKEN"` line from the `docker run` command.
 
-We are going to use the `nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4` model as it fits in DGX Station VRAM with KV headroom at `--max-model-len 32768`
+We are going to use the `nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4` model as it fits in DGX Station VRAM with KV headroom at `--max-model-len 32768`.
+
+**If this is a shared DGX Station**, verify port 8000 is free and a GPU has sufficient VRAM (~60 GB) before proceeding:
+
+```bash
+## Check port availability (no output = port is free)
+ss -tlnp sport = :8000
+## Check free VRAM per GPU index
+nvidia-smi --query-gpu=index,memory.free --format=csv,noheader
+```
+
+If port 8000 is already in use, replace `-p 8000:8000` with an unused port (e.g. `-p 8001:8000`) and update the port in Steps 6 and 7 to match. If a specific GPU has more free VRAM, replace `--gpus all` with `--gpus '"device=<index>"'` (e.g. `--gpus '"device=1"'`).
 
 > [!WARNING]
 > The **`--trust-remote-code`** flag in the following `docker run` command allows execution of arbitrary code from the model repository. Only use this with trusted models.
@@ -225,6 +244,30 @@ docker run -d --name vllm-openshell \
     --tool-call-parser qwen3_xml \
     --reasoning-parser nemotron_v3
 ```
+
+> [!TIP]
+> If you get a `docker: Error response from daemon:` error due to `Bind for 0.0.0.0:8000 failed: port is already allocated`, follow the steps below.
+>
+> Find what is using port 8000:
+> ```bash
+> sudo ss -tlnp sport = :8000
+> ```
+>
+> If it's a Docker container, find its name:
+> ```bash
+> docker ps --filter "publish=8000"
+> ```
+>
+> Stop and remove the container (replace `<name>` with the name from above):
+> ```bash
+> docker stop <name>
+> docker rm <name>
+> ```
+>
+> If it's a non-Docker process, kill it by PID (replace `<pid>` with the PID from the `ss` output):
+> ```bash
+> sudo kill <pid>
+> ```
 
 Watch logs until the server is ready (first start can take several minutes while weights load). Then, in a new terminal window, run:
 
@@ -258,14 +301,14 @@ First, find the IP address of your DGX Station:
 hostname -I | awk '{print $1}'
 ```
 
-Then create the provider, replacing `{Machine_IP}` with the IP address from the command above (e.g. `10.110.106.169`):
+Then create the provider, substituting your actual IP for `10.110.106.169` in the command below:
 
 ```bash
 openshell provider create \
     --name local-vllm \
     --type openai \
     --credential OPENAI_API_KEY=not-needed \
-    --config OPENAI_BASE_URL=http://{Machine_IP}:8000/v1
+    --config OPENAI_BASE_URL=http://10.110.106.169:8000/v1
 ```
 
 > [!IMPORTANT]
@@ -281,7 +324,13 @@ openshell provider list
 
 ## Step 7. Configure inference routing
 
-Point the `inference.local` endpoint (available inside every sandbox) at vLLM. The **model id must match** what `/v1/models` returns (for the default Step 5 command, use the Hugging Face id below). If you changed `--model` in Step 5, use that same string here.
+Point the `inference.local` endpoint (available inside every sandbox) at vLLM. The **model id must exactly match** what vLLM is serving — confirm it first:
+
+```bash
+curl -s http://localhost:8000/v1/models | python3 -m json.tool
+```
+
+Use the `id` value returned (e.g. `nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4`) in the command below. If you used a different model in Step 5, substitute that id here:
 
 ```bash
 openshell inference set \
@@ -329,6 +378,18 @@ The CLI will:
 3. Apply the bundled sandbox policy
 4. Launch OpenClaw inside the sandbox
 
+After the sandbox is created, activate the port forward so the OpenClaw dashboard is reachable on the host. The `--forward 18789` flag registers the intent but does not activate the forward automatically — run this to start it:
+
+```bash
+openshell forward start -d 18789 dgx-demo
+```
+
+Verify the forward is active:
+
+```bash
+openshell forward list
+```
+
 ## Step 9. Configure OpenClaw within OpenShell Sandbox
 
 The sandbox container will spin up and the OpenClaw onboarding wizard will launch automatically in your terminal.
@@ -337,6 +398,16 @@ The sandbox container will spin up and the OpenClaw onboarding wizard will launc
 > The onboarding wizard is **fully interactive** — it requires arrow-key navigation and Enter to select options. It cannot be completed from a non-interactive session (e.g. a script or automation tool). You must run `openshell sandbox create` from a terminal with full TTY support.
 >
 > If the wizard did not complete during sandbox creation, reconnect to the sandbox to re-run it:
+> ```bash
+> openshell sandbox connect dgx-demo
+> ```
+
+> [!NOTE]
+> **If `openshell sandbox get dgx-demo` shows `Phase: Unspecified`**, this is expected when the OpenClaw onboarding wizard has not yet been completed interactively. The phase does not advance to `Ready` until the wizard finishes. The sandbox container itself may be healthy even while the phase shows `Unspecified` — confirm by checking the supervisor logs:
+> ```bash
+> docker logs $(docker ps --filter name=openshell-dgx-demo --format '{{.Names}}') --tail 20
+> ```
+> A healthy sandbox will show `OpenShell Sandbox Supervisor success` and `Applying Landlock filesystem sandbox` in the output. If you are provisioning over SSH without a TTY, drive the wizard manually after creation:
 > ```bash
 > openshell sandbox connect dgx-demo
 > ```
@@ -380,7 +451,7 @@ openshell sandbox get dgx-demo
 **Accessing the dashboard from the host or a remote system:** The dashboard URL (e.g. `http://127.0.0.1:18789/?token=...`) is inside the sandbox, so the host does not forward port 18789 by default. To reach it from your host or another machine, use SSH local port forwarding. From a machine that can reach the OpenShell gateway, run (replace gateway URL, sandbox-id, token, and gateway-name with values from your environment):
 
 ```bash
-ssh -o ProxyCommand='/usr/local/bin/openshell ssh-proxy --gateway https://127.0.0.1:8080/connect/ssh --sandbox-id <sandbox-id> --token <token> --gateway-name openshell' -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -N -L 18789:127.0.0.1:18789 sandbox
+ssh -o ProxyCommand='openshell ssh-proxy --gateway https://127.0.0.1:17670/connect/ssh --sandbox-id <sandbox-id> --token <token> --gateway-name openshell' -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -N -L 18789:127.0.0.1:18789 sandbox
 ```
 
 Then open `http://127.0.0.1:18789/?token=<your-token>` in your local browser.
@@ -400,12 +471,15 @@ openshell sandbox connect dgx-demo
 
 Once loaded into the sandbox terminal, you can test connectivity to vLLM via `inference.local` with this command:
 ``` bash
-curl https://inference.local/v1/responses \
-          -H "Content-Type: application/json" \
-          -d '{
-        "instructions": "You are a helpful assistant.",
-        "input": "Hello!"
-      }'
+curl https://inference.local/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "Hello!"}
+    ]
+  }'
 ```
 
 ## Step 11. Verify sandbox isolation
@@ -413,7 +487,6 @@ curl https://inference.local/v1/responses \
 Open a second terminal and check the sandbox status and live logs:
 
 ```bash
-source ~/openshell-env/bin/activate
 openshell term
 ```
 
@@ -452,17 +525,17 @@ Stop and remove the sandbox (use the name you gave it, e.g. `dgx-demo`):
 openshell sandbox delete dgx-demo
 ```
 
-Stop the gateway (preserves state for later):
+To stop the gateway service (it will restart automatically on next login unless you disable it):
 
 ```bash
-openshell gateway stop
+systemctl --user stop openshell-gateway
 ```
 
-> [!WARNING]
-> The following command permanently removes the gateway cluster and all its data.
+To disable the gateway service entirely and remove linger so user services no longer start on boot:
 
 ```bash
-openshell gateway destroy
+systemctl --user disable openshell-gateway
+sudo loginctl disable-linger $USER
 ```
 
 Remove the inference provider you created in Step 6:

@@ -95,7 +95,7 @@ Use any **Hugging Face text-generation or chat** checkpoint that your SGLang bui
 | Model ID | Notes |
 |----------|--------|
 | `Qwen/Qwen3-8B` | **Default in this playbook.** Dense Qwen3 8B; ~16 GB download, fast warmup, ideal for validating the workflow end-to-end. |
-| `Qwen/Qwen3.6-35B-A3B` | Qwen3.6 MoE (~3B active experts); strong quality per GPU hour on Blackwell. ~70 GB download; allow ~30–45 min to first request. |
+| `Qwen/Qwen3.6-35B-A3B` | Qwen3.6 MoE (~3B active experts); strong quality per GPU hour on Blackwell. ~70 GB download; allow ~30–45 min to first request. **Hybrid mamba/SSM architecture** — the Step 7 prefix-cache check does not apply (see the note there). |
 | `Qwen/Qwen3.6-27B` | Dense Qwen3.6; higher VRAM than the MoE row above at equal batch settings. |
 | `google/gemma-3-12b-it` | Popular Gemma 3 instruct (text + vision in full stack; chat API usage is typically text-only). |
 | `google/gemma-3-27b-it` | Larger Gemma 3 instruct variant. |
@@ -247,6 +247,16 @@ docker logs sglang-server 2>&1 | grep "cached-token" | tail -10
 ```
 
 Look for `#cached-token` values greater than 0 on later turns — this confirms RadixAttention is reusing the KV cache from the shared prefix. Treat that as the primary signal of prefix caching; wall-clock `curl` latency alone can be misleading.
+
+> [!NOTE]
+> **This prefix-cache check does not apply to hybrid mamba/SSM models** such as `Qwen/Qwen3.6-35B-A3B`
+> (and any other Qwen3.6 mamba variant). SGLang serves mamba-bearing models with
+> `mamba_scheduler_strategy: no_buffer`, which does not carry SSM state across requests — so
+> cross-request prefix reuse is skipped and `#cached-token` / `cached_tokens` stay **0** on every
+> turn even though the server still reports `disable_radix_cache: false`. This is expected for these
+> architectures, not a misconfiguration, and `--disable-radix-cache` will not change it. To *validate*
+> prefix caching, use a standard-attention model such as the default `Qwen/Qwen3-8B`. On a mamba model
+> you may optionally pass `--disable-radix-cache` to `sglang serve` for higher throughput and concurrency.
 
 ## Step 8. Structured JSON output
 

@@ -73,6 +73,8 @@ def main() -> None:
     config.dataset.num_workers = 2
     config.train.eval_iters = 0
 
+    config.checkpoint.fully_parallel_save = False
+
     if args.disable_fp4:
         config.mixed_precision = bf16_mixed()
     else:

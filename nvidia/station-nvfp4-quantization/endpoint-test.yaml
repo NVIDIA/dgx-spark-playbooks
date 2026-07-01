@@ -82,6 +82,7 @@ spec:
         df -h .
         ```
         
+        
         # Time & risk
         
         * **Estimated duration**: 45-90 minutes depending on network speed and model size
@@ -90,6 +91,8 @@ spec:
           * Quantization process is memory-intensive and may fail on systems with insufficient GPU memory
           * Output files are large (several GB) and require adequate storage space
         * **Rollback**: Remove the output directory and any pulled Docker images to restore original state.
+        * **Last Updated:** 03/02/2026
+          * First Publication
         
       
 
@@ -161,7 +164,7 @@ spec:
         In this example, the GB300 is device **1**. Note this number for use in Docker commands.
         
         > [!NOTE]
-        > The examples below assume the GB300 is device 1. If your GPU has a different ID, adjust the `--gpus '"device=X"'` parameter in the Docker commands accordingly.
+        > The examples below assume the GB300 is device 1. If your GPU has a different ID, adjust the `--gpus "device=X"` parameter in the Docker commands accordingly.
         
         # Step 5. Run the quantization process using TensorRT Model Optimizer
         
@@ -191,7 +194,7 @@ spec:
         
         This command:
         
-        - Runs the container with full GPU access and optimized shared memory settings
+        - Runs the container with access to the specified GPU (device 1) and optimized shared memory settings
         - Mounts your output directory to persist quantized model files
         - Mounts your Hugging Face cache to avoid re-downloading the model
         - Clones and installs the TensorRT Model Optimizer from source
@@ -229,7 +232,7 @@ spec:
           -e HF_TOKEN=$HF_TOKEN \
           -v "$MODEL_PATH:/workspace/model" \
           --rm -it --ulimit memlock=-1 --ulimit stack=67108864 \
-          --gpus '"device=1"' --ipc=host --network host \
+          --gpus "device=1" --ipc=host --network host \
           nvcr.io/nvidia/vllm:25.12.post1-py3 \
           vllm serve /workspace/model \
             --max-model-len 4096 \
@@ -252,7 +255,7 @@ spec:
           -e HF_TOKEN=$HF_TOKEN \
           -v "$MODEL_PATH:/workspace/model" \
           --rm -it --ulimit memlock=-1 --ulimit stack=67108864 \
-          --gpus '"device=1"' --ipc=host --network host \
+          --gpus "device=1" --ipc=host --network host \
           nvcr.io/nvidia/vllm:25.12.post1-py3 \
           vllm serve /workspace/model \
             --backend pytorch \
@@ -261,13 +264,13 @@ spec:
             --port 8000
         ```
         
-        Run the following to test the server with a client CURL request:
+        When serving from a local path, vLLM exposes the model name as the path's last component (here, `model`). Run the following to test the server (use the same model name vLLM reports, e.g. from `curl http://localhost:8000/v1/models`):
         
         ```bash
         curl -X POST http://localhost:8000/v1/chat/completions \
           -H "Content-Type: application/json" \
           -d '{
-            "model": "deepseek-ai/DeepSeek-R1-Distill-Llama-8B",
+            "model": "model",
             "messages": [{"role": "user", "content": "What is artificial intelligence?"}],
             "max_tokens": 100,
             "temperature": 0.7,

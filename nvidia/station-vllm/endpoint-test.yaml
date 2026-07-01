@@ -78,9 +78,9 @@ spec:
         * **Duration:** 30 minutes (longer on first run due to model download)
         * **Risks:** Model download requires HuggingFace authentication
         * **Rollback:** Stop and remove the container to restore state
-        * **Last Updated:** 06/10/2026
-          * Update models
-          * Add base configuration example, per-setting explanations, and DeepSeek-V4-Flash recipe
+        * **Last Updated:** 06/29/2026
+          * Added Kimi-K2.5 and DeepSeek-V4-Flash to model support matrix
+          * Added base configuration example, per-setting explanations, and model-specific recipes
         
       
 
@@ -236,6 +236,8 @@ spec:
         
         For Kimi-K2.5 NVFP4 (1T) with DRAM offloading, run with the **26.03** NGC container. This model does not fit entirely in VRAM, so the MoE expert weights are offloaded to CPU DRAM with `--cpu-offload-gb 375 --cpu-offload-params experts`. Ensure the system has enough free DRAM to hold the offloaded weights.
         
+        Set `MODEL_HANDLE=nvidia/Kimi-K2.5-NVFP4` in Step 2 before running this recipe.
+        
         ```bash
         docker run -d \
           --name vllm-server \
@@ -247,13 +249,13 @@ spec:
           -e HF_TOKEN="$HF_TOKEN" \
           -v "$HOME/.cache/huggingface/hub:/root/.cache/huggingface/hub" \
           nvcr.io/nvidia/vllm:26.03-py3 \
-          vllm serve nvidia/Kimi-K2.5-NVFP4 \
+          vllm serve "$MODEL_HANDLE" \
             --host 0.0.0.0 \
             --port 8000 \
             --dtype auto \
             --kv-cache-dtype auto \
             --gpu-memory-utilization 0.95 \
-            --served-model-name nvidia/Kimi-K2.5-NVFP4 \
+            --served-model-name "$MODEL_HANDLE" \
             --tensor-parallel-size 1 \
             --no-enable-prefix-caching \
             --trust-remote-code \
@@ -274,7 +276,9 @@ spec:
         
         ## DeepSeek-V4-Flash — MTP + agentic
         
-        For DeepSeek-V4-Flash, run with the stable **v0.20.0-cu130** container. This recipe targets agentic workloads and enables Multi-Token Prediction (MTP) speculative decoding. On a single GB300 (TP1) the MoE expert-parallel path is used; the `deep_gemm_mega_moe` backend from some internal recipes is not needed at TP1 and is omitted here.
+        For DeepSeek-V4-Flash, run with the stable **v0.20.0-cu130** container. This recipe targets agentic workloads and enables Multi-Token Prediction (MTP) speculative decoding. On a single GB300 (TP1) the MoE expert-parallel path is sufficient.
+        
+        Set `MODEL_HANDLE=deepseek-ai/DeepSeek-V4-Flash` in Step 2 before running this recipe.
         
         ```bash
         docker run -d \
@@ -287,7 +291,7 @@ spec:
           -e HF_TOKEN="$HF_TOKEN" \
           -v "$HOME/.cache/huggingface/hub:/root/.cache/huggingface/hub" \
           vllm/vllm-openai:v0.20.0-cu130 \
-          deepseek-ai/DeepSeek-V4-Flash \
+          "$MODEL_HANDLE" \
             --enable-expert-parallel \
             --kv-cache-dtype fp8 \
             --trust-remote-code \
@@ -304,14 +308,14 @@ spec:
         
         Settings used (in addition to the base configuration):
         - `--enable-expert-parallel` — shards the MoE experts across the available GPU(s) using expert parallelism, the recommended MoE execution path for DeepSeek-V4.
-        - `--speculative-config '{"method": "mtp", "num_speculative_tokens": 3}'` — enables **MTP (Multi-Token Prediction)** speculative decoding: the model proposes 3 tokens per step that are verified in a single forward pass, cutting latency for accepted tokens.
+        - `--speculative-config '{"method": "mtp", "num_speculative_tokens": 3}'` — enables **MTP (Multi-Token Prediction)** speculative decoding: the model proposes 3 tokens per step that are verified in a single forward pass, cutting latency for accepted tokens. Increase `num_speculative_tokens` (e.g. to 5–7) for long-output tasks like code generation where the model produces predictable continuations and more tokens tend to be accepted; decrease it for short or highly variable outputs where the proposal overhead outweighs the gain.
         - `--kv-cache-dtype fp8` — FP8 KV cache to fit more concurrent/longer sequences.
         - `--block-size 256` — KV-cache page size in tokens. DeepSeek-V4 uses multiple KV-cache groups; `256` matches the recipe validated on Station.
         - `--attention_config.use_fp4_indexer_cache True` — enables the FP4 indexer cache used by DeepSeek-V4's attention. (Drop this flag on platforms without native FP4, e.g. Hopper.)
         - `--tokenizer-mode deepseek_v4` / `--tool-call-parser deepseek_v4` / `--reasoning-parser deepseek_v4` — DeepSeek-V4-specific tokenizer, tool-call, and reasoning parsers.
         - `--enable-auto-tool-choice` — OpenAI-compatible function calling for agentic use.
         - `--compilation-config '{"cudagraph_mode":"FULL_AND_PIECEWISE","custom_ops":["all"]}'` — uses full + piecewise CUDA graph capture and enables all custom ops for lower per-step overhead.
-        - **Prefix caching is left enabled (the vLLM default).** For agentic workloads with large shared prefixes (e.g. a 32k system/context prefix) at low batch sizes (~BS 3–4), prefix caching gives a significant throughput boost by reusing the cached prefix across requests. Some internal recipes carry `--no-enable-prefix-caching`, but that was inherited from random-data benchmarking and is not recommended for agentic use here.
+        - **Prefix caching is left enabled (the vLLM default).** For agentic workloads with large shared prefixes (e.g. a 32k system/context prefix) at low batch sizes (~BS 3–4), prefix caching gives a significant throughput boost by reusing the cached prefix across requests.
         
         Check the server logs for startup progress:
         

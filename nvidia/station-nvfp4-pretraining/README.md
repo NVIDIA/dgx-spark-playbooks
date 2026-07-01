@@ -94,6 +94,12 @@ python3 -c "import torch; print(torch.cuda.get_device_name(0))"
 
 The recommended way to run Megatron-Bridge on DGX Station is through the [NeMo Framework container](https://github.com/NVIDIA-NeMo/Megatron-Bridge#-nemo-framework-container), which includes Megatron-Bridge, Megatron-Core, Transformer Engine, and all CUDA dependencies pre-installed. Running outside the container is not supported in this playbook — the NVFP4 kernels rely on the exact Transformer Engine / CUDA versions shipped inside the image.
 
+The training recipe fetches the Llama 3 8B architecture config from HuggingFace, so export a [HuggingFace token](https://huggingface.co/settings/tokens) with access to `meta-llama/Meta-Llama-3-8B` before launching the container:
+
+```bash
+export HF_TOKEN=<YOUR_HF_TOKEN>
+```
+
 ```bash
 git clone https://github.com/NVIDIA/dgx-spark-playbooks
 cd dgx-spark-playbooks/nvidia/station-nvfp4-pretraining/assets
@@ -101,11 +107,15 @@ cd dgx-spark-playbooks/nvidia/station-nvfp4-pretraining/assets
 ## Use the latest nemo tag
 export TAG=26.04
 
+## This training primarily works on GB300 GPU
+GB300_DEVICE=$(nvidia-smi --query-gpu=index,name --format=csv,noheader | awk -F', ' '/GB300/ {print $1; exit}')
+
 docker run --rm -it \
-  --gpus all \
+  --gpus device=${GB300_DEVICE} \
   --ipc host \
   --ulimit memlock=-1 \
   --ulimit stack=67108864 \
+  -e HF_TOKEN="$HF_TOKEN" \
   -v "$HOME/.cache/huggingface:/root/.cache/huggingface" \
   -v "$(pwd):/workdir" \
   -w /workdir \
@@ -215,7 +225,7 @@ To train on your own dataset, modify the config in the script:
 
 ```python
 config = llama3_8b_pretrain_config()
-config.data.data_path = "/path/to/your/preprocessed/dataset"
+config.dataset.data_path = ["/path/to/your/preprocessed/dataset"]
 config.train.train_iters = 5000
 config.train.global_batch_size = 256
 config.train.micro_batch_size = 2

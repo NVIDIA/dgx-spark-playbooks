@@ -1,6 +1,6 @@
 # DGX Station Essential Constraints
 
-This file gives your coding agent the critical constraints it needs to avoid breaking things on NVIDIA DGX Station. When you need a step-by-step workflow, invoke the bundled skills: `vllm-setup`, `sglang-setup`, `mig-configure`, `dgx-diagnose`. In Codex, install them into `$CODEX_HOME/skills` and mention them as `$vllm-setup` or plain text like "use vllm-setup"; in Claude Code or Gemini CLI, type `/<name>`; in Cursor, reference the rule by name.
+This file gives your coding agent the critical constraints it needs to avoid breaking things on NVIDIA DGX Station. When you need a step-by-step workflow, invoke the bundled skills: `vllm-setup`, `sglang-setup`, `mig-configure`, `dgx-diagnose`. In Codex, they install into `.agents/skills/<name>/SKILL.md`; browse them with `/skills` or mention them as `$vllm-setup` (or plain text like "use vllm-setup"); in Claude Code or Gemini CLI, type `/<name>`; in Cursor, reference the rule by name.
 
 ## System architecture (quick reference)
 
@@ -57,8 +57,8 @@ export CUDA_DEVICE_MODALITY=NONATS   # RTX PRO (non-coherent)
 
 | Component | Validated version | Notes |
 |-----------|-------------------|-------|
-| NVIDIA Driver | 590.48.01 | Check with `nvidia-smi` |
-| CUDA (driver) | 13.1 | Containers bring their own runtime |
+| NVIDIA Driver | 590.48.01 or newer | Validated on 590.48.01 and 610.43.02; check yours with `nvidia-smi`. Newer drivers are expected and supported — do not gate on an exact version. |
+| CUDA (driver) | 13.1 or newer | Validated on 13.1 and 13.3; containers bring their own runtime |
 | vLLM container | `nvcr.io/nvidia/vllm:26.01-py3` | **Avoid 25.10** (FlashInfer buffer overflow) |
 | SGLang container | `lmsysorg/sglang:latest-cu130` | cu130 required for SM103 |
 | CUDA base image | `nvcr.io/nvidia/cuda:13.0.1-devel-ubuntu24.04` | For custom containers |
@@ -73,7 +73,7 @@ export CUDA_DEVICE_MODALITY=NONATS   # RTX PRO (non-coherent)
 | SGLang CUDA errors | Wrong CUDA for Blackwell | Use `sglang:latest-cu130` |
 | Model runs on RTX PRO | Wrong device index | Verify with `nvidia-smi --query-gpu=index,name --format=csv,noheader` |
 | `nvidia-smi -mig 1` "In use" | GPU processes running | `sudo fuser -v /dev/nvidia*` |
-| NVLink errors after disabling MIG | Fabric Manager stopped | `sudo systemctl start nvidia-fabricmanager` |
+| MIG mode stuck "pending" after disabling | Lingering GPU instances or processes | `sudo nvidia-smi -i <GB300_INDEX> --gpu-reset` (DGX Station has no Fabric Manager — NVLink-C2C re-initializes automatically; do not run `nvidia-fabricmanager`, that unit does not exist on this NVLink-C2C platform) |
 | `malloc` lands in GPU memory | HBM in system pool | `numactl --membind=0` |
 | X crash after `nvidia-xconfig -a` | Invalid mixed-coherency config | Restore from `/etc/X11/xorg.conf.nvidia-xconfig-original` |
 | Vulkan `VK_ERROR_INITIALIZATION_FAILED` | CUDA bound GB300 first | Separate CUDA and Vulkan into different processes |

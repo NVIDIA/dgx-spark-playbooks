@@ -20,7 +20,7 @@
 Modern coding agents — Claude Code, OpenAI Codex CLI, Gemini CLI, Cursor — all support two extension mechanisms: a project-level **context file** that's loaded into every conversation, and **on-demand procedural workflows** (called skills, prompts, commands, or rules depending on the harness). This playbook ships both for DGX Station:
 
 - An **`AGENTS.md`** with the critical DGX Station constraints your agent should always know (mixed coherency, GPU targeting, common pitfalls). `AGENTS.md` is the cross-harness standard; an `install.sh` lays it down as `CLAUDE.md`, `GEMINI.md`, or `AGENTS.md` depending on the agent you use.
-- **Four Agent Skills** — `vllm-setup`, `sglang-setup`, `mig-configure`, `dgx-diagnose` — authored once in the [Anthropic Agent Skills format](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) and installed into the right per-harness location (`.claude/skills/`, `.codex/prompts/`, `.gemini/commands/`, or `.cursor/rules/`).
+- **Four Agent Skills** — `vllm-setup`, `sglang-setup`, `mig-configure`, `dgx-diagnose` — authored once in the [Anthropic Agent Skills format](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) and installed into the right per-harness location (`.claude/skills/`, `.agents/skills/`, `.gemini/commands/`, or `.cursor/rules/`).
 
 This approach keeps your agent's context lean in every conversation while giving it deep procedural knowledge on demand, regardless of which agent you use.
 
@@ -52,7 +52,7 @@ The DGX Station mixed-coherency constraint (`--gpus all` will crash) should be i
 
 - NVIDIA DGX Station with GB300
 - One of the supported coding agents installed:
-  - **Claude Code:** `curl -fsSL https://claude.ai/install.sh | sh`
+  - **Claude Code:** `curl -fsSL https://claude.ai/install.sh | bash`
   - **OpenAI Codex CLI:** `npm i -g @openai/codex`
   - **Gemini CLI:** `npm i -g @google/gemini-cli`
   - **Cursor:** download from `https://cursor.com/`
@@ -71,7 +71,7 @@ The DGX Station mixed-coherency constraint (`--gpus all` will crash) should be i
 
 * **Duration:** 10-15 minutes
 * **Risk level:** Low — this playbook copies markdown files into your project directory
-* **Rollback:** Delete the context file (`AGENTS.md` / `CLAUDE.md` / `GEMINI.md`) and the harness-specific skill directory (`.claude/skills/`, `.codex/prompts/`, `.gemini/commands/`, or `.cursor/rules/`) from your project directory
+* **Rollback:** Delete the context file (`AGENTS.md` / `CLAUDE.md` / `GEMINI.md`) and the harness-specific skill directory (`.claude/skills/`, `.agents/skills/`, `.gemini/commands/`, or `.cursor/rules/`) from your project directory
 * **Last Updated:** 05/18/2026
   * Restructured as harness-agnostic Agent Skills (Claude Code, Codex, Gemini CLI, Cursor)
 
@@ -83,10 +83,16 @@ Pick whichever agent you prefer — the rest of this playbook works the same reg
 
 | Agent | Install |
 |-------|---------|
-| Claude Code | `curl -fsSL https://claude.ai/install.sh \| sh` |
+| Claude Code | `curl -fsSL https://claude.ai/install.sh \| bash` |
 | OpenAI Codex CLI | `npm i -g @openai/codex` |
 | Gemini CLI | `npm i -g @google/gemini-cli` |
 | Cursor | Download from `https://cursor.com/` |
+
+> [!NOTE]
+> On a stock DGX Station the global npm prefix (`/usr/lib/node_modules`) is root-owned, so
+> `npm i -g …` fails with `EACCES`. Either prefix the command with `sudo`, or configure a
+> user-local prefix first (`npm config set prefix ~/.npm-global` and add `~/.npm-global/bin`
+> to your `PATH`) and run `npm i -g …` without `sudo`.
 
 Verify with `claude --version`, `codex --version`, `gemini --version`, or by launching Cursor.
 
@@ -121,7 +127,7 @@ The installer is additive for skill directories (won't clobber existing skills y
 your-project/
   AGENTS.md   or  CLAUDE.md   or  GEMINI.md      # context file (named for your agent)
   .claude/skills/<name>/SKILL.md                  # claude
-  .codex/prompts/<name>.md                        # codex
+  .agents/skills/<name>/SKILL.md                  # codex
   .gemini/commands/<name>.md                      # gemini
   .cursor/rules/<name>.mdc                        # cursor
 ```
@@ -146,7 +152,7 @@ Then verify the skills are discoverable:
 | Agent | How to check |
 |-------|--------------|
 | Claude Code | Type `/` — `vllm-setup`, `sglang-setup`, `mig-configure`, `dgx-diagnose` should appear in the autocomplete |
-| Codex CLI | Type `/prompts:` — same four names appear |
+| Codex CLI | Run `/skills` (or type `$`) — same four names appear |
 | Gemini CLI | Type `/` — same four names appear |
 | Cursor | Open the Rules panel — same four rules appear |
 
@@ -157,7 +163,7 @@ Invoke the skill in your agent:
 | Agent | Invocation |
 |-------|-----------|
 | Claude Code | `/vllm-setup` (slash command) or just describe the task ("deploy vllm with Qwen3-8B") |
-| Codex CLI | `/prompts:vllm-setup` |
+| Codex CLI | `$vllm-setup` (mention), or run `/skills` and pick it |
 | Gemini CLI | `/vllm-setup` |
 | Cursor | In chat: "use the vllm-setup rule to deploy a vllm server" |
 
@@ -220,14 +226,14 @@ Each agent discovers skills from a harness-specific directory in the current dir
 | Agent | Expected location |
 |-------|-------------------|
 | Claude Code | `.claude/skills/<name>/SKILL.md` |
-| Codex CLI | `.codex/prompts/<name>.md` |
+| Codex CLI | `.agents/skills/<name>/SKILL.md` (browse with `/skills` or mention `$<name>`) |
 | Gemini CLI | `.gemini/commands/<name>.md` |
 | Cursor | `.cursor/rules/<name>.mdc` |
 
 ```bash
 ## Examples — check the directory for your agent
 ls -la .claude/skills/
-ls -la .codex/prompts/
+ls -la .agents/skills/
 ls -la .gemini/commands/
 ls -la .cursor/rules/
 ```
@@ -281,7 +287,7 @@ Or edit the installed copy directly:
 ## Claude Code
 nano .claude/skills/vllm-setup/SKILL.md
 ## Codex
-nano .codex/prompts/vllm-setup.md
+nano .agents/skills/vllm-setup/SKILL.md
 ## Gemini CLI
 nano .gemini/commands/vllm-setup.md
 ## Cursor

@@ -201,7 +201,7 @@ python profile_baseline.py
 > The first run downloads LLaMA 3.1 8B weights (~16 GB in BF16) from Hugging Face. This takes several minutes depending on network speed. Subsequent runs use the cached weights and start immediately.
 
 > [!NOTE]
-> **Repeat runs:** `profile_baseline.py` removes any prior trace directory and Chrome JSON for the same flags before recording, so you can re-run baseline profiling without a "trace is already saved" error.
+> **Repeat runs:** `profile_baseline.py` removes any prior Chrome trace for the same flags before recording and exports the trace exactly once, so you can re-run baseline profiling without a "trace is already saved" error.
 
 > [!NOTE]
 > **Ranking variance:** The exact ordering and percentages in the "Top 20 CUDA operations" table can change between runs, PyTorch / CUDA versions, and GPU generation. You should still see the same *categories* of work (matmuls, FlashAttention, RMSNorm decompositions, cross-entropy). **"Command Buffer Full"** (or similar) sometimes appears at the top of self-time tables: that reflects the GPU driver's **submission queue / scheduling**, not a user kernel to optimize. The script filters that row from the printed table; the raw trace in Perfetto still contains the underlying kernels.
@@ -650,8 +650,15 @@ docker rmi kernel-dev-ft
 To remove downloaded model weights cached by Hugging Face:
 
 ```bash
-rm -rf ~/.cache/huggingface/hub/models--meta-llama--Llama-3.1-8B
+sudo rm -rf ~/.cache/huggingface/hub/models--meta-llama--Llama-3.1-8B
 ```
+
+> [!NOTE]
+> `sudo` is required: the container ran as `root` (Step 1 uses the default user with the
+> `-v ~/.cache/huggingface:/root/.cache/huggingface` mount), so the cached weights are owned by
+> `root:root` on the host and a plain `rm` fails with "Permission denied". If you prefer the files
+> be owned by your host user instead, add `--user "$(id -u):$(id -g)"` to the Step 1 `docker run`
+> (then `~/.cache/huggingface` must already exist and be writable by your user before launching).
 
 ## Step 13. Next steps
 
@@ -671,7 +678,7 @@ You profiled a real training workload, identified bottlenecks, shipped custom Tr
 | `ModuleNotFoundError: No module named 'triton'` | Container missing Triton | Use the `kernel-dev-ft` container built from the playbook's Dockerfile. Triton ships with PyTorch NGC containers. Verify: `python -c "import triton; print(triton.__version__)"`. |
 | `triton.compiler.errors.CompilationError` referencing `sm_100` | Triton version too old for Blackwell | Use PyTorch NGC container 26.01+ which includes Triton with Blackwell support. Check: `python -c "import triton; print(triton.__version__)"`. |
 | Cross-entropy BF16 test fails on loss or gradient | BF16 + 128K vocab accumulate drift vs PyTorch's CE path | `cross_entropy_test.py` uses relaxed loss tolerances and compares **gradients in float32** with wider `atol/rtol`. If it still fails, check PyTorch / CUDA versions; file an issue with `torch.__version__`. |
-| `RuntimeError: Trace is already saved` from profiler | Stale `traces/` directory from a previous run | Use the latest `profile_baseline.py` (it deletes the prior trace dir and Chrome JSON). Or run `rm -rf traces/trace traces/trace_*` before profiling. |
+| `RuntimeError: Trace is already saved` from profiler | An older `profile_baseline.py` saved the same trace twice in one run (TensorBoard `on_trace_ready` handler **and** a manual `export_chrome_trace`); on PyTorch 2.10 kineto enforces save-once | Use the current `profile_baseline.py`, which exports the Chrome trace exactly once. This is an in-process double-save, **not** a stale-directory issue — deleting `traces/*` does not fix the older script. |
 | `torch.cuda.OutOfMemoryError` during baseline profiling | Batch size or sequence length too large | Reduce `--batch-size` or `--seq-len` in `profile_baseline.py`. LLaMA 3.1 8B in BF16 needs ~16 GB for weights alone, plus ~32 GB for AdamW optimizer states. |
 | `torch.cuda.OutOfMemoryError` during PyTorch cross-entropy but NOT during custom kernel | Standard cross-entropy materializes full `[B*T, V]` logit tensor | This demonstrates exactly why the custom kernel is needed. Reduce batch size or sequence length for the baseline comparison, or run only the custom kernel path. |
 | Profiler trace JSON is very large (>1 GB) | Too many training steps profiled | Reduce `wait`, `warmup`, `active` in the profiler schedule. The default script profiles only 1 active step. |

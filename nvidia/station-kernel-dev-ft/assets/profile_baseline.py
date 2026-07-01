@@ -15,7 +15,6 @@ Usage:
 
 import argparse
 import os
-import shutil
 import torch
 from torch.profiler import profile, ProfilerActivity, schedule
 
@@ -123,13 +122,8 @@ def main():
     if args.use_custom_ce:
         trace_name += "_custom_ce"
 
-    trace_dir = os.path.join("traces", trace_name)
     chrome_trace_path = os.path.join("traces", f"{trace_name}_chrome.json")
-    # tensorboard_trace_handler and Chrome export fail on repeat runs if paths already exist.
-    if os.path.isdir(trace_dir):
-        shutil.rmtree(trace_dir)
-    elif os.path.isfile(trace_dir):
-        os.remove(trace_dir)
+    # Remove a prior Chrome trace for these flags so re-runs start clean.
     if os.path.isfile(chrome_trace_path):
         os.remove(chrome_trace_path)
 
@@ -138,7 +132,6 @@ def main():
         record_shapes=True,
         with_stack=True,
         schedule=schedule(wait=0, warmup=0, active=1, repeat=1),
-        on_trace_ready=torch.profiler.tensorboard_trace_handler(f"traces/{trace_name}"),
     ) as prof:
         if custom_ce:
             outputs = model(input_ids=input_ids)
@@ -151,12 +144,11 @@ def main():
         optimizer.zero_grad()
         prof.step()
 
-    # Also export a Chrome trace JSON for manual inspection.
+    # Export a single Chrome trace JSON for manual inspection (open in Perfetto UI).
     prof.export_chrome_trace(chrome_trace_path)
 
     # Print summary table
     print(f"\nChrome trace saved to: {chrome_trace_path}")
-    print(f"TensorBoard trace saved to: traces/{trace_name}/")
     print("\n" + "=" * 70)
     print("  Top 20 CUDA Operations by Total GPU Time")
     print("=" * 70)

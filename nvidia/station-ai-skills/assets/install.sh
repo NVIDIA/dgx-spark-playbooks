@@ -8,7 +8,7 @@
 #
 # Layout produced per harness:
 #   claude  -> CLAUDE.md           + .claude/skills/<name>/SKILL.md
-#   codex   -> AGENTS.md           + $CODEX_HOME/skills/<name>/SKILL.md
+#   codex   -> AGENTS.md           + .agents/skills/<name>/SKILL.md
 #   gemini  -> GEMINI.md           + .gemini/commands/<name>.md
 #   cursor  -> AGENTS.md           + .cursor/rules/<name>.mdc
 #   all     -> all of the above
@@ -21,7 +21,7 @@ Usage: $0 <harness> [target-dir] [--force]
 
 Harnesses:
   claude   Claude Code        -> CLAUDE.md  + .claude/skills/<name>/SKILL.md
-  codex    OpenAI Codex CLI   -> AGENTS.md  + \$CODEX_HOME/skills/<name>/SKILL.md
+  codex    OpenAI Codex CLI   -> AGENTS.md  + .agents/skills/<name>/SKILL.md
   gemini   Gemini CLI         -> GEMINI.md  + .gemini/commands/<name>.md
   cursor   Cursor             -> AGENTS.md  + .cursor/rules/<name>.mdc
   all      Install for all four
@@ -149,8 +149,7 @@ install_claude() {
 install_codex() {
     printf 'Installing for OpenAI Codex CLI into %s/\n' "$TARGET"
     write_context "AGENTS.md" || true
-    codex_home="${CODEX_HOME:-$HOME/.codex}"
-    codex_skills="$codex_home/skills"
+    codex_skills="$TARGET/.agents/skills"
     mkdir -p "$codex_skills"
     for name in $SKILL_NAMES; do
         dest_dir="$codex_skills/$name"
@@ -163,7 +162,7 @@ install_codex() {
         cp -R "$SKILLS_DIR/$name/." "$dest_dir/"
         printf '  WROTE %s\n' "$dest_dir"
     done
-    printf 'Next: cd %s && codex   (mention $vllm-setup or "use vllm-setup"; restart Codex if it was already running)\n' "$TARGET"
+    printf 'Next: cd %s && codex   (run /skills, or mention $vllm-setup; restart Codex if it was already running)\n' "$TARGET"
 }
 
 install_gemini() {
