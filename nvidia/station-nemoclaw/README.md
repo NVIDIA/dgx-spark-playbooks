@@ -82,6 +82,7 @@ By participating in this demo, you acknowledge that you are solely responsible f
 - Basic use of the Linux terminal and SSH
 - Familiarity with Docker (permissions, `docker run`, optional `docker` group membership)
 - Awareness of the security and risk sections above
+- **`sudo` (passwordless or interactive) access on the DGX Station** -- the installer and several troubleshooting steps in this playbook require root privileges (e.g. installing Node.js, adding your user to the `docker` group, installing `cloudflared` via `dpkg`, editing `/etc/docker/daemon.json`, restarting the `docker` service).
 
 ### Prerequisites
 
@@ -143,12 +144,12 @@ The installer requires **Node.js 22.16+** (installed automatically if missing). 
 ### Step 2. NemoClaw Onboarding
 
 > [!NOTE]
-> If you chose **express install** in Step 1, all settings are auto-configured with recommended defaults. Skip to Step 3.
+> If you chose **express install** in Step 1, all settings are auto-configured with recommended defaults for DGX Station: inference is set up automatically with **vLLM** using the default model **`Qwen/Qwen3.6-27B-FP8`**, served from the `nemoclaw-vllm` container. Skip to Step 3.
 
 During custom setup, the onboard wizard walks you through:
 
-1. **Configuring inference** -- Choose to set up local inference on your DGX Station by selecting **`7) Local Ollama`**.
-2. **Ollama models** -- Choose desired inference model. If no model is present locally, the installer will download **`qwen3.6:35b`** automatically.
+1. **Configuring inference** -- Select the **vLLM** option to set up local inference on your DGX Station.
+2. **Inference model** -- Choose desired inference model. If no model is present locally, the installer will download the default **`Qwen/Qwen3.6-27B-FP8`** automatically.
 3. **Sandbox name** -- Pick a name (e.g. my-assistant). Each sandbox requires a unique name.
 4. **Apply this configuration** -- Enter `Y` to confirm setting up local inference.
 5. **Enable Brave Web Search** -- Optional. If you enable it, paste a [Brave Search API](https://brave.com/search/api/) key when prompted.
@@ -160,7 +161,7 @@ When complete you will see output like:
 ```text
 ──────────────────────────────────────────────────
 Sandbox      my-assistant (Landlock + seccomp + netns)
-Model        <your-selected-model> (Local Ollama)
+Model        Qwen/Qwen3.6-27B-FP8 (Local vLLM)
 ──────────────────────────────────────────────────
 Run:         nemoclaw my-assistant connect
 Status:      nemoclaw my-assistant status
@@ -377,13 +378,13 @@ openshell forward stop <port>   # stop the dashboard forward (use the port shown
 
 ### Step 8. Uninstall NemoClaw
 
-The NemoClaw CLI includes a built-in uninstaller. It removes all sandboxes, the OpenShell gateway, Docker containers/images/volumes, the CLI, and all state files. Docker, Node.js, npm, and Ollama are preserved.
+The NemoClaw CLI includes a built-in uninstaller. It removes all sandboxes, the OpenShell gateway, Docker containers/images/volumes, the CLI, and all state files. Docker, Node.js, and npm are preserved, and locally downloaded models are preserved unless `--delete-models` is used.
 
 ```bash
 nemoclaw uninstall --yes
 ```
 
-To remove everything including the Ollama model:
+To remove everything including locally downloaded models:
 
 ```bash
 nemoclaw uninstall --yes --delete-models
@@ -395,7 +396,7 @@ nemoclaw uninstall --yes --delete-models
 |------|--------|
 | `--yes` | Skip the confirmation prompt |
 | `--keep-openshell` | Leave the `openshell` binary in place |
-| `--delete-models` | Also remove the Ollama models pulled by NemoClaw |
+| `--delete-models` | Also remove the models pulled by NemoClaw |
 
 > [!NOTE]
 > If the `nemoclaw` CLI is not available (e.g. install failed partway), use the remote uninstaller as a fallback:
@@ -408,7 +409,7 @@ The uninstaller runs 6 steps:
 2. Delete all OpenShell sandboxes, the NemoClaw gateway, and providers
 3. Remove the global `nemoclaw` npm package
 4. Remove NemoClaw/OpenShell Docker containers, images, and volumes
-5. Remove Ollama models (only with `--delete-models`)
+5. Remove locally downloaded models (only with `--delete-models`)
 6. Remove state directories (`~/.nemoclaw`, `~/.config/openshell`, `~/.config/nemoclaw`) and the OpenShell binary
 
 > [!NOTE]
@@ -427,8 +428,8 @@ The uninstaller runs 6 steps:
 | `nemoclaw my-assistant dashboard-url --quiet` | Print the full tokenized Web UI URL (includes auto-assigned port) |
 | `openshell term` | Open the monitoring TUI on the host |
 | `openshell forward list` | List active port forwards |
-| `nemoclaw uninstall --yes` | Remove NemoClaw (preserves Docker, Node.js, Ollama) |
-| `nemoclaw uninstall --yes --delete-models` | Remove NemoClaw and Ollama models |
+| `nemoclaw uninstall --yes` | Remove NemoClaw (preserves Docker, Node.js, npm, and downloaded models) |
+| `nemoclaw uninstall --yes --delete-models` | Remove NemoClaw and downloaded models |
 
 ## Troubleshooting
 
@@ -442,8 +443,7 @@ The uninstaller runs 6 steps:
 | Gateway fails with "port 8080 is held by container..." | Another OpenShell gateway or container is using port 8080 | Stop the conflicting container: `openshell gateway destroy -g <old-gateway-name>` or `docker stop <container-name> && docker rm <container-name>`, then retry `nemoclaw onboard`. |
 | Sandbox creation fails | Stale gateway state or DNS not propagated | Run `openshell gateway destroy && openshell gateway start`, then re-run the installer or `nemoclaw onboard`. |
 | CoreDNS crash loop | Known issue on some DGX Station configurations | Re-run the NemoClaw installer (`curl -fsSL https://www.nvidia.com/nemoclaw.sh \| bash`) which includes the CoreDNS fix. If the issue persists, see [NemoClaw troubleshooting](https://docs.nvidia.com/nemoclaw/latest/reference/troubleshooting.html). |
-| "No GPU detected" during onboard | DGX Station GB300 reports unified memory differently | Expected on DGX Station. The wizard still works and uses Ollama for inference. |
-| Inference timeout or hangs | Ollama not running or not reachable | Check Ollama: `curl http://127.0.0.1:11434`. If not running: `sudo systemctl restart ollama`. Verify the NemoClaw auth proxy is healthy: `curl http://127.0.0.1:11435/api/tags`. If both respond, check `nemoclaw my-assistant status` for the Inference health line. |
+| "No GPU detected" during onboard | DGX Station GB300 reports unified memory differently | Expected on DGX Station. The wizard still works and uses vLLM for inference. |
 | Agent gives no response or is very slow | First response can be slow, especially with larger models | Response time depends on model size (30B: a few seconds, 120B: 30–90 seconds). Verify inference route: `nemoclaw my-assistant status`. |
 | Port 18789 already in use | Another process is bound to the port | `lsof -i :18789` then `kill <PID>`. If needed, `kill -9 <PID>` to force-terminate. |
 | Web UI port forward dies or dashboard unreachable | Port forward not active | `openshell forward stop 18789 my-assistant` then `openshell forward start 18789 my-assistant --background`. |

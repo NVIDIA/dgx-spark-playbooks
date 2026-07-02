@@ -177,10 +177,16 @@ spec:
         ./launch.sh
         ```
         
+        On a single-GPU DGX Station, the default `--gpus all` selects the GB300. On a multi-GPU host, set `GPU_DEVICE` to target the GB300 explicitly (`N` is the GB300's device ID from `nvidia-smi`):
+        
+        ```bash
+        GPU_DEVICE='"device=N"' ./launch.sh
+        ```
+        
         The training runs inside the `nanochat` container and executes the full pipeline automatically:
         
-        1. **Tokenizer training** — downloads ~2B characters from FineWeb, trains a 65K BPE tokenizer
-        2. **Base model pretraining** — downloads additional FineWeb shards, pretrains a d24 model (~1B params) with FP8
+        1. **Tokenizer training** — downloads ~2B characters from ClimbMix, trains a 65K BPE tokenizer
+        2. **Base model pretraining** — downloads additional ClimbMix shards, pretrains a d24 model (~1B params) with FP8
         3. **SFT** — downloads synthetic identity conversations, fine-tunes for chat
         4. **Report generation** — produces `report.md` with metrics and samples
         
@@ -198,6 +204,8 @@ spec:
         # Step 5. Inference
         
         After training, checkpoints are saved under the `nanochat_cache/` directory. Run inference from inside the container or interactively:
+        
+        On a multi-GPU host, replace `--gpus all` below with `--gpus '"device=N"'` (where `N` is the GB300's device ID from `nvidia-smi`) to pin inference to the GB300.
         
         **Web UI (recommended):**
         
@@ -237,11 +245,11 @@ spec:
         docker stop $(docker ps -q --filter ancestor=nanochat)
         ```
         
-        To free disk space:
+        To free disk space (the cache directories are root-owned because the container runs as root, so `sudo` is required):
         
         ```bash
-        rm -rf ./nanochat_cache ./hf_cache
-        docker system prune -a
+        sudo rm -rf ./nanochat_cache ./hf_cache
+        docker rmi nanochat
         ```
         
         # Step 7. Customization

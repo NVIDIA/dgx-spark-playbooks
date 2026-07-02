@@ -186,8 +186,8 @@ After the container completes, verify that the quantized model files were create
 ## Check output directory contents
 ls -la ./output_models/
 
-## Verify model files are present
-find ./output_models/ -name "*.bin" -o -name "*.safetensors" -o -name "config.json"
+## Verify model files are present (weights, config, tokenizer, and NVFP4 quant metadata)
+find ./output_models/ \( -name "*.bin" -o -name "*.safetensors" -o -name "*.json" -o -name "*.jinja" \)
 ```
 
 You should see model weight files, configuration files, and tokenizer files in the output directory.
@@ -228,7 +228,6 @@ docker run \
   --gpus "device=1" --ipc=host --network host \
   nvcr.io/nvidia/vllm:25.12.post1-py3 \
   vllm serve /workspace/model \
-    --backend pytorch \
     --max-num-seqs 4 \
     --max-model-len 8192 \
     --port 8000
@@ -257,9 +256,12 @@ To clean up the environment and remove generated files:
 > [!WARNING]
 > This will permanently delete all quantized model files and cached data.
 
+> [!NOTE]
+> The Step 5 container writes `./output_models/` as root, so a plain `rm -rf` from your (non-root) shell user will fail with `Permission denied`. Use `sudo` to remove it.
+
 ```bash
-## Remove output directory and all quantized models
-rm -rf ./output_models
+## Remove output directory and all quantized models (root-owned; written by the Step 5 container)
+sudo rm -rf ./output_models
 
 ## Remove Hugging Face cache (optional)
 rm -rf ~/.cache/huggingface
