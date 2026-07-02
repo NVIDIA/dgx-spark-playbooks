@@ -74,7 +74,7 @@ Note: for NVFP4 models, add the `--quantization modelopt_fp4` flag.
 ### Time & risk
 
 * **Estimated time:** 30 minutes for initial setup and validation
-* **Risk level:** Low - Uses pre-built, validated SGLang container with minimal configuration
+* **Risk level:** Low - Uses the pre-built SGLang CUDA container with minimal configuration
 * **Rollback:** Stop and remove containers with `docker stop` and `docker rm` commands
 * **Last Updated:** 04/28/2026
     * Introduce Nemotron-3-Nano-Omni reasoning FP8 support
@@ -96,6 +96,9 @@ your host system and ensures Docker, GPU drivers, and container toolkit are prop
 > Note: If you experience timeouts or "connection refused" errors while pulling the container image, you may need to use a VPN or a proxy, as some registries may be restricted by your local network or ISP.
 
 ```bash
+## Use the latest CUDA 13.0 SGLang image.
+export SGLANG_IMAGE="lmsysorg/sglang:latest-cu130"
+
 ## Verify Docker installation
 docker --version
 
@@ -103,7 +106,7 @@ docker --version
 nvidia-smi
 
 ## Verify Docker GPU support
-docker run --rm --gpus all lmsysorg/sglang:latest-cu130 nvidia-smi
+docker run --rm --gpus all "$SGLANG_IMAGE" nvidia-smi
 
 ## Check available disk space
 df -h /
@@ -123,11 +126,13 @@ several minutes depending on your network connection.
 
 
 ```bash
+export SGLANG_IMAGE="lmsysorg/sglang:latest-cu130"
+
 ## Pull the SGLang container
-docker pull lmsysorg/sglang:latest-cu130
+docker pull "$SGLANG_IMAGE"
 
 ## Verify the image was downloaded
-docker images | grep sglang
+docker images --digests | grep sglang
 ```
 
 ## Step 4. Launch SGLang container for server mode
@@ -136,11 +141,13 @@ Start the SGLang container in server mode to enable HTTP API access. This runs t
 server inside the container, exposing it on port 30000 for client connections.
 
 ```bash
+export SGLANG_IMAGE="lmsysorg/sglang:latest-cu130"
+
 ## Launch container with GPU support and port mapping
 docker run --gpus all -it --rm \
   -p 30000:30000 \
   -v /tmp:/tmp \
-  lmsysorg/sglang:latest-cu130 \
+  "$SGLANG_IMAGE" \
   bash
 ```
 
@@ -160,11 +167,11 @@ python3 -m sglang.launch_server \
   --attention-backend flashinfer \
   --mem-fraction-static 0.75 &
 
-## Wait for server to initialize
-sleep 30
+## Wait for the server to become ready
+timeout 900 bash -c 'until curl -sf http://localhost:30000/health > /dev/null; do sleep 5; done'
 
 ## Check server status
-curl http://localhost:30000/health
+curl -f http://localhost:30000/health
 ```
 
 ## Step 6. Test client-server inference
@@ -174,7 +181,7 @@ correctly. This validates that the server is accepting requests and generating r
 
 ```bash
 ## Test with curl
-curl -X POST http://localhost:30000/generate \
+curl -f -X POST http://localhost:30000/generate \
   -H "Content-Type: application/json" \
   -d '{
       "text": "What does NVIDIA love?",
@@ -187,10 +194,11 @@ curl -X POST http://localhost:30000/generate \
 
 ## Step 7. Test Python client API
 
-Create a simple Python script to test programmatic access to the SGLang server. This runs on
-the host system and demonstrates how to integrate SGLang into applications.
+Test programmatic access to the SGLang server from the host system. This demonstrates how to
+integrate SGLang into Python applications.
 
-```python
+```bash
+python3 << 'EOF'
 import requests
 
 ## Send prompt to server
@@ -203,6 +211,7 @@ response = requests.post('http://localhost:30000/generate', json={
 })
 
 print(f"Response: {response.json()['text']}")
+EOF
 ```
 
 ## Step 8. Validate installation
@@ -212,8 +221,8 @@ complete SGLang setup and ensures reliable operation.
 
 ```bash
 ## Check server mode (from host)
-curl http://localhost:30000/health
-curl -X POST http://localhost:30000/generate -H "Content-Type: application/json" \
+curl -f http://localhost:30000/health
+curl -f -X POST http://localhost:30000/generate -H "Content-Type: application/json" \
   -d '{"text": "Hello", "sampling_params": {"max_new_tokens": 10}}'
 
 ## Check container logs

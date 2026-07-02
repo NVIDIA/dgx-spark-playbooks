@@ -7,6 +7,11 @@
 - [Overview](#overview)
 - [Instructions](#instructions)
   - [Verify outbound HTTPS to Telegram (gateway requirement)](#verify-outbound-https-to-telegram-gateway-requirement)
+  - [3a. Installer basics](#3a-installer-basics)
+  - [3b. Point Hermes at your local model](#3b-point-hermes-at-your-local-model)
+  - [3c. Choose the terminal backend](#3c-choose-the-terminal-backend)
+  - [3d. Finish the wizard and verify](#3d-finish-the-wizard-and-verify)
+  - [3e. Configure Telegram](#3e-configure-telegram)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -119,65 +124,40 @@ You should see `nvidia/Qwen3.6-35B-A3B-NVFP4` in the returned list.
 
 ## Step 3. Install Hermes
 
+The steps below were verified against **Hermes Agent v0.18.0 (2026.7.1) · upstream `676236bb`**. Newer installer versions may word prompts differently or reorder them; follow the closest matching prompt.
+
 Run the installer from an **interactive terminal** on the Spark. If you are connected over SSH, use a normal SSH session where you can answer prompts and enter your `sudo` password when requested. If you run the installer from a non-interactive automation shell, Hermes can install but the setup wizard and optional system-package prompts may be skipped; use the **Non-interactive SSH fallback** below in that case.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash
 ```
 
-The installer will walk you through an interactive setup. Respond to each prompt in the order they appear:
+The installer walks you through an interactive setup wizard. This playbook uses the **Blank Slate** path, which keeps the wizard short — basics, model endpoint, and terminal backend — and then configures Telegram afterwards with a single `hermes gateway setup` command (Step 3e). The subsections below follow the wizard's prompt order.
 
 > [!IMPORTANT]
 > **OpenClaw on the same machine (out of scope for this playbook):** If another tool such as **OpenClaw** was installed previously, the Hermes installer may ask whether you want to **import** or **migrate** from it. For the steps in *this* playbook, answer **`n`** (no) so Hermes does not pull in OpenClaw configuration. Mixing migrations can leave Telegram or gateway state inconsistent; if you already migrated by mistake, prefer a clean reinstall (see **Start over from scratch** in the Troubleshooting tab) before continuing.
 
+### 3a. Installer basics
+
 1. **"Install ripgrep for faster file search ffmpeg for TTS voice messages? [Y/n]"** — Press **Enter** to accept the default and install both helpers. If `sudo` asks for your password, enter your Linux user password. If you skip this step or run without a terminal, Hermes still works, but file search falls back to slower tools and TTS voice-message support is limited. You can install the helpers later with `sudo apt install -y ripgrep ffmpeg`.
 
-2. **"How would you like to set up Hermes?"** — Choose **Quick setup** to proceed with the recommended defaults.
+2. **"How would you like to set up Hermes?"** — Choose **Blank Slate**. It starts with everything off except the bare minimum, still offers the provider prompts used in the rest of this step, and lets you opt in to individual capabilities later. For context on the other options: **Quick Setup** does not offer provider selection — it signs in through **https://portal.nousresearch.com** (registration or login required) instead, so it won't point Hermes at the local model endpoint on your DGX Spark — and **Full setup** walks through every provider, tool, and plugin option — this playbook uses Blank Slate to get users started quickly.
 
-3. **"Select Provider"** — Choose **Custom endpoint (enter URL manually)** so Hermes can be pointed at the model endpoint running on your DGX Spark.
+### 3b. Point Hermes at your local model
 
-4. **"API base URL [e.g. https://api.example.com/v1]:"** — *If this prompt appears*, enter the URL of your local model server. For the local vLLM endpoint from Step 2, use `http://localhost:8000/v1`. (Depending on installer version or prior config, this question is sometimes skipped when the endpoint is already inferred—continue with the prompts you do see.)
+1. **"Select provider"** — The wizard lists many hosted providers; scroll past them and choose **Custom endpoint (enter URL manually)** so Hermes can be pointed at the model endpoint running on your DGX Spark. (If the machine already has saved endpoints, entries like **Local (localhost:8000)** appear near the bottom of the list — selecting the matching saved entry works too.)
 
-5. **"API key [optional]"** — Leave blank and press **Enter**; vLLM does not require a key for a local model.
+2. **"API base URL [e.g. https://api.example.com/v1]:"** — *If this prompt appears*, enter the URL of your local model server. For the local vLLM endpoint from Step 2, use `http://localhost:8000/v1`. (Depending on installer version or prior config, this question is sometimes skipped when the endpoint is already inferred—continue with the prompts you do see.)
 
-6. **Model selection** — The installer lists the models served by your local endpoint (vLLM reports these via `/v1/models`). Select `nvidia/Qwen3.6-35B-A3B-NVFP4`.
+3. **"API key [optional]"** — Leave blank and press **Enter**; vLLM does not require a key for a local model.
 
-7. **"Context length in tokens [leave blank for auto-detect]:"** — Press **Enter** to let Hermes auto-detect the context length from the served model (the recipe serves `--max-model-len 262144`).
+4. **Model selection** — The installer lists the models served by your local endpoint (vLLM reports these via `/v1/models`). Select `nvidia/Qwen3.6-35B-A3B-NVFP4`.
 
-8. **"Display name [Local (localhost:8000)]"** — Press **Enter** to accept the suggested label, or type a custom name to identify this endpoint in the Hermes UI.
+5. **"Context length in tokens [leave blank for auto-detect]:"** — Press **Enter** to let Hermes auto-detect the context length from the served model (the recipe serves `--max-model-len 262144`).
 
-9. **"Connect a messaging platform? (Telegram, Discord, etc.)"** — Choose **Set up messaging now (recommended)** to configure a gateway during installation.
+6. **"Display name [Local (localhost:8000)]"** — Press **Enter** to accept the suggested label, or type a custom name to identify this endpoint in the Hermes UI.
 
-10. **"Select platforms to configure:"** — Choose **Telegram**. The remaining steps in this playbook use Telegram as the example; the same flow applies to the other supported gateways.
-
-    > [!TIP]
-    > **If Telegram questions are skipped:** Some users see **“Setup complete”** or **“Messaging Platforms (Gateway) configuration complete!”** immediately after choosing Telegram, without token or user-ID prompts. That usually means the installer thinks Telegram is already configured, or a prior partial state exists. Exit any TUI, reload your shell (`source ~/.bashrc`), then run **`hermes gateway setup`** and select Telegram there to supply the bot token and allowed user IDs. (If the CLI suggests `hermes setup gateway` but that flow still skips prompts, use **`hermes gateway setup`**—that is the command most users report as working for a full Telegram reconfiguration.) Follow the printed **`sudo`** lines to register the gateway service (see **Sudo and `hermes` PATH** below).
-
-11. **"Telegram bot token:"** — Open Telegram and start a chat with [@BotFather](https://t.me/BotFather), follow its guided flow to create a new bot, then paste the token BotFather returns into this prompt. **Tip:** Installing [Telegram Desktop](https://desktop.telegram.org/) on the same machine as your SSH session lets you **copy the token from Telegram and paste into the terminal** without retyping it from your phone. The terminal will not echo any characters as the token is pasted — this is expected. Press **Enter** to submit; the installer should respond with `Telegram token saved`.
-
-12. **"Allowed user IDs (comma-separated, leave empty for open access):"** — To restrict the bot to specific Telegram accounts, follow the on-screen instructions to look up your numeric Telegram user ID, then enter one or more IDs separated by commas. Leaving this field blank allows anyone who can reach the bot to use it, which is generally not recommended.
-
-13. **"Use your user ID (\<your-id\>) as the home channel? [Y/n]:"** — Press **Enter** to accept. This designates your own Telegram account as the default channel Hermes will use for proactive messages and scheduled deliveries.
-
-14. **"Install the gateway as a systemd service? (runs in background, starts on boot) [Y/n]:"** — Press **Enter** to accept. The gateway will run as a background service.
-
-15. **"Choose how the gateway should run in the background:"** — Choose **System service** if you want Hermes to start at boot without requiring an interactive login. The service will still run under your user account so it can read your Hermes configuration; only installation requires `sudo`. If you install the gateway after setup instead of through the wizard, use the system-service form shown in **Sudo and `hermes` PATH** below.
-
-16. **"Launch hermes chat now? [Y/n]:"** — Press **Enter** to launch the Hermes TUI immediately and verify the installation end-to-end. Once the TUI is open, type `hello` and press **Enter**; the agent should respond, confirming that the model endpoint and Hermes are wired up correctly. When you're done, type `/exit` to leave the chat and return to your shell. On exit, Hermes prints the exact command needed to resume this conversation later — `hermes --resume <sessionId>`. Save it if you want to pick up where you left off.
-
-17. **"Would you like to install the gateway as a background service? [Y/n]:"** — Press **Enter** to accept. This finalizes the gateway as a background service so it stays available for messaging-platform traffic outside of an interactive Hermes session.
-
-18. **Reload your shell** to make the `hermes` command available, then verify the command resolves:
-
-    ```bash
-    source ~/.bashrc
-    export PATH="$HOME/.local/bin:$PATH"
-    which hermes
-    ```
-
-#### Non-interactive SSH fallback
-
-If the installer prints **"Setup wizard skipped (no terminal available)"**, or if you are validating the playbook through non-interactive SSH, configure the local vLLM endpoint with Hermes' config command:
+**Non-interactive SSH fallback:** If the installer prints **"Setup wizard skipped (no terminal available)"**, or if you are validating the playbook through non-interactive SSH, configure the local vLLM endpoint with Hermes' config command instead of the prompts above:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
@@ -189,36 +169,70 @@ hermes -z "Reply exactly HERMES_OK"
 
 The last command should return `HERMES_OK`, confirming that Hermes can call the local vLLM model without opening the TUI.
 
-#### Sudo and `hermes` PATH
+### 3c. Choose the terminal backend
 
-`sudo` runs with a minimal environment and often **does not inherit your user `PATH`**, so `sudo hermes …` can fail with **`hermes: command not found`** even though `hermes` works without `sudo`. Use the real binary path, for example:
+1. **"Select terminal backend:"** — Choose **Keep current (local)** (or **Local** if no current option is shown). This determines where Hermes executes shell commands when the agent uses its terminal tool; the local backend runs them directly on the DGX Spark, which is what this playbook assumes. The other options (Docker, Modal, SSH, Daytona, Singularity/Apptainer) run commands in containers or off-box environments and are out of scope here.
+
+### 3d. Finish the wizard and verify
+
+1. **"Your minimal agent is ready. What next?"** — Choose **Start with everything disabled — finish now (most minimal)**. You can enable capabilities later at any time.
+
+2. **Reload your shell** to make the `hermes` command available, then verify the command resolves:
+
+    ```bash
+    source ~/.bashrc
+    export PATH="$HOME/.local/bin:$PATH"
+    which hermes
+    ```
+
+3. **Verify the model wiring.** Run `hermes` to open the TUI, type `hello`, and press **Enter**; the agent should respond, confirming that the model endpoint and Hermes are wired up correctly. When you're done, type `/exit` to leave the chat and return to your shell. On exit, Hermes prints the exact command needed to resume this conversation later — `hermes --resume <sessionId>`. Save it if you want to pick up where you left off.
+
+### 3e. Configure Telegram
+
+The Blank Slate path skips messaging setup, so configure the Telegram gateway now with:
 
 ```bash
-export PATH="$HOME/.local/bin:$PATH"
-HERMES_BIN="$(command -v hermes || printf '%s\n' "$HOME/.local/bin/hermes")"
-sudo "$HERMES_BIN" uninstall
+hermes gateway setup
 ```
 
-Or paste the absolute path printed by `which hermes` in place of `hermes` in any `sudo` command the installer prints. For a boot-time Linux system service, the current Hermes CLI supports:
+1. **"Select platforms to configure:"** — The command shows a multi-select list of all supported messaging platforms (Telegram, Discord, Slack, WhatsApp, and many more). Navigate to **Telegram**, press **SPACE** to select it, then press **ENTER** to confirm. The remaining steps in this playbook use Telegram as the example; the same flow applies to the other supported gateways.
 
-```bash
-sudo "$HERMES_BIN" gateway install --system --run-as-user "$USER"
-```
+    > [!TIP]
+    > **If Telegram questions are skipped:** Some users see **“Setup complete”** or **“Messaging Platforms (Gateway) configuration complete!”** immediately after choosing Telegram, without token or user-ID prompts. That usually means a prior partial Telegram state exists. Re-run **`hermes gateway setup`** and select Telegram again to supply the bot token and allowed user IDs. (If the CLI suggests `hermes setup gateway` but that flow still skips prompts, use **`hermes gateway setup`**—that is the command most users report as working for a full Telegram reconfiguration; if it keeps skipping, see **Start over from scratch** in the Troubleshooting tab.) Follow the printed **`sudo`** lines to register the gateway service (if a printed `sudo hermes …` command fails with `command not found`, see the Troubleshooting tab).
 
-#### Verify the Telegram gateway (after Step 3)
+2. **"Telegram bot token:"** — Open Telegram and start a chat with [@BotFather](https://t.me/BotFather), follow its guided flow to create a new bot, then paste the token BotFather returns into this prompt. **Tip:** Installing [Telegram Desktop](https://desktop.telegram.org/) on the same machine as your SSH session lets you **copy the token from Telegram and paste into the terminal** without retyping it from your phone. The terminal will not echo any characters as the token is pasted — this is expected. Press **Enter** to submit; the installer should respond with `Telegram token saved`.
 
-After configuration, confirm the gateway unit is active and recent logs look healthy (replace `<hermes-gateway-unit>` with the **exact** `*.service` name the installer printed—often something containing `hermes` and `gateway`):
+3. **"Allowed user IDs (comma-separated, leave empty for open access):"** — To restrict the bot to specific Telegram accounts, follow the on-screen instructions to look up your numeric Telegram user ID, then enter one or more IDs separated by commas. Leaving this field blank allows anyone who can reach the bot to use it, which is generally not recommended.
 
-```bash
-systemctl list-units --type=service --all | grep -i hermes
-systemctl --user list-units --type=service --all | grep -i hermes
-sudo systemctl status <hermes-gateway-unit>
-sudo journalctl -u <hermes-gateway-unit> -e --no-pager -n 50
-```
+4. **"Use your user ID (\<your-id\>) as the home channel? [Y/n]:"** — Press **Enter** to accept. This designates your own Telegram account as the default channel Hermes will use for proactive messages and scheduled deliveries.
 
-If `systemctl status` or `systemctl --user status` shows **active (running)** and logs are not repeating connection errors to Telegram, the service side is in good shape. If logs show TLS timeouts or “connection refused” to Telegram hosts, re-run the **outbound HTTPS** check at the top of this page.
+5. **"Install the gateway as a systemd service? (runs in background, starts on boot) [Y/n]:"** — Press **Enter** to accept. The gateway will run as a background service.
 
-## Step 4. Switch to a different model (optional)
+6. **"Choose how the gateway should run in the background:"** — Choose **System service** if you want Hermes to start at boot without requiring an interactive login. The service will still run under your user account so it can read your Hermes configuration; only installation requires `sudo`. If this prompt doesn't appear or you need to (re)install the service manually, run `sudo "$(which hermes)" gateway install --system --run-as-user "$USER"`.
+
+7. **Verify the gateway.** After configuration, confirm the gateway unit is active and recent logs look healthy (replace `<hermes-gateway-unit>` with the **exact** `*.service` name the installer printed—often something containing `hermes` and `gateway`):
+
+    ```bash
+    systemctl list-units --type=service --all | grep -i hermes
+    systemctl --user list-units --type=service --all | grep -i hermes
+    sudo systemctl status <hermes-gateway-unit>
+    sudo journalctl -u <hermes-gateway-unit> -e --no-pager -n 50
+    ```
+
+    If `systemctl status` or `systemctl --user status` shows **active (running)** and logs are not repeating connection errors to Telegram, the service side is in good shape. If logs show TLS timeouts or “connection refused” to Telegram hosts, re-run the **outbound HTTPS** check at the top of this page.
+
+8. **Talk to Hermes from Telegram.** The gateway is now running as a background service, so you can reach Hermes from any Telegram client without a terminal session:
+
+    - Open Telegram (mobile or desktop) and search for your bot by the username you assigned through @BotFather.
+    - Open the chat with the bot and tap **Start** (or send `/start`) on first contact.
+    - Send the message **`hello`**. Hermes will reply through the bot, confirming the gateway is wired to your DGX Spark and the underlying model.
+
+    > [!NOTE]
+    > After **`/start`**, Telegram may show a generic **“Unknown command”**-style message from the bot. That can be normal for bots that only implement free-form chat. **Ignore that message and send `hello` anyway**—Hermes should respond to normal text once the gateway and model are healthy.
+
+    From here you can send any prompt you would normally type in the TUI — Hermes will run on your DGX Spark and stream the response back to Telegram.
+
+## Step 4. Switch to a different model
 
 You configured an initial model during the Hermes install. To switch to a different one later, restart vLLM serving the new model handle, then re-point Hermes at the same local endpoint.
 
@@ -249,7 +263,17 @@ hermes config set model.default <new-model-handle>
 hermes -z "Reply exactly MODEL_OK"
 ```
 
-## Step 5. Resume a previous Hermes session
+## Step 5. Configure tools
+
+The Blank Slate install from Step 3 starts with the agent's tools disabled. To enable more tools or modify the existing tool configuration, run:
+
+```bash
+hermes tools
+```
+
+This opens the same multi-select tool list as the setup wizard (web search, browser automation, terminal, file operations, code execution, and more). Toggle entries with **SPACE** and press **ENTER** to confirm.
+
+## Step 6. Resume a previous Hermes session
 
 To pick up a past conversation, launch Hermes with the `--resume` flag and the session ID printed when you exited that chat:
 
@@ -258,21 +282,6 @@ hermes --resume <sessionId>
 ```
 
 The TUI will reopen with the prior conversation history restored, ready for follow-up prompts.
-
-## Step 6. Talk to Hermes from Telegram
-
-The Telegram gateway you configured during install is already running as a background service, so you can reach Hermes from any Telegram client without a terminal session.
-
-1. Open Telegram (mobile or desktop) and search for your bot by the username you assigned through @BotFather.
-
-2. Open the chat with the bot and tap **Start** (or send `/start`) on first contact.
-
-3. Send the message **`hello`**. Hermes will reply through the bot, confirming the gateway is wired to your DGX Spark and the underlying model.
-
-    > [!NOTE]
-    > After **`/start`**, Telegram may show a generic **“Unknown command”**-style message from the bot. That can be normal for bots that only implement free-form chat. **Ignore that message and send `hello` anyway**—Hermes should respond to normal text once the gateway and model are healthy.
-
-From here you can send any prompt you would normally type in the TUI — Hermes will run on your DGX Spark and stream the response back to Telegram.
 
 ## Step 7. Update Hermes
 
@@ -291,7 +300,7 @@ The command pulls the latest Hermes version, applies any required dependency cha
 
 Run cleanup from an **interactive terminal**. The uninstaller may refuse non-interactive subprocesses and still asks you to choose whether to keep data or perform a full uninstall. For a full wipe, choose **Full uninstall** and type **`yes`** at the confirmation prompt.
 
-Because the gateway was installed as a **System service** in Step 15, run the uninstall with `sudo` so it has permission to remove the system-scope systemd unit. If `sudo hermes uninstall` fails with **command not found**, use the same **full-path** pattern as in **Sudo and `hermes` PATH** above:
+Because the gateway was installed as a **System service** in Step 3e, run the uninstall with `sudo` so it has permission to remove the system-scope systemd unit. If `sudo hermes uninstall` fails with **command not found**, it is because `sudo` does not inherit your user `PATH`; invoke the binary by its full path instead:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"

@@ -64,9 +64,10 @@ DGX Spark supports any GGUF  format model checkpoint with llama.cpp, as long as 
 
 ## Step 1. Install the dependencies
 
-Install the required dependencies:
+Update the package metadata and install the required dependencies:
 
 ```shell
+sudo apt update
 sudo apt install -y git clang cmake libcurl4-openssl-dev libssl-dev
 ```
 
@@ -75,8 +76,8 @@ sudo apt install -y git clang cmake libcurl4-openssl-dev libssl-dev
 Clone upstream llama.cpp—the framework you are building:
 
 ```shell
-git clone https://github.com/ggml-org/llama.cpp
-cd llama.cpp
+git clone https://github.com/ggml-org/llama.cpp ~/llama.cpp
+cd ~/llama.cpp
 ```
 
 ## Step 3. Build llama.cpp with CUDA
@@ -85,10 +86,10 @@ Configure CMake with CUDA and GB10’s **sm\_121** architecture so GGML’s CUDA
 
 ```shell
 cmake -B build -DGGML_NATIVE=ON -DGGML_CUDA=ON -DGGML_CURL=ON -DGGML_RPC=ON -DCMAKE_CUDA_ARCHITECTURES=121a-real
-cmake --build build --config Release -j
+cmake --build build --config Release --target llama-server -j
 ```
 
-The build usually takes on the order of 5–10 minutes. When it finishes, binaries such as `llama-server` appear under `build/bin/`.
+The build usually takes on the order of 5–10 minutes. When it finishes, `llama-server` appears under `build/bin/`.
 
 ## Step 4. Start llama-server with a model
 
@@ -149,9 +150,13 @@ The server is only ready to accept incoming connections on port 30000 after you 
 
 ## Step 5. Test the API
 
-Use a **second terminal on the same machine** that runs `llama-server` (for example another SSH session into DGX Spark). If you run `curl` on your laptop while the server runs only on Spark, use the Spark hostname or IP instead of `localhost`. 
+Before sending requests, confirm the server is ready (large models can take several minutes to load):
 
-```shell
+```bash
+timeout 900 bash -c 'until curl -sf http://127.0.0.1:30000/health > /dev/null 2>&1; do sleep 5; done' || exit 1
+```
+
+```bash
 curl -X POST http://127.0.0.1:30000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{

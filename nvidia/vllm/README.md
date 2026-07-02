@@ -170,6 +170,20 @@ nvcr.io/nvidia/vllm:${LATEST_VLLM_VERSION} \
 vllm serve ${HF_MODEL_HANDLE}
 ```
 
+To run the server in detached (non-interactive) mode:
+
+```bash
+docker run -d --gpus all -p 8000:8000 --name vllm-server \
+  nvcr.io/nvidia/vllm:${LATEST_VLLM_VERSION} \
+  vllm serve ${HF_MODEL_HANDLE}
+```
+
+Wait for the server to become ready (model loading may take several minutes):
+
+```bash
+timeout 900 bash -c 'until curl -sf http://localhost:8000/health > /dev/null 2>&1; do sleep 10; done' || { echo "Server failed to start within 900s"; docker logs vllm-server | tail -50; exit 1; }
+```
+
 To run DiffusionGemma models (e.g. `google/diffusiongemma-26B-A4B-it`):
 ```bash
 docker run -it \
@@ -205,6 +219,12 @@ Expected output should include:
 - Model loading confirmation
 - Server startup on port 8000
 - GPU memory allocation details
+
+You can verify the server is ready by checking the health endpoint:
+
+```bash
+curl http://localhost:8000/health
+```
 
 In another terminal, test the server:
 
@@ -694,7 +714,7 @@ newgrp docker
 ## Step 2. Pull vLLM container image
 
 ```bash
-docker pull vllm/vllm-openai:nightly-aarch64
+docker pull vllm/vllm-openai:latest
 ```
 
 ## Step 3. Launch the Agent Ready Qwen3.6 35B server
@@ -711,7 +731,7 @@ export HF_TOKEN="your_huggingface_token"
 docker run -it --gpus all -p 8000:8000 \
   -e HF_TOKEN="$HF_TOKEN" \
   -v ~/.cache/huggingface:/root/.cache/huggingface \
-  vllm/vllm-openai:nightly-aarch64 \
+  vllm/vllm-openai:latest \
   nvidia/Qwen3.6-35B-A3B-NVFP4 \
   --host 0.0.0.0 \
   --port 8000 \
@@ -759,8 +779,8 @@ Expected response should contain `"content": "204"` or similar mathematical calc
 For container approach (non-destructive):
 
 ```bash
-docker rm $(docker ps -aq --filter ancestor=vllm/vllm-openai:nightly-aarch64)
-docker rmi vllm/vllm-openai:nightly-aarch64
+docker rm $(docker ps -aq --filter ancestor=vllm/vllm-openai:latest)
+docker rmi vllm/vllm-openai:latest
 ```
 
 ## Troubleshooting

@@ -48,7 +48,7 @@ You will accelerate popular machine learning algorithms and data analytics opera
 Use the following command to install the CUDA-X libraries (this will create a new conda environment)
   ```bash
     conda create -n rapids-test -c rapidsai -c conda-forge -c nvidia  \
-    rapids=25.10 python=3.12 'cuda-version=13.0' \
+    rapids=26.06 python=3.12 'cuda-version=13.0' \
     jupyter hdbscan umap-learn
   ```
 ## Step 3. Activate the conda environment
