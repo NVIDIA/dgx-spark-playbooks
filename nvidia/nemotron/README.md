@@ -342,6 +342,14 @@ docker run --rm -it --gpus all \
 
 **vLLM path only.**
 
+The server takes several minutes to download and load model weights on first run (the NVFP4 checkpoint is tens of gigabytes). In another terminal, confirm the server is ready and reports the served model:
+
+```bash
+curl -sf http://localhost:8000/v1/models
+```
+
+Once the model is listed, send a chat completion:
+
 ```bash
 curl http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \

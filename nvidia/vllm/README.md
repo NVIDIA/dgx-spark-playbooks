@@ -408,7 +408,7 @@ Start the vLLM inference server with tensor parallelism across both nodes.
 docker exec -it $VLLM_CONTAINER /bin/bash -c '
   vllm serve meta-llama/Llama-3.3-70B-Instruct \
     --tensor-parallel-size 2 --max-model-len 2048 \
-    --distributed-executor-backend ray'
+    --gpu-memory-utilization 0.8 --distributed-executor-backend ray'
 ```
 
 ## Step 9. Test 70B model inference
