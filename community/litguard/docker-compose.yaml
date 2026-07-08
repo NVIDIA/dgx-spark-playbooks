@@ -1,0 +1,31 @@
+services:
+  backend:
+    build: .
+    ports:
+      - "8234:8234"
+    volumes:
+      - model-cache:/root/.cache/huggingface
+    environment:
+      - DEVICE=cuda:0
+      - LITGUARD_CONFIG=/app/config.yaml
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  model-cache:
