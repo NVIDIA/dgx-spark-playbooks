@@ -155,42 +155,48 @@ Run a sample workload to verify the setup:
 docker run --rm --runtime=nvidia --gpus all ubuntu nvidia-smi
 ```
 
-## Step 3. Install the OpenShell CLI
+## Step 3. Install OpenShell
 
-Create a virtual environment and install the `openshell` CLI.
+Run the official installer, which installs both the `openshell` CLI and the `openshell-gateway` daemon as a systemd user service.
 
 ```bash
-cd ~
-uv venv openshell-env && source openshell-env/bin/activate
-uv pip install openshell 
+curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh
+```
+
+After installation, open a new shell (or `source ~/.bashrc`) so the `openshell` binary is on your `PATH`, then verify:
+
+```bash
 openshell --help
 ```
 
-If you don't have `uv` installed yet:
+Expected output should show the `openshell` command tree with subcommands like `sandbox`, `provider`, and `inference`.
+
+## Step 4. Verify the OpenShell gateway
+
+As of OpenShell v0.0.37, the gateway is managed as a systemd user service installed automatically in Step 3. Confirm the service is running and the CLI can reach it:
 
 ```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-Expected output should show the `openshell` command tree with subcommands like `gateway`, `sandbox`, `provider`, and `inference`.
-
-## Step 4. Deploy the OpenShell gateway on DGX Spark
-
-The gateway is the control plane that manages sandboxes. Since you are running directly on the Spark, it deploys locally inside Docker.
-
-```bash
-openshell gateway start
+systemctl --user status --no-pager openshell-gateway
 openshell status
 ```
 
-`openshell status` should report the gateway as **Connected**. The first run may take a few minutes while Docker pulls the required images and the internal k3s cluster bootstraps.
+`openshell status` should report the gateway as **Connected**. If the service is not running, start it manually:
 
-> [!NOTE]
-> Remote gateway deployment requires passwordless SSH access. Ensure your SSH public key is added to `~/.ssh/authorized_keys` on the DGX Spark before using the `--remote` flag.
+```bash
+systemctl --user start openshell-gateway
+```
 
-> [!TIP]
-> If you want to manage the Spark gateway from a separate workstation, run `openshell gateway start --remote <username>@<spark-ssid>.local` from that workstation instead. All subsequent commands will route through the SSH tunnel.
+To ensure the gateway persists after you log out:
+
+```bash
+sudo loginctl enable-linger $USER
+```
+
+To follow gateway logs in real time (streams continuously — press `Ctrl+C` to exit):
+
+```bash
+journalctl --user -u openshell-gateway -f
+```
 
 ## Step 5. Serve a model with vLLM
 
@@ -219,18 +225,18 @@ First, find the IP address of your DGX Spark:
 hostname -I | awk '{print $1}'
 ```
 
-Then create the provider, replacing `{Machine_IP}` with the IP address from the command above (e.g. `10.110.106.169`). vLLM does not require an API key, so any non-empty placeholder works:
+Then create the provider, substituting your actual IP for `MACHINE_IP` in the command below. vLLM does not require an API key, so any non-empty placeholder works:
 
 ```bash
 openshell provider create \
     --name local-vllm \
     --type openai \
     --credential OPENAI_API_KEY=not-needed \
-    --config OPENAI_BASE_URL=http://{Machine_IP}:8000/v1
+    --config OPENAI_BASE_URL=http://MACHINE_IP:8000/v1
 ```
 
 > [!IMPORTANT]
-> Do **not** use `localhost` or `127.0.0.1` here. The OpenShell gateway runs inside a Docker container, so it cannot reach the host via `localhost`. Use the machine's actual IP address.
+> Do **not** use `localhost` or `127.0.0.1` here. The OpenShell gateway runs inside a Docker container, so it cannot reach the host via `localhost`. Replace MACHINE_IP with the machine's actual IP address.
 
 Verify the provider was created:
 
@@ -268,6 +274,7 @@ Create a sandbox using the pre-built OpenClaw community sandbox. This pulls the 
 ``` bash
 openshell sandbox create \
   --keep \
+  --tty \
   --forward 18789 \
   --name dgx-demo \
   --from openclaw \
@@ -285,6 +292,12 @@ The CLI will:
 3. Apply the bundled sandbox policy
 4. Launch OpenClaw inside the sandbox
 
+Set the sandbox name as an environment variable now so subsequent commands can reference it:
+
+```bash
+export SANDBOX_NAME=dgx-demo
+```
+
 ## Step 9. Configure OpenClaw within OpenShell Sandbox
 
 The sandbox container will spin up and the OpenClaw onboarding wizard will launch automatically in your terminal.
@@ -297,22 +310,20 @@ The sandbox container will spin up and the OpenClaw onboarding wizard will launc
 > openshell sandbox connect dgx-demo
 > ```
 
-Use the arrow keys and Enter key to interact with the installation.
-- If you understand and agree, use the arrow key of your keyboard to select 'Yes' and press the Enter key.
-- Quickstart vs Manual: select Quickstart and press the Enter key.
-- Model/auth Provider: Select **Custom Provider**, the second-to-last option.
-- API Base URL: update to https://inference.local/v1
-- How do you want to provide this API key?: Paste API key for now.
-- API key: please enter "vllm" (vLLM does not validate the key; any non-empty value works).
-- Endpoint compatibility: select **OpenAI-compatible** and press Enter.
-- Model ID: enter the model handle you served in Step 5: `nvidia/Qwen3.6-35B-A3B-NVFP4`.
-	- The first request may take a moment while vLLM warms up.
-- Endpoint ID: leave the default value.
-- Alias: enter the same model name (this is optional).
-- Channel: Select **Skip for now**.
-- Search provider: Select **Skip for now**.
-- Skills: Select **No** for now.
-- Enable hooks: Press spacebar to select **Skip for now** and press Enter.
+The wizard prompt structure varies across openclaw versions — the community sandbox image and the latest npm release may differ. Use this version-agnostic walkthrough rather than following prompts by position:
+
+1. **Accept terms** — select **Yes**.
+2. **Quickstart vs Manual** — select **Quickstart**.
+3. **Model/auth Provider** — find and select **Custom Provider**:
+   - In openclaw 2026.6.5+: the short list shows `OpenAI / Anthropic / xAI / Google / More… / Skip`. Select **More…** to open the full provider submenu, then search for or scroll to **Custom Provider**.
+   - In older openclaw (community image): **Custom Provider** appears directly in the list.
+4. **API Base URL** — enter `https://inference.local/v1`.
+5. **API key** — enter any non-empty value (e.g. `not-needed`; vLLM does not validate it).
+6. **Model ID** — enter the model handle from Step 5: `nvidia/Qwen3.6-35B-A3B-NVFP4`.
+7. **Remaining prompts** (Channel, Search provider, Skills, Hooks) — select **Skip** or **No** for each.
+
+> [!NOTE]
+> The community sandbox image (`ghcr.io/nvidia/openshell-community/sandboxes/openclaw:latest`) may be several versions behind the latest openclaw npm release. If the wizard behaves unexpectedly, check the version baked into the image: `docker exec $(docker ps --filter name=openshell-${SANDBOX_NAME} --format '{{.Names}}') openclaw --version`.
 
 It might take 1-2 minutes to get through the final stages. Afterwards, you should see a URL with a token you can use to connect to the gateway. 
 
@@ -321,12 +332,6 @@ The expected output will be similar, but the token will be unique.
 OpenClaw gateway starting in background.
   Logs: /tmp/gateway.log
   UI:   http://127.0.0.1:18789/?token=9b4c9a9c9f6905131327ce55b6d044bd53e0ec423dd6189e
-```
-
-Now that we have configured OpenClaw within the OpenShell sandbox, let's set the name of our openshell sandbox as an environment variable. This will make future commands easier to run. Note that the name of the sandbox was set in the `openshell sandbox create` command in Step 8 using the `--name` flag.
-
-```bash
-export SANDBOX_NAME=dgx-demo
 ```
 
 In order to verify the default policy enabled for your sandbox, please run the following command:
@@ -433,7 +438,6 @@ curl https://inference.local/v1/chat/completions \
 Open a second terminal and check the sandbox status and live logs:
 
 ```bash
-source ~/openshell-env/bin/activate
 openshell term
 ```
 
@@ -478,17 +482,17 @@ Remove the inference provider you created in Step 6:
 openshell provider delete local-vllm
 ```
 
-Stop the gateway (preserves state for later):
+To stop the gateway service (it will restart automatically on next login unless you disable it):
 
 ```bash
-openshell gateway stop
+systemctl --user stop openshell-gateway
 ```
 
-> [!WARNING]
-> The following command permanently removes the gateway cluster and all its data.
+To disable the gateway service entirely and remove linger:
 
 ```bash
-openshell gateway destroy
+systemctl --user disable openshell-gateway
+sudo loginctl disable-linger $USER
 ```
 
 To also stop and remove the vLLM container and image:
@@ -509,8 +513,8 @@ docker rmi vllm/vllm-openai:nightly-aarch64
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `openshell gateway start` fails with "connection refused" or Docker errors | Docker is not running | Start Docker with `sudo systemctl start docker` or launch Docker Desktop, then retry `openshell gateway start` |
-| `openshell status` shows gateway as unhealthy | Gateway container crashed or failed to initialize | Run `openshell gateway destroy` and then `openshell gateway start` to recreate it. Check Docker logs with `docker ps -a` and `docker logs <container-id>` for details |
+| `openshell status` shows "Connection refused" after install | The `openshell-gateway` systemd user service failed to start, usually because the user's systemd session predates the docker group add | Run `systemctl --user status --no-pager openshell-gateway` to confirm the failure. Then run `systemctl --user start openshell-gateway`. If it still fails with a Docker socket auth error, apply a temporary ACL: `sudo setfacl -m u:$USER:rw /var/run/docker.sock` and restart: `systemctl --user restart openshell-gateway`. For a permanent fix, reboot the Spark (Step 2 recommends this after `usermod`) so the user session picks up the docker group. |
+| `openshell status` shows gateway as unhealthy | The gateway service crashed | Run `journalctl --user -u openshell-gateway --no-pager -n 50` to see the error. Restart with `systemctl --user restart openshell-gateway`. If Docker socket access is denied, see the row above. |
 | `openshell sandbox create --from openclaw` fails to build | Network issue pulling the community sandbox or Dockerfile build failure | Check internet connectivity. Retry the command. If the build fails on a specific package, check if the base image is compatible with your Docker version |
 | Sandbox is in `Error` phase after creation | Policy validation failed or container startup crashed | Run `openshell logs <sandbox-name>` to see error details. Common causes: invalid policy YAML, missing provider credentials, or port conflicts |
 | Agent cannot reach `inference.local` inside the sandbox | Inference routing not configured or provider unreachable | Run `openshell inference get` to verify the provider and model are set. Test the vLLM server from the host: `curl http://localhost:8000/v1/models`. Ensure the provider `OPENAI_BASE_URL` uses the Spark's IP address (not `localhost`), since the gateway runs inside Docker |
@@ -520,8 +524,7 @@ docker rmi vllm/vllm-openai:nightly-aarch64
 | vLLM OOM or very slow inference | Model too large for available memory or GPU contention | Free GPU memory (close other GPU workloads), or relaunch vLLM with a lower `--gpu-memory-utilization` / `--max-model-len` (or a smaller model handle). Monitor with `nvidia-smi` |
 | `openshell sandbox connect` hangs or times out | Sandbox not in `Ready` phase | Run `openshell sandbox get <sandbox-name>` to check the phase. If stuck in `Provisioning`, wait or check logs. If in `Error`, delete and recreate the sandbox |
 | Policy push returns exit code 1 (validation failed) | Malformed YAML or invalid policy fields | Check the YAML syntax. Common issues: paths not starting with `/`, `..` traversal in paths, `root` as `run_as_user`, or endpoints missing required `host`/`port` fields. Fix and re-push |
-| `openshell gateway start` fails with "K8s namespace not ready" / timed out waiting for namespace | The k3s cluster inside the Docker container takes longer to bootstrap than the CLI timeout allows. The internal components (TLS secrets, Helm chart, namespace creation) may need extra time, especially on first run when images are pulled inside the container. | First, check whether the container is still running and progressing: `docker ps --filter name=openshell` (look for `health: starting`). Inspect k3s state inside the container: `docker exec <container> sh -c "KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl get ns"` and `kubectl get pods -A`. If pods are in `ContainerCreating` and TLS secrets are missing (`navigator-server-tls`, `openshell-server-tls`), the cluster is still bootstrapping — wait a few minutes and run `openshell status` again. If it does not recover, destroy with `openshell gateway destroy` (and `docker rm -f <container>` if needed) and retry `openshell gateway start`. Ensure Docker has enough resources (memory and disk) for the k3s cluster. |
-| `openshell status` says "No gateway configured" even though the Docker container is running | The `gateway start` command failed or timed out before it could save the gateway configuration to the local config store | The container may still be healthy — check with `docker ps --filter name=openshell`. If the container is running and healthy, try `openshell gateway start` again (it should detect the existing container). If the container is unhealthy or stuck, remove it with `docker rm -f <container>` and then `openshell gateway destroy` followed by `openshell gateway start`. |
+| `openshell status` says "No gateway configured" | The gateway service is not running or was never started | Run `systemctl --user start openshell-gateway` and then `openshell status`. If the service fails to start, check logs: `journalctl --user -u openshell-gateway --no-pager -n 50`. |
 
 > [!NOTE]
 > DGX Spark uses a Unified Memory Architecture (UMA), which enables dynamic memory sharing between the GPU and CPU.
