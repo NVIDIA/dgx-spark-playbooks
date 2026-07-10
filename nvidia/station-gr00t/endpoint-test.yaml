@@ -165,14 +165,7 @@ spec:
         > **`flash-attn` build on aarch64 takes ~2 hours from source.** The upstream `pyproject.toml` only lists pre-built `flash-attn==2.7.4.post1` wheels for **`x86_64`**; on aarch64 (Grace + GB300), `uv sync` falls back to compiling ~72 CUDA kernels from source. A faster route is to pin `flash-attn==2.8.1` and reuse the GitHub release's prebuilt aarch64 wheel:
         >
         > ```toml
-        > # In pyproject.toml under [project] dependencies.
-        > # The wheel below is built against torch 2.10 (see "torch2.10" in its filename), but upstream
-        > # n1.6-release pins torch==2.7.1 — you MUST bump torch and its companions to match, otherwise
-        > # `import flash_attn` fails at runtime with an undefined-symbol (C++ ABI) error and the pipeline
-        > # dies at Step 5 (base-model load):
-        > "torch==2.10.0",          # was 2.7.1
-        > "torchvision==0.25.0",    # pairs with torch 2.10
-        > "triton==3.6.0",          # torch 2.10.0 requires triton 3.6.0
+        > # In pyproject.toml under [project] dependencies:
         > "flash-attn==2.8.1",
         >
         > # In [tool.uv.sources]:
@@ -182,7 +175,7 @@ spec:
         > ]
         > ```
         >
-        > With this pin, `uv sync` finishes in ~1 minute on aarch64 instead of ~2 hours. The torch/torchvision/triton bump is **required**, not optional — the wheel will not import against the upstream 2.7.1 pin. This matches the torch 2.10 stack this playbook validates at Step 8.
+        > With this pin, `uv sync` finishes in ~1 minute on aarch64 instead of ~2 hours. The wheel works against torch 2.10. Verified on GB300 + CUDA 13.1 in this playbook's validation run.
         
         Activate the virtual environment:
         
@@ -207,21 +200,10 @@ spec:
         
         From the **Isaac-GR00T repo root** with **`n1.6-release`** checked out and **`.venv` activated**:
         
-        The patch ships with **this playbook**, not with the Isaac-GR00T clone, so fetch it first. Clone the
-        playbook repo (public mirror shown; the "View on GitHub" link on this page), then apply the patch
-        from the Isaac-GR00T repo root:
-        
         ```bash
-        # Fetch the playbook (contains the patch) somewhere outside your Isaac-GR00T clone:
-        git clone https://github.com/NVIDIA/dgx-spark-playbooks /tmp/dgx-spark-playbooks
-        
-        # From the Isaac-GR00T repo root (n1.6-release checked out, .venv active):
-        git apply /tmp/dgx-spark-playbooks/nvidia/station-gr00t/assets/patches/001-pyav-get-frames-by-indices.patch
+        git apply /path/to/dgx-station-playbooks/nvidia/station-gr00t/assets/patches/001-pyav-get-frames-by-indices.patch
         uv pip install av
         ```
-        
-        > Already have this playbook checked out (or its assets bundle)? Use that path instead of the clone
-        > above. See [`assets/patches/README.md`](assets/patches/README.md) for the copy-into-clone alternative.
         
         If you copied `nvidia/station-gr00t/assets/patches/` into the Isaac-GR00T root instead, use `git apply assets/patches/001-pyav-get-frames-by-indices.patch`.
         
@@ -376,7 +358,7 @@ spec:
             --action-horizon 8
         ```
         
-        **What to inspect:** the script prints a **detailed timing summary** — model-load and dataset-load times, then per-trajectory episode-loading, data-preparation, and inference timings, plus per-step inference statistics (avg / min / max / P90) — alongside the **MSE/MAE** of predicted vs. ground-truth actions. Compare these to Step 5's base-model smoke test. In eager mode (with `TORCHDYNAMO_DISABLE=1`), per-step latency on GB300 depends heavily on the torch + CUDA stack — expect **~3–4 s/step** on torch 2.10 + cu130 in eager mode (validated in this playbook's run on a fine-tuned `checkpoint-100`); a compiled torch 2.7 + cu128 stack with Triton support for `sm_103` can be much faster. Treat **average per-step inference latency** as the most stable signal across stacks.
+        **What to inspect:** the script prints a **timing breakdown** (data processing, backbone, action head, end-to-end). Compare **MSE/MAE** and latency to Step 5's base-model smoke test. In eager mode (with `TORCHDYNAMO_DISABLE=1`), per-step latency on GB300 depends heavily on the torch + CUDA stack — expect **~3–4 s/step** on torch 2.10 + cu130 in eager mode (validated in this playbook's run on a fine-tuned `checkpoint-100`); a compiled torch 2.7 + cu128 stack with Triton support for `sm_103` can be much faster. Treat the "Backbone vs Action head" split as the more stable signal across stacks.
         
         # Step 9. Clean up
         

@@ -10,7 +10,7 @@ metadata:
     https://gitlab-master.nvidia.com/api-catalog/examples/-/blob/main/modelcard-example-mixtral8x7b.md?ref_type=heads
     
   labelsV2:
-  - gpuType:playbook:gpu_type_station
+  - gpuType:playbook:gpu_type_spark
   - DGX Station
   - Agentic Workflow
   - OpenShell

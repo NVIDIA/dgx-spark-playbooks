@@ -52,16 +52,16 @@ You will also need the following:
 
 ## Step 1. Log in to Brev
 
-Go to the [Brev UI](https://brev.nvidia.com), log in, and confirm you’re in the correct org (by clicking the org button on the top right hand side of the page). Once logged in, go to the [Registered Compute](https://brev.nvidia.com/org/environments?tab=registered-compute) section under the "GPU" tab in the main navigation.
+Go to the [Brev UI](https://brev.nvidia.com), log in, and confirm you’re in the correct org (by clicking the org button on the upper-right side of the page). Once logged in, go to the [Registered Compute](https://brev.nvidia.com/org/environments?tab=registered-compute) section under the "GPU" tab in the main navigation.
 
 Click the “Register Compute” button and follow the instructions in the pop-up window.
 
-## Step 2. Complete Popup Instructions
+## Step 2. Complete Pop-up Instructions
 
 * Install the Brev CLI
 * Configure your compute
     * Add a name for compute
-    * To configure ssh, ensure the “Enable SSH access” toggle is on
+    * To configure SSH, ensure the “Enable SSH access” toggle is on
 * Run the registration command
 
 ## Step 3. Follow Registration Flow
