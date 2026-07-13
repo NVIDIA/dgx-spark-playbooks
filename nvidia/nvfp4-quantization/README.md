@@ -65,7 +65,7 @@ df -h .
   * Quantization process is memory-intensive and may fail on systems with insufficient GPU memory
   * Output files are large (several GB) and require adequate storage space
 * **Rollback**: Remove the output directory and any pulled Docker images to restore original state.
-* **Last Updated**: 12/15/2025
+* **Last Updated**: 07/13/2026
   * Fix broken client CURL request in Step 8
   * Update ModelOptimizer project name
 
@@ -118,16 +118,16 @@ docker run --rm -it --gpus all --ipc=host --ulimit memlock=-1 --ulimit stack=671
   -v "./output_models:/workspace/output_models" \
   -v "$HOME/.cache/huggingface:/root/.cache/huggingface" \
   -e HF_TOKEN=$HF_TOKEN \
-  nvcr.io/nvidia/tensorrt-llm/release:spark-single-gpu-dev \
+  nvcr.io/nvidia/tensorrt-llm/release:1.3.0rc20 \
   bash -c "
-    git clone -b 0.35.0 --single-branch https://github.com/NVIDIA/Model-Optimizer.git /app/TensorRT-Model-Optimizer && \
-    cd /app/TensorRT-Model-Optimizer && pip install -e '.[dev]' && \
+    git clone -b 0.45.0 --single-branch https://github.com/NVIDIA/Model-Optimizer.git /app/TensorRT-Model-Optimizer && \
+    cd /app/TensorRT-Model-Optimizer && pip install -e '.' && \
     export ROOT_SAVE_PATH='/workspace/output_models' && \
     /app/TensorRT-Model-Optimizer/examples/llm_ptq/scripts/huggingface_example.sh \
-    --model 'deepseek-ai/DeepSeek-R1-Distill-Llama-8B' \
+    --model 'deepseek-ai/DeepSeek-R1-Distill-Qwen-7B' \
     --quant nvfp4 \
-    --tp 1 \
-    --export_fmt hf
+    --tasks quant \
+    --tp 1 
   "
 ```
 
@@ -168,7 +168,7 @@ First, set the path to your quantized model:
 
 ```bash
 ## Set path to quantized model directory
-export MODEL_PATH="./output_models/saved_models_DeepSeek-R1-Distill-Llama-8B_nvfp4_hf/"
+export MODEL_PATH="./output_models/saved_models_DeepSeek-R1-Distill-Qwen-7B_nvfp4/"
 ```
 
 Now verify the quantized model can be loaded properly using a simple test:
@@ -180,7 +180,7 @@ docker run \
   -v "$MODEL_PATH:/workspace/model" \
   --rm -it --ulimit memlock=-1 --ulimit stack=67108864 \
   --gpus=all --ipc=host --network host \
-  nvcr.io/nvidia/tensorrt-llm/release:spark-single-gpu-dev \
+  nvcr.io/nvidia/tensorrt-llm/release:1.3.0rc20 \
   bash -c '
     python examples/llm-api/quickstart_advanced.py \
       --model_dir /workspace/model/ \
@@ -195,14 +195,14 @@ First, set the path to your quantized model:
 
 ```bash
 ## Set path to quantized model directory
-export MODEL_PATH="./output_models/saved_models_DeepSeek-R1-Distill-Llama-8B_nvfp4_hf/"
+export MODEL_PATH="./output_models/saved_models_DeepSeek-R1-Distill-Qwen-7B_nvfp4"
 
 docker run \
   -e HF_TOKEN=$HF_TOKEN \
   -v "$MODEL_PATH:/workspace/model" \
   --rm -it --ulimit memlock=-1 --ulimit stack=67108864 \
   --gpus=all --ipc=host --network host \
-  nvcr.io/nvidia/tensorrt-llm/release:spark-single-gpu-dev \
+ nvcr.io/nvidia/tensorrt-llm/release:1.3.0rc20 \
   trtllm-serve /workspace/model \
     --backend pytorch \
     --max_batch_size 4 \
@@ -215,7 +215,7 @@ Run the following to test the server with a client CURL request:
 curl -X POST http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "deepseek-ai/DeepSeek-R1-Distill-Llama-8B",
+    "model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
     "messages": [{"role": "user", "content": "What is artificial intelligence?"}],
     "max_tokens": 100,
     "temperature": 0.7,
