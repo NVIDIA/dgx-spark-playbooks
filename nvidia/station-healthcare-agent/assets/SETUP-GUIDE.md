@@ -9,8 +9,8 @@ From-scratch setup for a DGX Station. Produces a working multi-agent clinical an
 ## Prerequisites
 
 - Docker + NVIDIA Container Toolkit (`docker info --format '{{.ServerVersion}}'` ≥ 23.0.1)
-- **Node.js v22+** (the DGX Station ships with v18 — upgrade with `curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs`)
-- OpenShell CLI ≥ 0.0.33
+- **Node.js v22+** (DGX OS 7.5.0 ships v22; if an older image reports v18 or Node is missing, download the setup script first, then run it: `curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh && sudo bash /tmp/nodesource_setup.sh && sudo apt-get install -y nodejs`)
+- OpenShell CLI ≥ 0.0.44
 - **At least 200 GB free** on `/` (86 GB Ollama model + Docker images + working space; verify with `df -h /`)
 - A single GPU with **≥150 GB free VRAM** (target the GB300, not the RTX PRO 6000, on dual-GPU stations)
 - Network access to `r4.smarthealthit.org` (FHIR test server) and `nvcr.io` (NGC registry)
@@ -31,10 +31,12 @@ make ngc-login   # docker login nvcr.io with NGC_API_KEY (required to pull OpenF
 
 ## 2. Install OpenShell
 
+The official installer installs both the `openshell` CLI and the `openshell-gateway` daemon. This is all the Healthcare Agent playbook needs — you do **not** need the full NemoClaw stack.
+
 ```bash
-pip install openshell --upgrade --pre \
-  --index-url https://urm.nvidia.com/artifactory/api/pypi/nv-shared-pypi/simple
-openshell --version   # >= 0.0.33
+curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh
+# Open a new shell (or `source ~/.bashrc`) so ~/.local/bin is on PATH, then:
+openshell --version   # >= 0.0.44
 ```
 
 > [!NOTE]
@@ -60,16 +62,22 @@ This starts:
 ## 4. Start OpenShell gateway
 
 ```bash
-# Ubuntu 24.04 needs the cgroup fix:
-OPENSHELL_K3S_ARGS='--kubelet-arg=cgroup-driver=systemd' openshell gateway start
+# OpenShell >= 0.0.44: start the standalone gateway server with the Docker
+# driver, then register it with the CLI.
+nohup openshell-gateway \
+    --disable-tls \
+    --drivers docker \
+    --bind-address 127.0.0.1 \
+    --port 17670 \
+    > /tmp/openshell-gateway.log 2>&1 &
 
-# k3s takes 10-15s to accept connections; poll until ready:
-for i in $(seq 1 30); do
-  openshell status 2>/dev/null | grep -q "Connected" && break
-  sleep 2
-done
+openshell gateway add http://127.0.0.1:17670 --name openshell
+
+# The gateway typically starts in under 1 second.
 openshell status   # Should show: Status: Connected
 ```
+
+If `openshell status` does not show `Connected`, check `/tmp/openshell-gateway.log` for errors.
 
 ## 5. (Optional) Configure inference provider manually
 

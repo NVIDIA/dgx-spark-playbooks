@@ -22,6 +22,11 @@
 # The Docker bridge IP is auto-detected via 'ip -4 addr show docker0' below.
 set -euo pipefail
 
+# OpenShell installs to ~/.local/bin, which is not on the default non-interactive
+# PATH (e.g. when this script runs via `make setup` over a non-login SSH). Ensure
+# it is reachable so `openshell` resolves regardless of how we were invoked.
+export PATH="$HOME/.local/bin:$PATH"
+
 BIND_MODE="loopback"
 for arg in "$@"; do
     case "$arg" in
@@ -59,7 +64,9 @@ echo ""
 echo "--- Pre-flight: Verify OpenShell gateway ---"
 if ! openshell status 2>&1 | grep -q "Connected"; then
     echo "ERROR: OpenShell gateway is not connected." >&2
-    echo "Start it with: openshell gateway start" >&2
+    echo "Start it with (see instructions.md Step 4):" >&2
+    echo "  nohup openshell-gateway --disable-tls --drivers docker --bind-address 127.0.0.1 --port 17670 >/tmp/openshell-gateway.log 2>&1 &" >&2
+    echo "  openshell gateway add http://127.0.0.1:17670 --name openshell" >&2
     exit 1
 fi
 echo "Gateway: Connected"
@@ -199,8 +206,8 @@ fi
 echo "Waiting for sandbox to become Ready..."
 for i in $(seq 1 60); do
     PHASE=$(openshell sandbox list 2>/dev/null \
-                | awk -v n="$SANDBOX_NAME" 'NR>1 && index($0,n) {print $NF; exit}' \
-                | sed 's/\x1b\[[0-9;]*m//g')
+                | sed "s/$(printf '\033')\[[0-9;]*[a-zA-Z]//g" \
+                | awk -v n="$SANDBOX_NAME" 'NR>1 { for (i=1;i<=NF;i++) if ($i==n) { print $NF; exit } }')
     if [ "$PHASE" = "Ready" ]; then
         echo "Sandbox Ready (after ${i} polls)."
         break
@@ -234,7 +241,12 @@ _gw_name() {
         return
     fi
     local name
+    # Strip ANSI color codes first: `openshell status` prints e.g.
+    # "Gateway:<ESC>[0m nemoclaw", and the reset code between "Gateway:" and the
+    # name defeats the grep, silently falling back to 'openshell' (which then
+    # fails with "Unknown gateway 'openshell'" when the active gateway differs).
     name=$(openshell status 2>/dev/null \
+        | sed "s/$(printf '\033')\[[0-9;]*[a-zA-Z]//g" \
         | grep -oE 'Gateway:[[:space:]]+[A-Za-z0-9_-]+' \
         | awk '{print $NF}' | head -1)
     printf '%s' "${name:-openshell}"

@@ -11,8 +11,9 @@ Usage:
   python scripts/test_molecular_viz_agent.py --drug "lisinopril" --port 8051 --openfold-url http://localhost:8000
 
 Requires: requests, dash, py3Dmol.
-OpenFold3 NIM must be running locally:
-  docker run --rm -p 8000:8000 --gpus all --shm-size=16g \\
+OpenFold3 NIM must be running locally (host port defaults to 8000; set
+OPENFOLD_PORT to avoid a clash with NemoClaw's nemoclaw-vllm on 8000):
+  docker run --rm -p "${OPENFOLD_PORT:-8000}":8000 --gpus all --shm-size=16g \\
     -e NGC_API_KEY=$NGC_API_KEY -e NIM_OPTIMIZED_BACKEND=torch_baseline \\
     nvcr.io/nim/openfold/openfold3:latest
 """

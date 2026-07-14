@@ -11,13 +11,16 @@ Installation, configuration, troubleshooting, and operational details for the Cl
 
 This sets up an isolated OpenShell sandbox with OpenClaw and a local Ollama inference backend. Everything the agent touches — filesystem, network, processes — is confined to the sandbox.
 
-**Requirements:** DGX Station GB300, Python 3.10+, `uv`, Docker + NVIDIA Container Toolkit, OpenShell CLI ≥ 0.0.33, Node.js 22+ LTS.
+**Requirements:** DGX Station GB300, Python 3.10+, `uv`, Docker + NVIDIA Container Toolkit, OpenShell CLI ≥ 0.0.44, Node.js 22+ LTS.
 
 ### 1. Install OpenShell
 
+The official installer provides both the `openshell` CLI and the `openshell-gateway` daemon — all this playbook needs (no NemoClaw required):
+
 ```bash
-uv pip install openshell --upgrade --pre \
-  --index-url https://urm.nvidia.com/artifactory/api/pypi/nv-shared-pypi/simple
+curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh
+# Open a new shell (or `source ~/.bashrc`) so ~/.local/bin is on PATH, then:
+openshell --version   # >= 0.0.44
 ```
 
 ### 2. Start Ollama (Docker, recommended)

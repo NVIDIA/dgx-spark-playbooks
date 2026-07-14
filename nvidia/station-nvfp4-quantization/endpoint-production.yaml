@@ -161,17 +161,21 @@ spec:
         +-----------------------------------------+------------------------+----------------------+
         ```
         
-        In this example, the GB300 is device **1**. Note this number for use in Docker commands.
+        In this example, the GB300 is device **1**. Export this number as a variable for use in Docker commands:
+        
+        ```bash
+        export GPU_ID=1  # Replace with your GB300 device number
+        ```
         
         > [!NOTE]
-        > The examples below assume the GB300 is device 1. If your GPU has a different ID, adjust the `--gpus "device=X"` parameter in the Docker commands accordingly.
+        > On a single-GPU DGX Station (GB300 only), the device ID is **0**. Set `GPU_ID=0` in that case.
         
         # Step 5. Run the quantization process using TensorRT Model Optimizer
         
         Launch the vLLM container with GPU access, IPC settings optimized for multi-GPU workloads, and volume mounts for model caching and output persistence.
         
         ```bash
-        docker run --rm -it --gpus "device=1" --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 \
+        docker run --rm -it --gpus "device=$GPU_ID" --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 \
           -v "./output_models:/workspace/output_models" \
           -v "$HOME/.cache/huggingface:/root/.cache/huggingface" \
           -e HF_TOKEN=$HF_TOKEN \
@@ -194,7 +198,7 @@ spec:
         
         This command:
         
-        - Runs the container with access to the specified GPU (device 1) and optimized shared memory settings
+        - Runs the container with access to the specified GPU and optimized shared memory settings
         - Mounts your output directory to persist quantized model files
         - Mounts your Hugging Face cache to avoid re-downloading the model
         - Clones and installs the TensorRT Model Optimizer from source
@@ -232,7 +236,7 @@ spec:
           -e HF_TOKEN=$HF_TOKEN \
           -v "$MODEL_PATH:/workspace/model" \
           --rm -it --ulimit memlock=-1 --ulimit stack=67108864 \
-          --gpus "device=1" --ipc=host --network host \
+          --gpus "device=$GPU_ID" --ipc=host --network host \
           nvcr.io/nvidia/vllm:25.12.post1-py3 \
           vllm serve /workspace/model \
             --max-model-len 4096 \
@@ -255,21 +259,22 @@ spec:
           -e HF_TOKEN=$HF_TOKEN \
           -v "$MODEL_PATH:/workspace/model" \
           --rm -it --ulimit memlock=-1 --ulimit stack=67108864 \
-          --gpus "device=1" --ipc=host --network host \
+          --gpus "device=$GPU_ID" --ipc=host --network host \
           nvcr.io/nvidia/vllm:25.12.post1-py3 \
           vllm serve /workspace/model \
+            --served-model-name DeepSeek-R1-Distill-Llama-8B-NVFP4 \
             --max-num-seqs 4 \
             --max-model-len 8192 \
             --port 8000
         ```
         
-        When serving from a local path, vLLM exposes the model name as the path's last component (here, `model`). Run the following to test the server (use the same model name vLLM reports, e.g. from `curl http://localhost:8000/v1/models`):
+        The `--served-model-name` flag sets the model ID the API responds to (`DeepSeek-R1-Distill-Llama-8B-NVFP4`). Without it, vLLM defaults the ID to the `--model` argument — here the mount path `/workspace/model` — which is why the request must use the served name, not the original Hugging Face ID. You can confirm the active name with `curl http://localhost:8000/v1/models`. Run the following to test the server:
         
         ```bash
         curl -X POST http://localhost:8000/v1/chat/completions \
           -H "Content-Type: application/json" \
           -d '{
-            "model": "model",
+            "model": "DeepSeek-R1-Distill-Llama-8B-NVFP4",
             "messages": [{"role": "user", "content": "What is artificial intelligence?"}],
             "max_tokens": 100,
             "temperature": 0.7,

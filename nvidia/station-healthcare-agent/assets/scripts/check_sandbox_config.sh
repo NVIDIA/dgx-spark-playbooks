@@ -19,10 +19,28 @@ green() { printf "\033[32m✓ %s\033[0m\n" "$1"; }
 red()   { printf "\033[31m✗ %s\033[0m\n" "$1"; FAIL=$((FAIL+1)); }
 yellow(){ printf "\033[33m⚠ %s\033[0m\n" "$1"; WARN=$((WARN+1)); }
 
+# Resolve the active gateway name (OPENSHELL_GATEWAY env → `openshell status` →
+# 'openshell'), so a NemoClaw-named gateway ('nemoclaw') does not break the check.
+_gw_name() {
+    if [ -n "${OPENSHELL_GATEWAY:-}" ]; then
+        printf '%s' "$OPENSHELL_GATEWAY"
+        return
+    fi
+    local name
+    # Strip ANSI color codes first — `openshell status` colorizes the output,
+    # putting a reset code between "Gateway:" and the name, which defeats the grep.
+    name=$(openshell status 2>/dev/null \
+        | sed "s/$(printf '\033')\[[0-9;]*[a-zA-Z]//g" \
+        | grep -oE 'Gateway:[[:space:]]+[A-Za-z0-9_-]+' \
+        | awk '{print $NF}' | head -1)
+    printf '%s' "${name:-openshell}"
+}
+GW_NAME="$(_gw_name)"
+
 sandbox_exec() {
     ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
         -o LogLevel=ERROR -o ConnectTimeout=15 \
-        -o "ProxyCommand=openshell ssh-proxy --gateway-name openshell --name ${SANDBOX}" \
+        -o "ProxyCommand=openshell ssh-proxy --gateway-name ${GW_NAME} --name ${SANDBOX}" \
         "sandbox@openshell-${SANDBOX}" "$1" 2>/dev/null
 }
 
@@ -31,7 +49,7 @@ echo ""
 
 # ── 1. Sandbox exists and is ready ─────────────────────────────
 echo "--- Sandbox Status ---"
-PHASE=$(openshell sandbox list 2>/dev/null | grep "$SANDBOX" | awk '{print $NF}' | sed 's/\x1b\[[0-9;]*m//g')
+PHASE=$(openshell sandbox list 2>/dev/null | sed "s/$(printf '\033')\[[0-9;]*[a-zA-Z]//g" | awk -v n="$SANDBOX" 'NR>1 { for (i=1;i<=NF;i++) if ($i==n) { print $NF; exit } }')
 if [ "$PHASE" = "Ready" ]; then
     green "Sandbox $SANDBOX is Ready"
 else
@@ -188,7 +206,7 @@ fi
 # ── 10. Port forward ──────────────────────────────────────────
 echo ""
 echo "--- Port Forward ---"
-FWD_STATUS=$(openshell forward list 2>/dev/null | grep "$SANDBOX" | sed 's/\x1b\[[0-9;]*m//g' | grep -o 'running\|dead')
+FWD_STATUS=$(openshell forward list 2>/dev/null | sed "s/$(printf '\033')\[[0-9;]*[a-zA-Z]//g" | awk -v n="$SANDBOX" 'NR>1 { hit=0; for (i=1;i<=NF;i++) if ($i==n) hit=1; if (hit) for (i=1;i<=NF;i++) if ($i=="running"||$i=="dead") { print $i; exit } }')
 if [ "$FWD_STATUS" = "running" ]; then
     green "Port forward 18789 running"
 else

@@ -30,12 +30,32 @@ init_test_run() {
     echo "Test logs: $TEST_LOG_DIR"
 }
 
+# Resolve the active gateway name for the ssh-proxy ProxyCommand.
+# Precedence: OPENSHELL_GATEWAY env var → active gateway from `openshell status`
+# → fallback to 'openshell'. Prevents "Unknown gateway 'openshell'" when the
+# user previously ran the NemoClaw playbook (gateway registered as 'nemoclaw').
+_gw_name() {
+    if [ -n "${OPENSHELL_GATEWAY:-}" ]; then
+        printf '%s' "$OPENSHELL_GATEWAY"
+        return
+    fi
+    local name
+    # Strip ANSI color codes first — `openshell status` colorizes the output,
+    # putting a reset code between "Gateway:" and the name, which defeats the grep.
+    name=$(openshell status 2>/dev/null \
+        | sed "s/$(printf '\033')\[[0-9;]*[a-zA-Z]//g" \
+        | grep -oE 'Gateway:[[:space:]]+[A-Za-z0-9_-]+' \
+        | awk '{print $NF}' | head -1)
+    printf '%s' "${name:-openshell}"
+}
+GW_NAME="${GW_NAME:-$(_gw_name)}"
+
 _sandbox() {
     ssh -o StrictHostKeyChecking=no \
         -o UserKnownHostsFile=/dev/null \
         -o LogLevel=ERROR \
         -o ConnectTimeout=10 \
-        -o "ProxyCommand=openshell ssh-proxy --gateway-name openshell --name $SANDBOX_NAME" \
+        -o "ProxyCommand=openshell ssh-proxy --gateway-name $GW_NAME --name $SANDBOX_NAME" \
         "sandbox@openshell-$SANDBOX_NAME" "$@"
 }
 

@@ -13,6 +13,10 @@
 
 set -uo pipefail
 
+# OpenShell installs to ~/.local/bin, not on the default non-interactive PATH
+# (e.g. when invoked via `make test` over a non-login SSH). Ensure it resolves.
+export PATH="$HOME/.local/bin:$PATH"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SCRIPT_DIR/test-lib.sh"
@@ -102,7 +106,7 @@ run_level2() {
     should_run "T2.1" && run_test "T2.1" "Gateway connected" \
         "openshell status 2>&1" \
         assert_contains \
-        "Gateway down. Run: OPENSHELL_K3S_ARGS='--kubelet-arg=cgroup-driver=systemd' openshell gateway start" \
+        "Gateway down. Run: nohup openshell-gateway --disable-tls --drivers docker --bind-address 127.0.0.1 --port 17670 >/tmp/openshell-gateway.log 2>&1 & openshell gateway add http://127.0.0.1:17670 --name openshell" \
         "Connected"
 
     should_run "T2.2" && run_test "T2.2" "Sandbox exists and ready" \

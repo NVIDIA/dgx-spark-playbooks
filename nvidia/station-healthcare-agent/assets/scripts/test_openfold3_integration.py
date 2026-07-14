@@ -12,14 +12,41 @@ Usage (inside sandbox, for T5-T7 only):
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
 import urllib.request
 import urllib.parse
 
-OPENFOLD_URL = "http://localhost:8000"
-OPENFOLD_BRIDGE_URL = "http://172.18.0.1:8000"
+
+def _docker_bridge_ip():
+    """Auto-detect the docker0 bridge IP (override with DOCKER_BRIDGE_IP).
+
+    The bridge IP varies by host; a hard-coded value breaks the
+    sandbox->OpenFold3 reachability tests on machines whose docker0 differs.
+    """
+    override = os.environ.get("DOCKER_BRIDGE_IP")
+    if override:
+        return override
+    try:
+        out = subprocess.run(
+            ["ip", "-4", "addr", "show", "docker0"],
+            capture_output=True, text=True, timeout=5,
+        ).stdout
+        for token in out.split():
+            if token.startswith("inet"):
+                continue
+            if token.count(".") == 3:
+                return token.split("/")[0]
+    except Exception:
+        pass
+    return "172.17.0.1"
+
+
+OPENFOLD_PORT = os.environ.get("OPENFOLD_PORT", "8000")
+OPENFOLD_URL = f"http://localhost:{OPENFOLD_PORT}"
+OPENFOLD_BRIDGE_URL = f"http://{_docker_bridge_ip()}:{OPENFOLD_PORT}"
 OLLAMA_URL = "http://localhost:11434"
 PUBCHEM_URL = "https://pubchem.ncbi.nlm.nih.gov"
 TEST_SEQUENCE = "MKTVRQERLKSIVR"

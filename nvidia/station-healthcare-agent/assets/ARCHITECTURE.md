@@ -87,7 +87,7 @@ Clinical knowledge lives in plain Markdown. The LLM reads these at runtime — n
 |-----------|------------|------|-----|
 | Ollama + nemotron-3-super:120b-a12b | Docker Compose | 11434 | ~94 GB |
 | OpenFold3 NIM | Docker Compose | 8000 | ~40-80 GB on-demand |
-| OpenShell Gateway | Host (`openshell gateway start`) | 8080 | — |
+| OpenShell Gateway | Host (`openshell-gateway` binary) | 17670 | — |
 | OpenClaw Gateway | Inside sandbox (`openclaw gateway run`) | 18789 | — |
 | **Total peak** | | | **~150 GB / 284 GB** |
 

@@ -637,11 +637,3 @@ spec:
       url: https://docs.openclaw.ai/gateway/security
       
 
-    - name: DGX Station Documentation
-      url: https://docs.nvidia.com/dgx/dgx-station
-      
-
-    - name: DGX Station and GB300
-      url: https://www.nvidia.com/en-us/data-center/dgx-station/
-      
-

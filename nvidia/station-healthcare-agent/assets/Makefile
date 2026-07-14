@@ -23,7 +23,7 @@ prereq: ## Validate Docker, Node.js v22, OpenShell, disk, GPU, port 11434, NGC a
 		|| { echo "  Docker:           ✗ not installed"; exit 1; }
 	@NODE_MAJ=$$(node --version 2>/dev/null | sed 's/v\([0-9]*\).*/\1/'); \
 		if [ -z "$$NODE_MAJ" ]; then echo "  Node.js:          ✗ not installed (need v22+)"; exit 1; \
-		elif [ "$$NODE_MAJ" -lt 22 ]; then echo "  Node.js:          ✗ v$$NODE_MAJ found, need v22+. Upgrade: curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs"; exit 1; \
+		elif [ "$$NODE_MAJ" -lt 22 ]; then echo "  Node.js:          ✗ v$$NODE_MAJ found, need v22+. Upgrade: curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh && sudo bash /tmp/nodesource_setup.sh && sudo apt-get install -y nodejs"; exit 1; \
 		else echo "  Node.js:          ✓ $$(node --version)"; fi
 	@command -v openshell >/dev/null 2>&1 \
 		&& echo "  OpenShell:        ✓ $$(openshell --version 2>/dev/null)" \
@@ -104,9 +104,11 @@ setup-local: ## Same as setup but bind gateway to 0.0.0.0 (no SSH tunnel needed)
 
 restart: ## Restart OpenClaw gateway inside sandbox
 	@export PATH="$$HOME/.local/bin:$$PATH"; \
+	GW="$${OPENSHELL_GATEWAY:-$$(openshell status 2>/dev/null | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g' | grep -oE 'Gateway:[[:space:]]+[A-Za-z0-9_-]+' | awk '{print $$NF}' | head -1)}"; \
+	GW="$${GW:-openshell}"; \
 	ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR \
 		-o ConnectTimeout=10 \
-		-o "ProxyCommand=openshell ssh-proxy --gateway-name openshell --name $${SANDBOX_NAME:-clinical-sandbox}" \
+		-o "ProxyCommand=openshell ssh-proxy --gateway-name $$GW --name $${SANDBOX_NAME:-clinical-sandbox}" \
 		"sandbox@openshell-$${SANDBOX_NAME:-clinical-sandbox}" \
 		"bash /sandbox/clinical-intelligence/scripts/restart_sandbox.sh"
 

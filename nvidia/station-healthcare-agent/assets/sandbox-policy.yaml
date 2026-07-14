@@ -1,11 +1,10 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
-# Machine-specific: the openfold3 policy references the Docker bridge IP.
-#   GB300:       Docker bridge 172.18.0.1
-#   New Station: Docker bridge 172.17.0.1
-# Use scripts/gen_sandbox_policy.sh to generate a policy with the correct IP,
-# or edit the openfold3 section below before sandbox creation.
+# Machine-specific: the openfold3 policy references the Docker bridge IP, which
+# varies by host (commonly 172.17.0.1). Do not hard-code it — run
+# scripts/gen_sandbox_policy.sh, which auto-detects the docker0 bridge IP
+# (override with DOCKER_BRIDGE_IP) and substitutes it before sandbox creation.
 
 version: 1
 
