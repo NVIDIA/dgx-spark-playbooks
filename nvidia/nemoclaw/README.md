@@ -151,32 +151,55 @@ The installer requires **Node.js 22.16+** (installed automatically if missing). 
 
 During custom setup, the onboard wizard walks you through:
 
-1. **Configuring inference** -- Choose a local inference option to run models on your DGX Spark.
-2. **Inference models** -- Select a model from the installer prompts. NemoClaw will prepare any required local model artifacts when needed.
-3. **Sandbox name** -- Pick a name (e.g. my-assistant). Each sandbox requires a unique name.
-4. **Apply this configuration** -- Enter `Y` to confirm setting up local inference.
-5. **Enable Brave Web Search** -- Optional. If you enable it, paste a [Brave Search API](https://brave.com/search/api/) key when prompted.
-6. **Messaging channels** -- Optional. If you enable it, choose your desired bot (`telegram`, `discord` or `slack`) and paste your bot token when prompted.
-7. **Policy presets** -- Choose desired Policy tier (`Balanced` recommended) and accept/edit the suggested presets when prompted (confirm with **Enter**).
+1. **Select your agent** -- Choose which agent to run in the sandbox. Enter `1` for **OpenClaw**:
+2. **Configuring inference** -- Choose a local inference option to run models on your DGX Spark.
+3. **Inference models** -- Select a model from the installer prompts. NemoClaw will prepare any required local model artifacts when needed.
+4. **Sandbox name** -- Pick a name (e.g. my-assistant). Each sandbox requires a unique name.
+5. **Apply this configuration** -- Enter `Y` to confirm setting up local inference.
+6. **Enable Brave Web Search** -- Optional. If you enable it, paste a [Brave Search API](https://brave.com/search/api/) key when prompted.
+7. **Messaging channels** -- Optional. If you enable it, choose your desired bot (`telegram`, `discord` or `slack`) and paste your bot token when prompted.
+8. **Resource profiles** -- Choose how much CPU and RAM the sandbox may use (`creator`, `gamer`, `game-developer`, `developer`, `custom`, or `No profile`). Press **Enter** to accept the default (`No profile`).
+9. **Policy presets** -- Choose desired Policy tier (`Balanced` recommended) and accept/edit the suggested presets when prompted (confirm with **Enter**).
 
 When complete you will see output like:
 
 ```text
-──────────────────────────────────────────────────
-Sandbox      my-assistant (Landlock + seccomp + netns)
-Model        <your-selected-model> (Local vLLM)
-──────────────────────────────────────────────────
-Run:         nemoclaw my-assistant connect
-Status:      nemoclaw my-assistant status
-Logs:        nemoclaw my-assistant logs --follow
-──────────────────────────────────────────────────
+OpenClaw is ready
+
+Sandbox:  my-assistant
+Model:    <your-selected-model> (Local vLLM)
+
+Start chatting
+
+  Browser:
+    http://127.0.0.1:18790/
+
+  Terminal:
+    nemoclaw my-assistant connect
+    then run: openclaw tui
+
+Authenticated dashboard URL, if needed:
+  nemoclaw my-assistant dashboard-url --quiet
+
+Remote access (SSH session detected):
+  On your workstation, run:
+    ssh -L 18790:127.0.0.1:18790 nvidia@<host>
+  Then open the dashboard URL above in your local browser.
+
+Manage later
+
+  Status:      nemoclaw my-assistant status
+  Logs:        nemoclaw my-assistant logs --follow
+  Model:       nemoclaw inference set --model <model> --provider <provider> --sandbox my-assistant
+  Policies:    nemoclaw my-assistant policy-add
+  Credentials: nemoclaw credentials reset <KEY> && nemoclaw onboard
 ```
 
 > [!NOTE]
 > - If `nemoclaw` is not found after install, run `source ~/.bashrc` to reload your shell path.
 > - Time to finish **Onboarding** can vary, depending on the model choice and internet speed.
 
-NemoClaw Onboarding can be run repeatedly to create multiple sandboxes for independent usecases. Use `--name <new-name>` to create an additional sandbox alongside any existing ones:
+NemoClaw Onboarding can be run repeatedly to create multiple sandboxes for independent use cases. Use `--name <new-name>` to create an additional sandbox alongside any existing ones:
 
 ```bash
 nemoclaw onboard --gpu --name <new-name>
@@ -284,7 +307,7 @@ To confirm web search is enabled, relaunch your OpenClaw WebUI or terminal UI. A
 These steps apply when your sandbox exists but **Telegram was never configured** (you skipped **Messaging channels** in Step 2, or the sandbox policy tier never included Telegram-related egress). Replace `<sandbox-name>` with your sandbox (for example `my-assistant`).
 
 > [!IMPORTANT]
-> Telegram does **not** require cloudflared. The bot uses long-polling to pull messages from Telegram servers, so no public URL or tunnel is needed. cloudflared is only for exposing the dashboard/Web UI remotely (Step 5.5) and is unrelated to messaging.
+> Telegram does **not** require cloudflared. The bot uses long-polling to pull messages from Telegram servers, so no public URL or tunnel is needed. cloudflared is only for exposing the dashboard/Web UI remotely (see sub-step 5 below) and is unrelated to messaging.
 
 #### 1. Create a Telegram bot
 
@@ -419,13 +442,13 @@ openshell forward stop <port>   # stop the dashboard forward (use the port shown
 
 ### Step 9. Uninstall NemoClaw
 
-The NemoClaw CLI includes a built-in uninstaller. It removes all sandboxes, the OpenShell gateway, Docker containers/images/volumes, the CLI, and all state files. Docker, Node.js, npm, and the vLLM container image are preserved.
+The NemoClaw CLI includes a built-in uninstaller. It removes all sandboxes, the OpenShell gateway, Docker containers/images/volumes, the CLI, and state directories. Docker, Node.js, npm, and the vLLM container image are preserved. Your `~/.nemoclaw/` user data (`rebuild-backups/`, `backups/`, `sandboxes.json`) is also preserved unless you pass `--destroy-user-data`.
 
 ```bash
 nemoclaw uninstall --yes
 ```
 
-To remove everything including the downloaded model weights:
+To remove everything including the downloaded Ollama models:
 
 ```bash
 nemoclaw uninstall --yes --delete-models
@@ -437,7 +460,8 @@ nemoclaw uninstall --yes --delete-models
 |------|--------|
 | `--yes` | Skip the confirmation prompt |
 | `--keep-openshell` | Leave the `openshell` binary in place |
-| `--delete-models` | Also remove the model weights pulled by NemoClaw |
+| `--delete-models` | Also remove Ollama models pulled by NemoClaw |
+| `--destroy-user-data` | Also remove preserved user data under `~/.nemoclaw/` (`rebuild-backups/`, `backups/`, `sandboxes.json`) |
 
 > [!NOTE]
 > If the `nemoclaw` CLI is not available (e.g. install failed partway), use the remote uninstaller as a fallback:
@@ -445,16 +469,17 @@ nemoclaw uninstall --yes --delete-models
 > curl -fsSL https://raw.githubusercontent.com/NVIDIA/NemoClaw/refs/heads/main/uninstall.sh | bash -s -- --yes
 > ```
 
-The uninstaller runs 6 steps:
+The uninstaller runs up to 7 steps:
 1. Stop NemoClaw helper services and port-forward processes
 2. Delete all OpenShell sandboxes, the NemoClaw gateway, and providers
 3. Remove the global `nemoclaw` npm package
 4. Remove NemoClaw/OpenShell Docker containers, images, and volumes
-5. Remove downloaded model weights (only with `--delete-models`)
-6. Remove state directories (`~/.nemoclaw`, `~/.config/openshell`, `~/.config/nemoclaw`) and the OpenShell binary
+5. Remove downloaded Ollama models (only with `--delete-models`)
+6. Remove config/state directories (`~/.config/openshell`, `~/.config/nemoclaw`) and the OpenShell binary
+7. Remove preserved user data under `~/.nemoclaw/` (`rebuild-backups/`, `backups/`, `sandboxes.json`) — only with `--destroy-user-data`
 
 > [!NOTE]
-> If you have a local clone at `~/.nemoclaw/source` you want to keep, move or back it up before running the uninstaller — it is removed as part of state cleanup in step 6.
+> `~/.nemoclaw/` user data is preserved by default and only removed in step 7 with `--destroy-user-data`. If you have a local clone at `~/.nemoclaw/source` you want to keep, move or back it up before running the uninstaller with that flag.
 
 ## Useful commands
 
@@ -470,7 +495,7 @@ The uninstaller runs 6 steps:
 | `openshell term` | Open the monitoring TUI on the host |
 | `openshell forward list` | List active port forwards |
 | `nemoclaw uninstall --yes` | Remove NemoClaw (preserves Docker, Node.js, vLLM image) |
-| `nemoclaw uninstall --yes --delete-models` | Remove NemoClaw and downloaded model weights |
+| `nemoclaw uninstall --yes --delete-models` | Remove NemoClaw and downloaded Ollama models |
 
 ## Troubleshooting
 
