@@ -82,6 +82,7 @@ spec:
         df -h .
         ```
         
+        
         # Time & risk
         
         * **Estimated duration**: 45-90 minutes depending on network speed and model size
@@ -90,6 +91,8 @@ spec:
           * Quantization process is memory-intensive and may fail on systems with insufficient GPU memory
           * Output files are large (several GB) and require adequate storage space
         * **Rollback**: Remove the output directory and any pulled Docker images to restore original state.
+        * **Last Updated:** 03/02/2026
+          * First Publication
         
       
 
@@ -158,17 +161,21 @@ spec:
         +-----------------------------------------+------------------------+----------------------+
         ```
         
-        In this example, the GB300 is device **1**. Note this number for use in Docker commands.
+        In this example, the GB300 is device **1**. Export this number as a variable for use in Docker commands:
+        
+        ```bash
+        export GPU_ID=1  # Replace with your GB300 device number
+        ```
         
         > [!NOTE]
-        > The examples below assume the GB300 is device 1. If your GPU has a different ID, adjust the `--gpus '"device=X"'` parameter in the Docker commands accordingly.
+        > On a single-GPU DGX Station (GB300 only), the device ID is **0**. Set `GPU_ID=0` in that case.
         
         # Step 5. Run the quantization process using TensorRT Model Optimizer
         
         Launch the vLLM container with GPU access, IPC settings optimized for multi-GPU workloads, and volume mounts for model caching and output persistence.
         
         ```bash
-        docker run --rm -it --gpus "device=1" --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 \
+        docker run --rm -it --gpus "device=$GPU_ID" --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 \
           -v "./output_models:/workspace/output_models" \
           -v "$HOME/.cache/huggingface:/root/.cache/huggingface" \
           -e HF_TOKEN=$HF_TOKEN \
@@ -191,7 +198,7 @@ spec:
         
         This command:
         
-        - Runs the container with full GPU access and optimized shared memory settings
+        - Runs the container with access to the specified GPU and optimized shared memory settings
         - Mounts your output directory to persist quantized model files
         - Mounts your Hugging Face cache to avoid re-downloading the model
         - Clones and installs the TensorRT Model Optimizer from source
@@ -213,8 +220,8 @@ spec:
         # Check output directory contents
         ls -la ./output_models/
         
-        # Verify model files are present
-        find ./output_models/ -name "*.bin" -o -name "*.safetensors" -o -name "config.json"
+        # Verify model files are present (weights, config, tokenizer, and NVFP4 quant metadata)
+        find ./output_models/ \( -name "*.bin" -o -name "*.safetensors" -o -name "*.json" -o -name "*.jinja" \)
         ```
         
         You should see model weight files, configuration files, and tokenizer files in the output directory.
@@ -229,7 +236,7 @@ spec:
           -e HF_TOKEN=$HF_TOKEN \
           -v "$MODEL_PATH:/workspace/model" \
           --rm -it --ulimit memlock=-1 --ulimit stack=67108864 \
-          --gpus '"device=1"' --ipc=host --network host \
+          --gpus "device=$GPU_ID" --ipc=host --network host \
           nvcr.io/nvidia/vllm:25.12.post1-py3 \
           vllm serve /workspace/model \
             --max-model-len 4096 \
@@ -252,22 +259,22 @@ spec:
           -e HF_TOKEN=$HF_TOKEN \
           -v "$MODEL_PATH:/workspace/model" \
           --rm -it --ulimit memlock=-1 --ulimit stack=67108864 \
-          --gpus '"device=1"' --ipc=host --network host \
+          --gpus "device=$GPU_ID" --ipc=host --network host \
           nvcr.io/nvidia/vllm:25.12.post1-py3 \
           vllm serve /workspace/model \
-            --backend pytorch \
+            --served-model-name DeepSeek-R1-Distill-Llama-8B-NVFP4 \
             --max-num-seqs 4 \
             --max-model-len 8192 \
             --port 8000
         ```
         
-        Run the following to test the server with a client CURL request:
+        The `--served-model-name` flag sets the model ID the API responds to (`DeepSeek-R1-Distill-Llama-8B-NVFP4`). Without it, vLLM defaults the ID to the `--model` argument — here the mount path `/workspace/model` — which is why the request must use the served name, not the original Hugging Face ID. You can confirm the active name with `curl http://localhost:8000/v1/models`. Run the following to test the server:
         
         ```bash
         curl -X POST http://localhost:8000/v1/chat/completions \
           -H "Content-Type: application/json" \
           -d '{
-            "model": "deepseek-ai/DeepSeek-R1-Distill-Llama-8B",
+            "model": "DeepSeek-R1-Distill-Llama-8B-NVFP4",
             "messages": [{"role": "user", "content": "What is artificial intelligence?"}],
             "max_tokens": 100,
             "temperature": 0.7,
@@ -284,9 +291,12 @@ spec:
         > [!WARNING]
         > This will permanently delete all quantized model files and cached data.
         
+        > [!NOTE]
+        > The Step 5 container writes `./output_models/` as root, so a plain `rm -rf` from your (non-root) shell user will fail with `Permission denied`. Use `sudo` to remove it.
+        
         ```bash
-        # Remove output directory and all quantized models
-        rm -rf ./output_models
+        # Remove output directory and all quantized models (root-owned; written by the Step 5 container)
+        sudo rm -rf ./output_models
         
         # Remove Hugging Face cache (optional)
         rm -rf ~/.cache/huggingface

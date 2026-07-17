@@ -122,8 +122,8 @@ spec:
         **Software Requirements:**
         
         - Docker with NVIDIA Container Toolkit: `docker info --format '{{.ServerVersion}}'`
-        - Node.js v22+: `node --version` (DGX Station ships with v18 — see Step 1 of `instructions.md` for upgrade)
-        - OpenShell CLI >= 0.0.33: `openshell --version` (binary installs to `~/.local/bin/openshell` — add to PATH; see Step 1 of `instructions.md`)
+        - Node.js v22+: `node --version` (DGX OS 7.5.0 ships v22; if an older image reports v18 or Node is missing, see Step 1 of `instructions.md`)
+        - OpenShell CLI >= 0.0.44: `openshell --version` (binary installs to `~/.local/bin/openshell` — add to PATH; see Step 1 of `instructions.md`)
         - NVIDIA NGC API key from [ngc.nvidia.com](https://ngc.nvidia.com/setup/api-key) (free) **and** Docker authentication for `nvcr.io` (`docker login nvcr.io`) so the OpenFold3 NIM image pull succeeds — see Step 2 of `instructions.md`
         - Network access to `nvcr.io` (NGC registry), `ollama.com` (model downloads), and `r4.smarthealthit.org` (FHIR data server)
         - Web browser access to `http://<STATION_IP>:18789`
@@ -131,7 +131,7 @@ spec:
         > [!NOTE]
         > This playbook runs Ollama as a Docker container; you do **not** need to install Ollama on the host. If host Ollama is already running (e.g., from the NemoClaw playbook), stop it before Step 3 of `instructions.md` to free port 11434, or override `OLLAMA_PORT` in `.env`.
         
-        If Docker, the NVIDIA runtime, or OpenShell are not yet installed, complete the NemoClaw playbook (`nvidia/station-nemoclaw/instructions.md`) Steps 1–4 first (~30–45 minutes).
+        If OpenShell is not yet installed, install it with the official installer (`curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh`) — this provides both the `openshell` CLI and the `openshell-gateway` daemon, which is all this playbook needs. You do **not** need the NemoClaw playbook. See Step 1 of `instructions.md` for Docker, NVIDIA runtime, and Node.js prerequisites.
         
         # Ancillary files
         
@@ -186,7 +186,7 @@ spec:
       label: Instructions
       content: |
         > [!IMPORTANT]
-        > This playbook requires Docker (with NVIDIA runtime), Node.js v22, and OpenShell CLI >= 0.0.33. If Docker, the NVIDIA runtime, or OpenShell are missing, complete the NemoClaw playbook (`nvidia/station-nemoclaw/instructions.md`) Steps 1–4 first — that takes about 30–45 minutes. Ollama runs as a Docker container in this playbook (host Ollama is not required and will conflict with port 11434, see Step 3).
+        > This playbook requires Docker (with NVIDIA runtime), Node.js v22, and OpenShell CLI >= 0.0.44 — both the `openshell` CLI **and** the `openshell-gateway` daemon, which the official OpenShell installer provides together (Step 1). You do **not** need the NemoClaw playbook: this playbook only uses the OpenShell binaries, and running the full NemoClaw stack first leaves services (host Ollama on 11434, `nemoclaw-vllm` on 8000, `openclaw-gateway` on 18789) that collide with this playbook — Step 1 and Step 3 explain how to clear them if you already ran it. Ollama runs as a Docker container here (host Ollama is not required and will conflict with port 11434, see Step 3).
         
         > [!NOTE]
         > Steps 1–3 are prerequisites. Steps 4–5 configure infrastructure and deploy the agent. Steps 6–9 are the demo. Steps 10–11 are cleanup and next steps.
@@ -209,10 +209,18 @@ spec:
         df -h /
         ```
         
-        Expected: Blackwell Ultra GPU, Docker >= 23.0.1, **Node.js v22.x**, OpenShell >= 0.0.33, and **at least 200 GB free** on `/` (86 GB model + Docker images + working space).
+        Expected: Blackwell Ultra GPU, Docker >= 23.0.1, **Node.js v22.x**, OpenShell >= 0.0.44, and **at least 200 GB free** on `/` (86 GB model + Docker images + working space).
         
         > [!WARNING]
-        > If `openshell --version` says `command not found`, the binary is at `~/.local/bin/openshell` but isn't on PATH. Run the `export PATH=...` line above and re-source `~/.bashrc`. Without this, every `openshell` and `make` command in later steps fails.
+        > If `openshell --version` says `command not found` but the binary exists at `~/.local/bin/openshell`, it just isn't on PATH. Run the `export PATH=...` line above and re-source `~/.bashrc`. Without this, every `openshell` and `make` command in later steps fails.
+        
+        **If OpenShell is not installed at all**, install it with the official installer — this installs both the `openshell` CLI and the `openshell-gateway` daemon, which is everything this playbook needs (no NemoClaw required):
+        
+        ```bash
+        curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh
+        source ~/.bashrc            # put ~/.local/bin on PATH
+        openshell --version         # should show >= 0.0.44
+        ```
         
         > [!TIP]
         > `make prereq` (run from `~/clinical-intelligence` after Step 2) bundles all of the checks below — Docker, Node version, OpenShell, disk space, GPU, port 11434, and NGC auth — into one command.
@@ -317,6 +325,13 @@ spec:
         ```bash
         docker compose up -d ollama openfold3
         ```
+        
+        > [!IMPORTANT]
+        > **Previously ran the NemoClaw playbook?** NemoClaw's `nemoclaw-vllm` inference container binds host port **8000** — the same port OpenFold3 needs. If OpenFold3 fails to start with a "port is already allocated" / "address already in use" error on 8000, either stop the NemoClaw container:
+        > ```bash
+        > docker stop nemoclaw-vllm && docker rm nemoclaw-vllm
+        > ```
+        > or give OpenFold3 a different host port by setting `OPENFOLD_PORT=8001` in `.env` (Step 2). `docker-compose.yml`, `make status`, and the test suite all honor the override. Check what holds 8000 with `ss -tlnp | grep :8000`.
         
         > [!NOTE]
         > First run downloads Nemotron 3 Super (~86 GB). This takes 15–25 minutes on a fast connection, up to an hour on slower links. Monitor with `docker compose logs -f ollama`. If interrupted, re-run — it resumes where it left off.
@@ -543,23 +558,24 @@ spec:
         |---------|-------|-----|
         | `make up` hangs on model pull | Nemotron-3-Super is ~86 GB and takes 15–25 min on first download (longer on slow links) | Wait. Check progress with `docker compose logs -f ollama`. If interrupted, re-run — it resumes where it left off. |
         | `OpenFold3: ✗ down` in `make status` | OpenFold3 takes ~3 minutes to load model weights on startup | Wait and re-run `make status`. Check logs with `docker compose logs -f openfold3`. |
+        | OpenFold3 crash-loops with `NIMProfileIDNotFound: Profile not found for this model` | The NIM matches your GPU by PCI device ID against its bundled `model_manifest.yaml`, and some Blackwell SKUs are absent — e.g. a `31c3:10de` GB300 or the RTX PRO 6000 `2bb4:10de` (note: `31c2:10de` GB300 units *are* listed and run natively). | Check your id and patch the manifest only if it's missing — see **"OpenFold3: GPU not recognized on DGX Station GB300"** below the tables. |
         | `failed to bind host port for 0.0.0.0:11434` on `docker compose up ollama` | Host Ollama is already listening on 11434 (common after the NemoClaw playbook) | Stop host Ollama: `sudo systemctl stop ollama && sudo systemctl disable ollama`. Or override in `.env`: `OLLAMA_PORT=11435` — `make setup` and `setup_sandbox.sh` source `.env` and configure the sandbox provider against the new port. |
+        | `failed to bind host port for 0.0.0.0:8000` / "address already in use" on `docker compose up openfold3` | NemoClaw's `nemoclaw-vllm` container already holds port 8000 (common after the NemoClaw playbook) | Stop it: `docker stop nemoclaw-vllm && docker rm nemoclaw-vllm`. Or override in `.env`: `OPENFOLD_PORT=8001` — `docker-compose.yml`, `make status`, and the tests honor it. Inspect with `ss -tlnp \| grep :8000`. |
         | `unauthorized: <html><head><title>401 Authorization Required` when pulling `nvcr.io/nim/openfold/openfold3` | Docker is not authenticated against NGC; `NGC_API_KEY` in `.env` is the runtime credential, not the pull credential | Run `make ngc-login` (reads `NGC_API_KEY` from `.env`). Manual equivalent: `echo "$NGC_API_KEY" \| docker login nvcr.io -u '$oauthtoken' --password-stdin`. |
         | OpenFold3 crashes with `device >= 0 && device < num_gpus INTERNAL ASSERT FAILED` | OpenFold3's PyTorch backend rejects multi-GPU containers; `count: all` exposes both GPUs on a dual-GPU station | `docker-compose.yml` pins to `LLM_GPU`/`OPENFOLD_GPU` (default `0`). On dual-GPU stations, set both to the **GB300** index in `.env` and `docker compose up -d --force-recreate openfold3`. |
         | `NGC_API_KEY not set` error | `.env` file missing or NGC key not configured | Run `cp .env.example .env` and edit to add your NGC API key from [ngc.nvidia.com](https://ngc.nvidia.com/setup/api-key). |
         | `exec format error` when pulling containers | Container architecture mismatch (x86 container on ARM64) | Ensure you're using ARM64-compatible containers. OpenFold3 (v1.3.0+) and Ollama support ARM64. Check with `docker inspect --format '{{.Architecture}}' <image>`. |
         | Sandbox policy validation fails on startup | `landlock: hard_requirement` aborts if filesystem paths can't be enforced | Check that all paths in `sandbox-policy.yaml` exist on the system. If running on non-standard DGX OS, try `compatibility: best_effort` temporarily to diagnose. |
-        | `node: command not found` or OpenShell rejects v18 | DGX Station ships with Node.js v18.19.1; OpenShell/OpenClaw need v22+ | `curl -fsSL https://deb.nodesource.com/setup_22.x \| sudo -E bash - && sudo apt-get install -y nodejs`. `make prereq` validates the version automatically. |
+        | `node: command not found` or OpenShell rejects the Node version | Node.js missing, or an older image ships v18; OpenShell/OpenClaw need v22+ | Download the setup script first, then run it — piping straight into `sudo bash` fails: `curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh && sudo bash /tmp/nodesource_setup.sh && sudo apt-get install -y nodejs`. `make prereq` validates the version automatically. |
         
         ### Gateway and sandbox
         
         | Symptom | Cause | Fix |
         |---------|-------|-----|
-        | Gateway fails with "ContainerManager" error | DGX Station uses cgroup v2 and needs the systemd driver flag | Start gateway with: `OPENSHELL_K3S_ARGS='--kubelet-arg=cgroup-driver=systemd' openshell gateway start` |
-        | `openshell status` returns "Connection reset by peer" right after `gateway start` | k3s inside the gateway container takes 10–15s to accept connections | Wait. Use the polling loop from `instructions.md` Step 4: `for i in $(seq 1 30); do openshell status 2>/dev/null \| grep -q Connected && break; sleep 2; done`. |
-        | `openshell status` shows "Not Connected" after 30s | Gateway not started or crashed | Run `openshell gateway start` (with the cgroup flag above). Check `docker ps` for the gateway container. |
+        | `openshell status` shows "Not Connected" | `openshell-gateway` is not running, exited on startup, or was never registered with the CLI | Start and register it per `instructions.md` Step 4: `nohup openshell-gateway --disable-tls --drivers docker --bind-address 127.0.0.1 --port 17670 > /tmp/openshell-gateway.log 2>&1 &` then `openshell gateway add http://127.0.0.1:17670 --name openshell`. The gateway typically starts in under 1 second. |
+        | Gateway was started but `openshell status` still fails | Gateway server crashed after startup (check `pgrep -f openshell-gateway`) or a stale registration points at a dead port | Check `/tmp/openshell-gateway.log` for errors. Remove the stale registration (`openshell gateway remove openshell`), restart `openshell-gateway`, and re-run `openshell gateway add`. |
         | `openshell sandbox create` fails with "port already forwarded" or hangs on `--forward 18789` | Stale port forward from a previously deleted sandbox is still registered | List forwards: `openshell forward list`. Stop each one bound to `:18789`: `openshell forward stop 18789 <sandbox-name>`. `setup_sandbox.sh` does this automatically before re-creating the sandbox. |
-        | Existing OpenShell gateway from another playbook silently reused with new name | `openshell gateway start` resumes any existing gateway in stopped state | Acceptable, but to start clean: `openshell gateway destroy` before running `openshell gateway start`. |
+        | Stale OpenShell gateway from another playbook is still registered | A previous playbook started `openshell-gateway` and registered it (possibly under a different name, e.g. `nemoclaw`) | Kill the process and remove the registration, then start clean: `pkill -f openshell-gateway` and `openshell gateway remove <name>` (see `instructions.md` Step 1), then redo Step 4. |
         | Port 18789 not accessible remotely | SSH tunnel not active or port forward dead inside sandbox | Check with `openshell forward list`. If dead: `openshell forward stop 18789 clinical-sandbox && openshell forward start -d 18789 clinical-sandbox`. Then re-establish SSH tunnel from your machine. |
         | `requests` library doesn't work in sandbox | Sandbox Python uses curl subprocess for HTTP, not the requests library | This is by design. All HTTP calls in agent scripts must use `subprocess.run(["curl", ...])` and `json.loads()`. The `fhir_helpers.py` library handles this automatically. |
         
@@ -576,7 +592,7 @@ spec:
         
         | Symptom | Cause | Fix |
         |---------|-------|-----|
-        | `make setup` fails | Setup did not complete successfully | Re-run `make setup` — the script recreates the sandbox from scratch with fresh config. Ensure you're on OpenShell >= 0.0.33. |
+        | `make setup` fails | Setup did not complete successfully | Re-run `make setup` — the script recreates the sandbox from scratch with fresh config. Ensure you're on OpenShell >= 0.0.44. |
         | `make check` shows stale skills | Workspace skill copies don't match the repo after an update | The check output tells you which skills are stale. Re-run `make setup` or manually copy from `/sandbox/clinical-intelligence/skills/` to `~/.openclaw/workspace/skills/` inside the sandbox. |
         | ENOENT errors for memory files in logs | OpenClaw tries to read daily memory files that don't exist | Create the memory directory: `mkdir -p ~/.openclaw/workspace/memory && touch ~/.openclaw/workspace/MEMORY.md` inside the sandbox. `make check` detects this. |
         | Agent writes code from scratch instead of using helpers | Stale IDENTITY.md or analysis-methods skill in workspace | Run `make check` to verify. If stale, the workspace IDENTITY.md doesn't have the `fhir_helpers` import instruction. |
@@ -589,6 +605,59 @@ spec:
         | FHIR queries return 0 patients | Wrong SNOMED code format | Use bare codes: `code=44054006`, not `code=http://snomed.info/sct\|44054006`. The skill files contain the correct patterns. |
         | Charts not visible in dashboard | Canvas directory not accessible or file not saved to correct path | Charts must be saved to `~/.openclaw/canvas/`. View canvas at `http://localhost:18789/__openclaw__/canvas/`. |
         | `make test-full` fails on L4/L5 agent tests | Agent query timed out, FHIR server unreachable from sandbox, or Ollama model unloaded | Check step by step: (1) `make status` — are Ollama and OpenFold3 healthy? (2) `make check` — are skills and config synced? (3) Send a warmup message in the dashboard to reload the model. (4) Run `make test --level 3` first to isolate whether the issue is infrastructure, config, or agent-level. |
+        
+        ### OpenFold3: GPU not recognized on DGX Station GB300
+        
+        The `openfold3` NIM selects a compute profile by matching your GPU's **PCI device ID** against the `model_manifest.yaml` bundled inside the image. If your GPU's id is not in the manifest, the NIM finds no profile and crash-loops with `NIMProfileIDNotFound`.
+        
+        This affects specific Blackwell board SKUs whose ids the shipped manifest omits. **GB300 units vary**: some report `31c2:10de` (which *is* in the manifest — these run natively), while others report `31c3:10de` (absent — these crash). The DGX Station's RTX PRO 6000 Max-Q (`2bb4:10de`) is also absent. So **do not assume a fixed id — check yours first**, and only patch if it is genuinely missing.
+        
+        This is a manifest gap in the **NIM image**, not a playbook defect — it is tracked upstream so the OpenFold3 NIM team can add the missing ids (`31c3:10de`, `2bb4:10de`) to the shipped manifest. Until that ships, patch the manifest locally:
+        
+        ```bash
+        # 1. Find YOUR GPU's PCI id. lspci prints it vendor:device, e.g. "[10de:31c3]"
+        #    -> your device id is 31c3. (nvidia-smi --query-gpu=pci.device_id -> 0x31C3.)
+        lspci -nn | grep -i nvidia
+        
+        # 2. Copy the manifest out of the image and list the ids it recognizes. The
+        #    manifest keys profiles by "gpu_device: <device>:10de" — device-first, the
+        #    REVERSE of lspci's vendor:device order.
+        cid=$(docker create nvcr.io/nim/openfold/openfold3:latest)
+        docker cp "$cid":/opt/nim/etc/default/model_manifest.yaml /tmp/model_manifest.yaml
+        docker rm "$cid"
+        grep gpu_device /tmp/model_manifest.yaml          # ids the NIM already recognizes
+        
+        # 3. ONLY if YOUR id is NOT listed in step 2: remap an existing same-architecture
+        #    profile's gpu_device to yours (device-first order). Substitute your real ids
+        #    — the example below is for a 31c3 GB300 borrowing the manifest's 31c2 profile:
+        sed -i 's/31c2:10de/31c3:10de/g' /tmp/model_manifest.yaml   # <-- use YOUR ids
+        
+        # 4. Move the patched manifest to a persistent path (NOT /tmp, which is cleared
+        #    on reboot) and mount it over the image copy so it survives recreates:
+        mkdir -p ./assets/openfold3 && mv /tmp/model_manifest.yaml ./assets/openfold3/
+        #    then add to the openfold3 service in docker-compose.yml:
+        #      volumes:
+        #        - ./assets/openfold3/model_manifest.yaml:/opt/nim/etc/default/model_manifest.yaml:ro
+        
+        # 5. A real NGC_API_KEY (not the .env placeholder) is required — the NIM
+        #    downloads TRT engines from NGC at startup. Then recreate the container:
+        docker compose up -d --force-recreate openfold3
+        ```
+        
+        After patching, `make status` should show OpenFold3 healthy; in a full local run `make test` passed 55/55 (exact results depend on your environment).
+        
+        > [!WARNING]
+        > Only patch if your GPU's id is genuinely absent from the manifest (step 2). On
+        > a unit whose id is already listed (e.g. a `31c2` GB300), running the example
+        > `sed` blindly would rename the very profile your GPU matches and *cause* the
+        > `NIMProfileIDNotFound` crash it is meant to prevent.
+        
+        > [!NOTE]
+        > Remapping a `gpu_device` id makes the NIM log a `Checksum mismatch` warning for
+        > that profile. It is currently non-fatal (the NIM still loads), but the NIM warns
+        > it *"will become an error in a future version"* — another reason the durable fix
+        > is to have the OpenFold3 NIM team add `31c3:10de` (GB300) and `2bb4:10de`
+        > (RTX PRO 6000) to the shipped manifest rather than relying on this patch.
         
       
 

@@ -295,7 +295,7 @@ spec:
       content: |
         | Symptom | Cause | Fix |
         |---------|-------|-----|
-        | `ollama: command not found` | Ollama not installed or PATH not updated | Rerun `curl -fsSL https://ollama.com/install.sh | sh` and open a new shell |
+        | `ollama: command not found` | Ollama not installed or PATH not updated | Rerun `curl -fsSL https://ollama.com/install.sh \| sh` and open a new shell |
         | Model load fails with version error | Ollama is older than the model requires | Update Ollama to a current stable release. Do not pin to older versions. |
         | `model not found` in Claude Code | Model was not pulled | Run `ollama pull qwen3.6:27b` and retry with `ollama launch claude --model qwen3.6:27b`. |
         | `connection refused` to localhost:11434 | Ollama service not running | Start with `ollama serve` or `sudo systemctl start ollama` |
@@ -305,7 +305,7 @@ spec:
         | `externally-managed-environment` or Python package install fails | System Python blocks direct package installs | Create and activate a virtual environment, then install pytest inside it: `python3 -m venv .venv`, `source .venv/bin/activate`, `python3 -m pip install -U pytest`. |
         | Slow responses or OOM | Insufficient GPU memory or fragmentation | On DGX Station (NVIDIA GB300), ensure no other heavy GPU workloads. If OOM persists, unload other models or set `OLLAMA_MAX_LOADED_MODELS=1`. |
         | `claude: command not found` after install | CLI not on PATH or install script did not complete | Restart the terminal or run `source ~/.bashrc` (or your shell profile). Check the install script output for the install path and add it to PATH. |
-        | Claude Code install fails (Node.js / network) | Node.js missing or install script cannot download | Ensure Node.js is installed (`node --version`). Run the installer with Bash: `curl -fsSL https://claude.ai/install.sh | bash`. If the install script fails with a network error, retry from a stable connection or download the Claude Code CLI from the official site. See [Claude Code documentation](https://claude.ai/docs) for alternatives. |
+        | Claude Code install fails (Node.js / network) | Node.js missing or install script cannot download | Ensure Node.js is installed (`node --version`). Run the installer with Bash: `curl -fsSL https://claude.ai/install.sh | bash`. If the install script fails with a network error, retry from a stable connection or download the Claude Code CLI from the official site. See [Claude Code documentation](https://docs.claude.com/en/docs/claude-code/overview) for alternatives. |
         
         > [!NOTE]
         > DGX Station with **NVIDIA GB300** provides ample GPU memory for the documented `qwen3.6:27b` workflow. Use `OLLAMA_MAX_LOADED_MODELS=1` if you hit memory limits with multiple models.
