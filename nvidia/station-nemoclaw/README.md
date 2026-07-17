@@ -40,6 +40,17 @@
   - [Step 8. Stop services](#step-8-stop-services)
   - [Step 9. Uninstall NemoClaw](#step-9-uninstall-nemoclaw)
 - [On Dual DGX Station](#on-dual-dgx-station)
+  - [Step 1. Prerequisites](#step-1-prerequisites)
+  - [Step 2. Verify the CX8 fabric](#step-2-verify-the-cx8-fabric)
+  - [Step 3. Download and copy the model cache](#step-3-download-and-copy-the-model-cache)
+  - [Step 4. Start the Nemotron 3 Ultra on station-1](#step-4-start-the-nemotron-3-ultra-on-station-1)
+  - [Step 5. Start the Nemotron 3 Ultra on station-2](#step-5-start-the-nemotron-3-ultra-on-station-2)
+  - [Step 6. Monitor startup without interrupting it](#step-6-monitor-startup-without-interrupting-it)
+  - [Step 7. Validate the API, reasoning, and tool calls](#step-7-validate-the-api-reasoning-and-tool-calls)
+  - [Step 8. Perform routine health checks](#step-8-perform-routine-health-checks)
+  - [Step 9. Troubleshoot common failures](#step-9-troubleshoot-common-failures)
+  - [Step 10. Stop or remove the deployment](#step-10-stop-or-remove-the-deployment)
+  - [Related resources](#related-resources)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -828,94 +839,361 @@ The uninstaller runs up to 7 steps:
 
 ## On Dual DGX Station
 
-<!--
-INSTRUCTIONS TEMPLATE: This file provides step-by-step tutorial instructions.
-Replace all placeholder text in {} with your actual content.
-Remove these comment blocks when you're done.
+## Deploy NVIDIA Nemotron 3 Ultra on Two DGX Stations
 
-STRUCTURE GUIDELINES:
-- Use numbered steps (# Step 1, # Step 2, etc.)
-- Add more steps if needed
-- Each step should have ONE clear objective
-- Include verification steps after installations
-- Use consistent formatting for commands and outputs
--->
+## Phase 1: Prepare Both Stations
 
-<!--
-Optional: At the top of the instructions you can call out any playbooks that should be completed before they begin following these steps.
--->
+Below steps deploy **NVIDIA Nemotron 3 Ultra** across 2 DGX Station with GB300 GPUs.
 
-> [!TIP]
-> {If you haven't already installed NVIDIA Sync, [learn how here](link).}
+### Step 1. Prerequisites
+- Complete [Connect Two DGX Stations for Distributed Workloads](https://build.nvidia.com/station/connect-two-stations/instructions) before starting this tab. Both CX8 RoCE rails must be configured and validated.
+- Huggging Face [Access Token](https://huggingface.co/docs/hub/en/security-tokens) for downloading the model.
+- Docker and [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) installed on both DGX Stations.
+- Both DGX Stations must be connected to each other via CX8 RoCE rails.
 
-## Step 1. Set up the dual DGX Station
+> [!NOTE]
+> The initial model download, weight loading, kernel compilation, autotuning, and CUDA graph capture can take more than an hour. Later starts are faster when the model cache and the existing containers are retained. Recreating the containers can rebuild compilation artifacts.
 
-Follow the [Connect Two DGX Stations for Distributed Workloads](build.nvidia.com/station/connect-two-stations/instructions) playbook to set up your dual DGX Station with high speed cable.
+### Step 2. Verify the CX8 fabric
 
-## Step 2. {Installation/configuration step}
-
-{What you're installing/configuring and why.}
+On both stations, confirm that the two CX8 interfaces are active:
 
 ```bash
-{installation-command}
+ibdev2netdev
+ip -br link show
+ip -br address show
+show_gids
 ```
 
-{Additional context about the installation - versions, dependencies, etc.}
+The examples in this guide use the following direct-attach network. Use your configured addresses if they differ.
 
-{Git Clone With Reference Variables}
-```bash
-git clone https://github.com/NVIDIA/dgx-spark-playbooks
-cd dgx-spark-playbooks/nvidia/station-nemoclaw
-```
+| Rail | `station-1` | `station-2` | HCA |
+| --- | --- | --- | --- |
+| 0 | `192.168.240.1/30` | `192.168.240.2/30` | `mlx5_0` |
+| 1 | `192.168.240.5/30` | `192.168.240.6/30` | `mlx5_1` |
 
-## Step 3. {Main running step}
-
-{Description of how to start/launch the main application.}
-
-```bash
-{launch-command}
-```
-
-{Explanation of what happens when you run this command.}
-
-## Step 4. {Verification/testing step}
-
-{How to verify everything is working correctly.}
+From `station-1`, verify both peers with jumbo packets:
 
 ```bash
-{test-command}
+ping -c 4 -M do -s 8972 192.168.240.2
+ping -c 4 -M do -s 8972 192.168.240.6
 ```
 
-Expected output should show {what indicates success}.
+Do not continue until both pings succeed and the two-station fabric playbook's RDMA and NCCL checks pass.
 
-{Instructions for accessing the application - e.g., "Open a web browser and navigate to `http://<STATION_IP>:8080` where `<STATION_IP>` is your device's IP address."}
+### Step 3. Download and copy the model cache
 
-## Step 5. Cleanup
+>[!NOTE]
+> This step takes more than an hour depending on the internet speed and requires minimum storage of 350GB on both stations.
 
-{When and why someone might need this step.}
-
-> [!WARNING]
-> This will {warning about what gets deleted/changed}.
+Authenticate to Hugging Face on `station-1`. The model is gated, so the account must have access before the download starts.
 
 ```bash
-{cleanup-commands}
+ssh station-1
+hf auth login
+hf auth whoami
+
+export HF_MODEL=nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4
+
+hf download "${HF_MODEL}" --cache-dir "${HOME}/.cache/huggingface"
 ```
 
-{Explanation of what each command does.}
+Copy the complete Hugging Face cache layout to `station-2`. Copying only the model shards is not sufficient.
 
-## Step 6. {Optional - Next steps/advanced usage}
+```bash
+ssh station-2 'mkdir -p ~/.cache/huggingface'
 
-{How to extend or build upon what they've accomplished.}
+rsync -aH --info=progress2 "${HOME}/.cache/huggingface/" station-2:.cache/huggingface/
+```
 
-{Suggestions for further learning or customization:}
+Confirm that the model snapshot exists on both stations:
 
-1. {Advanced feature or customization}
-2. {Deployment to cloud}
-3. {Integration with other tools}
-4. {Performance optimization tips}
-5. {How to monitor usage with `nvidia-smi` or other tools}
+```bash
+find "${HOME}/.cache/huggingface" -maxdepth 1 -type d \
+  -name 'models--nvidia--NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4'
+```
 
-{Final success criteria if they follow these next steps/advanced usage - e.g., "The application should complete within 30-60 seconds depending on your hardware configuration."}
+## Phase 2: Launch Nemotron 3 Ultra
+
+### Step 4. Start the Nemotron 3 Ultra on station-1
+
+Connect to `station-1` and set the deployment variables:
+
+```bash
+ssh station-1
+
+export HEAD_IFACE=$(ibdev2netdev | awk '$1 == "mlx5_0" {print $5; exit}')
+export HEAD_IP=$(ip -4 -o address show dev "${HEAD_IFACE}" \
+  | awk '{split($4, address, "/"); print address[1]; exit}')
+export GPU_UUID_HEAD=$(nvidia-smi \
+  --query-gpu=name,uuid --format=csv,noheader \
+  | awk -F', ' '/GB300|B300/ {print $2; exit}')
+export IMG=vllm/vllm-openai:v0.25.1-aarch64
+export HF_MODEL=nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4
+export SERVED_MODEL=nemotron-ultra
+```
+
+Review the discovered values before starting the container:
+
+```bash
+printf 'HEAD_IFACE=%s\nHEAD_IP=%s\nGPU_UUID_HEAD=%s\n' \
+  "${HEAD_IFACE}" "${HEAD_IP}" "${GPU_UUID_HEAD}"
+```
+
+Start the head container. It creates the Ray cluster and waits up to one hour for the worker GPU before launching vLLM.
+
+```bash
+sudo docker rm -f nemotron-ultra-head 2>/dev/null || true
+
+sudo docker run -d --name nemotron-ultra-head \
+  --restart unless-stopped --init \
+  --network host --shm-size 16g \
+  --gpus "device=${GPU_UUID_HEAD}" \
+  --device=/dev/infiniband/uverbs0 \
+  --device=/dev/infiniband/uverbs1 \
+  --ulimit memlock=-1 \
+  -e HEAD_IP="${HEAD_IP}" \
+  -e MODEL="${HF_MODEL}" \
+  -e SERVED_MODEL="${SERVED_MODEL}" \
+  -e VLLM_HOST_IP="${HEAD_IP}" \
+  -e VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=7200 \
+  -e VLLM_ALLOW_LONG_MAX_MODEL_LEN=1 \
+  -e NCCL_IB_HCA=mlx5_0,mlx5_1 \
+  -e NCCL_IB_DISABLE=0 \
+  -e NCCL_IB_ADDR_FAMILY=AF_INET \
+  -e NCCL_IB_ROCE_VERSION_NUM=2 \
+  -e NCCL_IB_TC=106 \
+  -e NCCL_NET_GDR_LEVEL=PHB \
+  -e NCCL_SOCKET_IFNAME="${HEAD_IFACE}" \
+  -e GLOO_SOCKET_IFNAME="${HEAD_IFACE}" \
+  -e TP_SOCKET_IFNAME="${HEAD_IFACE}" \
+  -e NCCL_IB_QPS_PER_CONNECTION=4 \
+  -e NCCL_IB_PCI_RELAXED_ORDERING=1 \
+  -e UCX_NET_DEVICES=mlx5_0:1,mlx5_1:1 \
+  -e HF_HOME=/models/huggingface \
+  -v "${HOME}/.cache/huggingface:/models/huggingface" \
+  --entrypoint bash "${IMG}" -lc '
+    set -euo pipefail
+    python3 -m pip install --break-system-packages "ray[cgraph]"
+    ray start --head --node-ip-address="${HEAD_IP}" --port=6379 --num-gpus=1
+
+    python3 - <<"PY"
+import time
+import ray
+
+ray.init(address="auto")
+deadline = time.time() + 3600
+while ray.cluster_resources().get("GPU", 0) < 2:
+    if time.time() >= deadline:
+        raise TimeoutError("station-2 GPU did not join Ray within 3600 seconds")
+    time.sleep(5)
+print(ray.cluster_resources())
+PY
+
+    exec vllm serve "${HF_MODEL}" \
+      --served-model-name "${SERVED_MODEL}" \
+      --host 0.0.0.0 --port 8000 \
+      --trust-remote-code \
+      --tensor-parallel-size 1 \
+      --pipeline-parallel-size 2 \
+      --distributed-executor-backend ray \
+      --kv-cache-dtype fp8 \
+      --max-model-len 262144 \
+      --gpu-memory-utilization 0.9 \
+      --max-num-seqs 256 \
+      --distributed-timeout-seconds 7200 \
+      --enable-prefix-caching \
+      --enable-auto-tool-choice \
+      --tool-call-parser qwen3_coder \
+      --reasoning-parser nemotron_v3
+  '
+```
+
+### Step 5. Start the Nemotron 3 Ultra on station-2
+
+Connect to `station-2` and set the worker variables:
+
+>[!NOTE]
+> HEAD_IP value should be fetched from station-1 [Step 4](#step-4-start-the-nemotron-3-ultra-on-station-1)
+
+```bash
+ssh station-2
+
+export WORKER_IFACE=$(ibdev2netdev \
+  | awk '$1 == "mlx5_0" {print $5; exit}')
+export WORKER_IP=$(ip -4 -o address show dev "${WORKER_IFACE}" \
+  | awk '{split($4, address, "/"); print address[1]; exit}')
+export GPU_UUID_WORKER=$(nvidia-smi \
+  --query-gpu=name,uuid --format=csv,noheader \
+  | awk -F', ' '/GB300|B300/ {print $2; exit}')
+
+export HEAD_IP="<station-1 CX8 IP>" # e.g. 192.168.240.1
+export IMG=vllm/vllm-openai:v0.25.1-aarch64
+```
+
+Review the values and then start the worker:
+
+```bash
+printf 'WORKER_IFACE=%s\nWORKER_IP=%s\nGPU_UUID_WORKER=%s\nHEAD_IP=%s\n' \
+  "${WORKER_IFACE}" "${WORKER_IP}" "${GPU_UUID_WORKER}" "${HEAD_IP}"
+
+sudo docker rm -f nemotron-ultra-worker 2>/dev/null || true
+
+sudo docker run -d --name nemotron-ultra-worker \
+  --restart unless-stopped --init \
+  --network host --shm-size 16g \
+  --gpus "device=${GPU_UUID_WORKER}" \
+  --device=/dev/infiniband/uverbs0 \
+  --device=/dev/infiniband/uverbs1 \
+  --ulimit memlock=-1 \
+  -e HEAD_IP="${HEAD_IP}" \
+  -e WORKER_IP="${WORKER_IP}" \
+  -e VLLM_HOST_IP="${WORKER_IP}" \
+  -e VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=3600 \
+  -e VLLM_ALLOW_LONG_MAX_MODEL_LEN=1 \
+  -e NCCL_IB_HCA=mlx5_0,mlx5_1 \
+  -e NCCL_IB_DISABLE=0 \
+  -e NCCL_IB_ADDR_FAMILY=AF_INET \
+  -e NCCL_IB_ROCE_VERSION_NUM=2 \
+  -e NCCL_IB_TC=106 \
+  -e NCCL_NET_GDR_LEVEL=PHB \
+  -e NCCL_SOCKET_IFNAME="${WORKER_IFACE}" \
+  -e GLOO_SOCKET_IFNAME="${WORKER_IFACE}" \
+  -e TP_SOCKET_IFNAME="${WORKER_IFACE}" \
+  -e NCCL_IB_QPS_PER_CONNECTION=4 \
+  -e NCCL_IB_PCI_RELAXED_ORDERING=1 \
+  -e UCX_NET_DEVICES=mlx5_0:1,mlx5_1:1 \
+  -e HF_HOME=/models/huggingface \
+  -v "${HOME}/.cache/huggingface:/models/huggingface" \
+  --entrypoint bash "${IMG}" -lc '
+    set -euo pipefail
+
+    python3 -m pip install --break-system-packages "ray[cgraph]"
+
+    exec ray start --address="${HEAD_IP}:6379" --node-ip-address="${WORKER_IP}" --num-gpus=1 --block
+  '
+```
+
+## Phase 3: Verify the Nemotron 3 Ultra inference server
+
+### Step 6. Monitor startup without interrupting it
+
+Open one terminal for each station to monitor the startup:
+
+```bash
+## station-1
+sudo docker logs -f nemotron-ultra-head
+```
+
+```bash
+## station-2
+sudo docker logs -f nemotron-ultra-worker
+```
+
+During a first start, vLLM loads model shards, compiles kernels, builds the KV cache, autotunes FlashInfer/TRT-LLM kernels, and captures CUDA graphs. The containers can remain `Up` while port 8000 returns HTTP `000`. This is expected while the logs continue to advance.
+
+Do not restart merely because the API is not yet listening. Investigate when a container exits, its restart count increases, an explicit error appears, or the worker logs stop advancing for an extended period.
+
+### Step 7. Validate the API, reasoning, and tool calls
+
+Wait for this message in the head logs:
+
+```text
+Application startup complete.
+```
+
+Then run all API checks on `station-1`.
+
+Confirm the model alias:
+
+```bash
+curl -fsS http://127.0.0.1:8000/v1/models | jq
+```
+
+Send a short chat request:
+
+```bash
+curl -fsS http://127.0.0.1:8000/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "nemotron-ultra",
+    "messages": [
+      {"role": "user", "content": "Reply with exactly: READY"}
+    ],
+    "max_tokens": 16,
+    "temperature": 0
+  }' | jq
+```
+
+### Step 8. Perform routine health checks
+
+Run these checks from `station-1`:
+
+```bash
+sudo docker inspect \
+  --format 'head={{.State.Status}} restarts={{.RestartCount}}' \
+  nemotron-ultra-head
+
+ssh station-2 sudo docker inspect \
+  --format 'worker={{.State.Status}} restarts={{.RestartCount}}' \
+  nemotron-ultra-worker
+
+curl -fsS http://127.0.0.1:8000/v1/models \
+  | jq -e '.data[] | select(.id == "nemotron-ultra")'
+```
+
+All three checks must succeed before treating the agent service as healthy.
+
+Recommended to Proceed to [Install NeMoClaw](https://build.nvidia.com/station/nemoclaw/instructions) on `station-1` with **NVIDIA Nemotron 3 Ultra** as inference backend.
+
+## Phase 4: Troubleshoot or Remove the Deployment
+
+### Step 9. Troubleshoot common failures
+
+| Symptom | Likely cause | Corrective action |
+| --- | --- | --- |
+| API responds, but tool calls appear as text | Tool parser flags are missing or NeMoClaw is using the Responses API | Confirm `--enable-auto-tool-choice`, `--tool-call-parser qwen3_coder`, `--reasoning-parser nemotron_v3`, and Chat Completions. |
+| Direct `curl` works, but NeMoClaw inference is unhealthy | OpenShell cannot reach the host endpoint | Confirm vLLM listens on `0.0.0.0`, inspect the OpenShell subnet, review firewall rules, and rerun onboarding. |
+| NeMoClaw reports the wrong model | The provider route or served-model alias is stale | Verify `/v1/models`, then rerun onboarding or use `nemoclaw inference set` with `nemotron-ultra`. |
+
+Useful diagnostics:
+
+```bash
+## station-1
+sudo docker logs --tail 200 nemotron-ultra-head
+sudo docker exec nemotron-ultra-head \
+  ray status --address=${HEAD_IP}:6379
+ss -ltnp | grep ':8000' || true
+```
+
+```bash
+## station-2
+sudo docker logs --tail 200 nemotron-ultra-worker
+nvidia-smi
+```
+
+### Step 10. Stop or remove the deployment
+
+Remove the inference containers in this order:
+
+```bash
+## station-1
+sudo docker rm -f nemotron-ultra-head
+```
+
+```bash
+## station-2
+sudo docker rm -f nemotron-ultra-worker
+```
+
+Keep the Hugging Face caches unless reclaiming disk is intentional. Retaining the model cache makes a controlled relaunch substantially faster. Reusing the existing containers also preserves their compilation artifacts.
+
+### Related resources
+
+- [NeMoClaw documentation](https://docs.nvidia.com/nemoclaw/latest/index.html)
+- [Set up vLLM for NeMoClaw](https://docs.nvidia.com/nemoclaw/latest/user-guide/openclaw/inference/local-inference/set-up-vllm)
+- [Verify the sandbox inference route](https://docs.nvidia.com/nemoclaw/latest/user-guide/openclaw/inference/validate-inference/verify-inference-route)
+- [NVIDIA Nemotron](https://github.com/NVIDIA-NeMo/Nemotron)
 
 ## Troubleshooting
 
