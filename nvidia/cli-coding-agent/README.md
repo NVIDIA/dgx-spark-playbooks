@@ -404,11 +404,13 @@ Write a short README checklist for a Python project.
 
 Expected output should show the model responding. When you are done, type `/bye` or press `Ctrl+D` to exit before continuing.
 
-## Step 5. Launch Codex CLI with Ollama
+## Step 5. Install and launch Codex CLI with Ollama
 
-**Description**: Use Ollama's built-in [launch method](https://ollama.com/blog/launch) to start [Codex CLI](https://github.com/openai/codex) against your local model. No `~/.codex/config.toml` and no manual `npm install -g @openai/codex` are required — Ollama handles the Codex integration.
+**Description**: Install [Codex CLI](https://github.com/openai/codex), then use Ollama's built-in [launch method](https://ollama.com/blog/launch) to start it against your local model. Ollama configures the local-model integration, but the Codex CLI binary must be installed first. No `~/.codex/config.toml` is required.
 
 ```bash
+npm install -g @openai/codex
+codex --version
 ollama launch codex --model qwen3.6
 ```
 
