@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+#
+# SPDX-FileCopyrightText: Copyright (c) 1993-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copy this file to 00_env.local and edit it for your lab pair.
+# 00_env.local is ignored by git so hostnames/IPs are not committed.
+
+CX8_A_NAME="station-a"
+CX8_A_HOST="<station-a-os-host-or-ip>"
+
+CX8_B_NAME="station-b"
+CX8_B_HOST="<station-b-os-host-or-ip>"
+
+# Used by all SSH commands. Leave commented if the OS user is nvidia.
+# CX8_OS_USER="nvidia"
+
+# Remote workspace defaults to /home/${CX8_OS_USER}/cx8-two-station.
+# Leave commented unless the remote home or workspace path is different.
+# CX8_REMOTE_BASE="/custom/path/cx8-two-station"
+
+# Optional for Step 8 --gdr on systems with more than one CUDA device.
+# Use the GB300 PCI bus ID reported by nvidia-smi, for example 0009:06:00.0.
+# Leave commented if CUDA device 0 is the intended GPU.
+# CX8_GPU_BDF="0009:06:00.0"
+
+# Default DGX Station OS images may use CUDA DMA-BUF/Data Direct for the Step 8
+# --gdr smoke test and may not load nvidia_peermem. Leave this commented unless
+# you specifically need to test the legacy/module-based peermem path.
+# CX8_TRY_NVIDIA_PEERMEM=1
+
+# Optional: override the perftest source used by Step 10 when the installed
+# ib_write_bw lacks --use_cuda_dmabuf / --use_data_direct.
+# CX8_PERFTEST_REPO="https://github.com/linux-rdma/perftest.git"
+# CX8_PERFTEST_REF="26.04.17"
+# CX8_PERFTEST_PREFIX="/usr/local"
+# CX8_PERFTEST_SERVER_READY_TIMEOUT=30
+
+# SSH host-key policy defaults to "ask", so the operator confirms each DUT host
+# key instead of trusting first use automatically. In controlled lab automation,
+# uncomment the next line only if trust-on-first-use is acceptable.
+# CX8_SSH_STRICT_HOST_KEY_CHECKING="accept-new"
+
+# Used by Step 5 and later. Leave commented unless these private rail subnets
+# conflict with your lab.
+# Keep rail0 and rail1 on different subnets, and keep Station A/B paired.
+# STATION_A_RAIL0_CIDR="192.168.100.1/24"
+# STATION_B_RAIL0_CIDR="192.168.100.2/24"
+# STATION_A_RAIL1_CIDR="192.168.101.1/24"
+# STATION_B_RAIL1_CIDR="192.168.101.2/24"

@@ -43,7 +43,7 @@ spec:
       content: |
         # Basic idea
         
-        **NVIDIA NemoClaw** is an open-source reference stack that simplifies running OpenClaw always-on assistants more safely. It installs the **NVIDIA OpenShell** runtime — an environment designed for executing agents with additional security — and connects them to **local vLLM** inference on your DGX Station. A single installer command (`nemoclaw.sh`) detects the DGX Station and offers an **Express Install** that selects the recommended model and policy, installs Node.js, OpenShell, and the NemoClaw CLI, and creates the sandbox.
+        **NVIDIA NemoClaw** is an open-source reference stack that simplifies the safe deployment of specialized autonomous agents. It installs the **NVIDIA OpenShell** runtime — an environment designed for executing agents with additional security — and connects them to **local vLLM** inference on your DGX Station. A single installer command (`nemoclaw.sh`) detects the DGX Station and offers an **Express Install** that selects the recommended model and policy, installs Node.js, OpenShell, and the NemoClaw CLI, and creates the sandbox.
         
         By the end of this playbook you will have a working AI agent inside an OpenShell sandbox, reachable through the **Web UI** or **terminal TUI**, with inference routed to **local vLLM** on the DGX Station. You can optionally add **Telegram** and optional **web search** — all without exposing your host filesystem or network beyond what you explicitly allow in policy.
         
