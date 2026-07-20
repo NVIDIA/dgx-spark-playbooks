@@ -6,6 +6,7 @@
 
 - [Overview](#overview)
 - [Instructions](#instructions)
+  - [Overall flow](#overall-flow)
   - [Command style by control host](#command-style-by-control-host)
 - [Troubleshooting](#troubleshooting)
   - [Stop conditions](#stop-conditions)
@@ -22,18 +23,18 @@ This playbook walks through the **manual fabric bring-up** from a separate **con
 
 ## What you'll accomplish
 
-You'll connect two DGX Stations with two CX8 QSFP rails and prove basic two-rail RoCE connectivity:
+You'll connect two DGX Stations with two CX8 QSFP rails and prove the fabric in two levels:
 
 - Confirm OS SSH access and prerequisite tools on both DGX Stations.
 - Physically cable QSFP0-to-QSFP0 and QSFP1-to-QSFP1 and verify 400 Gb/s link on both rails.
 - Assign private rail IPs and MTU 9000 on each CX8 netdev.
-- Apply RoCEv2 runtime settings and verify the CUDA DMA-BUF/Data Direct GPUDirect path used by the optional `--gdr` smoke test.
-- Optionally install or build a GDR-capable `perftest` if the SOT `ib_write_bw` lacks CUDA DMA-BUF/Data Direct flags.
-- Optionally configure ACS/Data Direct GRUB settings when GPUDirect/Data Direct is required and `rdma_topo` reports ACS/IOMMU prerequisites are not met.
+- Apply RoCEv2 runtime settings.
 - Validate jumbo ping, RDMA port state, and route selection on both rails.
-- Optionally run an RDMA bandwidth smoke test (`ib_write_bw`) per rail.
+- Run a host-memory RDMA bandwidth smoke test (`ib_write_bw`) per rail.
+- For GPU-performance work, optionally validate the GDR path with Step 8 `--gdr`.
+- If needed, optionally install or build a GDR-capable `perftest` and apply ACS/Data Direct GRUB settings.
 
-After Step 7 passes, the basic two-rail RoCE fabric is up. For performance workloads, also run Step 8: use the host-memory test for basic RDMA bandwidth, and use Step 8 `--gdr` to prove the CUDA DMA-BUF/Data Direct GPU-memory RDMA path before moving to NCCL, Ray, vLLM, or other distributed applications.
+After Step 7 passes, the basic two-rail RoCE fabric is up. After host-memory Step 8 passes, basic RDMA bandwidth is proven. Before using the pair for GPU-performance workloads such as NCCL, Ray, vLLM, or other distributed applications, use Step 8 `--gdr` to prove the CUDA DMA-BUF/Data Direct GPU-memory RDMA path.
 
 ## What to know before starting
 
@@ -77,7 +78,7 @@ All required assets can be found [in the playbook repository](https://github.com
 
 ## Time & risk
 
-* **Estimated time:** 60 minutes (including cable connection, SSH/sudo prompts, and validation)
+* **Estimated time:** 45-60 minutes for core bring-up; longer if optional GDR perftest build or ACS/Data Direct reboot is required
 * **Risk level:** Medium
   * Incorrect QSFP cabling (crisscrossed rails) causes hard-to-debug RDMA/NCCL issues
   * Cable thermal or module errors (`Cable error`, `High Temperature`) require physical intervention before software setup can continue
@@ -109,6 +110,7 @@ All required assets can be found [in the playbook repository](https://github.com
 
 > [!TIP]
 > Run all commands from a **control host** — a separate Linux, macOS, or Windows system with `ssh` and `tar` access to both DGX Stations. Do not run the control-host scripts directly on the DUTs.
+> Step 11 may reboot both DUTs; do not run Step 11 from a DUT that is being configured.
 
 > [!NOTE]
 > Before starting, the only file you should create or edit is `00_env.local`. Do not edit the tracked scripts for lab-specific hostnames, IP addresses, or user overrides.
@@ -138,12 +140,19 @@ Edit `00_env.local` before continuing. Set the Station A/B names and OS hosts fo
 | `CX8_PERFTEST_REPO` | Perftest git repository used by optional Step 10 source build | Only if a mirror or fork is required | `https://github.com/linux-rdma/perftest.git` |
 | `CX8_PERFTEST_REF` | Perftest git ref used by optional Step 10 source build | Only if a different tested ref is required | `26.04.17` |
 | `CX8_PERFTEST_PREFIX` | Install prefix used by optional Step 10 source build | Only if `/usr/local` is not desired | `/usr/local` |
+| `CX8_PERFTEST_SERVER_READY_TIMEOUT` | Step 8 wait time for the remote `ib_write_bw` server to become ready | Only if GPU-memory server startup is unusually slow | `30` |
 | `STATION_A_RAIL0_CIDR` / `STATION_B_RAIL0_CIDR` | Rail 0 private IPs assigned by Step 5 | Only if subnet conflicts | `192.168.100.1/24` / `192.168.100.2/24` |
 | `STATION_A_RAIL1_CIDR` / `STATION_B_RAIL1_CIDR` | Rail 1 private IPs assigned by Step 5 | Only if subnet conflicts | `192.168.101.1/24` / `192.168.101.2/24` |
 
 Passwords are intentionally not stored in this directory. SSH and `sudo` will prompt when needed. `00_env.local` is ignored by git.
 
 If the default private rail subnets conflict with your lab, change the four `STATION_*_RAIL*_CIDR` values before Step 5. Keep rail 0 and rail 1 on different subnets.
+
+### Overall flow
+
+Use Steps 1-8 without `--gdr` as the core bring-up path. That proves both rails are cabled, configured, routable, jumbo-ping clean, and RDMA-capable with host memory.
+
+Use Steps 8 `--gdr`, 10, and 11 only when you need GPU-memory RDMA/Data Direct performance validation. Those steps are intentionally separate because they may require package installation, ACS/Data Direct GRUB configuration, and reboot.
 
 ### Command style by control host
 
@@ -176,6 +185,8 @@ The Python wrapper uses the same `00_env.local` file as the shell scripts. Numer
 | 11 | `./11_configure_acs_grub.sh` | `python3 ./cx8_setup.py 11` |
 | 11 apply | `./11_configure_acs_grub.sh --apply` | `python3 ./cx8_setup.py 11 --apply` |
 | 99 | `./99_cleanup_runtime.sh` | `python3 ./cx8_setup.py 99` |
+
+For unattended lab loops, configure SSH keys and passwordless `sudo` outside this playbook. The playbook supports that setup but does not create it or store credentials.
 
 ## Step 1. Probe OS SSH access
 
@@ -294,6 +305,8 @@ Use `--persist` only when this pair should keep the same rail IP/MTU settings af
 ./05_configure_rails_runtime.sh --persist
 ```
 
+`--persist` is not required for the normal temporary bring-up flow and should not be treated as a bug workaround. It is the right choice when the validation flow intentionally crosses a reboot, when a longer GDR/Data Direct validation run should keep the rail settings stable, or when this pair is expected to keep the same private CX8 rail addresses for repeated performance runs.
+
 To remove persistent netplan configuration later:
 
 ```bash
@@ -320,6 +333,8 @@ This step also runs privileged commands on each DUT, so expect SSH and remote `s
 If the script prints a yellow `WARN` for `cma_roce_tos`, continue to Step 7 for basic RoCE validation. If `CX8_TRY_NVIDIA_PEERMEM=1` was set and `nvidia_peermem` fails with `Invalid argument`, that means only the peermem-based GPUDirect path is unavailable; it does not block basic rail/RoCE validation or the CUDA DMA-BUF/Data Direct GPUDirect path used by Step 8 `--gdr`.
 
 If Step 6 says `ib_write_bw` does not advertise `--use_cuda_dmabuf` and `--use_data_direct`, the installed `perftest` package is not ready for Step 8 `--gdr`. Continue with Step 7 and the non-`--gdr` host-memory Step 8 test first. If GPU-memory RDMA validation is required, run optional Step 10 to install or build a GDR-capable perftest, then rerun Step 6.
+
+When Step 10 installs `ib_write_bw` under `/usr/local`, Step 6 checks that prefix before the OS default path. This avoids a false warning from `sudo` using an older `/usr/bin/ib_write_bw`.
 
 ## Step 7. Validate basic setup
 
@@ -363,6 +378,10 @@ This step opens SSH sessions to both DUTs. On Linux/macOS, the wrapper uses temp
 CX8_DISABLE_SSH_MUX=1 ./08_run_perftest_pair.sh --rail 0
 ```
 
+The wrapper waits until the remote server is ready before starting the client. The default wait is 30 seconds; change `CX8_PERFTEST_SERVER_READY_TIMEOUT` only if the GDR server needs more time on your image.
+
+The non-`--gdr` host-memory test is a functional RDMA smoke test. It uses a simple single-QP configuration and may report less than 400 Gb/s on a 400G rail. Use Step 8 `--gdr` for GPU-memory/Data Direct performance acceptance.
+
 Rail 0:
 
 ```bash
@@ -400,6 +419,8 @@ Each script writes logs under `{repo_root}/logs/` on the control host. Remote lo
 
 Use this only when Step 6 or Step 8 reports that `ib_write_bw` does not support `--use_cuda_dmabuf` or `--use_data_direct`. It first tries the OS package path, then falls back to building `linux-rdma/perftest` from source with CUDA header support and installs it under `/usr/local` by default. The fallback source build defaults to pinned upstream tag `26.04.17` rather than a moving branch.
 
+This is not a read-only smoke test. It may install build dependencies or upgrade related OS packages through the DUT package manager. Use `--check-only` first if you only want to inspect the current `ib_write_bw` capability.
+
 ```bash
 ./10_install_perftest_gdr.sh
 ```
@@ -426,6 +447,8 @@ Use this only when Step 8 `--gdr` reaches the CUDA DMA-BUF/Data Direct path but 
 
 Step 11 is a selective `config_acs=` policy generated by `rdma_topo`; it is not a blanket "disable ACS everywhere" change. See the ACS/Data Direct appendix for an example of the default-vs-expected values this step fixes.
 
+Run Step 11 from the separate control host. If a DUT is used as the control host, rebooting that DUT will interrupt the playbook and can leave the two systems in different states.
+
 
 First inspect without changing the system:
 
@@ -439,17 +462,17 @@ If the output shows ACS/Data Direct failures and you need GPUDirect/Data Direct 
 ./11_configure_acs_grub.sh --apply
 ```
 
-Reboot both DUTs after `--apply`, then rerun:
+Before rebooting, confirm both DUTs are idle, no shared workload is active, and the workload owner has approved the downtime. Reboot both DUTs after `--apply`, then rerun:
 
 ```bash
-./05_configure_rails_runtime.sh
+./05_configure_rails_runtime.sh --persist
 ./06_configure_roce_gdr_runtime.sh
 ./07_validate_setup.sh
 ./08_run_perftest_pair.sh --rail 0 --gdr
 ./08_run_perftest_pair.sh --rail 1 --gdr
 ```
 
-Step 3 is optional after reboot unless the OS/packages changed. Step 4 is optional unless the cable/link state is uncertain. The important point is that runtime rail IP/MTU and RoCE settings may need to be restored after reboot before retrying Step 8.
+Step 3 is optional after reboot unless the OS/packages changed. Step 4 is optional unless the cable/link state is uncertain. Step 5 uses `--persist` here because this advanced GDR path intentionally crosses a reboot and often continues into longer performance validation, so the rail IP/MTU configuration should remain stable without rerunning Step 5 manually.
 
 ## Step 99. Optional cleanup
 
@@ -481,12 +504,22 @@ Options can be combined:
 
 After cleanup, rerun from Step 3 or Step 5 depending on how much state you want to re-check. If you changed the rail CIDRs in `00_env.local`, cleanup removes those configured CIDRs rather than the default example addresses.
 
+## Troubleshooting quick reference
+
+| Symptom | Meaning | Action |
+|---|---|---|
+| Step 7 or Step 8 says a rail IP is missing | The temporary runtime rail IP/MTU setup is not present, commonly after reboot or network service refresh | Rerun Step 5, then Step 6 and Step 7. Use Step 5 `--persist` when the pair must keep rail IPs after reboot or across repeated performance runs. |
+| Step 8 host-memory bandwidth is around 220-230 Gb/s on a 400G rail | Single-QP host-memory smoke test is below line-rate; the rail can still be functional | Use the result as basic RDMA proof. For GPU performance acceptance, run Step 8 `--gdr`. |
+| Step 8 `--gdr` server exits before the client connects | Perftest server failed during CUDA/GDR setup or rail IP state is stale | Inspect the saved server log. Rerun Step 5/6/7 first if rail IP or GDR prerequisites changed. |
+| A killed or interrupted `--gdr` run leaves CUDA/GPU state stuck | CUDA context cleanup may not have completed after interruption | Stop stale `ib_write_bw` processes. Only if the GPU is idle, no shared workload is active, and policy/workload-owner approval allows it, reset the GPU with `sudo nvidia-smi --gpu-reset -i <gpu-index>`, then rerun Step 8. |
+| Step 6 says `nvidia_peermem` is not loaded | Default path can use CUDA DMA-BUF/Data Direct instead of legacy peermem | Continue unless you explicitly need peermem. Validate the GDR path with Step 8 `--gdr`. |
+
 ## Next steps
 
 Use the validation level that matches the next workload:
 
 - Step 7 pass means the two DGX Stations have basic two-rail RoCE connectivity: correct rail IPs, MTU, route selection, link state, jumbo ping, and RDMA port visibility.
-- Step 8 without `--gdr` pass means host-memory RDMA bandwidth works on each rail.
+- Step 8 without `--gdr` pass means host-memory RDMA bandwidth works on each rail. It is not the line-rate acceptance bar for GPU workloads.
 - Step 8 with `--gdr` pass means the CUDA DMA-BUF/Data Direct GPU-memory RDMA path works. Use this bar before accepting the setup for GPU-performance work such as NCCL, vLLM, or other distributed AI workloads.
 
 Full NCCL/application validation still requires container RDMA device exposure, NCCL environment selection, and a distributed launcher configuration.

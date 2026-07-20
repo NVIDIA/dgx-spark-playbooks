@@ -151,8 +151,9 @@ All required assets are handled by the NemoClaw installer. No manual cloning is 
 
 - **Estimated time:** Installation and onboarding take about 30–60 minutes, plus the approximately 352 GB model download. Total time depends heavily on network and storage performance. Optional Brave, Telegram, and cloudflared steps add time if you do them in a second session.
 - **Risk level:** Medium — you are running an AI agent in a sandbox; risks are reduced by isolation but not eliminated. Use a clean environment and do not connect sensitive data or production accounts.
-- **Last Updated:** 07/16/2026
-  - Make the DGX Station Express Install the primary setup path
+- **Last Updated:** 07/19/2026
+  - Update instructions to NemoClaw express installer 
+  - Add instructions to run NemoClaw with Nemotron 3 Ultra on two connected DGX Station machines
 
 ## Instructions
 
@@ -767,11 +768,14 @@ For details, see the official NemoClaw [command reference](https://docs.nvidia.c
 
 ### Step 8. Stop services
 
-Stop the cloudflared tunnel:
+Stop external public access and associated services:
 
 ```bash
 nemoclaw tunnel stop
 ```
+
+> [!NOTE]
+> For OpenClaw, this may also stop the in-sandbox gateway and temporarily interrupt dashboard, agent, and messaging access. It does not delete persistent session data.
 
 Stop the port forward:
 
@@ -830,7 +834,7 @@ The uninstaller runs up to 7 steps:
 | `nemoclaw my-assistant logs --follow` | Stream sandbox logs in real time |
 | `nemoclaw list` | List all registered sandboxes |
 | `nemoclaw tunnel start` | Start cloudflared tunnel (public URL for remote Web UI access) |
-| `nemoclaw tunnel stop` | Stop the cloudflared tunnel |
+| `nemoclaw tunnel stop` | Stop the public tunnel; may also stop the in-sandbox OpenClaw gateway |
 | `nemoclaw my-assistant dashboard-url --quiet` | Print the full tokenized Web UI URL (includes auto-assigned port) |
 | `openshell term` | Open the monitoring TUI on the host |
 | `openshell forward list` | List active port forwards |
@@ -847,7 +851,7 @@ Below steps deploy **NVIDIA Nemotron 3 Ultra** across 2 DGX Station with GB300 G
 
 ### Step 1. Prerequisites
 - Complete [Connect Two DGX Stations for Distributed Workloads](https://build.nvidia.com/station/connect-two-stations/instructions) before starting this tab. Both CX8 RoCE rails must be configured and validated.
-- Huggging Face [Access Token](https://huggingface.co/docs/hub/en/security-tokens) for downloading the model.
+- Hugging Face [Access Token](https://huggingface.co/docs/hub/en/security-tokens) for downloading the model.
 - Docker and [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) installed on both DGX Stations.
 - Both DGX Stations must be connected to each other via CX8 RoCE rails.
 
@@ -953,7 +957,7 @@ sudo docker run -d --name nemotron-ultra-head \
   --device=/dev/infiniband/uverbs1 \
   --ulimit memlock=-1 \
   -e HEAD_IP="${HEAD_IP}" \
-  -e MODEL="${HF_MODEL}" \
+  -e HF_MODEL="${HF_MODEL}" \
   -e SERVED_MODEL="${SERVED_MODEL}" \
   -e VLLM_HOST_IP="${HEAD_IP}" \
   -e VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=7200 \
@@ -974,7 +978,8 @@ sudo docker run -d --name nemotron-ultra-head \
   -v "${HOME}/.cache/huggingface:/models/huggingface" \
   --entrypoint bash "${IMG}" -lc '
     set -euo pipefail
-    python3 -m pip install --break-system-packages "ray[cgraph]"
+    python3 -m pip install --break-system-packages "ray==2.56.0"
+    python3 -m pip install --break-system-packages --ignore-installed "blinker==1.9.0" "aiperf==0.11.0"
     ray start --head --node-ip-address="${HEAD_IP}" --port=6379 --num-gpus=1
 
     python3 - <<"PY"
@@ -1067,9 +1072,7 @@ sudo docker run -d --name nemotron-ultra-worker \
   -v "${HOME}/.cache/huggingface:/models/huggingface" \
   --entrypoint bash "${IMG}" -lc '
     set -euo pipefail
-
-    python3 -m pip install --break-system-packages "ray[cgraph]"
-
+    python3 -m pip install --break-system-packages "ray==2.56.0"
     exec ray start --address="${HEAD_IP}:6379" --node-ip-address="${WORKER_IP}" --num-gpus=1 --block
   '
 ```
@@ -1144,7 +1147,7 @@ curl -fsS http://127.0.0.1:8000/v1/models \
 
 All three checks must succeed before treating the agent service as healthy.
 
-Recommended to Proceed to [Install NeMoClaw](https://build.nvidia.com/station/nemoclaw/instructions) on `station-1` with **NVIDIA Nemotron 3 Ultra** as inference backend.
+Recommended to Proceed to [Install NemoClaw](https://build.nvidia.com/station/nemoclaw/instructions) on `station-1` with **NVIDIA Nemotron 3 Ultra** as inference backend.
 
 ## Phase 4: Troubleshoot or Remove the Deployment
 
@@ -1152,9 +1155,9 @@ Recommended to Proceed to [Install NeMoClaw](https://build.nvidia.com/station/ne
 
 | Symptom | Likely cause | Corrective action |
 | --- | --- | --- |
-| API responds, but tool calls appear as text | Tool parser flags are missing or NeMoClaw is using the Responses API | Confirm `--enable-auto-tool-choice`, `--tool-call-parser qwen3_coder`, `--reasoning-parser nemotron_v3`, and Chat Completions. |
-| Direct `curl` works, but NeMoClaw inference is unhealthy | OpenShell cannot reach the host endpoint | Confirm vLLM listens on `0.0.0.0`, inspect the OpenShell subnet, review firewall rules, and rerun onboarding. |
-| NeMoClaw reports the wrong model | The provider route or served-model alias is stale | Verify `/v1/models`, then rerun onboarding or use `nemoclaw inference set` with `nemotron-ultra`. |
+| API responds, but tool calls appear as text | Tool parser flags are missing or NemoClaw is using the Responses API | Confirm `--enable-auto-tool-choice`, `--tool-call-parser qwen3_coder`, `--reasoning-parser nemotron_v3`, and Chat Completions. |
+| Direct `curl` works, but NemoClaw inference is unhealthy | OpenShell cannot reach the host endpoint | Confirm vLLM listens on `0.0.0.0`, inspect the OpenShell subnet, review firewall rules, and rerun onboarding. |
+| NemoClaw reports the wrong model | The provider route or served-model alias is stale | Verify `/v1/models`, then rerun onboarding or use `nemoclaw inference set` with `nemotron-ultra`. |
 
 Useful diagnostics:
 
@@ -1190,8 +1193,8 @@ Keep the Hugging Face caches unless reclaiming disk is intentional. Retaining th
 
 ### Related resources
 
-- [NeMoClaw documentation](https://docs.nvidia.com/nemoclaw/latest/index.html)
-- [Set up vLLM for NeMoClaw](https://docs.nvidia.com/nemoclaw/latest/user-guide/openclaw/inference/local-inference/set-up-vllm)
+- [NemoClaw documentation](https://docs.nvidia.com/nemoclaw/latest/index.html)
+- [Set up vLLM for NemoClaw](https://docs.nvidia.com/nemoclaw/latest/user-guide/openclaw/inference/local-inference/set-up-vllm)
 - [Verify the sandbox inference route](https://docs.nvidia.com/nemoclaw/latest/user-guide/openclaw/inference/validate-inference/verify-inference-route)
 - [NVIDIA Nemotron](https://github.com/NVIDIA-NeMo/Nemotron)
 
