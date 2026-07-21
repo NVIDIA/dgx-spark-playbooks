@@ -2,6 +2,18 @@
 # SPDX-FileCopyrightText: Copyright (c) 1993-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
 x-build-base: &build-base
   build:
     context: .
@@ -40,7 +52,7 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
-
+      
   qwen3-embedding:
     <<: *build-base
     container_name: qwen3-embedding
@@ -53,7 +65,7 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    command:
+    command: 
       - "-m"
       - "/models/Qwen3-Embedding-4B-Q8_0.gguf"
       - "--port"
@@ -63,9 +75,36 @@ services:
       - "--jinja"
       - "--embeddings"
 
-  gpt-oss-20b:
+  # Uncomment next block if you want to use gpt-oss-20b
+  # gpt-oss-20b:
+  #   <<: *build-base
+  #   container_name: gpt-oss-20b
+  #   volumes:
+  #     - ./models:/models
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: all
+  #             capabilities: [gpu]
+  #   command: 
+  #     - "-m"
+  #     - "/models/gpt-oss-20b-mxfp4.gguf"
+  #     - "--port"
+  #     - "8000"
+  #     - "--host"
+  #     - "0.0.0.0"
+  #     - "-n"
+  #     - "2048"
+  #     - "--n-gpu-layers"
+  #     - "999"
+  #     - "--jinja"
+
+  # Comment next block if you want to use gpt-oss-20b
+  gpt-oss-120b:
     <<: *build-base
-    container_name: gpt-oss-20b
+    container_name: gpt-oss-120b
     volumes:
       - ./models:/models
     deploy:
@@ -75,17 +114,17 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    command:
+    command: 
       - "-m"
-      - "/models/gpt-oss-20b-mxfp4.gguf"
+      - "/models/gpt-oss-120b-mxfp4-00001-of-00003.gguf"
       - "--port"
       - "8000"
       - "--host"
       - "0.0.0.0"
       - "-n"
-      - "2048"
+      - "65536"
       - "--n-gpu-layers"
-      - "999"
+      - "70"
       - "--jinja"
 
   deepseek-coder:
@@ -100,7 +139,7 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    command:
+    command: 
       - "-m"
       - "/models/deepseek-coder-6.7b-instruct.Q8_0.gguf"
       - "--port"
@@ -115,7 +154,7 @@ services:
 
 volumes:
   ollama-data:
-
+  
 networks:
   default:
     name: chatbot-net
