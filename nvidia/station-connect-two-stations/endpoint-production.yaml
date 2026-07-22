@@ -400,7 +400,11 @@ spec:
         
         Prerequisite: Step 7 must pass on both DUTs. Do not use Step 8 to bypass a Step 7 red `ERROR` or `FAIL`. If Step 7 passed with yellow speed warnings, Step 8 is allowed only as a limited-speed functional smoke test; expect lower bandwidth and keep the result labeled as degraded, not 800G accepted.
         
-        This step opens SSH sessions to both DUTs. On Linux/macOS, the wrapper uses temporary SSH connection reuse during one script run, so expect one password prompt for Station A and one for Station B in the normal case. On Windows Git Bash/MSYS/Cygwin, SSH multiplexing is disabled automatically because OpenSSH control-master sockets can reset there; extra password prompts are expected. SSH multiplexing affects only SSH connection reuse and does not change RDMA, Data Direct, or perftest behavior. See the troubleshooting guide only if the control host reports an SSH control-socket error.
+        This step opens SSH sessions to both DUTs. On Linux/macOS, the wrapper uses temporary SSH connection reuse during one script run, so expect one password prompt for Station A and one for Station B in the normal case. On Windows Git Bash/MSYS/Cygwin, SSH multiplexing is disabled automatically because OpenSSH control-master sockets can reset there; extra password prompts are expected. Disable multiplexing manually on any host with:
+        
+        ```bash
+        CX8_DISABLE_SSH_MUX=1 ./08_run_perftest_pair.sh --rail 0
+        ```
         
         The wrapper waits until the remote server is ready before starting the client. The default wait is 30 seconds; change `CX8_PERFTEST_SERVER_READY_TIMEOUT` only if the GDR server needs more time on your image.
         
@@ -437,7 +441,7 @@ spec:
         ./09_collect_logs.sh
         ```
         
-        By default, each script writes logs under `./logs/` in the current playbook `assets` directory on the control host. Remote logs are written under `${CX8_REMOTE_BASE}/logs/` on each DUT.
+        Each script writes logs under `{repo_root}/logs/` on the control host. Remote logs are written under `${CX8_REMOTE_BASE}/logs/` on each DUT.
         
         # Step 10. Optional install or upgrade perftest for GPUDirect/Data Direct
         
@@ -657,7 +661,7 @@ spec:
         | Step 8 perftest fails or shows very low bandwidth | Wrong rail selected, firewall, or degraded link speed | Confirm Step 7 passed. Run perftest per rail separately. Check Step 4 speed reports. Verify rail IPs and routes match the selected `--rail` index. |
         | NCCL shows `NET/Socket` instead of `NET/IB` after fabric passes | Container missing RDMA devices, wrong `NCCL_IB_HCA`, or launcher config | Expose `/dev/infiniband` to the runtime. Set `NCCL_IB_HCA=mlx5_0,mlx5_1`. Use `NCCL_DEBUG=INFO` and confirm both HCAs appear in the log. |
         | `rdma_topo check` reports ACS/Data Direct prerequisites not met | PCIe topology or ACS configuration not set for GPUDirect/Data Direct | Complete basic two-rail setup first (Step 7 pass). Run Step 11 dry-run to capture the current state, then use `./11_configure_acs_grub.sh --apply` only when GPUDirect/Data Direct validation is required. Reboot before retesting, then restore runtime setup with Steps 5, 6, and 7 before Step 8 `--gdr`. |
-        | SSH control-socket reset or repeated connection-reuse failure | SSH multiplexing is incompatible with the control-host environment | Retry with `CX8_DISABLE_SSH_MUX=1 ./08_run_perftest_pair.sh --rail <0-or-1>`. This affects only SSH connection reuse, not RDMA, Data Direct, or perftest behavior. Windows Git Bash/MSYS/Cygwin disables multiplexing automatically. |
+        | Extra SSH password prompts on Windows | SSH multiplexing disabled on Git Bash/MSYS/Cygwin | Expected behavior. Use `CX8_DISABLE_SSH_MUX=1` explicitly if needed. Configure SSH keys to reduce prompts. |
         | Rail settings lost after reboot | Step 5 run without `--persist` | Expected for runtime setup. Rerun `./05_configure_rails_runtime.sh` after reboot, or use `--persist` if settings must survive reboot. |
         | Persistent netplan needs removal | Step 5 was run with `--persist` and you want to undo | Run `./99_cleanup_runtime.sh --remove-persist` or manually remove `/etc/netplan/60-cx8-fabric.yaml` on both DUTs and `sudo netplan apply`. |
         

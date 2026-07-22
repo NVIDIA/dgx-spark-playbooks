@@ -23,6 +23,7 @@ print_effective_config
 warn_count=0
 peermem_ready=0
 dmabuf_data_direct_ready=0
+ib_write_bw_path="$(need_ib_write_bw)"
 warn() {
   warn_count=$((warn_count + 1))
   echo "WARN: $*"
@@ -60,12 +61,13 @@ else
   warn "cma_roce_tos not found; skipped RoCE ToS setup"
 fi
 
-if ib_write_bw --help 2>&1 | grep -q -- '--use_cuda_dmabuf' && \
-   ib_write_bw --help 2>&1 | grep -q -- '--use_data_direct'; then
+info "Checking ib_write_bw at ${ib_write_bw_path}"
+if "${ib_write_bw_path}" --help 2>&1 | grep -q -- '--use_cuda_dmabuf' && \
+   "${ib_write_bw_path}" --help 2>&1 | grep -q -- '--use_data_direct'; then
   dmabuf_data_direct_ready=1
   echo "PASS: CUDA DMA-BUF/Data Direct GPUDirect path is available for Step 8 --gdr"
 else
-  warn "ib_write_bw does not advertise CUDA DMA-BUF/Data Direct flags for Step 8 --gdr"
+  warn "${ib_write_bw_path} does not advertise CUDA DMA-BUF/Data Direct flags for Step 8 --gdr"
 fi
 
 if lsmod | grep -E '^nvidia_peermem' >/dev/null; then

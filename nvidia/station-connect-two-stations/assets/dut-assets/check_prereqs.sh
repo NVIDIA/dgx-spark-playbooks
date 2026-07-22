@@ -28,7 +28,7 @@ for cmd in lspci nvidia-smi ibdev2netdev ibv_devinfo ip ethtool; do
     echo "missing ${cmd}"
   fi
 done
-for cmd in show_gids rdma_topo flint mlxconfig mlnx_qos cma_roce_tos ib_write_bw; do
+for cmd in show_gids rdma_topo flint mlxconfig mlnx_qos cma_roce_tos ib_write_bw stdbuf; do
   if command -v "${cmd}" >/dev/null 2>&1; then
     echo "optional_ok ${cmd}=$(command -v "${cmd}")"
   else

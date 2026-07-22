@@ -60,7 +60,7 @@ done
 if [[ "${MODE}" == "client" ]]; then
   need_role
 fi
-need_cmd ib_write_bw
+ib_write_bw_path="$(need_ib_write_bw)"
 detect_netifs
 
 hca="$(hca_for_rail "${RAIL}")"
@@ -71,11 +71,11 @@ fi
 args=(-d "${hca}" -F --report_gbits -s "${SIZE}" -D "${DURATION}")
 
 if [[ "${GDR}" == "1" ]]; then
-  help_text="$(ib_write_bw --help 2>&1 || true)"
+  help_text="$("${ib_write_bw_path}" --help 2>&1 || true)"
   grep -q -- '--use_cuda_dmabuf' <<<"${help_text}" || \
-    die "ib_write_bw does not support --use_cuda_dmabuf; install a perftest build with CUDA DMA-BUF support"
+    die "${ib_write_bw_path} does not support --use_cuda_dmabuf; install a perftest build with CUDA DMA-BUF support"
   grep -q -- '--use_data_direct' <<<"${help_text}" || \
-    die "ib_write_bw does not support --use_data_direct; install a perftest build with Data Direct support"
+    die "${ib_write_bw_path} does not support --use_data_direct; install a perftest build with Data Direct support"
 
   if lsmod | grep -E '^nvidia_peermem' >/dev/null; then
     echo "INFO: nvidia_peermem is loaded"
@@ -94,10 +94,16 @@ if [[ "${GDR}" == "1" ]]; then
 fi
 
 if [[ "${MODE}" == "server" ]]; then
+  # Step 8 redirects server output to a file and waits for perftest's readiness
+  # banner before launching the client. Force line buffering so that banner is
+  # observable immediately instead of remaining in the stdio buffer.
+  need_cmd stdbuf
+  echo "Using ib_write_bw: ${ib_write_bw_path}"
   echo "Starting ib_write_bw server on ${hca}; start client on peer."
-  exec ib_write_bw "${args[@]}"
+  exec stdbuf -oL "${ib_write_bw_path}" "${args[@]}"
 else
   peer="$(peer_ip_for_rail "${RAIL}")"
+  echo "Using ib_write_bw: ${ib_write_bw_path}"
   echo "Starting ib_write_bw client on ${hca}; peer=${peer}"
-  exec ib_write_bw "${args[@]}" "${peer}"
+  exec "${ib_write_bw_path}" "${args[@]}" "${peer}"
 fi

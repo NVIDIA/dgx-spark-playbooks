@@ -55,6 +55,22 @@ need_cmd() {
   command -v "$1" >/dev/null 2>&1 || die "Missing command: $1"
 }
 
+ib_write_bw_bin() {
+  local candidate=""
+  if [[ -n "${PERFTEST_PREFIX}" ]]; then
+    candidate="${PERFTEST_PREFIX%/}/bin/ib_write_bw"
+    if [[ -x "${candidate}" ]]; then
+      echo "${candidate}"
+      return 0
+    fi
+  fi
+  command -v ib_write_bw 2>/dev/null || return 1
+}
+
+need_ib_write_bw() {
+  ib_write_bw_bin || die "Missing command: ib_write_bw"
+}
+
 need_role() {
   [[ "${ROLE}" == "station-a" || "${ROLE}" == "station-b" ]] || \
     die "Set ROLE=station-a or ROLE=station-b"
