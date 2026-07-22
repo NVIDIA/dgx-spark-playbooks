@@ -62,8 +62,8 @@ All required files for this playbook can be found [here on GitHub](https://githu
 
 - **Rollback:** Network changes can be reversed by removing netplan configs or IP assignments
 
-- **Last Updated:** 3/19/2026
-  * First publication
+- **Last Updated:** 7/21/2026
+  * Network configuration updates
 
 ## Run on Four Sparks
 
@@ -179,10 +179,9 @@ cd dgx-spark-playbooks/nvidia/multi-sparks-through-switch/assets/spark_cluster_s
 
 ### 4.2 Manual Cluster networking configuration
 
-In this case, you can choose one of the options to assign the IPs to the CX7 logical interfaces. Options 1, 2 and 3 are mutually exclusive.
+In this case, you can choose one of the options to assign the IPs to the CX7 logical interfaces. Options 1 and 2 are mutually exclusive.
 1. DHCP server on the switch (recommended, if it is supported)
-2. Link local IP addressing (netplan is the same across all nodes)
-3. Manual IP addressing (netplan will be different on each node but provides more control and deterministic IPs)
+2. Manual IP addressing (netplan will be different on each node but provides more control and deterministic IPs)
 
 #### Option 1: Configure DHCP server on the switch
 
@@ -216,30 +215,7 @@ nvidia@dgx-spark-1:~$ ip addr show enp1s0f1np1 | grep -w inet
     inet 100.100.100.4/24 brd 100.100.100.255 scope global noprefixroute enp1s0f1np1
 ```
 
-#### Option 2: Automatic Link local IP Assignment
-
-Configure network interfaces using netplan on all DGX Spark nodes for automatic link-local addressing:
-
-```bash
-## Create the netplan configuration file
-sudo tee /etc/netplan/40-cx7.yaml > /dev/null <<EOF
-network:
-  version: 2
-  ethernets:
-    enp1s0f1np1:
-      link-local: [ ipv4 ]
-    enP2p1s0f1np1:
-      link-local: [ ipv4 ]
-EOF
-
-## Set appropriate permissions
-sudo chmod 600 /etc/netplan/40-cx7.yaml
-
-## Apply the configuration
-sudo netplan apply
-```
-
-#### Option 3: Manual IP Assignment with the netplan configuration file
+#### Option 2: Manual IP Assignment with the netplan configuration file
 
 > [!NOTE]
 > `enp1s0f1np1` and `enP2p1s0f1np1` are assigned to **different subnets** (`192.168.100.x/24` and `192.168.101.x/24` respectively). This is required — assigning two distinct network interfaces to the same subnet causes networking and software conflicts (e.g., routing ambiguity and NCCL communication failures).
@@ -353,10 +329,10 @@ bash ./discover-sparks
 
 Expected output similar to the below, with different IPs and node names. You may see up to two IPs for each node as two interfaces (eg. **enp1s0f1np1** and **enP2p1s0f1np1**) have IP addresses assigned. This is expected and does not cause any issues. The first time you run the script, you'll be prompted for your password for each node.
 ```
-Found: 169.254.35.62 (dgx-spark-1.local)
-Found: 169.254.35.63 (dgx-spark-2.local)
-Found: 169.254.35.64 (dgx-spark-3.local)
-Found: 169.254.35.65 (dgx-spark-4.local)
+Found: 192.168.100.1 (dgx-spark-1.local)
+Found: 192.168.100.2 (dgx-spark-2.local)
+Found: 192.168.100.3 (dgx-spark-3.local)
+Found: 192.168.100.4 (dgx-spark-4.local)
 
 Setting up bidirectional SSH access (local <-> remote nodes)...
 You may be prompted for your password for each node.
@@ -380,13 +356,13 @@ Example output:
 nvidia@dgx-spark-1:~$ ip addr show enp1s0f1np1
     4: enp1s0f1np1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP group default qlen 1000
         link/ether 3c:6d:66:cc:b3:b7 brd ff:ff:ff:ff:ff:ff
-        inet **169.254.35.62**/16 brd 169.254.255.255 scope link noprefixroute enp1s0f1np1
+        inet **192.168.100.1**/24 brd 192.168.100.255 scope global noprefixroute enp1s0f1np1
           valid_lft forever preferred_lft forever
         inet6 fe80::3e6d:66ff:fecc:b3b7/64 scope link
           valid_lft forever preferred_lft forever
 ```
 
-In this example, the IP address for Node 1 is **169.254.35.62**. Repeat the process for other nodes.
+In this example, the IP address for Node 1 is **192.168.100.1**. Repeat the process for other nodes.
 
 On all nodes, run the following commands to enable passwordless SSH:
 ```bash
