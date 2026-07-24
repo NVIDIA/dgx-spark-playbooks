@@ -120,8 +120,8 @@ All required assets can be found [in the playbook repository](https://github.com
 Clone the playbook repository on your control host and create the local environment file.
 
 ```bash
-git clone https://github.com/NVIDIA/dgx-spark-playbooks
-cd dgx-station-playbooks/nvidia/station-connect-two-stations/assets
+git clone https://github.com/NVIDIA/dgx-spark-playbooks dgx-spark-playbooks
+cd dgx-spark-playbooks/nvidia/station-connect-two-stations/assets
 cp 00_env.local.example 00_env.local
 ```
 
@@ -274,7 +274,7 @@ Recommended: use the temporary runtime setup for normal bring-up and validation.
 ./05_configure_rails_runtime.sh
 ```
 
-You can rerun this command safely. If Step 7 later reports that a rail is missing its configured `/24` address, rerun Step 5 and then rerun Step 7.
+You can rerun this command safely. If `./07_validate_setup.sh` later reports that a rail is missing its configured `/24` address, rerun `./05_configure_rails_runtime.sh` and then rerun `./07_validate_setup.sh`.
 
 This step runs privileged commands on each DUT. Expect up to two prompts per DUT: one for OS SSH login and one for remote `sudo`. With SSH keys and passwordless sudo configured, those prompts can be reduced, but this playbook does not require storing passwords.
 
@@ -332,9 +332,9 @@ This step also runs privileged commands on each DUT, so expect SSH and remote `s
 
 If the script prints a yellow `WARN` for `cma_roce_tos`, continue to Step 7 for basic RoCE validation. If `CX8_TRY_NVIDIA_PEERMEM=1` was set and `nvidia_peermem` fails with `Invalid argument`, that means only the peermem-based GPUDirect path is unavailable; it does not block basic rail/RoCE validation or the CUDA DMA-BUF/Data Direct GPUDirect path used by Step 8 `--gdr`.
 
-If Step 6 says `ib_write_bw` does not advertise `--use_cuda_dmabuf` and `--use_data_direct`, the installed `perftest` package is not ready for Step 8 `--gdr`. Continue with Step 7 and the non-`--gdr` host-memory Step 8 test first. If GPU-memory RDMA validation is required, run optional Step 10 to install or build a GDR-capable perftest, then rerun Step 6.
+If `./06_configure_roce_gdr_runtime.sh` says `ib_write_bw` does not advertise `--use_cuda_dmabuf` and `--use_data_direct`, the installed `perftest` package is not ready for Step 8 `--gdr`. Continue with Step 7 and the non-`--gdr` host-memory Step 8 test first. If GPU-memory RDMA validation is required, run optional Step 10 to install or build a GDR-capable perftest, then rerun `./06_configure_roce_gdr_runtime.sh`.
 
-When Step 10 installs `ib_write_bw` under `/usr/local`, Step 6 checks that prefix before the OS default path. This avoids a false warning from `sudo` using an older `/usr/bin/ib_write_bw`.
+When Step 10 installs `ib_write_bw` under `/usr/local`, `./06_configure_roce_gdr_runtime.sh` checks that prefix before the OS default path. This avoids a false warning from `sudo` using an older `/usr/bin/ib_write_bw`.
 
 ## Step 7. Validate basic setup
 
@@ -504,7 +504,7 @@ After cleanup, rerun from Step 3 or Step 5 depending on how much state you want 
 
 | Symptom | Meaning | Action |
 |---|---|---|
-| Step 7 or Step 8 says a rail IP is missing | The temporary runtime rail IP/MTU setup is not present, commonly after reboot or network service refresh | Rerun Step 5, then Step 6 and Step 7. Use Step 5 `--persist` when the pair must keep rail IPs after reboot or across repeated performance runs. |
+| Step 7 or Step 8 says a rail IP is missing | The temporary runtime rail IP/MTU setup is not present, commonly after reboot or network service refresh | Rerun `./05_configure_rails_runtime.sh`, then `./06_configure_roce_gdr_runtime.sh` and `./07_validate_setup.sh`. Use `./05_configure_rails_runtime.sh --persist` when the pair must keep rail IPs after reboot or across repeated performance runs. |
 | Step 8 host-memory bandwidth is around 220-230 Gb/s on a 400G rail | Single-QP host-memory smoke test is below line-rate; the rail can still be functional | Use the result as basic RDMA proof. For GPU performance acceptance, run Step 8 `--gdr`. |
 | Step 8 `--gdr` server exits before the client connects | Perftest server failed during CUDA/GDR setup or rail IP state is stale | Inspect the saved server log. Rerun Step 5/6/7 first if rail IP or GDR prerequisites changed. |
 | A killed or interrupted `--gdr` run leaves CUDA/GPU state stuck | CUDA context cleanup may not have completed after interruption | Stop stale `ib_write_bw` processes. Only if the GPU is idle, no shared workload is active, and policy/workload-owner approval allows it, reset the GPU with `sudo nvidia-smi --gpu-reset -i <gpu-index>`, then rerun Step 8. |

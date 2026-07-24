@@ -139,7 +139,7 @@ Expected: Ubuntu 24.04, NVIDIA GB300 GPU, Docker 28.x+.
 
 | Item | When you need it |
 |------|------------------|
-| **Telegram bot token** (optional) | Create with [@BotFather](https://t.me/BotFather) (`/newbot`). You can paste it during **onboarding** (Step 3) **or** when you run **`nemoclaw <sandbox> channels add telegram`** later. |
+| **Telegram bot token** (optional) | Create with [@BotFather](https://t.me/BotFather) (`/newbot`). You can paste it during **onboarding** (Step 2) **or** when you run **`nemoclaw <sandbox> channels add telegram`** later. |
 | **Brave Search API key** (optional) | From [Brave Search API](https://brave.com/search/api/) if you enable web search during onboarding, or to add it later by re-running onboarding with `BRAVE_API_KEY` set (see Step 4). |
 
 ### Ancillary files

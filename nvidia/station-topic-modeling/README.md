@@ -104,16 +104,16 @@ Install UMAP, HDBSCAN, BERTopic, and supporting libraries for topic modeling.
 Note: `datamapplot` will upgrade dask/distributed — the next step pins them back.
 
 ```bash
-pip install \
+python -m pip install \
   transformers datasets sentence-transformers \
   umap-learn hdbscan==0.8.40 bertopic matplotlib \
-  scikit-learn==1.4.2 datamapplot
+  scikit-learn==1.4.2 datamapplot streamlit
 ```
 
 Pin dask/distributed back to RAPIDS-compatible versions:
 
 ```bash
-pip install "dask==2025.9.1" "distributed==2025.9.1"
+python -m pip install "dask==2025.9.1" "distributed==2025.9.1"
 ```
 
 These packages provide:
@@ -123,6 +123,7 @@ These packages provide:
 - **umap-learn / hdbscan**: Dimensionality reduction and clustering (GPU-accelerated via cuML)
 - **bertopic**: Topic modeling framework
 - **datamapplot**: Document visualization
+- **streamlit**: Interactive dashboard for the topic explorer app (`run_app.sh`)
 
 > [!NOTE]
 > Pip may report dependency conflicts (e.g. dask/distributed downgraded, cuml/rapids-dask-dependency). BERTopic and the notebook can still run. If you need cuML and RAPIDS dask together, consider keeping the conda default dask versions and installing only the BERTopic stack via pip in a separate env; see **Troubleshooting**.
@@ -146,7 +147,7 @@ conda install -c conda-forge \
 If conda reports `PackagesNotFoundError` for `jupyterlab-widgets` (e.g. on some platforms), install it with pip:
 
 ```bash
-pip install jupyterlab-widgets
+python -m pip install jupyterlab-widgets
 ```
 
 ## Step 6. Install compatible PyTorch
@@ -154,7 +155,7 @@ pip install jupyterlab-widgets
 Install PyTorch with CUDA 13.0 support for GPU-accelerated embedding generation.
 
 ```bash
-pip install torch==2.9.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu130
+python -m pip install torch==2.9.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu130
 ```
 
 ## Step 7. Clone the repository and download the dataset
@@ -189,6 +190,18 @@ Start JupyterLab from the assets directory:
 ```bash
 jupyter lab
 ```
+
+## (Optional) Launch the interactive dashboard
+
+As an alternative to the notebook, run the Streamlit dashboard for live UMAP/HDBSCAN
+tuning. From the assets directory (with the dataset already downloaded in Step 7):
+
+```bash
+./run_app.sh
+```
+
+Then open the URL it prints (default `http://localhost:8501`). The script auto-selects the
+`rapids-25.10` conda env; override with `PYTHON=/path/to/python ./run_app.sh` if needed.
 
 ## Step 10. Select the rapids-25.10 kernel
 
