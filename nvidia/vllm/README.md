@@ -5,6 +5,7 @@
 ## Table of Contents
 
 - [Overview](#overview)
+- [Understand single-stream performance](#understand-single-stream-performance)
 - [Instructions](#instructions)
 - [Run on two Sparks](#run-on-two-sparks)
 - [Run on multiple Sparks through a switch](#run-on-multiple-sparks-through-a-switch)
@@ -93,6 +94,72 @@ The following models are supported with vLLM on Spark. All listed models are ava
 > You can use the NVFP4 Quantization documentation to generate your own NVFP4-quantized checkpoints for your favorite models. This enables you to take advantage of the performance and memory benefits of NVFP4 quantization even for models not already published by NVIDIA.
 
 Reminder: not all model architectures are supported for NVFP4 quantization.
+
+## Understand single-stream performance
+
+The support matrix means that a model can be served on DGX Spark. It does not
+mean that every model has similar token latency. In particular, total parameter
+count is not a useful way to compare a dense model with a mixture-of-experts
+(MoE) model:
+
+- A dense model reads almost all of its layer weights for every generated token.
+- An MoE model reads only the routed experts for a token. It can therefore have
+  more total parameters but much lower single-token latency.
+- NVFP4 reduces weight traffic and memory use, but it does not change a dense
+  model into a sparse one.
+
+At batch size 1, a useful optimistic bound for decode speed is:
+
+```text
+maximum tokens/s ≈ sustainable memory bandwidth / active weight bytes per token
+```
+
+This bound excludes attention, normalization, activation quantization, sampling,
+and framework overhead, so measured speed will be lower. For example,
+`nvidia/Llama-3.3-70B-Instruct-NVFP4` streams approximately 40 GB of active
+weights per decoded token. Against the DGX Spark's 273 GB/s peak unified-memory
+bandwidth ([DGX Spark User Guide](https://docs.nvidia.com/dgx/dgx-spark/dgx-spark.pdf)),
+the optimistic bound is about 6.8 tokens/s, not 20-30 tokens/s.
+By contrast, models such as `Qwen3.6-35B-A3B` and `gpt-oss-120b` are MoE models
+and only activate a fraction of their total weights per token.
+
+The following single-stream measurements were taken on one DGX Spark. They use
+the same model revision (`f792b707`), FlashInfer-CUTLASS NVFP4 GEMM, a requested
+input length of 32 tokens, 256 output tokens, one warmup request, three measured
+requests, and a maximum concurrency of one.
+
+| NGC vLLM image | vLLM version | Output throughput | Mean TPOT |
+|---|---:|---:|---:|
+| `26.02-py3` | 0.15.1 | 4.03 tokens/s | 248.27 ms |
+| `26.06-py3` | 0.22.1 | 4.74 tokens/s | 211.05 ms |
+
+These measurements are a point-in-time reference, not a performance guarantee.
+They show both that 4-5 tokens/s is expected for this dense 70B checkpoint on a
+single Spark and that current containers can improve performance. Use the
+latest NGC vLLM image unless a model-specific guide requires another image.
+
+To measure single-stream decode performance against the detached server from
+Step 4, run:
+
+```bash
+docker exec vllm-server vllm bench serve \
+  --backend openai \
+  --base-url http://127.0.0.1:8000 \
+  --endpoint /v1/completions \
+  --model "$HF_MODEL_HANDLE" \
+  --dataset-name random \
+  --random-input-len 32 \
+  --random-output-len 256 \
+  --num-warmups 1 \
+  --num-prompts 3 \
+  --request-rate inf \
+  --max-concurrency 1 \
+  --ignore-eos
+```
+
+Report TPOT or inter-token latency for interactive responsiveness. Aggregate
+output throughput can increase with batching, but that is a different metric
+from one request's token-to-token latency.
 
 ## Time & risk
 
