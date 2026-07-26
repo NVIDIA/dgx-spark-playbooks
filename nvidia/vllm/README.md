@@ -123,10 +123,11 @@ the optimistic bound is about 6.8 tokens/s, not 20-30 tokens/s.
 By contrast, models such as `Qwen3.6-35B-A3B` and `gpt-oss-120b` are MoE models
 and only activate a fraction of their total weights per token.
 
-The following single-stream measurements were taken on one DGX Spark. They use
-the same model revision (`f792b707`), FlashInfer-CUTLASS NVFP4 GEMM, a requested
-input length of 32 tokens, 256 output tokens, one warmup request, three measured
-requests, and a maximum concurrency of one.
+The following single-stream measurements were taken on one DGX Spark on
+July 26, 2026. They use the same model revision (`f792b707`),
+FlashInfer-CUTLASS NVFP4 GEMM, a requested input length of 32 tokens, 256 output
+tokens, one warmup request, three measured requests, and a maximum concurrency
+of one.
 
 | NGC vLLM image | vLLM version | Output throughput | Mean TPOT |
 |---|---:|---:|---:|
