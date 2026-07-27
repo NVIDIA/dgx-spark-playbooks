@@ -42,18 +42,15 @@ You'll install and configure ComfyUI on your NVIDIA DGX Spark device so you can 
 **Software Requirements:**
 - Python 3.8 or higher installed: `python3 --version`
 - pip package manager available: `pip3 --version`
-- CUDA toolkit compatible with Blackwell: `nvcc --version`
 - Git version control: `git --version`
 - Network access to download models from Hugging Face
 - Web browser access to `<SPARK_IP>:8188` port
 
 ## Ancillary files
 
-All required assets can be found [in the ComfyUI repository on GitHub](https://github.com/comfyanonymous/ComfyUI)
-
-- `requirements.txt` - Python dependencies for ComfyUI installation
-- `main.py` - Primary ComfyUI server application entry point
-- `v1-5-pruned-emaonly-fp16.safetensors` - Stable Diffusion 1.5 checkpoint model
+- `requirements.txt` - Python dependencies for ComfyUI installation ([here on ComfyUI GitHub](https://github.com/Comfy-Org/ComfyUI/blob/master/requirements.txt))
+- `main.py` - Primary ComfyUI server application entry point ([here on ComfyUI GitHub](https://github.com/Comfy-Org/ComfyUI/blob/master/main.py))
+- `DreamShaper_8_pruned.safetensors` - DreamShaper 8 checkpoint ([here on HuggingFace](https://huggingface.co/Lykon/DreamShaper/resolve/main/DreamShaper_8_pruned.safetensors))
 
 ## Time & risk
 
@@ -67,6 +64,24 @@ All required assets can be found [in the ComfyUI repository on GitHub](https://g
 
 ## Instructions
 
+## Quick start (optional)
+
+If you prefer an automated setup, download and run the provided script to perform Steps 1–6 in one go (prerequisite check, virtual environment, PyTorch, ComfyUI, dependencies, and model download):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/NVIDIA/dgx-spark-playbooks/refs/heads/main/nvidia/comfy-ui/assets/setup.sh | bash
+```
+
+When it finishes, launch the server from the **same directory** where you ran `setup.sh` (it expects `comfyui-env/` and `ComfyUI/` in the current directory):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/NVIDIA/dgx-spark-playbooks/refs/heads/main/nvidia/comfy-ui/assets/launch.sh | bash
+```
+
+Then continue from [Step 8. Validate installation](#step-8-validate-installation).
+
+To learn what each step does, follow the manual instructions below instead.
+
 ## Step 1. Verify system prerequisites
 
 Check that your NVIDIA DGX Spark device meets the requirements before proceeding with installation.
@@ -74,11 +89,10 @@ Check that your NVIDIA DGX Spark device meets the requirements before proceeding
 ```bash
 python3 --version
 pip3 --version
-nvcc --version
 nvidia-smi
 ```
 
-Expected output should show Python 3.8+, pip available, CUDA toolkit, and GPU detection.
+Expected output should show Python 3.8+, pip available, and GPU detection.
 
 ## Step 2. Create Python virtual environment
 
@@ -106,7 +120,7 @@ This installation targets CUDA 13.0 compatibility with Blackwell architecture GP
 Download the ComfyUI source code from the official repository.
 
 ```bash
-git clone https://github.com/comfyanonymous/ComfyUI.git
+git clone --branch v0.28.2 https://github.com/comfyanonymous/ComfyUI.git
 cd ComfyUI/
 ```
 
@@ -120,13 +134,11 @@ pip install -r requirements.txt
 
 This installs all necessary dependencies including web interface components and model handling libraries.
 
-## Step 6. Download Stable Diffusion checkpoint
-
-Navigate to the checkpoints directory and download the Stable Diffusion 1.5 model.
+## Step 6. Download model checkpoint that will be used in Step 9
 
 ```bash
 cd models/checkpoints/
-wget https://huggingface.co/Comfy-Org/stable-diffusion-v1-5-archive/resolve/main/v1-5-pruned-emaonly-fp16.safetensors
+wget https://huggingface.co/Lykon/DreamShaper/resolve/main/DreamShaper_8_pruned.safetensors
 cd ../../
 ```
 
@@ -144,6 +156,8 @@ The server will bind to all network interfaces on port 8188, making it accessibl
 
 ## Step 8. Validate installation
 
+The server from Step 7 keeps running in the foreground, so run the following in a **second terminal**.
+
 Check that ComfyUI is running correctly and accessible via your web browser.
 
 ```bash
@@ -154,7 +168,26 @@ Expected output should show HTTP 200 response indicating the web server is opera
 
 Open a web browser and navigate to `http://<SPARK_IP>:8188` where `<SPARK_IP>` is your device's IP address.
 
-## Step 9. Optional - Cleanup and rollback
+## Step 9. Run a template flow
+
+Test the installation with a basic image generation workflow:
+
+1. Access the web interface at `http://<SPARK_IP>:8188`
+
+   > [!NOTE]
+   > If the page fails to load, make sure the device you are browsing from is allowed to access your local network:
+   > - **macOS:** Open **System Settings → Privacy & Security → Local Network** and enable access for your browser. macOS blocks local-network connections until an app is granted this permission. See [Control access to your local network on Mac](https://support.apple.com/guide/mac-help/control-access-to-your-local-network-on-mac-mchla4f49138/mac).
+   > - **Windows:** Set your network profile to **Private** (not Public) so the device can reach others on the network. See [Make a Wi-Fi network public or private in Windows](https://support.microsoft.com/en-us/help/4043043/windows-10-make-network-public-private).
+2. Load a starter workflow:
+   1. Click **Templates** on the left side of the menu (skip this if the template window pops up automatically)
+   2. Choose **Getting Started** on the left side of the template window
+   3. Choose **1.1 Starter-Text to Image**
+   4. Click the **Run** button at the top right
+3. Monitor GPU usage with `nvidia-smi` in a separate terminal
+
+The image generation should complete within 30 seconds.
+
+## Step 10. Optional - Cleanup and rollback
 
 If you need to remove the installation completely, follow these steps:
 
@@ -169,25 +202,15 @@ rm -rf ComfyUI/
 
 To rollback during installation, press `Ctrl+C` to stop the server and remove the virtual environment.
 
-## Step 10. Optional - Next steps
-
-Test the installation with a basic image generation workflow:
-
-1. Access the web interface at `http://<SPARK_IP>:8188`
-2. Load the default workflow (should appear automatically)
-3. Click "Run" to generate your first image
-4. Monitor GPU usage with `nvidia-smi` in a separate terminal
-
-The image generation should complete within 30-60 seconds depending on your hardware configuration.
-
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| PyTorch CUDA not available | Incorrect CUDA version or missing drivers | Verify `nvcc --version` matches cu129, reinstall PyTorch |
+| PyTorch CUDA not available | Wrong build, inactive virtual environment, or unavailable GPU | Activate `comfyui-env`, run `python -c 'import torch; print(torch.cuda.is_available(), torch.version.cuda)'`, if False or None then confirm `nvidia-smi` and reinstall PyTorch per Step 3 |
 | Model download fails | Network connectivity or storage space | Check internet connection, verify 20GB+ available space |
 | Web interface inaccessible | Firewall blocking port 8188 | Configure firewall to allow port 8188, check IP address |
 | Out of GPU memory errors after manually flushing buffer cache | Insufficient VRAM for model | Use smaller models or enable CPU fallback mode |
+| Quick-start script fails or behaves unexpectedly | Script is outdated or differs from the current NVIDIA-published version | Run `sha256sum setup.sh launch.sh` and compare with the current hashes: `setup.sh` `97b03fb341b40bd8524549b234883427dda2e8bca4ceb1662a074dcc9a7cf3f8`; `launch.sh` `7dc75b155a198a49537832c4a363d321080b130be0a6945a0bc0afe78da8badc` |
 
 > [!NOTE] 
 > DGX Spark uses a Unified Memory Architecture (UMA), which enables dynamic memory sharing between the GPU and CPU. 

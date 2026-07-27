@@ -40,7 +40,7 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 - [Build and Deploy a Multi-Agent Chatbot](nvidia/multi-agent-chatbot/)
 - [Multi-modal Inference](nvidia/multi-modal-inference/)
 - [Connect Multiple DGX Spark through a Switch](nvidia/multi-sparks-through-switch/)
-- [NCCL for Two Sparks](nvidia/nccl/)
+- [NCCL for Multiple Sparks](nvidia/nccl/)
 - [Fine-tune with NeMo](nvidia/nemo-fine-tune/)
 - [Run NemoClaw with a Local LLM](nvidia/nemoclaw/)
 - [🦞 Set Up Example NemoClaw Agents 🦞](nvidia/nemoclaw-applications/)

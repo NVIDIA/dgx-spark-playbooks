@@ -37,6 +37,8 @@ export class BackendService {
   private modelName: string = 'all-MiniLM-L6-v2';
   private static instance: BackendService;
   private initialized: boolean = false;
+  private vectorServicesInitialized: boolean = false;
+  private vectorServicesInitPromise: Promise<void> | null = null;
   private activeGraphDbType: GraphDBType | null = null; // Set at runtime, not build time
   
   private getRuntimeGraphDbType(): GraphDBType {
@@ -127,26 +129,47 @@ export class BackendService {
       }
     }
     
-    // Initialize Qdrant
-    if (!this.qdrantService.isInitialized()) {
-      await this.qdrantService.initialize();
+    this.initialized = this.graphDBService.isInitialized();
+  }
+
+  /**
+   * Initialize optional vector services only for embedding/vector-search paths.
+   * Traditional graph queries run on the graph database alone.
+   */
+  private async ensureVectorServices(): Promise<void> {
+    if (this.vectorServicesInitialized && this.qdrantService.isInitialized()) {
+      return;
     }
-    
-    // Check if sentence-transformer service is available
-    try {
-      // Remove the check skip in development mode
-      const response = await axios.get(`${this.sentenceTransformerUrl}/health`);
-      console.log(`Connected to SentenceTransformer service: ${response.data.model}`);
-      this.initialized = true;
-    } catch (error) {
-      console.error(`Failed to connect to sentence-transformer service: ${error}`);
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Development mode: Continuing despite sentence transformer error');
-        this.initialized = true;
-      } else {
-        throw new Error('Sentence transformer service is not available');
-      }
+
+    if (!this.vectorServicesInitPromise) {
+      this.vectorServicesInitPromise = (async () => {
+        if (!this.qdrantService.isInitialized()) {
+          await this.qdrantService.initialize();
+        }
+
+        if (!this.qdrantService.isInitialized()) {
+          throw new Error('Qdrant service is not available. Start vector search with ./start.sh --vector-search for vector or embedding features.');
+        }
+
+        try {
+          const response = await axios.get(`${this.sentenceTransformerUrl}/health`);
+          console.log(`Connected to SentenceTransformer service: ${response.data.model}`);
+          this.vectorServicesInitialized = true;
+        } catch (error) {
+          console.error(`Failed to connect to sentence-transformer service: ${error}`);
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Development mode: Continuing despite sentence transformer error');
+            this.vectorServicesInitialized = true;
+          } else {
+            throw new Error('Sentence transformer service is not available. Start vector search with ./start.sh --vector-search for vector or embedding features.');
+          }
+        }
+      })().finally(() => {
+        this.vectorServicesInitPromise = null;
+      });
     }
+
+    await this.vectorServicesInitPromise;
   }
   
   /**
@@ -168,6 +191,7 @@ export class BackendService {
    */
   private async generateEmbeddings(texts: string[]): Promise<number[][]> {
     try {
+      await this.ensureVectorServices();
       const response = await axios.post(`${this.sentenceTransformerUrl}/embed`, {
         texts,
         batch_size: 32
@@ -213,38 +237,56 @@ export class BackendService {
     console.log(`Storing triples in ${this.activeGraphDbType} database`);
     await this.graphDBService.importTriples(this.convertTriples(uniqueTriples));
     
-    // Extract unique entities from triples
-    const entities = new Set<string>();
-    for (const triple of uniqueTriples) {
-      entities.add(triple.subject); // subject
-      entities.add(triple.object); // object
+    let entityCount = 0;
+    let embeddingsStored = false;
+    let vectorServicesAvailable = false;
+
+    try {
+      await this.ensureVectorServices();
+      vectorServicesAvailable = true;
+    } catch (error) {
+      console.warn(`Vector indexing skipped after graph import: ${error instanceof Error ? error.message : String(error)}`);
     }
-    
-    // Generate embeddings for entities in batches
-    const entityList = Array.from(entities);
-    const batchSize = 256;
-    const entityEmbeddings = new Map<string, number[]>();
-    const textContent = new Map<string, string>(); // Map for text content
-    
-    console.log(`Generating embeddings for ${entityList.length} entities`);
-    
-    for (let i = 0; i < entityList.length; i += batchSize) {
-      const batch = entityList.slice(i, i + batchSize);
-      console.log(`Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(entityList.length/batchSize)}`);
-      
-      const embeddings = await this.generateEmbeddings(batch);
-      
-      // Store in maps
-      for (let j = 0; j < batch.length; j++) {
-        entityEmbeddings.set(batch[j], embeddings[j]);
-        textContent.set(batch[j], batch[j]); // Store the entity name as text content
+
+    if (vectorServicesAvailable) {
+      // Extract unique entities from triples
+      const entities = new Set<string>();
+      for (const triple of uniqueTriples) {
+        entities.add(triple.subject); // subject
+        entities.add(triple.object); // object
       }
+
+      // Generate embeddings for entities in batches
+      const entityList = Array.from(entities);
+      entityCount = entityList.length;
+      const batchSize = 256;
+      const entityEmbeddings = new Map<string, number[]>();
+      const textContent = new Map<string, string>(); // Map for text content
+
+      console.log(`Generating embeddings for ${entityList.length} entities`);
+
+      for (let i = 0; i < entityList.length; i += batchSize) {
+        const batch = entityList.slice(i, i + batchSize);
+        console.log(`Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(entityList.length/batchSize)}`);
+
+        const embeddings = await this.generateEmbeddings(batch);
+
+        // Store in maps
+        for (let j = 0; j < batch.length; j++) {
+          entityEmbeddings.set(batch[j], embeddings[j]);
+          textContent.set(batch[j], batch[j]); // Store the entity name as text content
+        }
+      }
+
+      // Store embeddings and text content in Qdrant
+      await this.qdrantService.storeEmbeddings(entityEmbeddings, textContent);
+      embeddingsStored = true;
     }
-    
-    // Store embeddings and text content in Qdrant
-    await this.qdrantService.storeEmbeddings(entityEmbeddings, textContent);
-    
-    console.log(`Backend processing complete: ${uniqueTriples.length} triples and ${entityList.length} entities stored using ${this.activeGraphDbType}`);
+
+    const vectorMessage = embeddingsStored
+      ? ` and ${entityCount} entities indexed in Qdrant`
+      : '; vector indexing skipped';
+    console.log(`Backend processing complete: ${uniqueTriples.length} triples stored using ${this.activeGraphDbType}${vectorMessage}`);
   }
   
   /**
@@ -398,6 +440,8 @@ export class BackendService {
       return this.queryTraditional(queryText);
     }
     
+    await this.ensureVectorServices();
+
     // Generate embedding for query
     const queryEmbedding = (await this.generateEmbeddings([queryText]))[0];
     
@@ -545,8 +589,18 @@ Question: ${queryText}
 Answer:`;
 
       // Determine LLM endpoint and model based on provider
-      const finalProvider = llmProvider || 'ollama';
-      const finalModel = llmModel || process.env.OLLAMA_MODEL || 'llama3.1:8b';
+      const configuredVllmModel = process.env.VLLM_MODEL;
+      const configuredOllamaModel = process.env.OLLAMA_MODEL;
+      const finalProvider = llmProvider || (
+        configuredVllmModel && configuredVllmModel !== 'disabled' && configuredOllamaModel === 'disabled'
+          ? 'vllm'
+          : 'ollama'
+      );
+      const finalModel = llmModel || (
+        finalProvider === 'vllm'
+          ? configuredVllmModel || 'nvidia/Llama-3_3-Nemotron-Super-49B-v1_5-FP8'
+          : configuredOllamaModel || 'llama3.1:8b'
+      );
 
       console.log(`Using LLM: provider=${finalProvider}, model=${finalModel}`);
 
@@ -590,6 +644,31 @@ Answer:`;
             'Content-Type': 'application/json'
           },
           timeout: 120000  // 120 second timeout
+        });
+      } else if (finalProvider === 'vllm') {
+        const vllmUrl = process.env.VLLM_BASE_URL || 'http://localhost:8001/v1';
+
+        response = await axios.post(`${vllmUrl}/chat/completions`, {
+          model: finalModel,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a knowledgeable research assistant. Provide accurate, well-structured answers based on the provided knowledge graph context. Clearly indicate when information is limited or uncertain.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          temperature: 0.2,
+          max_tokens: 800,
+          top_p: 0.95,
+          stream: false
+        }, {
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          timeout: 120000
         });
       } else {
         // Use Ollama (default)
@@ -674,4 +753,4 @@ Answer:`;
   }
 }
 
-export default BackendService.getInstance(); 
+export default BackendService.getInstance();

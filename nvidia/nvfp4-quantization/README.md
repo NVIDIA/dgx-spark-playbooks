@@ -1,6 +1,6 @@
 # NVFP4 Quantization
 
-> Quantize Qwen3.6 MoE to NVFP4 with TensorRT Model Optimizer recipes and serve it on Spark with vLLM
+> Quantize Qwen3.6 MoE to NVFP4 with NVIDIA Model Optimizer recipes and serve it on Spark with vLLM
 
 
 ## Table of Contents
@@ -28,14 +28,14 @@ Immediate benefits are:
 
 ## What you'll accomplish
 
-You'll quantize the Qwen3.6-35B-A3B Mixture-of-Experts model using NVIDIA's TensorRT Model Optimizer
-inside a TensorRT-LLM container, producing an NVFP4 quantized Hugging Face checkpoint, and then serve
-it on NVIDIA DGX Spark with vLLM.
+You'll quantize the Qwen3.6-35B-A3B Mixture-of-Experts model using NVIDIA Model Optimizer
+inside the NGC vLLM container, producing an NVFP4 quantized Hugging Face checkpoint, and then serve
+it on NVIDIA DGX Spark with the same container image. This workflow has been validated end-to-end
+on DGX Spark hardware.
 
-Quantization is driven by Model Optimizer **recipes** — declarative YAML configurations selected with
-the `--recipe` flag. The playbook offers two: a Qwen3.5/3.6-MoE dedicated W4A16 recipe (NVFP4 weights
-on the MoE MLPs, FP8 attention) recommended for interactive use on DGX Spark, and a general-purpose
-NVFP4 experts-only recipe (W4A4) for compute-bound, higher-concurrency serving.
+Quantization is driven by Model Optimizer **recipes** selected with the `--recipe` flag. The playbook
+offers two: a Qwen3.5/3.6-MoE dedicated W4A16 recipe recommended for interactive use on DGX Spark,
+and a general-purpose NVFP4 experts-only recipe (W4A4) for higher-concurrency serving.
 
 Depending on the recipe, quantization reduces model size by roughly 3x compared to the BF16 model.
 This quantization approach aims to preserve accuracy while providing significant throughput improvements. However, it's important to note that quantization can potentially impact model accuracy - we recommend running evaluations to verify if the quantized model maintains acceptable performance for your use case.
@@ -57,8 +57,9 @@ This quantization approach aims to preserve accuracy while providing significant
 
 Verify your setup:
 ```bash
-## Check Docker GPU access
-docker run --rm --gpus all nvcr.io/nvidia/tensorrt-llm/release:spark-single-gpu-dev nvidia-smi
+## Check Docker GPU access (find the latest vLLM container version at
+## https://catalog.ngc.nvidia.com/orgs/nvidia/containers/vllm — 26.05 or newer required)
+docker run --rm --gpus all nvcr.io/nvidia/vllm:26.05.post1-py3 nvidia-smi
 
 ## Verify sufficient disk space
 df -h .
@@ -66,17 +67,18 @@ df -h .
 
 ## Time & risk
 
-* **Estimated duration**: 1.5-3 hours, usually dominated by the model download
+* **Estimated duration**: about 2 hours (1.5-3 hours depending on network speed), usually dominated by the model download
 * **Risks**:
   * Model download may fail due to network issues or Hugging Face authentication problems
   * Quantization process is memory-intensive and may fail on systems with insufficient GPU memory
   * Output files are large (several GB) and require adequate storage space
 * **Rollback**: Remove the output directory and any pulled Docker images to restore original state.
-* **Last Updated**: 07/21/2026
-  * Update TensorRT Model Optimizer to the 0.45.0 release
-  * Switch the example model from DeepSeek-R1-Distill-Llama-8B to Qwen3.6-35B-A3B (MoE)
-  * Use recipe-driven PTQ (`hf_ptq.py --recipe`) instead of the removed `--export_fmt` flow, offering the Qwen3.5/3.6-MoE dedicated W4A16 recipe and the general-purpose NVFP4 experts-only recipe
-  * Serve the quantized checkpoint with the NGC vLLM container
+* **Last Updated**: 07/22/2026
+  * Validate the workflow end-to-end on DGX Spark hardware
+  * Run quantization and serving in a single NGC vLLM container (26.05 or newer); the TensorRT-LLM container is no longer used
+  * Install NVIDIA Model Optimizer with `--no-deps` to preserve the container's NVIDIA PyTorch build
+  * Document the gated calibration dataset and the public-dataset alternative
+  * Rename TensorRT Model Optimizer to NVIDIA Model Optimizer, matching the product's current branding
 
 ## Instructions
 
@@ -118,16 +120,19 @@ export HF_TOKEN="your_token_here"
 
 The token will be automatically used by the container for model downloads.
 
+> [!NOTE]
+> Calibration uses the gated [nvidia/Nemotron-Post-Training-Dataset-v2](https://huggingface.co/datasets/nvidia/Nemotron-Post-Training-Dataset-v2) dataset by default — request access with your account, or add `--dataset cnn_dailymail` to the `hf_ptq.py` command in Step 5.
+
 ## Step 4. Choose a quantization recipe
 
-TensorRT Model Optimizer drives post-training quantization through **recipes** — declarative YAML files that bundle the full quantization configuration (per-layer formats, calibration algorithm, and KV-cache setting). A recipe is selected with the `--recipe` flag of `hf_ptq.py` and replaces the older `--qformat`/`--quant` flags.
+NVIDIA Model Optimizer drives post-training quantization through **recipes** — YAML files bundling the full quantization configuration, selected with the `--recipe` flag of `hf_ptq.py`.
 
 This playbook quantizes the Qwen3.6-35B-A3B Mixture-of-Experts model and offers two recipes:
 
 | Recipe | What it does | When to use it |
 |--------|--------------|----------------|
-| `huggingface/qwen3_5_moe/ptq/w4a16_nvfp4-fp8_attn-kv_fp8_cast` | Dedicated to the Qwen3.5/Qwen3.6 MoE architecture: NVFP4 weight-only (W4A16) on the MoE expert and shared-expert MLP weights and `lm_head`, FP8 on self-attention and the linear-attention projections, FP8 KV cache. Same layout as the published [nvidia/Qwen3.6-35B-A3B-NVFP4](https://huggingface.co/nvidia/Qwen3.6-35B-A3B-NVFP4) checkpoint. | **Recommended on DGX Spark.** Weight-only quantization keeps the memory-bound decode path fast, so it gives the best interactive (low-concurrency) performance, and it usually does not regress accuracy versus the BF16 model. |
-| `general/ptq/nvfp4_experts_only-kv_fp8_cast` | General-purpose MoE recipe: NVFP4 weights *and* activations (W4A4) on the routed experts, FP8 KV cache; attention and dense layers stay in high precision. | Maximum compute throughput once serving becomes compute-bound (higher concurrency or larger batches), and a good template to reuse with other MoE models. |
+| `huggingface/qwen3_5_moe/ptq/w4a16_nvfp4-fp8_attn-kv_fp8_cast` | Qwen3.5/3.6-MoE dedicated: NVFP4 weight-only (W4A16) MoE MLPs and `lm_head`, FP8 attention, FP8 KV cache — same layout as [nvidia/Qwen3.6-35B-A3B-NVFP4](https://huggingface.co/nvidia/Qwen3.6-35B-A3B-NVFP4). | **Recommended on DGX Spark**: best interactive (low-concurrency) decode performance, near-lossless accuracy. |
+| `general/ptq/nvfp4_experts_only-kv_fp8_cast` | General-purpose MoE recipe: NVFP4 weights and activations (W4A4) on the routed experts, FP8 KV cache. | Higher-concurrency, compute-bound serving; reusable with other MoE models. |
 
 Set the recipe you want to use:
 
@@ -143,17 +148,26 @@ export EXPORT_NAME="Qwen3.6-35B-A3B-W4A16-NVFP4"
 
 ## Step 5. Run the quantization
 
-Launch the TensorRT-LLM container with GPU access, IPC settings optimized for multi-GPU workloads, and volume mounts for model caching and output persistence, then run recipe-driven PTQ with `hf_ptq.py`.
+Quantization and serving both use the NGC vLLM container (version 26.05 or newer). Find the latest build from https://catalog.ngc.nvidia.com/orgs/nvidia/containers/vllm:
+
+```bash
+export VLLM_VERSION=<latest_container_version>
+## example
+## export VLLM_VERSION=26.05.post1-py3
+```
+
+Launch the container and run recipe-driven PTQ with `hf_ptq.py`:
 
 ```bash
 docker run --rm -it --gpus all --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 \
   -v "./output_models:/workspace/output_models" \
   -v "$HOME/.cache/huggingface:/root/.cache/huggingface" \
   -e HF_TOKEN=$HF_TOKEN \
-  nvcr.io/nvidia/tensorrt-llm/release:spark-single-gpu-dev \
+  nvcr.io/nvidia/vllm:${VLLM_VERSION} \
   bash -c "
     git clone -b 0.45.0 --single-branch https://github.com/NVIDIA/Model-Optimizer.git /app/Model-Optimizer && \
-    cd /app/Model-Optimizer && pip install -e '.[hf]' && \
+    cd /app/Model-Optimizer && pip install --no-deps -e . && \
+    pip install accelerate datasets omegaconf 'pulp<4.0' && \
     cd examples/llm_ptq && \
     python hf_ptq.py \
       --pyt_ckpt_path 'Qwen/Qwen3.6-35B-A3B' \
@@ -162,17 +176,10 @@ docker run --rm -it --gpus all --ipc=host --ulimit memlock=-1 --ulimit stack=671
   "
 ```
 
-Note: You may see a message like `Failed to get GPU memory info: ... Stopping GPU memory monitor.` on DGX Spark. This is expected in some environments and does not affect quantization results.
-Note: Please be aware that if your model is too large, you may encounter an out of memory error. You can try quantizing a smaller model instead.
+Note: `--no-deps` keeps the container's NVIDIA PyTorch build intact (see Troubleshooting).
+Note: The message `Failed to get GPU memory info: ... Stopping GPU memory monitor.` is expected on DGX Spark and does not affect results.
 
-This command:
-- Runs the container with full GPU access and optimized shared memory settings
-- Mounts your output directory to persist quantized model files
-- Mounts your Hugging Face cache to avoid re-downloading the model
-- Clones and installs the TensorRT Model Optimizer 0.45.0 release from source
-- Runs recipe-driven PTQ and exports a unified Hugging Face checkpoint to `./output_models/$EXPORT_NAME`
-
-The process will display progress information including the model download from Hugging Face, quantization calibration steps (512 calibration samples by default), and the model export phase. End-to-end time is usually dominated by the model download.
+The quantized Hugging Face checkpoint is exported to `./output_models/$EXPORT_NAME`. End-to-end time is usually dominated by the model download.
 
 ## Step 6. Validate the quantized model
 
@@ -190,13 +197,9 @@ You should see model weight files, configuration files (including `hf_quant_conf
 
 ## Step 7. Serve the model with vLLM
 
-Quantized Qwen3.6 MoE checkpoints are served with vLLM — this is also how NVIDIA validates the published Qwen3.6 NVFP4 checkpoint. Find the latest container build from https://catalog.ngc.nvidia.com/orgs/nvidia/containers/vllm:
+Serve the quantized checkpoint with the same container image used in Step 5:
 
 ```bash
-export LATEST_VLLM_VERSION=<latest_container_version>
-## example
-## export LATEST_VLLM_VERSION=26.05.post1-py3
-
 ## Path to the quantized model produced in Step 5
 export MODEL_PATH="./output_models/$EXPORT_NAME/"
 
@@ -204,7 +207,7 @@ docker run --rm -it --gpus all --ipc=host --network host \
   --ulimit memlock=-1 --ulimit stack=67108864 \
   -v "$MODEL_PATH:/workspace/model" \
   -e HF_TOKEN=$HF_TOKEN \
-  nvcr.io/nvidia/vllm:${LATEST_VLLM_VERSION} \
+  nvcr.io/nvidia/vllm:${VLLM_VERSION} \
   vllm serve /workspace/model \
     --served-model-name qwen3.6-35b-a3b \
     --host 0.0.0.0 \
@@ -222,7 +225,7 @@ docker run --rm -it --gpus all --ipc=host --network host \
 ```
 
 > [!NOTE]
-> For the W4A16 recipe, the [nvidia/Qwen3.6-35B-A3B-NVFP4 model card](https://huggingface.co/nvidia/Qwen3.6-35B-A3B-NVFP4) lists additional DGX Spark tuning flags (FlashInfer attention backend, Marlin MoE backend, MTP speculative decoding, and fastsafetensors loading) that can further improve performance.
+> See the [nvidia/Qwen3.6-35B-A3B-NVFP4 model card](https://huggingface.co/nvidia/Qwen3.6-35B-A3B-NVFP4) for additional DGX Spark performance tuning flags.
 
 In a second terminal, wait for the server to become ready (model loading may take several minutes):
 
@@ -240,11 +243,13 @@ curl -X POST http://localhost:8000/v1/chat/completions \
   -d '{
     "model": "qwen3.6-35b-a3b",
     "messages": [{"role": "user", "content": "What is artificial intelligence?"}],
-    "max_tokens": 100,
+    "max_tokens": 1024,
     "temperature": 0.7,
     "stream": false
   }'
 ```
+
+Note: Qwen3.6 is a reasoning model — the response's `reasoning` field contains the thinking process, and `content` is filled once thinking completes (use a generous `max_tokens`).
 
 ## Step 9. Cleanup and rollback
 
@@ -260,9 +265,8 @@ rm -rf ./output_models
 ## Remove Hugging Face cache (optional)
 rm -rf ~/.cache/huggingface
 
-## Remove Docker images (optional)
-docker rmi nvcr.io/nvidia/tensorrt-llm/release:spark-single-gpu-dev
-docker rmi nvcr.io/nvidia/vllm:${LATEST_VLLM_VERSION}
+## Remove Docker image (optional)
+docker rmi nvcr.io/nvidia/vllm:${VLLM_VERSION}
 ```
 
 ## Step 10. Next steps
@@ -283,8 +287,12 @@ The quantized model is now ready for deployment. Common next steps include:
 | Git clone fails inside container | Network connectivity issues | Check internet connection and retry |
 | Quantization process hangs | Container resource limits | Increase Docker memory limits or use `--ulimit` flags |
 | Cannot access gated repo for URL | Certain HuggingFace models have restricted access | Regenerate your [HuggingFace token](https://huggingface.co/docs/hub/en/security-tokens); and request access to the [gated model](https://huggingface.co/docs/hub/en/models-gated#customize-requested-information) on your web browser |
-| `KeyError: 'qwen3_5_moe'` or "unrecognized model type" during quantization | The container's `transformers` version predates Qwen3.6 support | Run `pip install -U transformers` inside the container before running `hf_ptq.py` |
-| vLLM fails to load the quantized checkpoint | Older vLLM containers may not support this model architecture or the ModelOpt quantization layout | Use the latest [NGC vLLM container](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/vllm) |
+| `KeyError: 'qwen3_5_moe'` or "unrecognized model type" during quantization | The container's `transformers` version predates Qwen3.6 support (requires `transformers>=5.2`; no 4.x release supports it) | Use NGC vLLM container 26.05 or newer (ships transformers 5.6), or run `pip install "transformers>=5.2,<5.10"` inside the container |
+| vLLM fails to load the quantized checkpoint | vLLM containers older than 26.05 lack W4A16 NVFP4 (ModelOpt) support | Use [NGC vLLM container](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/vllm) 26.05 or newer |
+| `RuntimeError: torch._grouped_mm is only supported on CUDA devices with compute capability = 9.0` during calibration | The container's PyTorch predates grouped-GEMM support for the DGX Spark GPU (SM121) | Use a 26.xx NGC container (NVIDIA PyTorch 2.11 or newer) |
+| Quantization container killed (exit code 137) while loading weights | Unified-memory exhaustion: model weights plus filesystem page cache exceed DGX Spark memory | Keep the model on the local NVMe drive (not a network mount), stop other GPU workloads, and flush the buffer cache (see note below) |
+| `DatasetNotFoundError: ... is a gated dataset` during calibration | The default calibration mix includes the gated `nvidia/Nemotron-Post-Training-Dataset-v2` | Request access on its Hugging Face page, or pass `--dataset cnn_dailymail` to `hf_ptq.py` |
+| GPU support broken after `pip install` in the container (e.g. CUDA unavailable) | Installing packages that depend on torch replaced the container's NVIDIA-built PyTorch with the generic PyPI build | Re-create the container; install Model Optimizer with `pip install --no-deps -e .` as shown in Step 5 |
 
 > [!NOTE]
 > DGX Spark uses a Unified Memory Architecture (UMA), which enables dynamic memory sharing between the GPU and CPU. 

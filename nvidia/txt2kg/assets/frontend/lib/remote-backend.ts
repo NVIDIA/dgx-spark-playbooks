@@ -32,6 +32,8 @@ export class RemoteBackendService {
   private embeddingsService: EmbeddingsService;
   private textProcessor: TextProcessor;
   private initialized: boolean = false;
+  private vectorServicesInitialized: boolean = false;
+  private vectorServicesInitPromise: Promise<void> | null = null;
   private static instance: RemoteBackendService;
 
   private constructor() {
@@ -59,7 +61,8 @@ export class RemoteBackendService {
   }
 
   /**
-   * Initialize the remote backend with all required services
+   * Initialize the graph database. Vector services are optional and initialized
+   * lazily by vector-search and embedding paths.
    * @param graphDbType - Type of graph database to use (defaults to GRAPH_DB_TYPE env var)
    */
   public async initialize(graphDbType?: GraphDBType): Promise<void> {
@@ -69,17 +72,38 @@ export class RemoteBackendService {
     // Initialize Graph Database
     await this.graphDBService.initialize(dbType);
     console.log(`${dbType} service initialized`);
-    
-    // Initialize Qdrant
-    await this.qdrantService.initialize();
-    console.log('Qdrant service initialized');
-    
-    // Initialize Embeddings service
-    await this.embeddingsService.initialize();
-    console.log('Embeddings service initialized');
-    
-    this.initialized = true;
-    console.log('Remote backend initialized successfully');
+
+    this.initialized = this.graphDBService.isInitialized();
+    console.log('Remote backend graph database initialized successfully');
+  }
+
+  /**
+   * Initialize vector services only for vector-search and embedding paths.
+   */
+  private async ensureVectorServices(): Promise<void> {
+    if (this.vectorServicesInitialized && this.qdrantService.isInitialized()) {
+      return;
+    }
+
+    if (!this.vectorServicesInitPromise) {
+      this.vectorServicesInitPromise = (async () => {
+        if (!this.qdrantService.isInitialized()) {
+          await this.qdrantService.initialize();
+        }
+
+        if (!this.qdrantService.isInitialized()) {
+          throw new Error('Qdrant service is not available. Start vector search with ./start.sh --vector-search for vector or embedding features.');
+        }
+
+        await this.embeddingsService.initialize();
+        this.vectorServicesInitialized = true;
+        console.log('Remote backend vector services initialized successfully');
+      })().finally(() => {
+        this.vectorServicesInitPromise = null;
+      });
+    }
+
+    await this.vectorServicesInitPromise;
   }
 
   /**
@@ -122,67 +146,77 @@ export class RemoteBackendService {
     
     // Store triples in graph database
     await this.storeTriplesToNeo4j(simpleTriples);
-    
-    // Extract entities and generate embeddings
-    const entities = this.extractEntitiesFromTriples(simpleTriples);
-    console.log(`Extracted ${entities.length} unique entities from triples`);
-    
-    // Generate embeddings for entities
-    const embeddings = await this.embeddingsService.encode(entities);
-    console.log(`Generated embeddings for ${embeddings.length} entities`);
-    
-    // Create entity-embedding map with metadata
-    const entityEmbeddings = new Map<string, number[]>();
-    const textContent = new Map<string, string>();
-    const entityMetadata = new Map<string, any>();
-    
-    // Process each entity
-    for (let i = 0; i < entities.length; i++) {
-      const entity = entities[i];
-      entityEmbeddings.set(entity, embeddings[i]);
-      textContent.set(entity, entity);
-      
-      // Collect metadata for each entity from processed triples
-      const entityData: any = {
-        types: [] as string[],
-        contexts: [] as string[]
-      };
-      
-      // Find all triples that mention this entity
-      for (const triple of processedTriples) {
-        // Check subject
-        if (triple.subject.toLowerCase() === entity.toLowerCase()) {
-          // Add subject type if available
-          if (triple.metadata?.entityTypes?.[0] && !entityData.types.includes(triple.metadata.entityTypes[0])) {
-            entityData.types.push(triple.metadata.entityTypes[0]);
-          }
-          
-          // Add context if available
-          if (triple.metadata?.context && !entityData.contexts.includes(triple.metadata.context)) {
-            entityData.contexts.push(triple.metadata.context);
-          }
-        }
-        
-        // Check object
-        if (triple.object.toLowerCase() === entity.toLowerCase()) {
-          // Add object type if available
-          if (triple.metadata?.entityTypes?.[1] && !entityData.types.includes(triple.metadata.entityTypes[1])) {
-            entityData.types.push(triple.metadata.entityTypes[1]);
-          }
-          
-          // Add context if available
-          if (triple.metadata?.context && !entityData.contexts.includes(triple.metadata.context)) {
-            entityData.contexts.push(triple.metadata.context);
-          }
-        }
-      }
-      
-      entityMetadata.set(entity, entityData);
+
+    let vectorServicesAvailable = false;
+    try {
+      await this.ensureVectorServices();
+      vectorServicesAvailable = true;
+    } catch (error) {
+      console.warn(`Vector indexing skipped after graph import: ${error instanceof Error ? error.message : String(error)}`);
     }
-    
-    // Store embeddings and metadata in Qdrant
-    await this.qdrantService.storeEmbeddingsWithMetadata(entityEmbeddings, textContent, entityMetadata);
-    console.log('Stored embeddings with metadata in Qdrant');
+
+    if (vectorServicesAvailable) {
+      // Extract entities and generate embeddings
+      const entities = this.extractEntitiesFromTriples(simpleTriples);
+      console.log(`Extracted ${entities.length} unique entities from triples`);
+
+      // Generate embeddings for entities
+      const embeddings = await this.embeddingsService.encode(entities);
+      console.log(`Generated embeddings for ${embeddings.length} entities`);
+
+      // Create entity-embedding map with metadata
+      const entityEmbeddings = new Map<string, number[]>();
+      const textContent = new Map<string, string>();
+      const entityMetadata = new Map<string, any>();
+
+      // Process each entity
+      for (let i = 0; i < entities.length; i++) {
+        const entity = entities[i];
+        entityEmbeddings.set(entity, embeddings[i]);
+        textContent.set(entity, entity);
+
+        // Collect metadata for each entity from processed triples
+        const entityData: any = {
+          types: [] as string[],
+          contexts: [] as string[]
+        };
+
+        // Find all triples that mention this entity
+        for (const triple of processedTriples) {
+          // Check subject
+          if (triple.subject.toLowerCase() === entity.toLowerCase()) {
+            // Add subject type if available
+            if (triple.metadata?.entityTypes?.[0] && !entityData.types.includes(triple.metadata.entityTypes[0])) {
+              entityData.types.push(triple.metadata.entityTypes[0]);
+            }
+
+            // Add context if available
+            if (triple.metadata?.context && !entityData.contexts.includes(triple.metadata.context)) {
+              entityData.contexts.push(triple.metadata.context);
+            }
+          }
+
+          // Check object
+          if (triple.object.toLowerCase() === entity.toLowerCase()) {
+            // Add object type if available
+            if (triple.metadata?.entityTypes?.[1] && !entityData.types.includes(triple.metadata.entityTypes[1])) {
+              entityData.types.push(triple.metadata.entityTypes[1]);
+            }
+
+            // Add context if available
+            if (triple.metadata?.context && !entityData.contexts.includes(triple.metadata.context)) {
+              entityData.contexts.push(triple.metadata.context);
+            }
+          }
+        }
+
+        entityMetadata.set(entity, entityData);
+      }
+
+      // Store embeddings and metadata in Qdrant
+      await this.qdrantService.storeEmbeddingsWithMetadata(entityEmbeddings, textContent, entityMetadata);
+      console.log('Stored embeddings with metadata in Qdrant');
+    }
     
     console.log('Backend created successfully from text');
   }
@@ -198,36 +232,46 @@ export class RemoteBackendService {
     
     // Store triples in graph database
     await this.storeTriplesToNeo4j(triples);
-    
-    // Extract entities and generate embeddings
-    const entities = this.extractEntitiesFromTriples(triples);
-    console.log(`Extracted ${entities.length} unique entities from triples`);
-    
-    // Generate embeddings for entities
-    const embeddings = await this.embeddingsService.encode(entities);
-    console.log(`Generated embeddings for ${embeddings.length} entities`);
-    
-    // Create entity-embedding map with simple metadata
-    const entityEmbeddings = new Map<string, number[]>();
-    const textContent = new Map<string, string>();
-    const entityMetadata = new Map<string, any>();
-    
-    // Process each entity
-    for (let i = 0; i < entities.length; i++) {
-      const entity = entities[i];
-      entityEmbeddings.set(entity, embeddings[i]);
-      textContent.set(entity, entity);
-      
-      // Simple metadata for triples
-      entityMetadata.set(entity, {
-        types: [],
-        contexts: []
-      });
+
+    let vectorServicesAvailable = false;
+    try {
+      await this.ensureVectorServices();
+      vectorServicesAvailable = true;
+    } catch (error) {
+      console.warn(`Vector indexing skipped after graph import: ${error instanceof Error ? error.message : String(error)}`);
     }
-    
-    // Store embeddings and metadata in Qdrant
-    await this.qdrantService.storeEmbeddingsWithMetadata(entityEmbeddings, textContent, entityMetadata);
-    console.log('Stored embeddings with metadata in Qdrant');
+
+    if (vectorServicesAvailable) {
+      // Extract entities and generate embeddings
+      const entities = this.extractEntitiesFromTriples(triples);
+      console.log(`Extracted ${entities.length} unique entities from triples`);
+
+      // Generate embeddings for entities
+      const embeddings = await this.embeddingsService.encode(entities);
+      console.log(`Generated embeddings for ${embeddings.length} entities`);
+
+      // Create entity-embedding map with simple metadata
+      const entityEmbeddings = new Map<string, number[]>();
+      const textContent = new Map<string, string>();
+      const entityMetadata = new Map<string, any>();
+
+      // Process each entity
+      for (let i = 0; i < entities.length; i++) {
+        const entity = entities[i];
+        entityEmbeddings.set(entity, embeddings[i]);
+        textContent.set(entity, entity);
+
+        // Simple metadata for triples
+        entityMetadata.set(entity, {
+          types: [],
+          contexts: []
+        });
+      }
+
+      // Store embeddings and metadata in Qdrant
+      await this.qdrantService.storeEmbeddingsWithMetadata(entityEmbeddings, textContent, entityMetadata);
+      console.log('Stored embeddings with metadata in Qdrant');
+    }
     
     console.log('Backend created successfully from triples');
   }
@@ -284,6 +328,8 @@ export class RemoteBackendService {
     if (useTraditional) {
       return this.queryTraditional(query);
     }
+
+    await this.ensureVectorServices();
     
     // Step 1: Generate embedding for query
     const queryEmbedding = (await this.embeddingsService.encode([query]))[0];
@@ -549,6 +595,8 @@ export class RemoteBackendService {
     }
     
     console.log(`Enhanced query with: "${query}"`);
+
+    await this.ensureVectorServices();
     
     // Step 1: Generate embedding for query
     const queryEmbedding = (await this.embeddingsService.encode([query]))[0];
@@ -751,8 +799,10 @@ export class RemoteBackendService {
     }
     
     this.initialized = false;
+    this.vectorServicesInitialized = false;
+    this.vectorServicesInitPromise = null;
     console.log('Remote backend closed');
   }
 }
 
-export default RemoteBackendService.getInstance(); 
+export default RemoteBackendService.getInstance();
