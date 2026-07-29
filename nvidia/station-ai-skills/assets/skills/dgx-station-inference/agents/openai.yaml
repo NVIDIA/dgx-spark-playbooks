@@ -1,0 +1,6 @@
+interface:
+  display_name: "DGX Station Inference"
+  short_description: "Tune or run validated model inference"
+  default_prompt: >-
+    Use $dgx-station-inference to give sourced tuning guidance or safely
+    serve the exact model I name on this Station.

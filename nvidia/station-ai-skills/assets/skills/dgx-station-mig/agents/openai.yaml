@@ -1,0 +1,4 @@
+interface:
+  display_name: "DGX Station MIG"
+  short_description: "Inspect and plan safe Station MIG layouts"
+  default_prompt: "Use $dgx-station-mig to inspect this GB300 and plan the MIG layout I request."

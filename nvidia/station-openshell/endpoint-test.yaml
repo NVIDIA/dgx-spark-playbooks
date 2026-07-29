@@ -338,11 +338,11 @@ spec:
             --name local-vllm \
             --type openai \
             --credential OPENAI_API_KEY=not-needed \
-            --config OPENAI_BASE_URL=http://10.110.106.169:8000/v1
+            --config OPENAI_BASE_URL=MACHINE_IP:8000/v1
         ```
         
         > [!IMPORTANT]
-        > Do **not** use `localhost` or `127.0.0.1` here. The OpenShell gateway runs inside a Docker container, so it cannot reach the host via `localhost`. Use the machine's actual IP address.
+        > Do **not** use `localhost` or `127.0.0.1` here. The OpenShell gateway runs inside a Docker container, so it cannot reach the host via `localhost`. Replace MACHINE_IP with the machine's actual IP address.
         
         Some Linux Docker setups can use `http://host.docker.internal:8000/v1` instead of the host IP; if your gateway resolves that hostname, it is equivalent.
         
@@ -549,29 +549,19 @@ spec:
         
         # Step 13. Cleanup
         
-        Stop and remove the sandbox (use the name you gave it, e.g. `dgx-demo`):
+        Run all gateway-dependent cleanup commands first, while the gateway is still running:
         
         ```bash
         openshell sandbox delete dgx-demo
+        openshell provider delete local-vllm
         ```
         
-        To stop the gateway service (it will restart automatically on next login unless you disable it):
+        Then stop and disable the gateway:
         
         ```bash
         systemctl --user stop openshell-gateway
-        ```
-        
-        To disable the gateway service entirely and remove linger so user services no longer start on boot:
-        
-        ```bash
         systemctl --user disable openshell-gateway
         sudo loginctl disable-linger $USER
-        ```
-        
-        Remove the inference provider you created in Step 6:
-        
-        ```bash
-        openshell provider delete local-vllm
         ```
         
         Stop and remove the vLLM container started in Step 5:
@@ -603,8 +593,8 @@ spec:
       content: |
         | Symptom | Cause | Fix |
         |---------|-------|-----|
-        | `openshell gateway start` fails with "connection refused" or Docker errors | Docker is not running | Start Docker with `sudo systemctl start docker` or launch Docker Desktop, then retry `openshell gateway start` |
-        | `openshell status` shows gateway as unhealthy | Gateway container crashed or failed to initialize | Run `openshell gateway destroy` and then `openshell gateway start` to recreate it. Check Docker logs with `docker ps -a` and `docker logs <container-id>` for details |
+        | `openshell status` shows "Connection refused" | The `openshell-gateway` systemd user service is not running | Start it: `systemctl --user start openshell-gateway`. If it fails, check logs: `journalctl --user -u openshell-gateway --no-pager -n 50`. Common cause: Docker socket not accessible from the user service — fix with `sudo setfacl -m u:$USER:rw /var/run/docker.sock` then restart. |
+        | `openshell status` shows gateway as unhealthy | The gateway service crashed or failed to initialize | Restart: `systemctl --user restart openshell-gateway`. Check logs with `journalctl --user -u openshell-gateway --no-pager -n 50` to identify the root cause. |
         | `openshell sandbox create --from openclaw` fails to build | Network issue pulling the community sandbox or Dockerfile build failure | Check internet connectivity. Retry the command. If the build fails on a specific package, check if the base image is compatible with your Docker version |
         | Sandbox is in `Error` phase after creation | Policy validation failed or container startup crashed | Run `openshell logs <sandbox-name>` to see error details. Common causes: invalid policy YAML, missing provider credentials, or port conflicts |
         | Agent cannot reach `inference.local` inside the sandbox | Inference routing not configured or provider unreachable | Run `openshell inference get` to verify the provider and model are set. From the host, test vLLM: `curl -s http://localhost:8000/v1/models`. The provider base URL must use the host’s real IP (not `127.0.0.1`/`localhost`) so the gateway container can reach vLLM (see `instructions.md` Step 6). |
@@ -614,8 +604,7 @@ spec:
         | vLLM OOM or very slow inference | Model too large for available VRAM, `--max-model-len` too high, or GPU contention | Free GPU memory (close other GPU workloads), use a smaller Hugging Face model or quantized variant, or lower `--max-model-len`. Check `docker logs` for the vLLM container. Monitor with `nvidia-smi` |
         | `openshell sandbox connect` hangs or times out | Sandbox not in `Ready` phase | Run `openshell sandbox get <sandbox-name>` to check the phase. If stuck in `Provisioning`, wait or check logs. If in `Error`, delete and recreate the sandbox |
         | Policy push returns exit code 1 (validation failed) | Malformed YAML or invalid policy fields | Check the YAML syntax. Common issues: paths not starting with `/`, `..` traversal in paths, `root` as `run_as_user`, or endpoints missing required `host`/`port` fields. Fix and re-push |
-        | `openshell gateway start` fails with "K8s namespace not ready" / timed out waiting for namespace | The k3s cluster inside the Docker container takes longer to bootstrap than the CLI timeout allows. The internal components (TLS secrets, Helm chart, namespace creation) may need extra time, especially on first run when images are pulled inside the container. | First, check whether the container is still running and progressing: `docker ps --filter name=openshell` (look for `health: starting`). Inspect k3s state inside the container: `docker exec <container> sh -c "KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl get ns"` and `kubectl get pods -A`. If pods are in `ContainerCreating` and TLS secrets are missing (`navigator-server-tls`, `openshell-server-tls`), the cluster is still bootstrapping — wait a few minutes and run `openshell status` again. If it does not recover, destroy with `openshell gateway destroy` (and `docker rm -f <container>` if needed) and retry `openshell gateway start`. Ensure Docker has enough resources (memory and disk) for the k3s cluster. |
-        | `openshell status` says "No gateway configured" even though the Docker container is running | The `gateway start` command failed or timed out before it could save the gateway configuration to the local config store | The container may still be healthy — check with `docker ps --filter name=openshell`. If the container is running and healthy, try `openshell gateway start` again (it should detect the existing container). If the container is unhealthy or stuck, remove it with `docker rm -f <container>` and then `openshell gateway destroy` followed by `openshell gateway start`. |
+        | `openshell status` says "No gateway configured" | The gateway service has never been started or was disabled | Run `systemctl --user start openshell-gateway` then `openshell status`. To enable it permanently: `systemctl --user enable openshell-gateway`. |
         
       
 

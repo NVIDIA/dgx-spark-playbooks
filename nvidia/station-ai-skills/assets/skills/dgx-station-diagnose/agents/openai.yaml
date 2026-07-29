@@ -1,0 +1,4 @@
+interface:
+  display_name: "DGX Station Diagnostics"
+  short_description: "Diagnose Station faults without mutation"
+  default_prompt: "Use $dgx-station-diagnose to run read-only Station diagnostics and explain the findings."

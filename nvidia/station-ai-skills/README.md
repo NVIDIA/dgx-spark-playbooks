@@ -1,14 +1,11 @@
-# DGX Station AI Skills for Coding Agents
+# DGX Station AI Skills and dgx-assist
 
-> Give your coding agent (Claude Code, Codex, Gemini CLI, Cursor) DGX Station expertise via an AGENTS.md and on-demand Agent Skills
-
+> Inspect DGX Station software and route version-aware, CLI-backed workflows
 
 ## Table of Contents
 
 - [Overview](#overview)
-  - [AGENTS.md vs Agent Skill — why split?](#agentsmd-vs-agent-skill-why-split)
 - [Instructions](#instructions)
-  - [Project-specific](#project-specific)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -17,317 +14,495 @@
 
 ## Basic idea
 
-Modern coding agents — Claude Code, OpenAI Codex CLI, Gemini CLI, Cursor — all support two extension mechanisms: a project-level **context file** that's loaded into every conversation, and **on-demand procedural workflows** (called skills, prompts, commands, or rules depending on the harness). This playbook ships both for DGX Station:
+DGX Station AI Skills teaches your AI coding agent how to operate a DGX Station
+correctly. It installs four native Agent Skills plus a dependency-free
+`dgx-assist` command-line tool into a project you choose, so that asking your
+agent "serve this model" or "why is this GPU unavailable?" produces answers
+grounded in your actual hardware instead of recalled generic advice.
 
-- An **`AGENTS.md`** with the critical DGX Station constraints your agent should always know (mixed coherency, GPU targeting, common pitfalls). `AGENTS.md` is the cross-harness standard; an `install.sh` lays it down as `CLAUDE.md`, `GEMINI.md`, or `AGENTS.md` depending on the agent you use.
-- **Four Agent Skills** — `vllm-setup`, `sglang-setup`, `mig-configure`, `dgx-diagnose` — authored once in the [Anthropic Agent Skills format](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) and installed into the right per-harness location (`.claude/skills/`, `.agents/skills/`, `.gemini/commands/`, or `.cursor/rules/`).
+The skills route the agent through a fixed workflow: inspect the real Station,
+search a pinned snapshot of NVIDIA guidance, resolve an exact named model to a
+qualified recipe, run preflight, ask you to approve, then act and verify. Every
+mutation requires your confirmation, and `dgx-assist` only ever stops services
+it started and labelled as its own.
 
-This approach keeps your agent's context lean in every conversation while giving it deep procedural knowledge on demand, regardless of which agent you use.
-
-### AGENTS.md vs Agent Skill — why split?
-
-| | AGENTS.md | Agent Skill |
-|---|---|---|
-| **Loaded** | Every conversation, automatically | Only when invoked by name (or matched by description, in Claude) |
-| **Best for** | Constraints, pitfalls, "never do X" rules | Step-by-step workflows, deployment procedures |
-| **Context cost** | Consumed every time | Zero until invoked |
-
-The DGX Station mixed-coherency constraint (`--gpus all` will crash) should be in every conversation. The full vLLM deployment procedure should not.
+The same CLI works without an agent. Add `--json` and it emits a stable
+versioned envelope for scripts and CI; omit it and you get readable headings,
+tables, and action previews for terminal use.
 
 ## What you'll accomplish
 
-- Install the `AGENTS.md` and four Agent Skills into your project directory for your chosen agent (Claude Code, Codex, Gemini CLI, or Cursor).
-- Verify the agent loads the constraints automatically and the skills on demand.
-- Invoke `vllm-setup` to deploy a vLLM inference server with validated configuration.
-- Invoke `sglang-setup` to deploy an SGLang inference server.
-- Invoke `mig-configure` to partition the GB300 into MIG instances.
-- Invoke `dgx-diagnose` to troubleshoot common DGX Station issues.
+You'll install the four DGX Station skills and the `dgx-assist` CLI into a
+project, then drive a qualified vLLM inference workload from a plain-language
+request through preflight, approval, launch, and verification.
+
+You'll also be able to:
+
+- Inspect your Station's software profile and see exactly which actions its
+  release qualifies it for.
+- Search pinned NVIDIA Development Guide and Bring-Up Guide content with
+  revision and source-digest provenance on every result.
+- Plan MIG layouts and run read-only diagnostics that produce redacted support
+  bundles.
 
 ## What to know before starting
 
-- Basic familiarity with one supported coding agent (running it, giving it prompts, using slash commands or rule references)
-- General understanding of DGX Station (two GPUs, Docker-based workflows)
+- Experience with the Linux command line and running shell scripts
+- Familiarity with an AI coding agent — Claude Code, Codex, Gemini CLI, or
+  Cursor — and how it loads project-level context
+- Basic understanding of Docker containers and GPU device selection
+- Familiarity with vLLM or SGLang inference serving (helpful but not required)
+
+Two safety rules matter more than the rest, and the skills enforce them for
+you: select GPUs by UUID rather than by `nvidia-smi` index, which is not a CUDA
+ordinal on this platform; and treat an unrecognized software build as unknown
+rather than assuming it behaves like a qualified one.
 
 ## Prerequisites
 
-- NVIDIA DGX Station with GB300
-- One of the supported coding agents installed:
-  - **Claude Code:** `curl -fsSL https://claude.ai/install.sh | bash`
-  - **OpenAI Codex CLI:** `npm i -g @openai/codex`
-  - **Gemini CLI:** `npm i -g @google/gemini-cli`
-  - **Cursor:** download from `https://cursor.com/`
-- A project directory where you do DGX Station work
+**Hardware Requirements:**
+
+- NVIDIA Grace Blackwell GB300 Ultra Superchip System (DGX Station)
+- GB300 compute capability `10.3`, confirmed by `nvidia-smi --query-gpu=compute_cap --format=csv`
+- At least 20GB available storage space for the qualified model weights and
+  container image
+
+**Software Requirements:**
+
+- Python 3.11 or newer: `python3 --version`
+- Docker with the NVIDIA Container Toolkit: `docker info | grep -i runtime`
+- One supported AI coding agent installed: `claude --version`, `codex --version`,
+  `gemini --version`, or Cursor
+- Network access to download model weights and container images on first run
+- No inbound port access is required; inference binds to localhost by default
 
 ## Ancillary files
 
-- `assets/AGENTS.md` — canonical context file with critical constraints, GPU targeting, software versions, and common pitfalls. Cross-harness standard.
-- `assets/skills/vllm-setup/SKILL.md` — skill: deploy vLLM with validated configuration.
-- `assets/skills/sglang-setup/SKILL.md` — skill: deploy SGLang with validated configuration.
-- `assets/skills/mig-configure/SKILL.md` — skill: configure MIG partitions on the GB300.
-- `assets/skills/dgx-diagnose/SKILL.md` — skill: troubleshoot common DGX Station issues.
-- `assets/install.sh` — per-harness installer (`claude`, `codex`, `gemini`, `cursor`, or `all`).
+All required assets can be found [in the DGX Station AI Skills playbook repository](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/station-ai-skills/).
+
+- `assets/install.sh` — Thin wrapper that runs the Python installer
+- `assets/installer.py` — Installs, updates, migrates, and uninstalls the
+  skills; writes `.dgx-station/install-manifest.json` and manages the delimited
+  NVIDIA block in your agent context file
+- `assets/dgx-assist.pyz` — The standalone zipapp CLI providing host
+  inspection, guidance search, recipe resolution, preflight, service
+  lifecycle, MIG planning, and diagnostics
+- `assets/skills/dgx-station/` — Platform compatibility, coherency, GPU
+  selection, container, CDI, and power guidance
+- `assets/skills/dgx-station-inference/` — Exact-model recipe resolution,
+  preflight, approved launch, verification, and owned service lifecycle
+- `assets/skills/dgx-station-mig/` — Driver-discovered MIG inspection,
+  planning, approved apply, and restoration evidence
+- `assets/skills/dgx-station-diagnose/` — Read-only diagnostics, playbook
+  correlation, redacted bundles, and one allowlisted fix at a time
+- `assets/AGENTS.md` — The managed context block written into your agent's
+  project context file
 
 ## Time & risk
 
-* **Duration:** 10-15 minutes
-* **Risk level:** Low — this playbook copies markdown files into your project directory
-* **Rollback:** Delete the context file (`AGENTS.md` / `CLAUDE.md` / `GEMINI.md`) and the harness-specific skill directory (`.claude/skills/`, `.agents/skills/`, `.gemini/commands/`, or `.cursor/rules/`) from your project directory
-* **Last Updated:** 05/18/2026
-  * Restructured as harness-agnostic Agent Skills (Claude Code, Codex, Gemini CLI, Cursor)
+* **Estimated time:** 15 minutes to install and verify, plus 20–40 minutes if
+  you run the qualified inference recipe (most of that is the first model and
+  container download)
+* **Risk level:** Low
+  * The installer refuses unmanaged file collisions and symlink destinations
+    rather than overwriting anything it does not own
+  * First-run model and container downloads require network bandwidth and may
+    fail on a slow or interrupted connection
+  * Only one model is qualified to launch in v1; larger bundled candidates are
+    reported as non-runnable by design
+  * MIG changes are disruptive and are blocked unless your release profile
+    enables them and you explicitly approve the plan
+* **Rollback:** Run `assets/install.sh uninstall --target /path/to/project` to
+  remove every manifest-owned file and the delimited context block. The
+  installer preserves any managed file you modified and leaves unrelated
+  context untouched. A user-scope CLI installed with `install-cli` is removed
+  by deleting `~/.local/bin/dgx-assist`. Cached state lives under
+  `~/.cache/dgx-assist/` and `~/.local/state/dgx-assist/` and can be deleted.
+* **Last Updated:** 07/28/2026
+  * First Publication
 
 ## Instructions
 
-## Step 1. Install your coding agent
+## Step 1. Verify your environment
 
-Pick whichever agent you prefer — the rest of this playbook works the same regardless. Install commands:
-
-| Agent | Install |
-|-------|---------|
-| Claude Code | `curl -fsSL https://claude.ai/install.sh \| bash` |
-| OpenAI Codex CLI | `npm i -g @openai/codex` |
-| Gemini CLI | `npm i -g @google/gemini-cli` |
-| Cursor | Download from `https://cursor.com/` |
-
-> [!NOTE]
-> On a stock DGX Station the global npm prefix (`/usr/lib/node_modules`) is root-owned, so
-> `npm i -g …` fails with `EACCES`. Either prefix the command with `sudo`, or configure a
-> user-local prefix first (`npm config set prefix ~/.npm-global` and add `~/.npm-global/bin`
-> to your `PATH`) and run `npm i -g …` without `sudo`.
-
-Verify with `claude --version`, `codex --version`, `gemini --version`, or by launching Cursor.
-
-## Step 2. Install the skills into your project
-
-Navigate to the project where you want DGX Station expertise, then run the installer with the harness you use:
+Confirm the Station has the hardware and software the skills expect. Python
+3.11 or newer is required by the installer.
 
 ```bash
-cd ~/your-project
-
-## Pick one:
-/path/to/this/playbook/assets/install.sh claude
-/path/to/this/playbook/assets/install.sh codex
-/path/to/this/playbook/assets/install.sh gemini
-/path/to/this/playbook/assets/install.sh cursor
-
-## Or install for all four at once:
-/path/to/this/playbook/assets/install.sh all
+python3 --version
+nvidia-smi --query-gpu=name,compute_cap,uuid --format=csv
+docker info --format '{{.ServerVersion}}'
 ```
 
-If you downloaded the playbook as a zip, the path is relative to the extracted directory:
+Expected output should show Python 3.11 or newer, a GB300 GPU reporting
+compute capability `10.3`, and a running Docker daemon. Note the GPU UUIDs
+rather than the row order — the `nvidia-smi` index is not a CUDA ordinal on
+this platform, and the skills always select GPUs by UUID.
+
+## Step 2. Clone the playbook
+
+Clone the playbook repository so the installer and bundled skills are available
+locally.
 
 ```bash
-station-ai-skills/assets/install.sh claude ~/your-project
+git clone https://github.com/NVIDIA/dgx-spark-playbooks
+cd dgx-spark-playbooks/nvidia/station-ai-skills
 ```
 
-The installer is additive for skill directories (won't clobber existing skills you've written) and refuses to overwrite an existing context file (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`) unless you pass `--force`.
+Everything the installer needs lives under `assets/`: the installer itself, the
+`dgx-assist.pyz` CLI, and the four skill directories.
 
-**Resulting layout** (per harness):
+## Step 3. Preview the installation
+
+Preview the exact changes before writing anything. The target is the project
+that should receive the skills — not this playbook directory.
+
+```bash
+assets/install.sh install \
+  --harness codex \
+  --target /path/to/project \
+  --dry-run
+```
+
+Expected output should show a `WOULD WRITE` line for each skill file, one for
+`.dgx-station/bin/dgx-assist`, a diff of the managed NVIDIA block that will be
+added to your context file, and a closing `DRY-RUN: no files changed`.
+
+Choose the `--harness` value that matches your agent:
+
+| Harness | Skill directory | Context file |
+|---|---|---|
+| `claude` | `.claude/skills/` | `CLAUDE.md` |
+| `codex` | `.agents/skills/` | `AGENTS.md` |
+| `gemini` | `.gemini/skills/` | `GEMINI.md` |
+| `cursor` | `.cursor/skills/` | `AGENTS.md` |
+| `all` | every supported harness | managed blocks as applicable |
+
+Each harness receives complete native skill directories with their references,
+scripts, and UI metadata — never a lossy transformed command or rule.
+
+## Step 4. Install the skills and CLI
+
+If the preview is correct, run the same command without `--dry-run`.
+
+```bash
+assets/install.sh install \
+  --harness codex \
+  --target /path/to/project
+```
+
+The installer backs up an existing context file before its first managed edit,
+refuses unmanaged skill collisions and symlink destinations, and records every
+installed hash in `.dgx-station/install-manifest.json`.
+
+To install only the CLI for the current user, when a project-local
+installation is not appropriate:
+
+```bash
+assets/install.sh install-cli --scope user
+```
+
+Restart your AI coding agent in the target project so it picks up the new
+skills and context block.
+
+## Step 5. Verify the installation
+
+Confirm the CLI is present and the bundled content is intact.
+
+```bash
+cd /path/to/project
+.dgx-station/bin/dgx-assist version
+.dgx-station/bin/dgx-assist catalog status
+.dgx-station/bin/dgx-assist playbook status
+```
+
+Expected output should show the CLI version, a valid bundled catalog, and a
+healthy playbook search index. You can check the installation itself at any
+time:
+
+```bash
+assets/install.sh status --target /path/to/project
+```
+
+## Step 6. Confirm your platform support profile
+
+The skills refuse to guess what your Station can do. Inspect it and read the
+resolved profile.
+
+```bash
+.dgx-station/bin/dgx-assist system inspect
+```
+
+Expected output should show an exact compatibility profile and per-feature
+capabilities. The trusted release marker selects one of three profiles:
+
+| Profile | Identity | Behavior |
+|---|---|---|
+| Software 1.0 | `7.4.1` or `7.4.1-GB300ws`; build `2026-02-20-05-22-42` | Guidance, diagnostics, read-only MIG inspection, and explicitly qualified recipes |
+| Software 2.0 | `7.5.0`; build `2026-06-16-11-48-10` | Capability-scoped qualified workflows |
+| Unknown | Any other exact identity | General read-only evidence only |
+
+A recognized Software 2.0 profile requires this base identity and hardware
+evidence, and the release marker must also pass ownership, file-type, symlink,
+and mode checks:
+
+| Field | Required value |
+|---|---|
+| `DGX_SWBUILD_VERSION` | `7.5.0` |
+| `DGX_SWBUILD_DATE` | `2026-06-16-11-48-10` |
+| `DGX_PRETTY_NAME` | `NVIDIA DGX GB300WS` |
+| GB300 compute capability | `10.3` |
+
+Software 1.0 does not inherit Software 2.0 CDMM, ordering-service, or `vsloshd`
+expectations. It permits only recipes explicitly validated for its exact
+profile; MIG mutation and platform fixes remain blocked. A different build is
+reported as unknown rather than assumed compatible.
+
+## Step 7. Ask your agent for a DGX Station task
+
+This is the normal way to use the playbook. Open your agent in the target
+project and make a plain-language request:
 
 ```text
-your-project/
-  AGENTS.md   or  CLAUDE.md   or  GEMINI.md      # context file (named for your agent)
-  .claude/skills/<name>/SKILL.md                  # claude
-  .agents/skills/<name>/SKILL.md                  # codex
-  .gemini/commands/<name>.md                      # gemini
-  .cursor/rules/<name>.mdc                        # cursor
+Inspect this DGX Station and explain its compatibility profile and restrictions.
 ```
-
-Where `<name>` is each of `vllm-setup`, `sglang-setup`, `mig-configure`, `dgx-diagnose`.
-
-> [!NOTE]
-> Every supported agent automatically reads the context file from the working directory at startup. Skills/prompts/rules in the harness-specific directory are discovered automatically — no additional configuration needed.
-
-## Step 3. Verify the setup
-
-Start your agent in the project directory and ask a question that requires constraint knowledge:
 
 ```text
-Can I use --gpus all to run my CUDA workload on DGX Station?
+Serve Qwen/Qwen2.5-Coder-1.5B-Instruct with vLLM. Show the preflight and wait
+for my approval before starting anything.
 ```
 
-The agent should immediately warn about the mixed-coherency constraint and recommend `--gpus '"device=N"'` targeting. If you don't get the warning, the context file isn't being loaded — see Troubleshooting.
+The activated skill runs `dgx-assist --json`, interprets the evidence, carries
+resolution, report, and plan IDs between commands, and presents the result and
+approval boundary to you. You never need to read or copy raw JSON in this mode.
 
-Then verify the skills are discoverable:
+The remaining steps show the equivalent direct CLI commands, which are useful
+for terminal work and for understanding what the agent is doing on your behalf.
 
-| Agent | How to check |
-|-------|--------------|
-| Claude Code | Type `/` — `vllm-setup`, `sglang-setup`, `mig-configure`, `dgx-diagnose` should appear in the autocomplete |
-| Codex CLI | Run `/skills` (or type `$`) — same four names appear |
-| Gemini CLI | Type `/` — same four names appear |
-| Cursor | Open the Rules panel — same four rules appear |
+## Step 8. Search the pinned NVIDIA guidance
 
-## Step 4. Use vllm-setup to deploy an inference server
-
-Invoke the skill in your agent:
-
-| Agent | Invocation |
-|-------|-----------|
-| Claude Code | `/vllm-setup` (slash command) or just describe the task ("deploy vllm with Qwen3-8B") |
-| Codex CLI | `$vllm-setup` (mention), or run `/skills` and pick it |
-| Gemini CLI | `/vllm-setup` |
-| Cursor | In chat: "use the vllm-setup rule to deploy a vllm server" |
-
-The agent will walk you through deploying a vLLM server with a validated container image, correct GPU targeting, and recommended parameters. It will check your GPU index, ask which model you want to serve, and generate the full `docker run` command.
-
-## Step 5. Use sglang-setup to deploy SGLang
-
-Same invocation pattern, but for SGLang with the `cu130` container, RadixAttention prefix caching, and structured JSON output support.
-
-## Step 6. Use mig-configure to partition the GB300
-
-The agent will query your current MIG state, show available profiles, help you choose a layout for your workloads, and execute the partitioning commands.
-
-## Step 7. Use dgx-diagnose to troubleshoot issues
-
-If you encounter problems, invoke `dgx-diagnose`. The agent will check GPU status, driver version, running processes, MIG state, and Fabric Manager to identify the issue.
-
-## Step 8. Customize
-
-Both the `AGENTS.md` and the skills are plain markdown — extend them freely.
-
-**Add project-specific constraints to `AGENTS.md`** (or your harness-specific context file):
-
-```markdown
-### Project-specific
-
-- Our production MIG layout is 3g.139gb + 2g.70gb + 2g.70gb
-- Always use port 8080 for inference (nginx proxy on 443)
-- Model weights are cached at /data/models, mount with -v /data/models:/root/.cache/huggingface/hub
-```
-
-**Create new skills** by adding a directory and `SKILL.md` to `assets/skills/`, then re-run `install.sh`:
+Guidance comes from a bundled multi-source snapshot, not model memory.
 
 ```bash
-mkdir -p assets/skills/run-benchmarks
-cat > assets/skills/run-benchmarks/SKILL.md << 'EOF'
----
-name: run-benchmarks
-description: Run our standard inference benchmark suite against the running vLLM or SGLang server and compare against the baseline.
----
-
-## Run benchmarks
-
-1. Check which inference server is running (vLLM on port 8000 or SGLang on port 30000)
-2. Run the appropriate benchmark script from ./benchmarks/
-3. Report throughput (tokens/sec), latency (TTFT, ITL), and memory utilization
-4. Compare against the baseline in ./benchmarks/baseline.json
-EOF
+.dgx-station/bin/dgx-assist playbook search "mixed coherency containers"
+.dgx-station/bin/dgx-assist playbook search "CPU weight offload HBM forward pass"
+.dgx-station/bin/dgx-assist playbook search "ISL KV cache maximum concurrency"
+.dgx-station/bin/dgx-assist playbook show RESULT_ID
 ```
 
-> [!TIP]
-> Keep `AGENTS.md` focused on constraints and pitfalls (things that break). Put procedural workflows in skills (things you do step-by-step).
+Every retrieved record carries its repository revision, source-file SHA-256,
+heading, lines, role, and authority class. The snapshot pins the DGX Station
+Development Guide at `76a1f6adf1a740699c2efff201377947d90f7fd8`, the GB300
+Bring-Up Guide at `2f2d22b2fee4b6a2964045a97b786b86b366b65b`, upstream vLLM
+`v0.22.1` at `0decac0d96c42b49572498019f0a0e3600f50398` matching NVIDIA vLLM
+container 26.06, and the NVIDIA vLLM release notes.
+
+Where sources conflict, the current Development Guide overrides older bring-up
+statements about mixed GPU contexts and device indices; those passages and any
+credential examples are excluded from retrieval. Retrieval abstains when query
+terms do not overlap the pinned content — do not fill an abstention with
+remembered platform commands.
+
+## Step 9. Run the qualified inference recipe
+
+Resolve an exact model ID to a recipe, inspect it, run preflight, then preview
+the launch.
+
+```bash
+.dgx-station/bin/dgx-assist recipe models
+.dgx-station/bin/dgx-assist recipe resolve --model Qwen/Qwen2.5-Coder-1.5B-Instruct
+.dgx-station/bin/dgx-assist recipe show --recipe-id RECIPE_ID
+.dgx-station/bin/dgx-assist recipe preflight --resolution-id RESOLUTION_ID
+.dgx-station/bin/dgx-assist recipe run --resolution-id RESOLUTION_ID --dry-run
+```
+
+Copy the labeled recipe and resolution IDs from one command to the next; in
+agent use the skill does this for you. Without `--dry-run` or `--yes`, an
+interactive terminal shows the action preview and asks for confirmation. A
+non-interactive caller repeats the command with `--yes` only after showing that
+preview and obtaining approval. Add `--allow-download` only after every
+required model and image download is disclosed and approved. If you set a
+non-local `--bind-host` on `recipe resolve`, the matching `recipe run` also
+requires an explicit `--allow-external-bind`.
+
+The bundled v1 catalog contains one published Software 1.0 smoke recipe —
+`Qwen/Qwen2.5-Coder-1.5B-Instruct` on vLLM — bound to its exact model revision,
+immutable NGC image digest, backend version, release profile, and checksummed
+qualification evidence. This is a functional smoke claim, not a performance
+benchmark.
+
+These candidates are bundled but deliberately non-runnable, and will refuse to
+resolve:
+
+- `nvidia/nemotron-3.5-nano` on vLLM
+- `qwen/qwen3.6-27b` on vLLM
+- `nvidia/nemotron-3-super-120b-a12b` on vLLM
+- `qwen/qwen3.6-27b` on SGLang
+
+Verify and manage a running service, then stop it when finished:
+
+```bash
+.dgx-station/bin/dgx-assist recipe status
+.dgx-station/bin/dgx-assist recipe stop --service-id SERVICE_ID
+```
+
+`recipe stop` revalidates ownership labels and sends SIGTERM only. It never
+force-kills, and it only ever stops resources recorded as owned by
+`dgx-assist`.
+
+## Step 10. Plan a MIG layout
+
+Inspection is available on recognized Software 1.0 and Software 2.0 profiles.
+Planning and apply additionally require `mig_mutation=true` and your approval.
+
+```bash
+.dgx-station/bin/dgx-assist mig inspect
+.dgx-station/bin/dgx-assist mig profiles
+.dgx-station/bin/dgx-assist mig plan --layout "DRIVER_PROFILE_IDS_OR_NAMES"
+.dgx-station/bin/dgx-assist mig apply --plan-id PLAN_ID --dry-run
+```
+
+Expected output should show driver-discovered profiles, the disruption and
+restoration information for the plan, and — under `--dry-run` — no change to
+the GPUs. `dgx-assist` never stops active GPU clients to apply a layout.
+
+## Step 11. Run diagnostics
+
+Diagnosis is read-only. Each allowlisted fix is separately previewed,
+confirmed, verified, and recorded.
+
+```bash
+.dgx-station/bin/dgx-assist diagnose run
+.dgx-station/bin/dgx-assist diagnose bundle --report-id REPORT_ID
+.dgx-station/bin/dgx-assist diagnose fix --report-id REPORT_ID --finding FINDING_ID --dry-run
+```
+
+Expected output should show findings correlated to pinned playbook content, and
+a redacted support bundle path. Bundles and receipts persist redacted argv and
+credential variable names only, never secret values.
+
+## Step 12. Cleanup
+
+Remove the skills, the CLI, and the managed context block from a project.
+
+> [!WARNING]
+> This deletes every file recorded in `.dgx-station/install-manifest.json` and
+> removes the delimited NVIDIA block from your context file. Managed files you
+> modified are preserved, and unrelated context is left untouched.
+
+```bash
+assets/install.sh uninstall --target /path/to/project --dry-run
+assets/install.sh uninstall --target /path/to/project
+```
+
+To remove a user-scope CLI and the local caches as well:
+
+```bash
+rm -f ~/.local/bin/dgx-assist
+rm -rf ~/.cache/dgx-assist ~/.local/state/dgx-assist
+```
+
+## Step 13. Next steps
+
+Keep an installation current, or migrate one made by an older release:
+
+```bash
+assets/install.sh update --target /path/to/project --dry-run
+assets/install.sh update --target /path/to/project
+assets/install.sh migrate --target /path/to/project --dry-run
+assets/install.sh migrate --target /path/to/project
+```
+
+Migration removes a released legacy skill only when its exact artifact hash is
+known; modified legacy skills remain with a warning. Update and uninstall
+operate only on manifest-owned files and delimited context blocks.
+
+1. **Automate with the JSON envelope.** Every command accepts `--json`
+   anywhere in its arguments and returns `schema_version`, `command`, `ok`,
+   `data`, `warnings`, and `provenance`. Errors use the same envelope with an
+   `error` object. Never parse the human display in automation.
+
+   ```bash
+   .dgx-station/bin/dgx-assist system inspect --json |
+     jq '.data.compatibility | {profile_id, support_level, capabilities}'
+   ```
+
+2. **Branch on stable exit classes.** Inspect both the process exit code and
+   the JSON `error.code`.
+
+   | Exit code | Meaning |
+   |---:|---|
+   | `0` | Success |
+   | `2` | Invalid command, configuration, or input |
+   | `3` | Unsupported platform or operation |
+   | `4` | No eligible exact recipe |
+   | `5` | Safety, approval, staleness, conflict, or policy block |
+   | `6` | Authorized action or internal operation failed |
+
+3. **Relocate configuration and state.** Unless XDG environment variables
+   override them, configuration lives at `~/.config/dgx-assist/config.json`,
+   caches at `~/.cache/dgx-assist/`, and resolutions, diagnostics, service
+   ownership, receipts, and MIG plans at `~/.local/state/dgx-assist/`.
+
+4. **Point at a live content endpoint.** The public package uses its bundled
+   snapshot and is entirely offline by default. An internal pilot can supply
+   endpoint configuration in the XDG config file or via `--config PATH`:
+
+   ```json
+   {
+     "catalog": {
+       "manifest_url": "https://approved.example/catalog/manifest.json",
+       "allowed_hosts": ["approved.example"]
+     },
+     "playbook": {
+       "manifest_url": "https://approved.example/playbook/manifest.json",
+       "allowed_hosts": ["approved.example"]
+     }
+   }
+   ```
+
+   Refresh accepts HTTPS from explicit hosts, validates schema, key ID, Ed25519
+   signature through OpenSSL, digest, generation time, and expiry, then
+   atomically activates the artifact. A failed refresh retains the
+   last-known-good content. Use `--offline` to suppress the 24-hour bounded
+   refresh attempt, or `catalog refresh --dry-run` and
+   `playbook refresh --dry-run` to inspect the configured host and cache impact
+   without network access.
+
+5. **Tune inference with sourced guidance.** Name the exact model and describe
+   the workload's ISL, generated-output distribution, target concurrency,
+   latency and throughput goals, and repeated-prefix rate. The inference skill
+   explains NGC versus upstream containers, GPU-memory headroom, weight and KV
+   offload, HBM placement, KV-cache sizing, prefix caching, and chunked
+   prefill — without turning those recommendations into launch flags. Changed
+   parameters stay non-executable until an exact recipe is physically
+   validated.
+
+A successful end state is an agent in your project that inspects the real
+Station before advising, cites pinned NVIDIA guidance with provenance, and
+stops for your approval before every mutation.
 
 ## Troubleshooting
 
-## Skills don't appear in autocomplete / aren't discoverable
+## Common issues
 
-Each agent discovers skills from a harness-specific directory in the current directory (or a parent). Check the right one:
-
-| Agent | Expected location |
-|-------|-------------------|
-| Claude Code | `.claude/skills/<name>/SKILL.md` |
-| Codex CLI | `.agents/skills/<name>/SKILL.md` (browse with `/skills` or mention `$<name>`) |
-| Gemini CLI | `.gemini/commands/<name>.md` |
-| Cursor | `.cursor/rules/<name>.mdc` |
-
-```bash
-## Examples — check the directory for your agent
-ls -la .claude/skills/
-ls -la .agents/skills/
-ls -la .gemini/commands/
-ls -la .cursor/rules/
-```
-
-You should see entries for `vllm-setup`, `sglang-setup`, `mig-configure`, and `dgx-diagnose`.
-
-**Check you're in the right directory:**
-
-```bash
-pwd
-```
-
-The agent must be started from the directory containing the harness directory, or a subdirectory of it.
-
-## Context file not loaded
-
-If the agent gives generic answers without DGX Station awareness, the context file isn't being picked up. Each agent reads a different filename — verify the one for your agent exists:
-
-| Agent | Expected filename |
-|-------|-------------------|
-| Claude Code | `CLAUDE.md` (also reads `AGENTS.md` as fallback) |
-| Codex CLI | `AGENTS.md` |
-| Gemini CLI | `GEMINI.md` |
-| Cursor | `AGENTS.md` |
-
-```bash
-## Verify the file exists for your agent
-cat AGENTS.md | head -5
-cat CLAUDE.md | head -5
-cat GEMINI.md | head -5
-
-## Restart the agent in the correct directory
-cd ~/your-project
-claude    # or codex, gemini, etc.
-```
-
-All four agents read the context file from the working directory (and parent directories up to the project root).
-
-## Skill gives outdated information
-
-The skills contain validated container versions and parameters as of the publication date. If a newer container is available, edit the canonical source and re-install:
-
-```bash
-nano /path/to/playbook/assets/skills/vllm-setup/SKILL.md
-/path/to/playbook/assets/install.sh all --force
-```
-
-Or edit the installed copy directly:
-
-```bash
-## Claude Code
-nano .claude/skills/vllm-setup/SKILL.md
-## Codex
-nano .agents/skills/vllm-setup/SKILL.md
-## Gemini CLI
-nano .gemini/commands/vllm-setup.md
-## Cursor
-nano .cursor/rules/vllm-setup.mdc
-```
-
-> [!TIP]
-> Skills are plain markdown — you can version them in git alongside your project code.
-
-## "Both GPUs cannot be used" errors
-
-This is the mixed-coherency constraint working as intended. If you see CUDA errors when using `--gpus all`:
-
-```bash
-## Find the GB300 index
-nvidia-smi --query-gpu=index,name --format=csv,noheader
-
-## Use device-specific targeting
-docker run --gpus '"device=1"' ...
-```
-
-The `AGENTS.md` covers this constraint, but if you removed that section, add it back — it's the most important piece of DGX Station knowledge.
-
-## Skills conflict with existing project directory
-
-If your project already has a `.claude/`, `.codex/`, `.gemini/`, or `.cursor/` directory with its own contents, `install.sh` is **additive** for skill directories — it adds the new skill files alongside whatever you already have and warns on collision rather than overwriting.
-
-For context files (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`), the installer **refuses** to overwrite an existing file. Pass `--force` to override, or merge the new content manually:
-
-```bash
-## See what would be written
-diff /path/to/playbook/assets/AGENTS.md ./AGENTS.md
-
-## Force overwrite
-/path/to/playbook/assets/install.sh claude . --force
-```
-
-## Installer reports "WROTE" for some files but "SKIP" for others
-
-That's the safe-by-default behavior. The installer skips any file that already exists, prints a warning, and continues with the rest. To get a clean install, either:
-
-1. Delete the existing files first: `rm -rf .claude/skills/{vllm-setup,sglang-setup,mig-configure,dgx-diagnose}`
-2. Or pass `--force` (only affects context files; skill files are still skipped if present)
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `system inspect` reports restricted or unknown actions | Untrusted or unknown release identity, missing GB300 `10.3` compute capability, or an observed power-budget violation | Run `.dgx-station/bin/dgx-assist system inspect` and read the compatibility profile, capabilities, and restrictions. With `--json`, inspect `data.compatibility` and `data.rejection_reasons`. Do not bypass qualification or rely on product-name strings alone — a different build is not automatically compatible |
+| Software 1.0 profile blocks MIG mutation and platform fixes | Expected behavior: the Software 1.0 profile is capability-scoped to guidance, diagnostics, read-only MIG inspection, and explicitly validated recipes | No action. Qualified recipe execution still works; MIG mutation and platform fixes require a profile that enables them |
+| No recipe resolves for your model | The bundled v1 catalog has one runnable Software 1.0 smoke model, `Qwen/Qwen2.5-Coder-1.5B-Instruct`; larger candidates are deliberately non-runnable | Run `.dgx-station/bin/dgx-assist recipe models` and `catalog status` to list exact IDs. Other stable reasons: experimental lifecycle, missing LaunchSpec, mutable model or image references, stale recipe hash, expired evidence, wrong release or hardware, ambiguity, or a hard preflight conflict. No error path substitutes a different model |
+| `playbook search` returns nothing, with `retrieval_trace.abstained=true` | Query terms did not overlap the pinned content | Narrow the query using Station-specific terms. Do not invent a command to fill the abstention |
+| `playbook status` reports a missing or corrupt index | Damaged bundled search index | Run `.dgx-station/bin/dgx-assist diagnose run`, then `diagnose fix --report-id REPORT --finding content.playbook.index --dry-run`. Approve the fix before repeating it with `--yes` |
+| Mixed-coherency GPU ordering looks wrong in a container | Containers do not automatically inherit host device exposure or ordinals from `/etc/mixed-coherency-gpu-select/env` | Inspect `compatibility.capabilities` first and report observed NVML addressing modes and UUIDs. Check the ordering service only when `mixed_coherency_service` is true. Pass explicit UUIDs; never assume `nvidia-smi` index `0` or `1` is the GB300 CUDA ordinal. See the [NVIDIA mixed-coherency guide](https://docs.nvidia.com/dgx/dgx-station-development-guide/coherency.html) |
+| Older guidance says one CUDA context cannot use both GPUs | Superseded bring-up passage that predates the current Development Guide | Do not follow it on the qualified R610+ Software 2.0 profile. The signed retrieval snapshot excludes that passage and records the current Development Guide as the superseding source. Software 2.0 can access ATS and HMM devices; do not import that behavior into Software 1.0 |
+| A power check fails or `vsloshd` is missing | `dynamic_power_sloshing` is not enabled on this profile, or a real budget violation was observed | When the capability is true, report the `vsloshd` service and mode. On Software 1.0 its absence is not a fault. Report observed caps and violations; never attempt an ad hoc power-cap fix. See the [NVIDIA power-sloshing guide](https://docs.nvidia.com/dgx/dgx-station-development-guide/dynamic-power-sloshing.html) |
+| vLLM tuning advice seems too generic | The request lacked an exact model and workload shape | Name the model and give ISL, generated-output distribution, target concurrency, TTFT/inter-token-latency/throughput goals, and repeated-prefix rate, then run `playbook search "gpu_memory_utilization KV cache preemption"` or `playbook search "prefix caching chunked prefill concurrency"`. Do not maximize `gpu_memory_utilization` blindly, treat CPU memory as HBM-equivalent, promise concurrency from ISL alone, or claim a prefix-cache speedup for decode-heavy workloads |
+| Preflight reports a port or GPU conflict | Another listener or GPU client owns the resource | Resolve the conflict yourself — `dgx-assist` never stops, kills, or takes over an unknown resource. Create a fresh resolution afterwards if any input changed |
+| `recipe stop` leaves the service running | The graceful SIGTERM timeout expired; `dgx-assist` does not implicitly send SIGKILL | The receipt reports a degraded stop and leaves the resource for explicit operator review. Stop it manually after confirming what it is |
+| A MIG plan is rejected as stale | Clients, mode, instances, installed profiles, release identity, or the driver changed after planning | Run `mig inspect` and `mig profiles`, then create a new plan. Do not replay or edit the old commands |
+| Skills are not discovered by the agent | Incomplete skill folder, wrong directory, or a harness without native skill support | Verify the native path contains the full folder and the exact uppercase filename — `.claude/skills/dgx-station/SKILL.md`, `.agents/skills/…`, `.gemini/skills/…`, or `.cursor/skills/…` — then restart the agent in that project. Upgrade a harness that lacks native skill support rather than transforming the bundle |
+| `install.sh status` reports `MODIFIED` files | You edited a managed file after installation | Expected and safe: the installer preserves a modified managed file during update and uninstall. Review it manually, or delete it and re-run `install` to restore the shipped version |
+| Install fails with `unmanaged skill collision` or `unmanaged CLI collision` | A same-name file exists that the installer does not own | The installer never overwrites unmanaged files. Move or delete the existing file, then re-run `install` |
+| Install fails partway with an OS error | A write failed mid-installation | The installer records a recovery manifest covering the files that landed. Re-run `install` to finish, or `uninstall` to remove them |
+| `install-cli --scope user` refuses to write | `~/.local/bin/dgx-assist` already exists or is a symlink | Remove or rename the existing destination, then re-run. The installer refuses to replace a symlink destination or an existing user CLI |
+| Context file changes look unexpected | Only the delimited NVIDIA block is managed | Unrelated content is never touched, and the original file is backed up under `.dgx-station/backups/` before the first managed edit. Restore from that backup if needed |
