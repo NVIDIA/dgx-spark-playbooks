@@ -109,6 +109,9 @@ services:
       - OLLAMA_KV_CACHE_TYPE=q8_0
       - OLLAMA_GPU_LAYERS=-1
       - OLLAMA_LLM_LIBRARY=cuda_v13
+      # Cold-loading an 80+ GiB model into the GB10 CUDA buffer exceeds the
+      # default 5m startup budget; Ollama would kill the runner mid-load.
+      - OLLAMA_LOAD_TIMEOUT=20m
     networks:
       - default
     restart: unless-stopped
