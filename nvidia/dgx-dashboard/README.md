@@ -14,11 +14,11 @@
 
 ## Basic idea
 
-The DGX Dashboard is a web application that runs locally on DGX Spark devices, providing a graphical interface for system updates, resource monitoring, and an integrated JupyterLab environment. Users can access the dashboard locally from the app launcher or remotely through NVIDIA Sync or SSH tunneling. The dashboard is the easiest way to update system packages and firmware when working remotely.
+The DGX Dashboard is a web application that runs locally on DGX Spark devices, providing a graphical interface for system updates, resource monitoring, and an integrated JupyterLab environment. Users can access the dashboard locally from the app launcher or remotely through NVIDIA Sync, SSH tunneling, or Tailscale. The dashboard is the easiest way to update system packages and firmware when working remotely.
 
 ## What you'll accomplish
 
-You will learn how to access and use the DGX Dashboard on your DGX Spark device. By the end of this walkthrough, you will be able to launch JupyterLab instances with pre-configured Python environments, monitor GPU performance, manage system updates, and run a sample AI workload using Stable Diffusion. You'll understand multiple access methods including desktop shortcuts, NVIDIA Sync, and manual SSH tunneling.
+You will learn how to access and use the DGX Dashboard on your DGX Spark device. By the end of this walkthrough, you will be able to launch JupyterLab instances with pre-configured Python environments, monitor GPU performance, manage system updates, and run a sample AI workload using Stable Diffusion. You'll understand multiple access methods including desktop shortcuts, NVIDIA Sync, manual SSH tunneling, and Tailscale.
 
 ## What to know before starting
 
@@ -97,6 +97,10 @@ Replace `<USERNAME>` with your DGX Spark device username and `<SPARK_DEVICE_IP>`
 Replace `<ASSIGNED_PORT>` with the port number from the YAML file.
 
 Open your web browser and navigate to `http://localhost:11000`.
+
+**Option D: Tailscale (alternative to manual SSH tunnels)**
+
+For secure remote access over your private network without manual SSH tunneling, check out the [Tailscale playbook](../tailscale/README.md#step-12-access-dgx-dashboard-over-tailnet) for instructions on accessing the DGX Dashboard over the tailnet using Tailscale Serve.
 
 
 ## Step 2. Log into DGX Dashboard

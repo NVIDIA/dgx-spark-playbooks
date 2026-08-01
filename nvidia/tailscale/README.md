@@ -18,8 +18,10 @@
   - [Step 9. Configure SSH authentication](#step-9-configure-ssh-authentication)
   - [Step 10. Test SSH connection](#step-10-test-ssh-connection)
   - [Step 11. Validate installation](#step-11-validate-installation)
-  - [Step 13. Cleanup and rollback](#step-13-cleanup-and-rollback)
-  - [Step 14. Next steps](#step-14-next-steps)
+  - [Step 12. Access DGX Dashboard over Tailnet](#step-12-access-dgx-dashboard-over-tailnet)
+  - [Step 13. Next steps](#step-13-next-steps)
+  - [Step 14. Cleanup and rollback](#step-14-cleanup-and-rollback)
+  
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -316,13 +318,88 @@ Expected output:
 - Successful file transfers
 - Remote command execution working
 
-### Step 13. Cleanup and rollback
+### Step 12. Access DGX Dashboard over Tailnet
+
+The DGX Dashboard is locked to localhost:11000 for security. This means you can only access it over localhost thorugh the ssh tunnel. Instead of manually creating an SSH tunnel every time, use Tailscale Serve to proxy the traffic so you can access it via your Tailscale IP/URL from any device.
+
+## On your DGX Spark machine, run:
+```bash
+## Proxy incoming Tailnet traffic to the local dashboard
+## The --bg flag ensures this keeps running after you close your terminal
+sudo tailscale serve --bg --http=11000 localhost:11000
+```
+
+## Verify proxy is active:
+```bash
+tailscale serve status
+```
+
+You can access the dashboard using the Tailscale IP address:
+
+`http://<TAILSCALE_IP>:11000`
+
+You can find your Tailscale IP by running `tailscale ip -4` on the DGX Spark device.
+
+Alternatively, if you set up tailsale with Magic DNS, you can use your tailscale URL with:
+
+`http://SPARK_HOST_NAME.XXXXX-YYYYYY.ts.net:11000`
+
+Where XXXXX an YYYYYY are part of the custom domain name to your tailnet.
+
+You can now bookmark this URL and access it anywhere on your tailnet.
+
+**Option: Enable HTTPS (recommended for security)**
+
+For secure HTTPS access with SSL certificates, enable MagicDNS and HTTPS Certificates in your Tailscale Admin Console:
+
+1. Go to your Tailscale Admin Console
+2. Under DNS, ensure MagicDNS is enabled
+3. Scroll down to HTTPS Certificates and click Enable
+
+Then, on your DGX Spark machine, reset the HTTP proxy and start the HTTPS proxy:
+
+```bash
+# First, reset the old HTTP proxy
+sudo tailscale serve --http=11000 off
+
+# Now, start the HTTPS proxy
+sudo tailscale serve --bg --https=11000 localhost:11000
+```
+
+Access the dashboard securely via: `https://SPARK_HOST_NAME.XXXXX-YYYYYY.ts.net:11000`
+ > **Note:** It may take a little longer on first load to set the SSL certificate. This is normal.
+
+### Step 13. Next steps
+
+Your Tailscale setup is complete. You can now:
+
+- Access your DGX Spark device from any network with: `ssh <USERNAME>@<SPARK_HOSTNAME>`
+- Transfer files securely: `scp file.txt <USERNAME>@<SPARK_HOSTNAME>:~/`
+- Open the DGX Dashboard and start JupyterLab, then connect with:
+  `ssh -L 8888:localhost:1102 <USERNAME>@<SPARK_HOSTNAME>`
+
+  > **Note:** Alternatively, see Step 12 for accessing the DGX Dashboard over Tailnet without manual SSH tunneling.
+
+
+### Step 14. Cleanup and rollback
 
 Remove Tailscale completely if needed. This will disconnect devices from the
 tailnet and remove all network configurations.
 
+**Option A: Remove only DGX Dashboard access**
+
+If you want to keep Tailscale installed but stop serving the DGX Dashboard:
+
+```bash
+## Remove DGX Dashboard access from tailnet (from Step 12)
+sudo tailscale serve --http=11000 off
+sudo tailscale serve --https=11000 off
+```
+
 > [!WARNING]
 > This will permanently remove the device from your Tailscale network and require re-authentication to rejoin.
+
+**Option B: Full Tailscale removal**
 
 ```bash
 ## Stop Tailscale service
@@ -337,18 +414,11 @@ sudo rm /usr/share/keyrings/tailscale-archive-keyring.gpg
 
 ## Update package list
 sudo apt update
+
 ```
 
+
 To restore: Re-run installation steps 3-5.
-
-### Step 14. Next steps
-
-Your Tailscale setup is complete. You can now:
-
-- Access your DGX Spark device from any network with: `ssh <USERNAME>@<SPARK_HOSTNAME>`
-- Transfer files securely: `scp file.txt <USERNAME>@<SPARK_HOSTNAME>:~/`
-- Open the DGX Dashboard and start JupyterLab, then connect with:
-  `ssh -L 8888:localhost:1102 <USERNAME>@<SPARK_HOSTNAME>`
 
 ## Troubleshooting
 
