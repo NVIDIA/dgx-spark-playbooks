@@ -1,3 +1,4 @@
+#!/bin/env bash
 #
 # SPDX-FileCopyrightText: Copyright (c) 1993-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
@@ -14,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-#!/bin/env bash
 
 # discover-sparks
 # Discover available systems using avahi-browse and generate MPI hosts file
