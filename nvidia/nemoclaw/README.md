@@ -11,6 +11,7 @@
   - [Isolation layers (OpenShell)](#isolation-layers-openshell)
   - [What to know before starting](#what-to-know-before-starting)
   - [Prerequisites](#prerequisites)
+  - [Multi-node and two-Spark deployments](#multi-node-and-two-spark-deployments)
   - [Have ready before you begin](#have-ready-before-you-begin)
   - [Ancillary files](#ancillary-files)
   - [Time and risk](#time-and-risk)
@@ -56,7 +57,7 @@ By the end of this playbook you will have a working AI agent inside an OpenShell
 - Accept the DGX Spark **Express Install** for managed vLLM, the `qwen3.6-35b-a3b-nvfp4` model, the `my-assistant` sandbox, and Balanced policy, or choose custom onboarding
 - Open the **Web UI** to interact with agent
 - Optionally enable **Brave Search** or **Telegram** after onboarding
-- **Cleanup and uninstall** with the documented `uninstall.sh` flags when finished
+- **Cleanup and uninstall** with the documented `uninstall.sh` flags when finished, then reclaim the managed vLLM model cache manually
 
 ### Notice and disclaimers
 
@@ -117,6 +118,27 @@ docker info --format '{{.ServerVersion}}'
 ```
 
 Expected: Ubuntu 24.04, NVIDIA GB10 GPU, Docker 28.x+.
+
+### Multi-node and two-Spark deployments
+
+This playbook is single-node. NemoClaw's managed local inference runs one vLLM server on the Spark you install it on — tensor, pipeline, and data parallel size are all 1 — and the NemoClaw CLI manages that one host. There is no cross-host management console and no NemoClaw command that spans two Sparks.
+
+Two Sparks are still usable, by separating the two jobs. Stand the distributed model server up yourself with the sibling Spark playbooks, then run NemoClaw on **Node 1**, the node that exposes the OpenAI-compatible API, and point it at that server over loopback:
+
+1. Connect the two Sparks and validate the fabric with [Connect Two Sparks](https://build.nvidia.com/spark/connect-two-sparks/stacked-sparks), then the two-Spark checks in the [NCCL](https://build.nvidia.com/spark/nccl/stacked-sparks) playbook.
+2. Serve the model across both nodes with the two-node serving procedure in the [vLLM for Inference](https://build.nvidia.com/spark/vllm) playbook. It leaves an OpenAI-compatible API on Node 1 at `http://localhost:8000/v1`.
+3. On Node 1 only, follow this playbook's **Instructions** tab and select **Existing vLLM** during onboarding rather than the Express Install, which stands up its own single-node managed vLLM server on port 8000. **Existing vLLM** is offered when a ready server is detected on `localhost:8000`, and onboarding then uses that loopback endpoint without prompting for a URL.
+
+> [!IMPORTANT]
+> Three constraints apply to that composition:
+> - Serve on `0.0.0.0`, not `127.0.0.1`, so the OpenShell bridge can reach the endpoint from inside the sandbox.
+> - Run NemoClaw on the node that exposes the API, so the endpoint is reachable over loopback. If you use the **Other OpenAI-compatible endpoint** path instead, enter a loopback URL such as `http://localhost:8000/v1`; a peer node's fabric address such as `192.168.100.11` is rejected by NemoClaw's host-side SSRF validation unless the operator sets `NEMOCLAW_TRUSTED_PRIVATE_INFERENCE_HOSTS`.
+> - Add `--enable-auto-tool-choice` and the `--tool-call-parser` your model family requires to the `vllm serve` command. The vLLM playbook's two-node example omits both because it is not an agent workload, and without them tool calls can appear as raw assistant text instead of structured `tool_calls`.
+
+> [!NOTE]
+> This is not a supported NemoClaw multi-node profile. NemoClaw itself has no multi-node inference capability on DGX Spark, and no two-Spark model recipe has been validated end to end with it. Treat the sequence above as operator-assembled: the multi-node work is done entirely by the inference engine, and NemoClaw only consumes the resulting endpoint on the node it runs on. Check the current DGX Spark playbook on build.nvidia.com before relying on it.
+
+The DGX Station multi-node deployment documented in the [DGX Station NemoClaw playbook](https://build.nvidia.com/station/nemoclaw) is not an alternative to this section. It targets a pair of DGX Station systems over their own high-speed fabric, and its model, container image, rail addressing, and NCCL settings are Station-specific. Do not run those steps on a DGX Spark.
 
 ### Have ready before you begin
 
@@ -728,17 +750,22 @@ openshell forward stop <port>   # stop the dashboard forward (use the port shown
 
 ### Step 9. Uninstall NemoClaw
 
-The NemoClaw CLI includes a built-in uninstaller. It removes all sandboxes, the OpenShell gateway, Docker containers/images/volumes, the CLI, and state directories. Docker, Node.js, npm, and the vLLM container image are preserved. Your `~/.nemoclaw/` user data (`rebuild-backups/`, `backups/`, `sandboxes.json`) is also preserved unless you pass `--destroy-user-data`.
+The NemoClaw CLI includes a built-in uninstaller. It removes all sandboxes, the OpenShell gateway, Docker containers/images/volumes, the CLI, and state directories. Docker, Node.js, npm, the vLLM container image, and the downloaded model weights under `~/.cache/huggingface` are preserved. Your `~/.nemoclaw/` user data (`rebuild-backups/`, `backups/`, `sandboxes.json`) is also preserved unless you pass `--destroy-user-data`.
 
 ```bash
 nemoclaw uninstall --yes
 ```
 
-To remove everything including the downloaded Ollama models:
+`--delete-models` additionally removes two Ollama model tags, `nemotron-3-super:120b` and `nemotron-3-nano:30b`:
 
 ```bash
 nemoclaw uninstall --yes --delete-models
 ```
+
+> [!IMPORTANT]
+> `--delete-models` is Ollama-only. Express Install configures managed vLLM with `qwen3.6-35b-a3b-nvfp4`, which downloads about 23.5 GB into `~/.cache/huggingface`, so on the default DGX Spark setup this flag reclaims nothing — with no `ollama` binary on the host the uninstaller prints `ollama not found; skipping model cleanup.` and continues. To recover that disk space, follow **Reclaim managed vLLM disk space** below.
+>
+> Deletion is by tag, not by provenance. Those two tags are removed even if you pulled them yourself, and every other Ollama model is left in place — including `qwen3.6:35b` and `qwen3.5:9b`, which NemoClaw can also pull. Remove those with `ollama rm <tag>`.
 
 **Uninstaller flags:**
 
@@ -746,7 +773,7 @@ nemoclaw uninstall --yes --delete-models
 |------|--------|
 | `--yes` | Skip the confirmation prompt |
 | `--keep-openshell` | Leave the `openshell` binary in place |
-| `--delete-models` | Also remove Ollama models pulled by NemoClaw |
+| `--delete-models` | Also remove the Ollama tags `nemotron-3-super:120b` and `nemotron-3-nano:30b`; all other Ollama models and managed vLLM weights are kept |
 | `--destroy-user-data` | Also remove preserved user data under `~/.nemoclaw/` (`rebuild-backups/`, `backups/`, `sandboxes.json`) |
 
 > [!NOTE]
@@ -755,17 +782,34 @@ nemoclaw uninstall --yes --delete-models
 > curl -fsSL https://raw.githubusercontent.com/NVIDIA/NemoClaw/refs/heads/main/uninstall.sh | bash -s -- --yes
 > ```
 
-The uninstaller runs up to 7 steps:
+The uninstaller prints six numbered steps, `[1/6]` through `[6/6]`:
 1. Stop NemoClaw helper services and port-forward processes
 2. Delete all OpenShell sandboxes, the NemoClaw gateway, and providers
 3. Remove the global `nemoclaw` npm package
 4. Remove NemoClaw/OpenShell Docker containers, images, and volumes
-5. Remove downloaded Ollama models (only with `--delete-models`)
+5. Remove the two Ollama tags listed above (only with `--delete-models`)
 6. Remove config/state directories (`~/.config/openshell`, `~/.config/nemoclaw`) and the OpenShell binary
-7. Remove preserved user data under `~/.nemoclaw/` (`rebuild-backups/`, `backups/`, `sandboxes.json`) — only with `--destroy-user-data`
+
+With `--destroy-user-data`, the uninstaller also purges preserved user data under `~/.nemoclaw/` (`rebuild-backups/`, `backups/`, `sandboxes.json`). That purge is announced on its own line and is not one of the numbered steps.
+
+No step removes managed vLLM model weights or the vLLM container image; reclaim those manually.
 
 > [!NOTE]
-> `~/.nemoclaw/` user data is preserved by default and only removed in step 7 with `--destroy-user-data`. If you have a local clone at `~/.nemoclaw/source` you want to keep, move or back it up before running the uninstaller with that flag.
+> `~/.nemoclaw/` user data is preserved by default and removed only when you pass `--destroy-user-data`. If you have a local clone at `~/.nemoclaw/source` you want to keep, move or back it up before running the uninstaller with that flag.
+
+**Reclaim managed vLLM disk space:**
+
+Keep the Hugging Face cache unless reclaiming disk is intentional. Retaining the model cache makes a later reinstall substantially faster. When you do want the space back, run these on the host after the uninstaller finishes:
+
+```bash
+docker rm -f nemoclaw-vllm 2>/dev/null || true
+rm -rf ~/.cache/huggingface/hub/models--nvidia--Qwen3.6-35B-A3B-NVFP4
+docker images --digests nvcr.io/nvidia/vllm
+df -h "$HOME/.cache/huggingface"
+```
+
+> [!NOTE]
+> The uninstaller normally removes the `nemoclaw-vllm` container already, so the first command is usually a no-op. `nemoclaw uninstall` force-removes any container whose name or image matches `nemoclaw`, `openshell`, or `openclaw`, so rename an unrelated container that matches before you uninstall. NemoClaw pulls the vLLM image by digest rather than by tag, so `docker images` lists it with `TAG` as `<none>`; the third command prints the digest. Remove the image with `docker image rm nvcr.io/nvidia/vllm@sha256:<digest>` once no other workload needs it. If you served other models, list the rest of the cache with `du -sh ~/.cache/huggingface/hub/*` and delete only the `models--*` directories you no longer need.
 
 ## Useful commands
 
@@ -780,8 +824,8 @@ The uninstaller runs up to 7 steps:
 | `nemoclaw my-assistant dashboard-url --quiet` | Print the full tokenized Web UI URL (includes auto-assigned port) |
 | `openshell term` | Open the monitoring TUI on the host |
 | `openshell forward list` | List active port forwards |
-| `nemoclaw uninstall --yes` | Remove NemoClaw (preserves Docker, Node.js, vLLM image) |
-| `nemoclaw uninstall --yes --delete-models` | Remove NemoClaw and downloaded Ollama models |
+| `nemoclaw uninstall --yes` | Remove NemoClaw (preserves Docker, Node.js, vLLM image, and `~/.cache/huggingface`) |
+| `nemoclaw uninstall --yes --delete-models` | Remove NemoClaw and the two fixed Ollama tags (not other models, not vLLM weights) |
 
 ## Troubleshooting
 

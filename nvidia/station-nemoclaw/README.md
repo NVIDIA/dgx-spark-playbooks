@@ -68,7 +68,7 @@ By the end of this playbook you will have a working AI agent inside an OpenShell
 - Accept the DGX Station **Express Install** for managed vLLM, the `nemotron-3-ultra-550b-a55b` model, the `my-assistant` sandbox, and Balanced policy, or choose custom onboarding
 - Open the **Web UI** to interact with agent
 - Optionally enable **Brave Search** or **Telegram** after onboarding
-- **Cleanup and uninstall** with the documented `uninstall.sh` flags when finished
+- **Cleanup and uninstall** with the documented `uninstall.sh` flags when finished, then reclaim the managed vLLM model cache manually
 
 ### Notice and disclaimers
 
@@ -755,17 +755,22 @@ openshell forward stop <port>   # stop the dashboard forward (use the port shown
 
 ### Step 9. Uninstall NemoClaw
 
-The NemoClaw CLI includes a built-in uninstaller. It removes all sandboxes, the OpenShell gateway, Docker containers/images/volumes, the CLI, and state directories. Docker, Node.js, npm, and the vLLM container image are preserved. Your `~/.nemoclaw/` user data (`rebuild-backups/`, `backups/`, `sandboxes.json`) is also preserved unless you pass `--destroy-user-data`.
+The NemoClaw CLI includes a built-in uninstaller. It removes all sandboxes, the OpenShell gateway, Docker containers/images/volumes, the CLI, and state directories. Docker, Node.js, npm, the vLLM container image, and the downloaded model weights under `~/.cache/huggingface` are preserved. Your `~/.nemoclaw/` user data (`rebuild-backups/`, `backups/`, `sandboxes.json`) is also preserved unless you pass `--destroy-user-data`.
 
 ```bash
 nemoclaw uninstall --yes
 ```
 
-To remove everything including the downloaded Ollama models:
+`--delete-models` additionally removes two Ollama model tags, `nemotron-3-super:120b` and `nemotron-3-nano:30b`:
 
 ```bash
 nemoclaw uninstall --yes --delete-models
 ```
+
+> [!IMPORTANT]
+> `--delete-models` is Ollama-only. Express Install configures managed vLLM with `nemotron-3-ultra-550b-a55b`, an approximately 352 GB download into `~/.cache/huggingface`, so on the default DGX Station setup this flag reclaims nothing — with no `ollama` binary on the host the uninstaller prints `ollama not found; skipping model cleanup.` and continues. To recover that disk space, follow **Reclaim managed vLLM disk space** below.
+>
+> Deletion is by tag, not by provenance. Those two tags are removed even if you pulled them yourself, and every other Ollama model is left in place — including `qwen3.6:35b` and `qwen3.5:9b`, which NemoClaw can also pull. Remove those with `ollama rm <tag>`.
 
 **Uninstaller flags:**
 
@@ -773,7 +778,7 @@ nemoclaw uninstall --yes --delete-models
 |------|--------|
 | `--yes` | Skip the confirmation prompt |
 | `--keep-openshell` | Leave the `openshell` binary in place |
-| `--delete-models` | Also remove Ollama models pulled by NemoClaw |
+| `--delete-models` | Also remove the Ollama tags `nemotron-3-super:120b` and `nemotron-3-nano:30b`; all other Ollama models and managed vLLM weights are kept |
 | `--destroy-user-data` | Also remove preserved user data under `~/.nemoclaw/` (`rebuild-backups/`, `backups/`, `sandboxes.json`) |
 
 > [!NOTE]
@@ -782,17 +787,37 @@ nemoclaw uninstall --yes --delete-models
 > curl -fsSL https://raw.githubusercontent.com/NVIDIA/NemoClaw/refs/heads/main/uninstall.sh | bash -s -- --yes
 > ```
 
-The uninstaller runs up to 7 steps:
+The uninstaller prints six numbered steps, `[1/6]` through `[6/6]`:
 1. Stop NemoClaw helper services and port-forward processes
 2. Delete all OpenShell sandboxes, the NemoClaw gateway, and providers
 3. Remove the global `nemoclaw` npm package
 4. Remove NemoClaw/OpenShell Docker containers, images, and volumes
-5. Remove downloaded Ollama models (only with `--delete-models`)
+5. Remove the two Ollama tags listed above (only with `--delete-models`)
 6. Remove config/state directories (`~/.config/openshell`, `~/.config/nemoclaw`) and the OpenShell binary
-7. Remove preserved user data under `~/.nemoclaw/` (`rebuild-backups/`, `backups/`, `sandboxes.json`) — only with `--destroy-user-data`
+
+With `--destroy-user-data`, the uninstaller also purges preserved user data under `~/.nemoclaw/` (`rebuild-backups/`, `backups/`, `sandboxes.json`). That purge is announced on its own line and is not one of the numbered steps.
+
+No step removes managed vLLM model weights or the vLLM container image; reclaim those manually.
 
 > [!NOTE]
-> `~/.nemoclaw/` user data is preserved by default and only removed in step 7 with `--destroy-user-data`. If you have a local clone at `~/.nemoclaw/source` you want to keep, move or back it up before running the uninstaller with that flag.
+> `~/.nemoclaw/` user data is preserved by default and removed only when you pass `--destroy-user-data`. If you have a local clone at `~/.nemoclaw/source` you want to keep, move or back it up before running the uninstaller with that flag.
+
+**Reclaim managed vLLM disk space:**
+
+Keep the Hugging Face caches unless reclaiming disk is intentional. Retaining the model cache makes a later reinstall substantially faster. When you do want the space back, run these on the host after the uninstaller finishes:
+
+> [!WARNING]
+> The dual DGX Station deployment documented later in this playbook mounts each node's own `~/.cache/huggingface` into its container. Deleting the model directory on a node breaks that node's running container. Stop the deployment first, and run the cleanup on each station separately.
+
+```bash
+docker rm -f nemoclaw-vllm 2>/dev/null || true
+rm -rf ~/.cache/huggingface/hub/models--nvidia--NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4
+docker images | grep vllm
+df -h "$HOME/.cache/huggingface"
+```
+
+> [!NOTE]
+> The uninstaller normally removes the `nemoclaw-vllm` container already, so the first command is usually a no-op. `nemoclaw uninstall` force-removes any container whose name or image matches `nemoclaw`, `openshell`, or `openclaw`, so rename an unrelated container that matches before you uninstall. The second command targets the Express Install model; if you installed with `--station-deepseek` or chose another model, list the cache with `du -sh ~/.cache/huggingface/hub/*` and delete only the `models--*` directories you no longer need. Express Install pulls `vllm/vllm-openai:v0.22.0`; the DGX Station managed-vLLM profile default (`deepseek-v4-flash`) uses `nvcr.io/nvidia/vllm:26.05.post1-py3`. Remove whichever image the third command lists with `docker image rm <image>`, once no other workload needs it.
 
 ## Useful commands
 
@@ -807,8 +832,8 @@ The uninstaller runs up to 7 steps:
 | `nemoclaw my-assistant dashboard-url --quiet` | Print the full tokenized Web UI URL (includes auto-assigned port) |
 | `openshell term` | Open the monitoring TUI on the host |
 | `openshell forward list` | List active port forwards |
-| `nemoclaw uninstall --yes` | Remove NemoClaw (preserves Docker, Node.js, vLLM image) |
-| `nemoclaw uninstall --yes --delete-models` | Remove NemoClaw and downloaded Ollama models |
+| `nemoclaw uninstall --yes` | Remove NemoClaw (preserves Docker, Node.js, vLLM image, and `~/.cache/huggingface`) |
+| `nemoclaw uninstall --yes --delete-models` | Remove NemoClaw and the two fixed Ollama tags (not other models, not vLLM weights) |
 
 ## On Dual DGX Station
 
@@ -817,6 +842,9 @@ The uninstaller runs up to 7 steps:
 ## Phase 1: Prepare Both Stations
 
 Below steps deploy **NVIDIA Nemotron 3 Ultra** across 2 DGX Station with GB300 GPUs.
+
+> [!IMPORTANT]
+> This tab applies to DGX Station (GB300) only. It is not a DGX Spark procedure. The model, container image, rail addressing, and NCCL settings below are specific to a pair of DGX Stations connected over CX8 RoCE rails, and NemoClaw itself does not span hosts — it runs on `station-1` and consumes the endpoint this tab produces. For two DGX Sparks, see the two-Spark guidance in the [DGX Spark NemoClaw playbook](https://build.nvidia.com/spark/nemoclaw).
 
 ### Step 1. Prerequisites
 - Complete [Connect Two DGX Stations for Distributed Workloads](https://build.nvidia.com/station/connect-two-stations/instructions) before starting this tab. Both CX8 RoCE rails must be configured and validated.
