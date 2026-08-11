@@ -39,6 +39,8 @@
   - [Step 8. Stop services](#step-8-stop-services)
   - [Step 9. Uninstall NemoClaw](#step-9-uninstall-nemoclaw)
 - [Troubleshooting](#troubleshooting)
+- [Multi-Node](#multi-node)
+  - [Run NemoClaw on Two DGX Sparks](#run-nemoclaw-on-two-dgx-sparks)
 
 ---
 
@@ -862,3 +864,21 @@ sudo sh -c 'sync; echo 3 > /proc/sys/vm/drop_caches'
 ```
 
 For the latest known issues, please review the [DGX Spark User Guide](https://docs.nvidia.com/dgx/dgx-spark/known-issues.html).
+
+---
+
+## Multi-Node
+
+### Run NemoClaw on Two DGX Sparks
+
+NemoClaw includes an Experimental managed vLLM profile for a qualified two-system DGX Spark cluster.
+DGX Spark Express can select this profile automatically when you keep option 1, **Managed vLLM with automatic serving-profile selection**.
+The profile serves DeepSeek V4 Flash 0731 through NemoClaw's managed `inference.local` route.
+
+> [!IMPORTANT]
+> This profile is Experimental because physical two-node end-to-end validation is pending.
+> Use it only for evaluation until the required validation is complete.
+
+Follow [Set Up vLLM on Two DGX Sparks](https://docs.nvidia.com/nemoclaw/latest/user-guide/openclaw/inference/local-inference/set-up-vllm-on-two-dgx-sparks) for qualification, network and storage requirements, trusted SSH setup, installation, verification, and cleanup.
+
+When no matching cluster qualifies during automatic selection, NemoClaw retains the single-DGX Spark managed vLLM path from the **Instructions** tab.
