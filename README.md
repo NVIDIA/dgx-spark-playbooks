@@ -62,6 +62,7 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 - [Set up Tailscale on Your Spark](nvidia/tailscale/)
 - [TRT LLM for Inference](nvidia/trt-llm/)
 - [Text to Knowledge Graph on DGX Spark](nvidia/txt2kg/)
+- [Build Your Own Transaction Foundation Model](nvidia/transaction-foundation-model/)
 - [Unsloth on DGX Spark](nvidia/unsloth/)
 - [Vibe Coding in VS Code](nvidia/vibe-coding/)
 - [vLLM for Inference](nvidia/vllm/)
