@@ -1,0 +1,53 @@
+FROM nvcr.io/nvidia/nemo-automodel:26.06.00
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PATH="/root/.local/bin:${PATH}"
+ENV UV_SYSTEM_PYTHON=1
+ENV UV_BREAK_SYSTEM_PACKAGES=1
+ENV UV_NO_CACHE=1
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        git \
+        git-lfs \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN if ! command -v uv >/dev/null 2>&1; then \
+        curl -LsSf https://astral.sh/uv/install.sh -o /tmp/install-uv.sh; \
+        sh /tmp/install-uv.sh; \
+    fi
+
+COPY requirements-gb10.txt /tmp/requirements-gb10.txt
+
+RUN uv pip install --system --break-system-packages --no-cache \
+    --index https://pypi.nvidia.com \
+    -r /tmp/requirements-gb10.txt
+
+RUN uv pip install --system --break-system-packages --no-cache --no-deps \
+    "torchdata>=0.11,<0.12"
+
+RUN python - <<'PY'
+import cudf
+import cuml
+import cupy
+import nemo_automodel
+import torch
+import torchdata
+import transformers
+import xgboost
+
+print("torch", torch.__version__)
+print("cudf", cudf.__version__)
+print("cuml", cuml.__version__)
+print("cupy", cupy.__version__)
+print("transformers", transformers.__version__)
+print("torchdata", torchdata.__version__)
+print("xgboost", xgboost.__version__)
+print("nemo_automodel", getattr(nemo_automodel, "__version__", "imported"))
+PY
+
+WORKDIR /workspace
+
+CMD ["/bin/bash"]
