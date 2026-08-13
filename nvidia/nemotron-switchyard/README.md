@@ -67,6 +67,7 @@ The Switchyard deployment is defined in [`assets/nemotron-switchyard-routes.toml
 - **Rollback:** Stop Switchyard, remove the two Docker containers, and remove downloaded model files or images if disk space must be recovered.
 - **Last Updated:** 08/13/2026
   - Initial publication using Sparky and NeMo Switchyard 0.2.0
+  - Added Rust and Cargo installation troubleshooting for Ubuntu 24.04
 
 ## Instructions
 
@@ -94,6 +95,28 @@ Expected results:
 - Docker can access the GB10 GPU.
 - Rust and Cargo are installed.
 - The port check returns no listeners.
+
+If `rustc` and `cargo` are the only missing prerequisites on Ubuntu 24.04, install `rustup` and the stable Rust toolchain:
+
+```bash
+sudo apt update
+sudo apt install -y rustup
+rustup default stable
+
+rustc --version
+cargo --version
+```
+
+If the installation succeeds but either command is still not found, start a new shell or add Cargo's binary directory to the current shell, then verify again:
+
+```bash
+export PATH="$HOME/.cargo/bin:$PATH"
+hash -r
+rustc --version
+cargo --version
+```
+
+Do not continue until both version commands succeed. `cargo install` in Step 6 requires this toolchain.
 
 Validate Docker GPU access:
 
@@ -325,6 +348,7 @@ The Sparky repository includes [`scripts/vllm-stack-up.sh`](https://github.com/h
 | Second model reports no available cache-block memory | Both models started concurrently or their memory fractions are too high | Start Qwen first, wait for readiness, then start Nemotron. Keep the fractions at `0.45 + 0.42` unless you revalidate another split. |
 | Nemotron hangs before loading weights | CUDA graph or compile deadlock under co-location | Keep `--enforce-eager` on the Nemotron command. |
 | Nemotron reports `block_size (4176)` greater than `max_num_batched_tokens` | Incompatible Mamba cache alignment option | Do not add `--mamba-cache-mode align`. |
+| `rustc` and `cargo` are not found during host validation | The Rust toolchain is not installed | On Ubuntu 24.04, install `rustup` with APT, run `rustup default stable`, and verify both commands before continuing. If they remain unavailable, start a new shell or add `$HOME/.cargo/bin` to `PATH`. |
 | Switchyard dry-run reports a missing environment variable | `SPARKY_API_KEY` is not exported in the current shell | Export the same key used in both vLLM launch commands and rerun `--dry-run`. |
 | Switchyard receives `401 Unauthorized` from a backend | The vLLM key and `SPARKY_API_KEY` differ | Restart the affected vLLM container and Switchyard with the same key. |
 | Classifier always falls back to Nemotron | Qwen returned invalid or incomplete structured output | Confirm Qwen is healthy, keep classifier thinking disabled, and inspect Switchyard debug logs. |
@@ -335,6 +359,7 @@ The Sparky repository includes [`scripts/vllm-stack-up.sh`](https://github.com/h
 
 - [Sparky](https://github.com/hsrakri/sparky)
 - [NeMo Switchyard](https://github.com/NVIDIA-NeMo/Switchyard)
+- [Install Rust with rustup](https://rust-lang.github.io/rustup/installation/)
 - [Switchyard 0.2.0 release](https://github.com/NVIDIA-NeMo/Switchyard/releases/tag/v0.2.0)
 - [Switchyard classifier routing](https://github.com/NVIDIA-NeMo/Switchyard/blob/v0.2.0/docs/routing_algorithms/llm_classifier_routing.md)
 - [Switchyard server configuration](https://github.com/NVIDIA-NeMo/Switchyard/blob/v0.2.0/docs/reference/toml_schema.md)
