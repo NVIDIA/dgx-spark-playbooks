@@ -88,11 +88,15 @@ Two Spark-specific tips make a large difference:
   unified memory those are the same physical LPDDR5X, so that shuttle is wasted
   work — it dominates per-step time and can trigger out-of-memory failures on
   larger models. `--profile 3` keeps the whole model resident (easily within
-  128 GB) and is dramatically faster. Add `--teacache 2.0` for a further speed-up:
+  128 GB) and is dramatically faster:
 
   ```bash
-  bash assets/launch.sh --profile 3 --teacache 2.0
+  bash assets/launch.sh --profile 3
   ```
+
+  (WanGP also has a TeaCache step-cache for extra speed; enable it in the UI's
+  Advanced Mode if your version exposes it — the `--teacache` CLI flag is not
+  available in all WanGP versions.)
 
 - **If you hit an out-of-memory error mid-generation,** flush the Linux buffer
   cache, which can consume the unified memory pool on the Spark (a documented DGX
