@@ -68,6 +68,7 @@ The Switchyard deployment is defined in [`assets/nemotron-switchyard-routes.toml
 - **Last Updated:** 08/13/2026
   - Initial publication using Sparky and NeMo Switchyard 0.2.0
   - Added Rust and Cargo installation troubleshooting for Ubuntu 24.04
+  - Reduced the dual-model memory baseline and added fail-fast startup checks
 
 ## Instructions
 
@@ -84,6 +85,8 @@ git --version
 curl --version
 rustc --version
 cargo --version
+openssl version
+free -h
 df -h .
 
 ss -ltn '( sport = :4000 or sport = :8000 or sport = :8001 )'
@@ -94,6 +97,7 @@ Expected results:
 - `uname -m` returns `aarch64`.
 - Docker can access the GB10 GPU.
 - Rust and Cargo are installed.
+- `free -h` shows enough available unified memory to start both models.
 - The port check returns no listeners.
 
 If `rustc` and `cargo` are the only missing prerequisites on Ubuntu 24.04, install `rustup` and the stable Rust toolchain:
@@ -141,12 +145,18 @@ If either repository already exists, reuse that checkout instead of cloning it a
 Create one key that vLLM requires for both local endpoints and that Switchyard uses for upstream authentication:
 
 ```bash
-export SPARKY_API_KEY="replace-with-a-long-random-local-key"
+export SPARKY_API_KEY="$(openssl rand -hex 32)"
 ```
 
 Keep this value in the same host shell used to start Switchyard. Do not commit it to either repository.
 
 ## Step 4. Start the Qwen coder first
+
+If you are restarting after a failed attempt, remove both playbook containers so the new memory settings take effect:
+
+```bash
+docker rm -f nemotron-vllm qwen36-vllm 2>/dev/null || true
+```
 
 Sparky requires the coder to become ready before Nemotron starts. Launch Qwen on port `8000`:
 
@@ -164,7 +174,8 @@ docker run -d --name qwen36-vllm --restart no \
     --enable-auto-tool-choice \
     --tool-call-parser qwen3_coder \
     --default-chat-template-kwargs '{"enable_thinking": false}' \
-    --gpu-memory-utilization 0.45 \
+    --gpu-memory-utilization 0.35 \
+    --max-model-len 32768 \
     --api-key "$SPARKY_API_KEY" \
     --host 0.0.0.0 --port 8000
 ```
@@ -175,11 +186,19 @@ Wait until the endpoint is ready:
 until curl -fsS \
   -H "Authorization: Bearer $SPARKY_API_KEY" \
   http://127.0.0.1:8000/v1/models >/dev/null; do
+  if [ "$(docker inspect -f '{{.State.Running}}' qwen36-vllm 2>/dev/null)" != "true" ]; then
+    docker logs --tail 100 qwen36-vllm
+    break
+  fi
   sleep 5
 done
+
+curl -fsS \
+  -H "Authorization: Bearer $SPARKY_API_KEY" \
+  http://127.0.0.1:8000/v1/models >/dev/null
 ```
 
-Do not continue until this command exits successfully.
+Do not continue until the final `curl` command exits successfully.
 
 ## Step 5. Start the Nemotron orchestrator second
 
@@ -198,8 +217,8 @@ docker run -d --name nemotron-vllm --restart no \
     --reasoning-parser nemotron_v3 \
     --enable-auto-tool-choice \
     --tool-call-parser qwen3_coder \
-    --gpu-memory-utilization 0.42 \
-    --max-model-len 131072 \
+    --gpu-memory-utilization 0.35 \
+    --max-model-len 32768 \
     --api-key "$SPARKY_API_KEY" \
     --host 0.0.0.0 --port 8001
 ```
@@ -210,8 +229,16 @@ Wait until both models are ready:
 until curl -fsS \
   -H "Authorization: Bearer $SPARKY_API_KEY" \
   http://127.0.0.1:8001/v1/models >/dev/null; do
+  if [ "$(docker inspect -f '{{.State.Running}}' nemotron-vllm 2>/dev/null)" != "true" ]; then
+    docker logs --tail 100 nemotron-vllm
+    break
+  fi
   sleep 5
 done
+
+curl -fsS \
+  -H "Authorization: Bearer $SPARKY_API_KEY" \
+  http://127.0.0.1:8001/v1/models >/dev/null
 
 curl -fsS -H "Authorization: Bearer $SPARKY_API_KEY" \
   http://127.0.0.1:8000/v1/models
@@ -219,7 +246,7 @@ curl -fsS -H "Authorization: Bearer $SPARKY_API_KEY" \
   http://127.0.0.1:8001/v1/models
 ```
 
-Cold starts can take several minutes per model.
+Cold starts can take several minutes per model. In another terminal, use `docker logs --follow qwen36-vllm` or `docker logs --follow nemotron-vllm` to watch progress. The readiness loops stop and print the last 100 log lines if a container exits.
 
 ## Step 6. Install NeMo Switchyard
 
@@ -345,7 +372,8 @@ The Sparky repository includes [`scripts/vllm-stack-up.sh`](https://github.com/h
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| Second model reports no available cache-block memory | Both models started concurrently or their memory fractions are too high | Start Qwen first, wait for readiness, then start Nemotron. Keep the fractions at `0.45 + 0.42` unless you revalidate another split. |
+| Nemotron exits with `CUDA error: out of memory` during `MemorySnapshot` | Qwen's allocation leaves too little unified-memory headroom for the second CUDA context | Remove both containers, confirm available memory with `free -h`, then recreate them sequentially with the documented `0.35 + 0.35` split and 32K context limits. |
+| Second model reports no available cache-block memory | Both models started concurrently or their memory fractions are too high | Remove both containers, start Qwen first, wait for readiness, then start Nemotron. Reduce both memory fractions further if other host workloads consume substantial unified memory. |
 | Nemotron hangs before loading weights | CUDA graph or compile deadlock under co-location | Keep `--enforce-eager` on the Nemotron command. |
 | Nemotron reports `block_size (4176)` greater than `max_num_batched_tokens` | Incompatible Mamba cache alignment option | Do not add `--mamba-cache-mode align`. |
 | `rustc` and `cargo` are not found during host validation | The Rust toolchain is not installed | On Ubuntu 24.04, install `rustup` with APT, run `rustup default stable`, and verify both commands before continuing. If they remain unavailable, start a new shell or add `$HOME/.cargo/bin` to `PATH`. |
