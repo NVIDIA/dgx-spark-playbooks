@@ -56,7 +56,7 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 - [RAG Application in AI Workbench](nvidia/rag-ai-workbench/)
 - [Spark & Reachy Photo Booth](nvidia/reachy-photo-booth/)
 - [Register DGX Spark to Brev](nvidia/register-to-brev/)
-- [Route Sparky Models with NeMo Switchyard](nvidia/sparky-switchyard/)
+- [Nemotron Switchyard](nvidia/nemotron-switchyard/)
 - [SGLang for Inference](nvidia/sglang/)
 - [Single-cell RNA Sequencing](nvidia/single-cell/)
 - [Speculative Decoding](nvidia/speculative-decoding/)

@@ -1,4 +1,4 @@
-# Route Sparky Models with NeMo Switchyard
+# Nemotron Switchyard
 
 > Co-locate Nemotron and Qwen on DGX Spark, then route each request to the appropriate model
 
@@ -58,7 +58,7 @@ You will:
 
 ## Ancillary files
 
-The Switchyard deployment is defined in [`assets/sparky-routes.toml`](assets/sparky-routes.toml).
+The Switchyard deployment is defined in [`assets/nemotron-switchyard-routes.toml`](assets/nemotron-switchyard-routes.toml).
 
 ## Time & risk
 
@@ -218,13 +218,13 @@ export PATH="$HOME/.cargo/bin:$PATH"
 From the parent directory containing both cloned repositories, set the route path:
 
 ```bash
-export SPARKY_ROUTES="$PWD/dgx-spark-playbooks/nvidia/sparky-switchyard/assets/sparky-routes.toml"
+export NEMOTRON_SWITCHYARD_ROUTES="$PWD/dgx-spark-playbooks/nvidia/nemotron-switchyard/assets/nemotron-switchyard-routes.toml"
 ```
 
 Validate the TOML configuration and environment without starting the server:
 
 ```bash
-switchyard-server --config "$SPARKY_ROUTES" --dry-run
+switchyard-server --config "$NEMOTRON_SWITCHYARD_ROUTES" --dry-run
 ```
 
 Create the local state directory, then start Switchyard on the loopback interface:
@@ -234,10 +234,10 @@ mkdir -p "$HOME/.local/state"
 
 RUST_LOG=switchyard_server=info,libsy=info \
 switchyard-server \
-  --config "$SPARKY_ROUTES" \
+  --config "$NEMOTRON_SWITCHYARD_ROUTES" \
   --host 127.0.0.1 \
   --port 4000 \
-  --routing-log-file "$HOME/.local/state/sparky-switchyard-routing.jsonl"
+  --routing-log-file "$HOME/.local/state/nemotron-switchyard-routing.jsonl"
 ```
 
 Keep this terminal open. Switchyard reads `SPARKY_API_KEY` when it starts.
@@ -281,7 +281,7 @@ Inspect the `x-model-router-selected-model` and `x-model-router-rationale` respo
 
 ```bash
 curl -fsS http://127.0.0.1:4000/v1/stats
-tail -n 20 "$HOME/.local/state/sparky-switchyard-routing.jsonl"
+tail -n 20 "$HOME/.local/state/nemotron-switchyard-routing.jsonl"
 ```
 
 Any OpenAI Chat Completions client can now use:
@@ -292,7 +292,7 @@ Any OpenAI Chat Completions client can now use:
 
 ## Step 9. Tune the routing policy
 
-Edit `sparky-routes.toml` only after collecting representative routing decisions:
+Edit `nemotron-switchyard-routes.toml` only after collecting representative routing decisions:
 
 - Adjust the classifier prompt when requests repeatedly select the wrong specialization.
 - Keep `default_target = "orchestrator"` so classifier failures use the broader model.
