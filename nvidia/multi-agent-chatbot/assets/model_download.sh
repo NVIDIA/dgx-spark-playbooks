@@ -44,6 +44,6 @@ download_if_needed "https://huggingface.co/ggml-org/gpt-oss-120b-GGUF/resolve/ma
 download_if_needed "https://huggingface.co/ggml-org/gpt-oss-120b-GGUF/resolve/main/gpt-oss-120b-mxfp4-00003-of-00003.gguf" "gpt-oss-120b-mxfp4-00003-of-00003.gguf"
 
 # Uncomment next line if you want to use gpt-oss-20b
-# download_if_needed "https://huggingface.co/ggml-org/gpt-oss-20b-GGUF/resolve/main/gpt-oss-20b-mxfp4.gguf" "gpt-oss-20b-mxfp4.gguf"
+# download_if_needed "https://huggingface.co/ggml-org/gpt-oss-20b-GGUF/resolve/main/gpt-oss-20b-MXFP4.gguf" "gpt-oss-20b-mxfp4.gguf"
 
 echo "All models downloaded."
