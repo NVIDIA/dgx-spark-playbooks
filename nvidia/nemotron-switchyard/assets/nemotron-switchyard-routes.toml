@@ -1,0 +1,76 @@
+schema_version = 1
+
+[llm_clients.qwen_classifier]
+format = "openai_chat"
+base_url = "http://127.0.0.1:8000/v1"
+api_key_env = "NEMOTRON_SWITCHYARD_API_KEY"
+
+[llm_clients.qwen_coder]
+format = "openai_chat"
+base_url = "http://127.0.0.1:8000/v1"
+api_key_env = "NEMOTRON_SWITCHYARD_API_KEY"
+
+[llm_clients.nemotron]
+format = "openai_chat"
+base_url = "http://127.0.0.1:8001/v1"
+api_key_env = "NEMOTRON_SWITCHYARD_API_KEY"
+
+[targets.classifier]
+id = "nvidia/Qwen3.6-35B-A3B-NVFP4"
+llm_client = "qwen_classifier"
+extra_body = { chat_template_kwargs = { enable_thinking = false } }
+
+[targets.coder]
+id = "nvidia/Qwen3.6-35B-A3B-NVFP4"
+llm_client = "qwen_coder"
+
+[targets.orchestrator]
+id = "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4"
+llm_client = "nemotron"
+
+[routes.nemotron_switchyard]
+id = "nemotron-switchyard"
+type = "llm_classifier"
+mode = "custom"
+classifier_target = "classifier"
+targets = ["coder", "orchestrator"]
+default_target = "orchestrator"
+max_output_tokens = 512
+recent_turn_window = 3
+prompt = """
+Choose the best target for the current request.
+
+Select coder for source-code implementation, debugging, test creation, code review,
+refactoring, command construction, and other tasks where coding specialization is
+the primary requirement.
+
+Select orchestrator for planning, decomposition, architecture, coordination,
+general reasoning, research synthesis, and ambiguous requests that need broad
+judgment before implementation.
+
+Return exactly one JSON object matching the response schema supplied with the request.
+"""
+response_schema = '''
+{
+  "type": "object",
+  "properties": {
+    "decision": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string",
+          "enum": ["coder", "orchestrator"]
+        }
+      },
+      "required": ["target"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["decision"],
+  "additionalProperties": false
+}
+'''
+
+[routes.nemotron_switchyard.policy]
+type = "target_selector"
+selector = "/decision/target"
