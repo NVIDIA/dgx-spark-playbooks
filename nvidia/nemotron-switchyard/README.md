@@ -69,6 +69,7 @@ The Switchyard deployment is defined in [`assets/nemotron-switchyard-routes.toml
   - Initial publication using Sparky and NeMo Switchyard 0.2.0
   - Added Rust and Cargo installation troubleshooting for Ubuntu 24.04
   - Reduced the dual-model memory baseline and added fail-fast startup checks
+  - Added SSH tunnel access for a coding harness running on a developer laptop
 
 ## Instructions
 
@@ -162,7 +163,7 @@ Sparky requires the coder to become ready before Nemotron starts. Launch Qwen on
 
 ```bash
 docker run -d --name qwen36-vllm --restart no \
-  --gpus all --ipc=host -p 8000:8000 \
+  --gpus all --ipc=host -p 127.0.0.1:8000:8000 \
   -v "$HOME/.cache/huggingface:/root/.cache/huggingface" \
   vllm/vllm-openai:v0.26.0-aarch64 \
   nvidia/Qwen3.6-35B-A3B-NVFP4 \
@@ -206,7 +207,7 @@ After Qwen is ready, launch Nemotron on port `8001`:
 
 ```bash
 docker run -d --name nemotron-vllm --restart no \
-  --gpus all --ipc=host -p 8001:8001 \
+  --gpus all --ipc=host -p 127.0.0.1:8001:8001 \
   -v "$HOME/.cache/huggingface:/root/.cache/huggingface" \
   vllm/vllm-openai:v0.26.0-aarch64 \
   nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4 \
@@ -334,7 +335,7 @@ curl -fsS http://127.0.0.1:4000/v1/stats
 tail -n 20 "$HOME/.local/state/nemotron-switchyard-routing.jsonl"
 ```
 
-Any OpenAI Chat Completions client can now use:
+Any OpenAI Chat Completions client running on the DGX Spark can now use:
 
 - Base URL: `http://127.0.0.1:4000/v1`
 - Model: `sparky`
@@ -351,7 +352,39 @@ Edit `nemotron-switchyard-routes.toml` only after collecting representative rout
 
 Restart Switchyard after changing the route file, then run `--dry-run` again before serving traffic.
 
-## Step 10. Cleanup and rollback
+## Step 10. Connect a coding harness from your laptop
+
+Switchyard and both vLLM backends remain bound to the DGX Spark loopback interface. From your laptop, create an authenticated and encrypted SSH tunnel to Switchyard:
+
+```bash
+export SPARK_USER="your-spark-user"
+export SPARK_HOST="spark-hostname-or-ip"
+
+ssh \
+  -o ExitOnForwardFailure=yes \
+  -o ServerAliveInterval=30 \
+  -N -L 4000:127.0.0.1:4000 \
+  "${SPARK_USER}@${SPARK_HOST}"
+```
+
+Keep this laptop terminal open while using the remote models. In a second laptop terminal, verify the tunnel:
+
+```bash
+curl -fsS http://127.0.0.1:4000/health
+curl -fsS http://127.0.0.1:4000/v1/models
+```
+
+Configure an OpenAI Chat Completions-compatible coding harness on the laptop with:
+
+- Base URL: `http://127.0.0.1:4000/v1`
+- Model: `sparky`
+- API key: any non-empty placeholder if the harness requires one
+
+The coding harness connects to the laptop's loopback port. SSH carries the traffic to Switchyard on the DGX Spark, and Switchyard selects Qwen or Nemotron. Do not configure the harness with ports `8000` or `8001`, and do not expose those backend ports outside the Spark.
+
+Stop the tunnel with `Ctrl+C`. This does not stop Switchyard or either model container.
+
+## Step 11. Cleanup and rollback
 
 Stop Switchyard with `Ctrl+C`, then remove the model containers:
 
@@ -382,6 +415,7 @@ The Sparky repository includes [`scripts/vllm-stack-up.sh`](https://github.com/h
 | Classifier always falls back to Nemotron | Qwen returned invalid or incomplete structured output | Confirm Qwen is healthy, keep classifier thinking disabled, and inspect Switchyard debug logs. |
 | Coding or planning requests select the wrong model | The classification prompt does not match the workload | Review routing logs, refine the prompt with representative examples, and revalidate. |
 | Client cannot connect to port 4000 | Switchyard is stopped, bound elsewhere, or the client is remote | Check `/health`. Keep loopback binding for local use; use an SSH tunnel rather than exposing the unauthenticated endpoint. |
+| SSH reports `bind [127.0.0.1]:4000: Address already in use` | Another process on the laptop uses local port `4000` | Change the tunnel to `-L 14000:127.0.0.1:4000` and configure the harness with `http://127.0.0.1:14000/v1`. |
 
 ## References
 
