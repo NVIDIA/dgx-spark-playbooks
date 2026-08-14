@@ -14,18 +14,18 @@
 
 ## Basic idea
 
-This playbook builds on the [Sparky](https://github.com/hsrakri/sparky) dual-model recipe for a single NVIDIA DGX Spark. Sparky co-locates two OpenAI-compatible vLLM servers:
+This playbook co-locates two OpenAI-compatible vLLM servers on a single NVIDIA DGX Spark:
 
 - `nvidia/Qwen3.6-35B-A3B-NVFP4` on port `8000` for coding work
 - `nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4` on port `8001` for orchestration and general reasoning
 
-Sparky originally wires these models into fixed orchestrator and delegated-coder roles. This playbook adds [NVIDIA NeMo Switchyard](https://github.com/NVIDIA-NeMo/Switchyard) in front of both endpoints. Clients send every request to one model ID, `sparky`, and Switchyard classifies the request before selecting a backend:
+The playbook places [NVIDIA NeMo Switchyard](https://github.com/NVIDIA-NeMo/Switchyard) in front of both endpoints. Clients send every request to one model ID, `nemotron-switchyard`, and Switchyard classifies the request before selecting a backend:
 
 - Implementation, debugging, tests, code review, and refactoring route to Qwen.
 - Planning, decomposition, architecture, coordination, and general reasoning route to Nemotron.
 - Invalid or unavailable classifier output falls back to Nemotron.
 
-Switchyard selects the model but does not start, stop, or monitor the vLLM servers. Sparky remains responsible for the two-model deployment and its required startup order.
+Switchyard selects the model but does not start, stop, or monitor the vLLM servers. This playbook provides the complete two-model deployment and its required startup order.
 
 > [!NOTE]
 > NeMo Switchyard 0.2.0 is pre-alpha software. Its APIs and configuration may change before a stable release. This playbook pins version `0.2.0`.
@@ -34,10 +34,10 @@ Switchyard selects the model but does not start, stop, or monitor the vLLM serve
 
 You will:
 
-1. Start the Sparky Qwen and Nemotron servers sequentially on one DGX Spark.
+1. Start Qwen and Nemotron sequentially on one DGX Spark.
 2. Install the pinned Switchyard standalone server.
 3. Validate a custom classifier route for the two local models.
-4. Expose one OpenAI-compatible endpoint on port `4000` using the model ID `sparky`.
+4. Expose one OpenAI-compatible endpoint on port `4000` using the model ID `nemotron-switchyard`.
 5. Verify which backend served coding and planning requests.
 
 ## What to know before starting
@@ -66,10 +66,11 @@ The Switchyard deployment is defined in [`assets/nemotron-switchyard-routes.toml
 - **Risks:** The two vLLM processes use most of DGX Spark's unified memory. Starting them concurrently can make the second server fail. Classifier routing adds latency and may occasionally choose an unexpected model.
 - **Rollback:** Stop Switchyard, remove the two Docker containers, and remove downloaded model files or images if disk space must be recovered.
 - **Last Updated:** 08/13/2026
-  - Initial publication using Sparky and NeMo Switchyard 0.2.0
+  - Initial publication using Qwen, Nemotron, and NeMo Switchyard 0.2.0
   - Added Rust and Cargo installation troubleshooting for Ubuntu 24.04
   - Reduced the dual-model memory baseline and added fail-fast startup checks
   - Added SSH tunnel access for a coding harness running on a developer laptop
+  - Removed the external repository dependency and made this playbook self-contained
 
 ## Instructions
 
@@ -129,27 +130,26 @@ Validate Docker GPU access:
 docker run --rm --gpus all nvcr.io/nvidia/cuda:13.0.1-devel-ubuntu24.04 nvidia-smi
 ```
 
-## Step 2. Clone the playbook and Sparky repositories
+## Step 2. Clone the playbook repository
 
-Clone both repositories into the same parent directory:
+Clone this repository into your home directory:
 
 ```bash
-git clone https://github.com/NVIDIA/dgx-spark-playbooks.git
-git clone https://github.com/hsrakri/sparky.git
-git -C sparky checkout 6391f400cb2dc53c795f4ea8b1e4ba2a92e52604
+export PLAYBOOKS_DIR="$HOME/dgx-spark-playbooks"
+git clone https://github.com/NVIDIA/dgx-spark-playbooks.git "$PLAYBOOKS_DIR"
 ```
 
-If either repository already exists, reuse that checkout instead of cloning it again. The Sparky commit is pinned to the version reviewed for this playbook.
+If the repository already exists, reuse that checkout instead of cloning it again. No other source repository is required.
 
 ## Step 3. Set the local API key
 
 Create one key that vLLM requires for both local endpoints and that Switchyard uses for upstream authentication:
 
 ```bash
-export SPARKY_API_KEY="$(openssl rand -hex 32)"
+export NEMOTRON_SWITCHYARD_API_KEY="$(openssl rand -hex 32)"
 ```
 
-Keep this value in the same host shell used to start Switchyard. Do not commit it to either repository.
+Keep this value in the same host shell used to start Switchyard. Do not commit it to the repository.
 
 ## Step 4. Start the Qwen coder first
 
@@ -159,7 +159,7 @@ If you are restarting after a failed attempt, remove both playbook containers so
 docker rm -f nemotron-vllm qwen36-vllm 2>/dev/null || true
 ```
 
-Sparky requires the coder to become ready before Nemotron starts. Launch Qwen on port `8000`:
+To avoid unified-memory contention, the coder must become ready before Nemotron starts. Launch Qwen on port `8000`:
 
 ```bash
 docker run -d --name qwen36-vllm --restart no \
@@ -177,7 +177,7 @@ docker run -d --name qwen36-vllm --restart no \
     --default-chat-template-kwargs '{"enable_thinking": false}' \
     --gpu-memory-utilization 0.35 \
     --max-model-len 32768 \
-    --api-key "$SPARKY_API_KEY" \
+    --api-key "$NEMOTRON_SWITCHYARD_API_KEY" \
     --host 0.0.0.0 --port 8000
 ```
 
@@ -185,7 +185,7 @@ Wait until the endpoint is ready:
 
 ```bash
 until curl -fsS \
-  -H "Authorization: Bearer $SPARKY_API_KEY" \
+  -H "Authorization: Bearer $NEMOTRON_SWITCHYARD_API_KEY" \
   http://127.0.0.1:8000/v1/models >/dev/null; do
   if [ "$(docker inspect -f '{{.State.Running}}' qwen36-vllm 2>/dev/null)" != "true" ]; then
     docker logs --tail 100 qwen36-vllm
@@ -195,7 +195,7 @@ until curl -fsS \
 done
 
 curl -fsS \
-  -H "Authorization: Bearer $SPARKY_API_KEY" \
+  -H "Authorization: Bearer $NEMOTRON_SWITCHYARD_API_KEY" \
   http://127.0.0.1:8000/v1/models >/dev/null
 ```
 
@@ -220,7 +220,7 @@ docker run -d --name nemotron-vllm --restart no \
     --tool-call-parser qwen3_coder \
     --gpu-memory-utilization 0.35 \
     --max-model-len 32768 \
-    --api-key "$SPARKY_API_KEY" \
+    --api-key "$NEMOTRON_SWITCHYARD_API_KEY" \
     --host 0.0.0.0 --port 8001
 ```
 
@@ -228,7 +228,7 @@ Wait until both models are ready:
 
 ```bash
 until curl -fsS \
-  -H "Authorization: Bearer $SPARKY_API_KEY" \
+  -H "Authorization: Bearer $NEMOTRON_SWITCHYARD_API_KEY" \
   http://127.0.0.1:8001/v1/models >/dev/null; do
   if [ "$(docker inspect -f '{{.State.Running}}' nemotron-vllm 2>/dev/null)" != "true" ]; then
     docker logs --tail 100 nemotron-vllm
@@ -238,12 +238,12 @@ until curl -fsS \
 done
 
 curl -fsS \
-  -H "Authorization: Bearer $SPARKY_API_KEY" \
+  -H "Authorization: Bearer $NEMOTRON_SWITCHYARD_API_KEY" \
   http://127.0.0.1:8001/v1/models >/dev/null
 
-curl -fsS -H "Authorization: Bearer $SPARKY_API_KEY" \
+curl -fsS -H "Authorization: Bearer $NEMOTRON_SWITCHYARD_API_KEY" \
   http://127.0.0.1:8000/v1/models
-curl -fsS -H "Authorization: Bearer $SPARKY_API_KEY" \
+curl -fsS -H "Authorization: Bearer $NEMOTRON_SWITCHYARD_API_KEY" \
   http://127.0.0.1:8001/v1/models
 ```
 
@@ -266,10 +266,12 @@ export PATH="$HOME/.cargo/bin:$PATH"
 
 ## Step 7. Validate and start the route
 
-From the parent directory containing both cloned repositories, set the route path:
+Set the route path independently of the current working directory:
 
 ```bash
-export NEMOTRON_SWITCHYARD_ROUTES="$PWD/dgx-spark-playbooks/nvidia/nemotron-switchyard/assets/nemotron-switchyard-routes.toml"
+export PLAYBOOKS_DIR="${PLAYBOOKS_DIR:-$HOME/dgx-spark-playbooks}"
+export NEMOTRON_SWITCHYARD_ROUTES="$PLAYBOOKS_DIR/nvidia/nemotron-switchyard/assets/nemotron-switchyard-routes.toml"
+test -f "$NEMOTRON_SWITCHYARD_ROUTES"
 ```
 
 Validate the TOML configuration and environment without starting the server:
@@ -291,11 +293,11 @@ switchyard-server \
   --routing-log-file "$HOME/.local/state/nemotron-switchyard-routing.jsonl"
 ```
 
-Keep this terminal open. Switchyard reads `SPARKY_API_KEY` when it starts.
+Keep this terminal open. Switchyard reads `NEMOTRON_SWITCHYARD_API_KEY` when it starts.
 
 ## Step 8. Verify routing
 
-Open a second terminal, then confirm Switchyard exposes the `sparky` route:
+Open a second terminal, then confirm Switchyard exposes the `nemotron-switchyard` route:
 
 ```bash
 curl -fsS http://127.0.0.1:4000/health
@@ -308,7 +310,7 @@ Send a coding request:
 curl -i http://127.0.0.1:4000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "sparky",
+    "model": "nemotron-switchyard",
     "messages": [
       {"role": "user", "content": "Implement a Python function that validates IPv4 addresses and include tests."}
     ]
@@ -321,7 +323,7 @@ Send a planning request:
 curl -i http://127.0.0.1:4000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "sparky",
+    "model": "nemotron-switchyard",
     "messages": [
       {"role": "user", "content": "Create an architecture plan for migrating a monolith to services, including risks and sequencing."}
     ]
@@ -338,7 +340,7 @@ tail -n 20 "$HOME/.local/state/nemotron-switchyard-routing.jsonl"
 Any OpenAI Chat Completions client running on the DGX Spark can now use:
 
 - Base URL: `http://127.0.0.1:4000/v1`
-- Model: `sparky`
+- Model: `nemotron-switchyard`
 - API key: any non-empty placeholder if the client requires one; Switchyard does not require inbound authentication in this local configuration
 
 ## Step 9. Tune the routing policy
@@ -377,7 +379,7 @@ curl -fsS http://127.0.0.1:4000/v1/models
 Configure an OpenAI Chat Completions-compatible coding harness on the laptop with:
 
 - Base URL: `http://127.0.0.1:4000/v1`
-- Model: `sparky`
+- Model: `nemotron-switchyard`
 - API key: any non-empty placeholder if the harness requires one
 
 The coding harness connects to the laptop's loopback port. SSH carries the traffic to Switchyard on the DGX Spark, and Switchyard selects Qwen or Nemotron. Do not configure the harness with ports `8000` or `8001`, and do not expose those backend ports outside the Spark.
@@ -399,7 +401,7 @@ Optionally remove the Switchyard binary:
 cargo uninstall switchyard-server
 ```
 
-The Sparky repository includes [`scripts/vllm-stack-up.sh`](https://github.com/hsrakri/sparky/blob/main/scripts/vllm-stack-up.sh) for deterministic reboot ordering after the containers have been created. Do not enable independent Docker auto-restarts for these two containers because they can race for unified memory.
+Do not enable independent Docker auto-restarts for these two containers because they can race for unified memory. Start Qwen first and wait for readiness before starting Nemotron after every reboot.
 
 ## Troubleshooting
 
@@ -410,8 +412,8 @@ The Sparky repository includes [`scripts/vllm-stack-up.sh`](https://github.com/h
 | Nemotron hangs before loading weights | CUDA graph or compile deadlock under co-location | Keep `--enforce-eager` on the Nemotron command. |
 | Nemotron reports `block_size (4176)` greater than `max_num_batched_tokens` | Incompatible Mamba cache alignment option | Do not add `--mamba-cache-mode align`. |
 | `rustc` and `cargo` are not found during host validation | The Rust toolchain is not installed | On Ubuntu 24.04, install `rustup` with APT, run `rustup default stable`, and verify both commands before continuing. If they remain unavailable, start a new shell or add `$HOME/.cargo/bin` to `PATH`. |
-| Switchyard dry-run reports a missing environment variable | `SPARKY_API_KEY` is not exported in the current shell | Export the same key used in both vLLM launch commands and rerun `--dry-run`. |
-| Switchyard receives `401 Unauthorized` from a backend | The vLLM key and `SPARKY_API_KEY` differ | Restart the affected vLLM container and Switchyard with the same key. |
+| Switchyard dry-run reports a missing environment variable | `NEMOTRON_SWITCHYARD_API_KEY` is not exported in the current shell | Export the same key used in both vLLM launch commands and rerun `--dry-run`. |
+| Switchyard receives `401 Unauthorized` from a backend | The vLLM key and `NEMOTRON_SWITCHYARD_API_KEY` differ | Restart the affected vLLM container and Switchyard with the same key. |
 | Classifier always falls back to Nemotron | Qwen returned invalid or incomplete structured output | Confirm Qwen is healthy, keep classifier thinking disabled, and inspect Switchyard debug logs. |
 | Coding or planning requests select the wrong model | The classification prompt does not match the workload | Review routing logs, refine the prompt with representative examples, and revalidate. |
 | Client cannot connect to port 4000 | Switchyard is stopped, bound elsewhere, or the client is remote | Check `/health`. Keep loopback binding for local use; use an SSH tunnel rather than exposing the unauthenticated endpoint. |
@@ -419,7 +421,8 @@ The Sparky repository includes [`scripts/vllm-stack-up.sh`](https://github.com/h
 
 ## References
 
-- [Sparky](https://github.com/hsrakri/sparky)
+- [Qwen3.6-35B-A3B-NVFP4 model card](https://huggingface.co/nvidia/Qwen3.6-35B-A3B-NVFP4)
+- [NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4 model card](https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4)
 - [NeMo Switchyard](https://github.com/NVIDIA-NeMo/Switchyard)
 - [Install Rust with rustup](https://rust-lang.github.io/rustup/installation/)
 - [Switchyard 0.2.0 release](https://github.com/NVIDIA-NeMo/Switchyard/releases/tag/v0.2.0)
@@ -428,4 +431,4 @@ The Sparky repository includes [`scripts/vllm-stack-up.sh`](https://github.com/h
 
 ## License
 
-Sparky is licensed under the MIT License. NeMo Switchyard is licensed under Apache License 2.0. Model weights and container images remain governed by their respective upstream licenses and terms.
+NeMo Switchyard is licensed under Apache License 2.0. Model weights and container images remain governed by their respective upstream licenses and terms.

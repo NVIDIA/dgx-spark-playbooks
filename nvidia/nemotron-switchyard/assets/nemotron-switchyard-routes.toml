@@ -3,17 +3,17 @@ schema_version = 1
 [llm_clients.qwen_classifier]
 format = "openai_chat"
 base_url = "http://127.0.0.1:8000/v1"
-api_key_env = "SPARKY_API_KEY"
+api_key_env = "NEMOTRON_SWITCHYARD_API_KEY"
 
 [llm_clients.qwen_coder]
 format = "openai_chat"
 base_url = "http://127.0.0.1:8000/v1"
-api_key_env = "SPARKY_API_KEY"
+api_key_env = "NEMOTRON_SWITCHYARD_API_KEY"
 
 [llm_clients.nemotron]
 format = "openai_chat"
 base_url = "http://127.0.0.1:8001/v1"
-api_key_env = "SPARKY_API_KEY"
+api_key_env = "NEMOTRON_SWITCHYARD_API_KEY"
 
 [targets.classifier]
 id = "nvidia/Qwen3.6-35B-A3B-NVFP4"
@@ -28,8 +28,8 @@ llm_client = "qwen_coder"
 id = "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4"
 llm_client = "nemotron"
 
-[routes.sparky]
-id = "sparky"
+[routes.nemotron_switchyard]
+id = "nemotron-switchyard"
 type = "llm_classifier"
 mode = "custom"
 classifier_target = "classifier"
@@ -71,6 +71,6 @@ response_schema = '''
 }
 '''
 
-[routes.sparky.policy]
+[routes.nemotron_switchyard.policy]
 type = "target_selector"
 selector = "/decision/target"
