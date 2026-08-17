@@ -172,7 +172,46 @@ mpirun -np 2 -H <management IP for Node 1>:1,<management IP for Node 2>:1 \
   $HOME/nccl-tests/build/all_gather_perf
 ```
 
+> [!IMPORTANT]
+> **Reaching full 200 Gbps bandwidth.** This section assumes a **single QSFP
+> cable** between the two Sparks (200 Gbps is the maximum a single cable can
+> carry). Each Spark exposes that one port as **two PCIe Gen5 x4 endpoints**
+> (~100 Gbps each), so NCCL must use *both* to saturate the link. The variables
+> above only select the *bootstrap* interface; NCCL chooses the data path
+> itself. To aggregate both halves, pin the RoCE devices explicitly and use
+> jumbo frames:
+>
+> ```bash
+> # On both nodes: use both RoCE halves of the QSFP port
+> # (exact device names from ibdev2netdev; the mixed capitalization
+> # below is real on DGX Spark, not a typo)
+> export NCCL_IB_HCA=rocep1s0f0,roceP2p1s0f0
+>
+> # On both nodes: jumbo frames on the CX-7 interfaces
+> sudo ip link set enp1s0f0np0 mtu 9000
+> sudo ip link set enP2p1s0f0np0 mtu 9000
+> ```
+>
+> Verify in the test output (with `NCCL_DEBUG=INFO`) that you see
+> `NET/IB : Using [0]rocep1s0f0:1/RoCE [1]roceP2p1s0f0:1/RoCE`.
+> Expected result with the large-buffer test below: **busbw ≈ 20-24 GB/s**
+> (~190 Gbps), i.e. ~95% of the single-cable line rate. If you see ~3 GB/s
+> regardless of buffer size, see Troubleshooting.
+
 You can also test your NCCL setup with a larger buffer size to use more of your 200Gbps bandwidth.
+
+> [!WARNING]
+> **Unified memory OOM risk.** The 16 GB buffer test allocates ~32 GB per node
+> (send + receive buffers) in unified memory. With a desktop session active
+> (browser, RDP), this can exhaust memory and **freeze the system completely**
+> (physical power cycle required). Prefer a progressive sweep, which saturates
+> the link just as well:
+>
+> ```bash
+> $HOME/nccl-tests/build/all_gather_perf -b 512M -e 4G -f 2
+> ```
+>
+> Only use `-b 16G -e 16G` from a console/SSH session with the desktop closed.
 
 ```bash
 ## Set network interface environment variables (use your management network interface)
@@ -519,3 +558,6 @@ Now you can try running a larger distributed workload such as TRT-LLM or vLLM in
 | mpirun hangs or times out | SSH connectivity issues | 1. Test basic SSH connectivity: `ssh <remote_ip>` should work without password prompts<br>2. Try a simple mpirun test: `mpirun -np 2 -H <IP for Node 1>:1,<IP for Node 2>:1 hostname`<br>3. Verify SSH keys are setup correctly for all nodes |
 | Network interface not found | Wrong interface name or down status | Check interface status with `ibdev2netdev` and verify IP configuration |
 | NCCL build fails | Missing dependencies such as OpenMPI or incorrect CUDA version | Verify CUDA installation and required libraries are present |
+| busbw stuck at ~3 GB/s regardless of buffer size | NCCL using only part of the link, or a non-release NCCL build | 1. Re-run with `NCCL_DEBUG=INFO` and check for `NET/IB : Using [0]... [1]...` (both RoCE devices)<br>2. Set `NCCL_IB_HCA=rocep1s0f0,roceP2p1s0f0` (exact names from `ibdev2netdev`; mixed capitalization is real)<br>3. Build NCCL from an exact release tag (`git clone -b v2.30.7-1 ...`); on identical hardware and settings, a development-branch build measured 3 GB/s vs 23.7 GB/s from the release tag<br>4. Set MTU 9000 on the CX-7 interfaces |
+| System completely freezes during the 16 GB buffer test | Unified-memory OOM (desktop session active) | Physical power cycle, close desktop/RDP sessions, and validate with `-b 512M -e 4G -f 2` instead |
+
