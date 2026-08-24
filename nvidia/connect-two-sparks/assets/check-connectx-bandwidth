@@ -1,0 +1,285 @@
+#!/usr/bin/env bash
+
+# Validate one DGX Spark ConnectX-7 rail with a bounded RDMA write test.
+#
+# This helper intentionally does not reset PCIe devices or change network state.
+# A client result between 8 and 25 Gb/s, together with a 200 Gb/s Ethernet link
+# and a PCIe Gen5 x4 link, identifies the known degraded initialization state.
+
+set -uo pipefail
+
+readonly EXIT_DEGRADED=1
+readonly EXIT_STALE_INITIALIZATION=2
+readonly DEFAULT_PORT=12000
+readonly DEFAULT_DURATION=5
+readonly DEFAULT_HEALTHY_MIN_GBPS=80
+
+mode=""
+device=""
+peer=""
+input_file=""
+port="$DEFAULT_PORT"
+duration="$DEFAULT_DURATION"
+healthy_min_gbps="$DEFAULT_HEALTHY_MIN_GBPS"
+
+usage() {
+    cat <<'EOF'
+Usage:
+  check-connectx-bandwidth --server --device DEVICE [options]
+  check-connectx-bandwidth --client PEER_IP --device DEVICE [options]
+  check-connectx-bandwidth --analyze FILE [--device DEVICE] [options]
+
+Modes:
+  --server              Run the bounded ib_write_bw server.
+  --client PEER_IP      Run the bounded client and classify its result.
+  --analyze FILE        Classify previously captured ib_write_bw output.
+                        Use - for standard input.
+
+Options:
+  --device DEVICE       RDMA device reported Up by ibdev2netdev.
+  --port PORT           TCP control port (default: 12000).
+  --duration SECONDS    Test duration (default: 5).
+  --healthy-min GBPS    Per-rail pass threshold (default: 80).
+  -h, --help            Show this help.
+
+Exit status:
+  0  Throughput is at or above the healthy threshold.
+  1  Invalid setup, failed test, or other degraded result.
+  2  8-25 Gb/s result consistent with the stale initialization state.
+EOF
+}
+
+die() {
+    echo "ERROR: $*" >&2
+    exit "$EXIT_DEGRADED"
+}
+
+is_positive_number() {
+    awk -v value="$1" 'BEGIN { exit !(value ~ /^[0-9]+([.][0-9]+)?$/ && value > 0) }'
+}
+
+while (($#)); do
+    case "$1" in
+        --server)
+            [[ -z "$mode" ]] || die "choose exactly one mode"
+            mode="server"
+            shift
+            ;;
+        --client)
+            [[ -z "$mode" ]] || die "choose exactly one mode"
+            (($# >= 2)) || die "--client requires a peer IP address"
+            mode="client"
+            peer="$2"
+            shift 2
+            ;;
+        --analyze)
+            [[ -z "$mode" ]] || die "choose exactly one mode"
+            (($# >= 2)) || die "--analyze requires a file path or -"
+            mode="analyze"
+            input_file="$2"
+            shift 2
+            ;;
+        --device)
+            (($# >= 2)) || die "--device requires an RDMA device"
+            device="$2"
+            shift 2
+            ;;
+        --port)
+            (($# >= 2)) || die "--port requires a value"
+            port="$2"
+            shift 2
+            ;;
+        --duration)
+            (($# >= 2)) || die "--duration requires a value"
+            duration="$2"
+            shift 2
+            ;;
+        --healthy-min)
+            (($# >= 2)) || die "--healthy-min requires a value"
+            healthy_min_gbps="$2"
+            shift 2
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            die "unknown argument: $1"
+            ;;
+    esac
+done
+
+[[ -n "$mode" ]] || {
+    usage >&2
+    exit "$EXIT_DEGRADED"
+}
+if ! [[ "$port" =~ ^[0-9]+$ ]] || ((port < 1 || port > 65535)); then
+    die "invalid port: $port"
+fi
+if ! [[ "$duration" =~ ^[0-9]+$ ]] || ((duration < 1)); then
+    die "invalid duration: $duration"
+fi
+is_positive_number "$healthy_min_gbps" || die "invalid healthy threshold: $healthy_min_gbps"
+
+netdev=""
+link_speed_mbps=""
+pcie_gen5_x4="unknown"
+
+inspect_device() {
+    [[ -n "$device" ]] || die "--device is required for $mode mode"
+    command -v ibdev2netdev >/dev/null 2>&1 || die "ibdev2netdev is not installed"
+    command -v ethtool >/dev/null 2>&1 || die "ethtool is not installed"
+
+    local mapping
+    mapping=$(ibdev2netdev | awk -v rdma_device="$device" '$1 == rdma_device { print; exit }')
+    [[ -n "$mapping" ]] || die "RDMA device $device was not found by ibdev2netdev"
+    netdev=$(awk '{ print $5 }' <<<"$mapping")
+    [[ "$mapping" == *"(Up)"* ]] || die "$device maps to $netdev, but it is not Up"
+
+    link_speed_mbps=$(ethtool "$netdev" 2>/dev/null | awk '
+        /^[[:space:]]*Speed:/ {
+            split($0, parts, /:[[:space:]]*/)
+            sub(/Mb\/s$/, "", parts[2])
+            print parts[2]
+            exit
+        }
+    ')
+    local firmware
+    firmware=$(ethtool -i "$netdev" 2>/dev/null | awk -F': ' '/^firmware-version:/ { print $2; exit }')
+
+    local bdf=""
+    local link_status=""
+    if [[ -e "/sys/class/infiniband/$device/device" ]]; then
+        bdf=$(basename "$(readlink -f "/sys/class/infiniband/$device/device")")
+    fi
+    if [[ -n "$bdf" ]]; then
+        local pcie_speed=""
+        local pcie_width=""
+        pcie_speed=$(cat "/sys/bus/pci/devices/$bdf/current_link_speed" 2>/dev/null || true)
+        pcie_width=$(cat "/sys/bus/pci/devices/$bdf/current_link_width" 2>/dev/null || true)
+        if [[ -n "$pcie_speed" && -n "$pcie_width" ]]; then
+            link_status="$pcie_speed, Width x$pcie_width"
+        elif command -v lspci >/dev/null 2>&1; then
+            link_status=$(lspci -s "$bdf" -vv 2>/dev/null | awk '/LnkSta:/ { print; exit }')
+        fi
+
+        if [[ "$link_status" == *"32.0 GT/s"* && "$link_status" == *"Width x4"* ]] ||
+           [[ "$link_status" == *"Speed 32GT/s"* && "$link_status" == *"Width x4"* ]]; then
+            pcie_gen5_x4="yes"
+        elif [[ -n "$link_status" ]]; then
+            pcie_gen5_x4="no"
+        fi
+    fi
+
+    echo "ConnectX-7 preflight"
+    echo "  RDMA device: $device"
+    echo "  network interface: $netdev"
+    echo "  negotiated speed: ${link_speed_mbps:-unknown} Mb/s"
+    echo "  firmware: ${firmware:-unknown}"
+    local link_status_display=${link_status#*LnkSta: }
+    echo "  PCIe link: ${link_status_display:-unknown}"
+
+    if command -v journalctl >/dev/null 2>&1 &&
+       journalctl -k -b --no-pager 2>/dev/null |
+           awk '/Detected insufficient power on the PCIe slot/ { found = 1 } END { exit !found }'; then
+        echo "  note: the mlx5 27 W warning is present; it also occurs on healthy systems"
+    fi
+}
+
+extract_bandwidth() {
+    awk '
+        $1 ~ /^[0-9]+$/ &&
+        $2 ~ /^[0-9]+$/ &&
+        $4 ~ /^[0-9]+([.][0-9]+)?$/ {
+            bandwidth = $4
+        }
+        END {
+            if (bandwidth != "") print bandwidth
+        }
+    ' "$1"
+}
+
+classify_bandwidth() {
+    local bandwidth_gbps="$1"
+    echo "Measured bandwidth: $bandwidth_gbps Gb/s"
+
+    if awk -v measured="$bandwidth_gbps" -v minimum="$healthy_min_gbps" \
+        'BEGIN { exit !(measured >= minimum) }'; then
+        echo "PASS: throughput meets the ${healthy_min_gbps} Gb/s per-rail health threshold"
+        return 0
+    fi
+
+    if awk -v measured="$bandwidth_gbps" \
+        'BEGIN { exit !(measured >= 8 && measured <= 25) }'; then
+        if [[ -n "$device" && ("$link_speed_mbps" != "200000" || "$pcie_gen5_x4" == "no") ]]; then
+            echo "DEGRADED: throughput is in the 8-25 Gb/s range, but link negotiation or PCIe width also needs attention" >&2
+            return "$EXIT_DEGRADED"
+        fi
+
+        cat >&2 <<'EOF'
+STALE INITIALIZATION STATE: throughput is in the characteristic 8-25 Gb/s range.
+Keep the final QSFP topology connected, reboot both endpoints, and retest. If the
+cap remains, shut down both endpoints, disconnect each Spark and its power brick
+from AC for at least 60 seconds, reconnect power without moving the QSFP cables,
+boot, and retest. This tool does not reset hardware automatically.
+EOF
+        return "$EXIT_STALE_INITIALIZATION"
+    fi
+
+    echo "DEGRADED: throughput is below the ${healthy_min_gbps} Gb/s per-rail health threshold" >&2
+    return "$EXIT_DEGRADED"
+}
+
+run_test() {
+    command -v ib_write_bw >/dev/null 2>&1 || die "ib_write_bw is not installed; install the perftest package"
+    inspect_device
+
+    local command=(
+        ib_write_bw
+        -d "$device"
+        -i 1
+        -p "$port"
+        -F
+        --report_gbits
+        -q 4
+        -D "$duration"
+    )
+    if [[ "$mode" == "client" ]]; then
+        command+=("$peer")
+    fi
+
+    local output
+    output=$(mktemp)
+    trap 'rm -f "$output"' EXIT
+
+    echo "Running: ${command[*]}"
+    "${command[@]}" 2>&1 | tee "$output"
+    local test_status=${PIPESTATUS[0]}
+    ((test_status == 0)) || die "ib_write_bw failed with status $test_status"
+
+    local bandwidth_gbps
+    bandwidth_gbps=$(extract_bandwidth "$output")
+    [[ -n "$bandwidth_gbps" ]] || die "could not parse average bandwidth from ib_write_bw output"
+    classify_bandwidth "$bandwidth_gbps"
+}
+
+case "$mode" in
+    server|client)
+        run_test
+        ;;
+    analyze)
+        if [[ -n "$device" ]]; then
+            inspect_device
+        fi
+        if [[ "$input_file" == "-" ]]; then
+            input_file=$(mktemp)
+            trap 'rm -f "$input_file"' EXIT
+            cat >"$input_file"
+        else
+            [[ -r "$input_file" ]] || die "cannot read $input_file"
+        fi
+        bandwidth_gbps=$(extract_bandwidth "$input_file")
+        [[ -n "$bandwidth_gbps" ]] || die "could not parse average bandwidth from $input_file"
+        classify_bandwidth "$bandwidth_gbps"
+        ;;
+esac

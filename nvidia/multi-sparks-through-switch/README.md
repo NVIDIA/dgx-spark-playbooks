@@ -53,6 +53,7 @@ All required files for this playbook can be found [here on GitHub](https://githu
 
 - [**discover-sparks.sh**](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/connect-two-sparks/assets/discover-sparks) script for automatic node discovery and SSH key distribution
 - [**Cluster setup script**](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/multi-sparks-through-switch/assets/spark_cluster_setup) for automatic network configuration, validation and running NCCL sanity test
+- [**check-connectx-bandwidth**](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/connect-two-sparks/assets/check-connectx-bandwidth) runs a bounded per-rail RDMA health check and detects the degraded 8-25 Gb/s initialization state
 
 ## Time & risk
 
@@ -433,3 +434,4 @@ sudo netplan apply
 | Nodes not visible in cluster | Network connectivity issue | Verify QSFP cable connection, check IP configuration |
 | "APT update" errors (eg. E: The list of sources could not be read.) | APT sources errors, conflicting sources or signing keys | Check APT and Ubuntu documentation to fix the APT sources or keys conflicts |
 | NCCL test failures (eg. libnccl.so.2: cannot open shared object file) | NCCL configuration not done on all nodes | Make sure to follow the NCCL playbook to configure **all** nodes before running the NCCL test|
+| Links report 200 Gb/s, but `iperf3` and `ib_write_bw` are both limited to about 8-25 Gb/s | One or more ConnectX-7 endpoints did not leave their degraded initialization state after boot or a cable change | Test each Spark against a known-good peer with the [bounded bandwidth health check](../connect-two-sparks/assets/performance_benchmarking_guide.md#detect-a-degraded-connectx-7-initialization), then follow its reboot and full AC-disconnect recovery procedure |
