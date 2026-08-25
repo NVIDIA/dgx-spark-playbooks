@@ -152,9 +152,14 @@ That's it! No configuration needed. The script will:
 - Launch Ollama with GPU acceleration
 - Start the Next.js frontend
 
-3. **Pull an Ollama model (first time only):**
+3. **Wait for the default Ollama model (first time only):**
+The Ollama entrypoint pulls `llama3.1:8b` automatically if needed. Check progress with:
 ```bash
-docker exec ollama-compose ollama pull llama3.1:8b
+docker logs ollama-compose -f
+```
+To use a different model:
+```bash
+docker exec ollama-compose ollama pull <model-name>
 ```
 
 4. **Access the application:**
