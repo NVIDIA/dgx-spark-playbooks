@@ -21,6 +21,7 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 
 ### NVIDIA
 
+- [Agentic RAG with Provenance-Enforced Refusal](nvidia/agentic-rag-provenance-refusal/)
 - [CLI Coding Agent](nvidia/cli-coding-agent/)
 - [Comfy UI](nvidia/comfy-ui/)
 - [Connect Three DGX Spark in a Ring Topology](nvidia/connect-three-sparks/)
