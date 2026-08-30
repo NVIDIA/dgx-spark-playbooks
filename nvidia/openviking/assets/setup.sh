@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly SCRIPT_DIR
@@ -21,7 +22,7 @@ if [[ "$(uname -s)" != "Linux" || "$(uname -m)" != "aarch64" ]]; then
 fi
 
 for command_name in cmp cp curl date grep install ln mkdir mktemp mv nvidia-smi python3 \
-  readlink rm seq sleep ss systemctl tr uname; do
+  readlink rm sleep ss sudo systemctl tr uname; do
   command -v "${command_name}" >/dev/null || {
     echo "${command_name} is required. Install current DGX Spark system updates first." >&2
     exit 1
@@ -106,19 +107,35 @@ if [[ "$(readlink -f "${ollama_command}")" != "${EXPECTED_OLLAMA_BINARY}" ]]; th
   exit 1
 fi
 
-ollama_client_output="$(ollama --version 2>&1)"
+ollama_client_output="$(OLLAMA_HOST=127.0.0.1:1 ollama --version 2>&1)"
 printf '%s\n' "${ollama_client_output}" | python3 -c '
-import re
 import sys
 
 required = sys.argv[1]
-versions = re.findall(r"(?<![0-9.])(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?![0-9.])", sys.stdin.read())
-if not versions or versions[-1] != required:
+prefix = "Warning: client version is "
+versions = [line.removeprefix(prefix).strip() for line in sys.stdin if line.startswith(prefix)]
+if versions != [required]:
     raise SystemExit(f"Expected exact Ollama client version {required}; found {versions}")
 ' "${REQUIRED_OLLAMA_VERSION}"
 
+ollama_service_active="$(sudo systemctl show ollama.service --property=ActiveState --value \
+  2>/dev/null || true)"
+ollama_service_substate="$(sudo systemctl show ollama.service --property=SubState --value \
+  2>/dev/null || true)"
+ollama_service_pid="$(sudo systemctl show ollama.service --property=MainPID --value \
+  2>/dev/null || true)"
+if [[ "${ollama_service_active}" != "active" || "${ollama_service_substate}" != "running" || \
+  ! "${ollama_service_pid}" =~ ^[1-9][0-9]*$ ]]; then
+  echo "ollama.service must be active/running with a live MainPID; run ./install-ollama.sh." >&2
+  exit 1
+fi
+ollama_listeners="$(sudo ss -H -ltnp 'sport = :11434')"
+printf '%s\n' "${ollama_listeners}" | python3 "${SCRIPT_DIR}/validate_listener.py" \
+  --port 11434 --label Ollama --expected-pid "${ollama_service_pid}"
+
 ollama_server_json="$(
-  curl --fail --silent --show-error http://127.0.0.1:11434/api/version
+  curl --fail --silent --show-error --connect-timeout 2 --max-time 10 \
+    http://127.0.0.1:11434/api/version
 )" || {
   echo "Ollama is not reachable at http://127.0.0.1:11434." >&2
   exit 1
@@ -133,28 +150,8 @@ if actual != required:
     raise SystemExit(f"Expected Ollama server {required}; found {actual}")
 ' "${REQUIRED_OLLAMA_VERSION}"
 
-ollama_listeners="$(ss -H -ltn 'sport = :11434')"
-printf '%s\n' "${ollama_listeners}" | python3 -c '
-import ipaddress
-import sys
-
-lines = [line for line in sys.stdin.read().splitlines() if line.strip()]
-if not lines:
-    raise SystemExit("No TCP listener found on port 11434")
-for line in lines:
-    fields = line.split()
-    if len(fields) < 4:
-        raise SystemExit(f"Could not parse listener: {line!r}")
-    host = fields[3].rsplit(":", 1)[0].strip("[]")
-    try:
-        address = ipaddress.ip_address(host)
-    except ValueError as error:
-        raise SystemExit(f"Ollama must listen only on loopback; found {fields[3]}") from error
-    if not address.is_loopback:
-        raise SystemExit(f"Ollama must listen only on loopback; found {fields[3]}")
-'
-
-ollama_tags_json="$(curl --fail --silent --show-error http://127.0.0.1:11434/api/tags)"
+ollama_tags_json="$(curl --fail --silent --show-error --connect-timeout 2 --max-time 10 \
+  http://127.0.0.1:11434/api/tags)"
 printf '%s\n' "${ollama_tags_json}" | python3 -c '
 import json
 import sys
@@ -177,6 +174,20 @@ if problems:
         f"intentional model review. Mismatches: {problems}"
     )
 ' "${PINS_PATH}"
+
+confirmed_ollama_active="$(sudo systemctl show ollama.service --property=ActiveState --value)"
+confirmed_ollama_substate="$(sudo systemctl show ollama.service --property=SubState --value)"
+confirmed_ollama_pid="$(sudo systemctl show ollama.service --property=MainPID --value)"
+confirmed_ollama_listeners="$(sudo ss -H -ltnp 'sport = :11434')"
+if [[ "${confirmed_ollama_active}" != "active" || \
+  "${confirmed_ollama_substate}" != "running" || \
+  "${confirmed_ollama_pid}" != "${ollama_service_pid}" ]]; then
+  echo "ollama.service changed during model preflight; rerun ./install-ollama.sh." >&2
+  exit 1
+fi
+printf '%s\n' "${confirmed_ollama_listeners}" | \
+  python3 "${SCRIPT_DIR}/validate_listener.py" --port 11434 --label Ollama \
+    --expected-pid "${confirmed_ollama_pid}"
 
 if [[ -L "${CONFIG_PATH}" ]]; then
   echo "Refusing symlinked configuration ${CONFIG_PATH}." >&2
@@ -209,11 +220,12 @@ if [[ -e "${USER_UNIT_PATH}" ]]; then
   fi
 fi
 
-if [[ -L "${INSTALL_ROOT}" || -L "${RELEASES_DIR}" ]]; then
-  echo "Refusing symlinked OpenViking install or releases directory." >&2
+if [[ -L "${INSTALL_ROOT}" || -L "${RELEASES_DIR}" || -L "${CONFIG_DIR}" || \
+  -L "${USER_UNIT_DIR}" ]]; then
+  echo "Refusing symlinked OpenViking install, configuration, or user-unit directory." >&2
   exit 1
 fi
-mkdir -p "${INSTALL_ROOT}" "${RELEASES_DIR}" "${CONFIG_DIR}" "${USER_UNIT_DIR}"
+install -d -m 0700 "${INSTALL_ROOT}" "${RELEASES_DIR}" "${CONFIG_DIR}" "${USER_UNIT_DIR}"
 if [[ -e "${ROLLBACK_VENV}" || -L "${ROLLBACK_VENV}" ]]; then
   echo "Refusing to continue while ${ROLLBACK_VENV} exists. Inspect the prior rollback first." >&2
   exit 1
@@ -369,15 +381,56 @@ systemctl --user enable openviking-cuvs.service
 systemctl --user restart openviking-cuvs.service
 
 health_json=""
-for _ in $(seq 1 60); do
-  if health_json="$(curl --fail --silent --show-error \
-    http://127.0.0.1:1933/health 2>/dev/null)"; then
-    break
+new_pid=""
+openviking_listeners=""
+readiness_deadline=$((SECONDS + 120))
+while ((SECONDS < readiness_deadline)); do
+  candidate_active="$(systemctl --user show openviking-cuvs.service \
+    --property=ActiveState --value 2>/dev/null || true)"
+  candidate_substate="$(systemctl --user show openviking-cuvs.service \
+    --property=SubState --value 2>/dev/null || true)"
+  candidate_pid="$(systemctl --user show openviking-cuvs.service \
+    --property=MainPID --value 2>/dev/null || true)"
+  if [[ "${candidate_active}" == "active" && "${candidate_substate}" == "running" && \
+    "${candidate_pid}" =~ ^[1-9][0-9]*$ ]]; then
+    candidate_listeners="$(ss -H -ltnp 'sport = :1933' 2>/dev/null || true)"
+    if printf '%s\n' "${candidate_listeners}" | python3 "${SCRIPT_DIR}/validate_listener.py" \
+      --port 1933 --label OpenViking --expected-pid "${candidate_pid}" >/dev/null 2>&1 && \
+      candidate_health="$(curl --fail --silent --show-error --connect-timeout 2 --max-time 5 \
+        http://127.0.0.1:1933/health 2>/dev/null)"; then
+      confirmed_active="$(systemctl --user show openviking-cuvs.service \
+        --property=ActiveState --value 2>/dev/null || true)"
+      confirmed_substate="$(systemctl --user show openviking-cuvs.service \
+        --property=SubState --value 2>/dev/null || true)"
+      confirmed_pid="$(systemctl --user show openviking-cuvs.service \
+        --property=MainPID --value 2>/dev/null || true)"
+      confirmed_listeners="$(ss -H -ltnp 'sport = :1933' 2>/dev/null || true)"
+      if [[ "${confirmed_active}" == "active" && "${confirmed_substate}" == "running" && \
+        "${confirmed_pid}" == "${candidate_pid}" ]] && \
+        printf '%s\n' "${confirmed_listeners}" | \
+          python3 "${SCRIPT_DIR}/validate_listener.py" --port 1933 --label OpenViking \
+            --expected-pid "${confirmed_pid}" >/dev/null 2>&1; then
+        health_json="${candidate_health}"
+        new_pid="${confirmed_pid}"
+        openviking_listeners="${confirmed_listeners}"
+        break
+      fi
+    fi
   fi
   sleep 2
 done
 if [[ -z "${health_json}" ]]; then
-  echo "OpenViking did not become healthy. Inspect: journalctl --user -u openviking-cuvs -n 100" >&2
+  failed_active="$(systemctl --user show openviking-cuvs.service \
+    --property=ActiveState --value 2>/dev/null || true)"
+  failed_substate="$(systemctl --user show openviking-cuvs.service \
+    --property=SubState --value 2>/dev/null || true)"
+  failed_pid="$(systemctl --user show openviking-cuvs.service \
+    --property=MainPID --value 2>/dev/null || true)"
+  failed_listeners="$(ss -H -ltnp 'sport = :1933' 2>/dev/null || true)"
+  echo "OpenViking did not become healthy as its own loopback listener " \
+    "(ActiveState=${failed_active}, SubState=${failed_substate}, MainPID=${failed_pid})." >&2
+  printf '%s\n' "${failed_listeners}" >&2
+  echo "Inspect: journalctl --user -u openviking-cuvs -n 100" >&2
   exit 1
 fi
 
@@ -398,7 +451,6 @@ if auth_mode != "dev":
 print(auth_mode)
 ' "${REQUIRED_OPENVIKING_VERSION}")"
 
-new_pid="$(systemctl --user show openviking-cuvs.service --property MainPID --value)"
 if [[ ! "${new_pid}" =~ ^[1-9][0-9]*$ ]]; then
   echo "OpenViking service has no live MainPID after restart: ${new_pid}" >&2
   exit 1
@@ -418,6 +470,21 @@ if [[ "${runtime_cmdline}" != *"${staged_venv}/bin/"* || \
   echo "OpenViking MainPID ${new_pid} is not running the installed staged environment." >&2
   exit 1
 fi
+
+final_active="$(systemctl --user show openviking-cuvs.service \
+  --property=ActiveState --value)"
+final_substate="$(systemctl --user show openviking-cuvs.service \
+  --property=SubState --value)"
+final_pid="$(systemctl --user show openviking-cuvs.service --property=MainPID --value)"
+openviking_listeners="$(ss -H -ltnp 'sport = :1933')"
+if [[ "${final_active}" != "active" || "${final_substate}" != "running" || \
+  "${final_pid}" != "${new_pid}" ]]; then
+  echo "OpenViking service changed after readiness verification: " \
+    "ActiveState=${final_active}, SubState=${final_substate}, MainPID=${final_pid}." >&2
+  exit 1
+fi
+printf '%s\n' "${openviking_listeners}" | python3 "${SCRIPT_DIR}/validate_listener.py" \
+  --port 1933 --label OpenViking --expected-pid "${new_pid}"
 
 runtime_verified=true
 if [[ "${had_previous}" == true ]]; then

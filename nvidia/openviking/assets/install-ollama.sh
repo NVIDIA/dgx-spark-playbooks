@@ -12,7 +12,7 @@ if [[ "$(uname -s)" != "Linux" || "$(uname -m)" != "aarch64" ]]; then
 fi
 
 for command_name in chmod chown cmp cp curl date getent groupadd id install ln mkdir mktemp mv \
-  python3 readlink rm sed seq sha256sum sleep ss stat sudo systemctl tar uname unzstd useradd \
+  python3 readlink rm sed sha256sum sleep ss stat sudo systemctl tar uname unzstd useradd \
   usermod; do
   command -v "${command_name}" >/dev/null || {
     echo "${command_name} is required before installing Ollama." >&2
@@ -158,12 +158,12 @@ tar --use-compress-program=unzstd -xf "${archive_path}" -C "${extract_path}"
 
 client_output="$(OLLAMA_HOST=127.0.0.1:1 "${extract_path}/bin/ollama" --version 2>&1)"
 printf '%s\n' "${client_output}" | python3 -c '
-import re
 import sys
 
 required = sys.argv[1]
-versions = re.findall(r"(?<![0-9.])(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?![0-9.])", sys.stdin.read())
-if not versions or versions[-1] != required:
+prefix = "Warning: client version is "
+versions = [line.removeprefix(prefix).strip() for line in sys.stdin if line.startswith(prefix)]
+if versions != [required]:
     raise SystemExit(f"Expected exact Ollama client version {required}; found {versions}")
 ' "${REQUIRED_OLLAMA_VERSION}"
 
@@ -263,7 +263,14 @@ if sudo test -L "${INSTALL_PARENT}"; then
   echo "Refusing symlinked installation parent ${INSTALL_PARENT}." >&2
   exit 1
 fi
-sudo install -d -o root -g root -m 0755 "${INSTALL_PARENT}"
+if sudo test -e "${INSTALL_PARENT}"; then
+  if ! sudo test -d "${INSTALL_PARENT}"; then
+    echo "Refusing non-directory installation parent ${INSTALL_PARENT}." >&2
+    exit 1
+  fi
+else
+  sudo install -d -o root -g root -m 0755 "${INSTALL_PARENT}"
+fi
 install_parent_metadata="$(sudo stat --format='%u:%g:%a' "${INSTALL_PARENT}")"
 if [[ "${install_parent_metadata}" != "0:0:755" ]]; then
   echo "Refusing insecure installation parent ${INSTALL_PARENT}: ${install_parent_metadata}." >&2
@@ -320,7 +327,22 @@ if sudo test -e "${OLLAMA_LINK}" || sudo test -L "${OLLAMA_LINK}"; then
     echo "Backed up the previous Ollama command to ${link_backup}."
   fi
 fi
-sudo install -d -m 0755 /usr/local/bin
+if sudo test -L /usr/local/bin; then
+  echo "Refusing symlinked command directory /usr/local/bin." >&2
+  exit 1
+elif sudo test -e /usr/local/bin; then
+  if ! sudo test -d /usr/local/bin; then
+    echo "Refusing non-directory command path /usr/local/bin." >&2
+    exit 1
+  fi
+else
+  sudo install -d -o root -g root -m 0755 /usr/local/bin
+fi
+command_dir_metadata="$(sudo stat --format='%u:%g:%a' /usr/local/bin)"
+if [[ "${command_dir_metadata}" != "0:0:755" ]]; then
+  echo "Refusing insecure command directory /usr/local/bin: ${command_dir_metadata}." >&2
+  exit 1
+fi
 if [[ "${link_needs_update}" == true ]]; then
   link_changed=true
   sudo ln -sfn "${INSTALL_PATH}/bin/ollama" "${OLLAMA_LINK}"
@@ -337,7 +359,64 @@ if ! id -u ollama >/dev/null 2>&1; then
   sudo useradd --system --gid ollama --home-dir /var/lib/ollama \
     --shell /usr/sbin/nologin ollama
 fi
-sudo install -d -o ollama -g ollama -m 0750 /var/lib/ollama /var/lib/ollama/models
+ollama_uid="$(id -u ollama)"
+ollama_gid="$(id -g ollama)"
+service_touched=true
+sudo systemctl stop ollama.service >/dev/null 2>&1 || true
+if sudo systemctl is-active --quiet ollama.service; then
+  echo "Could not stop ollama.service before validating its writable state directories." >&2
+  exit 1
+fi
+sudo python3 - "${ollama_uid}" "${ollama_gid}" <<'PY'
+import errno
+import os
+import stat
+import sys
+
+ollama_uid = int(sys.argv[1])
+ollama_gid = int(sys.argv[2])
+directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+
+
+def ensure_directory(parent_fd: int, name: str, uid: int, gid: int, mode: int) -> int:
+    created = False
+    try:
+        descriptor = os.open(name, directory_flags, dir_fd=parent_fd)
+    except FileNotFoundError:
+        os.mkdir(name, mode=mode, dir_fd=parent_fd)
+        created = True
+        descriptor = os.open(name, directory_flags, dir_fd=parent_fd)
+    except OSError as error:
+        if error.errno in {errno.ELOOP, errno.ENOTDIR}:
+            raise SystemExit(f"Refusing non-directory or symlinked Ollama state path: {name}")
+        raise
+
+    metadata = os.fstat(descriptor)
+    if created:
+        os.fchown(descriptor, uid, gid)
+        os.fchmod(descriptor, mode)
+        metadata = os.fstat(descriptor)
+    actual = (metadata.st_uid, metadata.st_gid, stat.S_IMODE(metadata.st_mode))
+    expected = (uid, gid, mode)
+    if actual != expected:
+        os.close(descriptor)
+        raise SystemExit(
+            f"Refusing incompatible Ollama state directory {name}: {actual}; expected {expected}"
+        )
+    return descriptor
+
+
+var_lib_fd = os.open("/var/lib", directory_flags)
+try:
+    ollama_fd = ensure_directory(var_lib_fd, "ollama", ollama_uid, ollama_gid, 0o750)
+    try:
+        models_fd = ensure_directory(ollama_fd, "models", ollama_uid, ollama_gid, 0o750)
+        os.close(models_fd)
+    finally:
+        os.close(ollama_fd)
+finally:
+    os.close(var_lib_fd)
+PY
 for gpu_group in render video; do
   if getent group "${gpu_group}" >/dev/null; then
     sudo usermod -aG "${gpu_group}" ollama
@@ -373,15 +452,57 @@ sudo systemctl daemon-reload
 sudo systemctl enable ollama.service
 sudo systemctl restart ollama.service
 
-for _ in $(seq 1 60); do
-  if server_json="$(curl --fail --silent --show-error \
-    http://127.0.0.1:11434/api/version 2>/dev/null)"; then
-    break
+server_json=""
+ollama_main_pid=""
+ollama_listeners=""
+readiness_deadline=$((SECONDS + 120))
+while ((SECONDS < readiness_deadline)); do
+  candidate_active="$(sudo systemctl show ollama.service --property=ActiveState --value \
+    2>/dev/null || true)"
+  candidate_substate="$(sudo systemctl show ollama.service --property=SubState --value \
+    2>/dev/null || true)"
+  candidate_pid="$(sudo systemctl show ollama.service --property=MainPID --value \
+    2>/dev/null || true)"
+  if [[ "${candidate_active}" == "active" && "${candidate_substate}" == "running" && \
+    "${candidate_pid}" =~ ^[1-9][0-9]*$ ]]; then
+    candidate_listeners="$(sudo ss -H -ltnp 'sport = :11434' 2>/dev/null || true)"
+    if printf '%s\n' "${candidate_listeners}" | python3 "${SCRIPT_DIR}/validate_listener.py" \
+      --port 11434 --label Ollama --expected-pid "${candidate_pid}" >/dev/null 2>&1 && \
+      candidate_json="$(curl --fail --silent --show-error --connect-timeout 2 --max-time 5 \
+        http://127.0.0.1:11434/api/version 2>/dev/null)"; then
+      confirmed_active="$(sudo systemctl show ollama.service --property=ActiveState --value \
+        2>/dev/null || true)"
+      confirmed_substate="$(sudo systemctl show ollama.service --property=SubState --value \
+        2>/dev/null || true)"
+      confirmed_pid="$(sudo systemctl show ollama.service --property=MainPID --value \
+        2>/dev/null || true)"
+      confirmed_listeners="$(sudo ss -H -ltnp 'sport = :11434' 2>/dev/null || true)"
+      if [[ "${confirmed_active}" == "active" && "${confirmed_substate}" == "running" && \
+        "${confirmed_pid}" == "${candidate_pid}" ]] && \
+        printf '%s\n' "${confirmed_listeners}" | \
+          python3 "${SCRIPT_DIR}/validate_listener.py" --port 11434 --label Ollama \
+            --expected-pid "${confirmed_pid}" >/dev/null 2>&1; then
+        server_json="${candidate_json}"
+        ollama_main_pid="${confirmed_pid}"
+        ollama_listeners="${confirmed_listeners}"
+        break
+      fi
+    fi
   fi
   sleep 2
 done
-if [[ -z "${server_json:-}" ]]; then
-  echo "Ollama did not become ready. Inspect: sudo journalctl -u ollama -n 100" >&2
+if [[ -z "${server_json}" ]]; then
+  failed_active="$(sudo systemctl show ollama.service --property=ActiveState --value \
+    2>/dev/null || true)"
+  failed_substate="$(sudo systemctl show ollama.service --property=SubState --value \
+    2>/dev/null || true)"
+  failed_pid="$(sudo systemctl show ollama.service --property=MainPID --value \
+    2>/dev/null || true)"
+  failed_listeners="$(sudo ss -H -ltnp 'sport = :11434' 2>/dev/null || true)"
+  echo "Ollama did not become ready as its own loopback listener " \
+    "(ActiveState=${failed_active}, SubState=${failed_substate}, MainPID=${failed_pid})." >&2
+  printf '%s\n' "${failed_listeners}" >&2
+  echo "Inspect: sudo journalctl -u ollama -n 100" >&2
   exit 1
 fi
 
@@ -395,25 +516,17 @@ if actual != required:
     raise SystemExit(f"Expected Ollama server {required}; found {actual}")
 ' "${REQUIRED_OLLAMA_VERSION}"
 
-listeners="$(ss -H -ltn 'sport = :11434')"
-printf '%s\n' "${listeners}" | python3 -c '
-import ipaddress
-import sys
+final_active="$(sudo systemctl show ollama.service --property=ActiveState --value)"
+final_substate="$(sudo systemctl show ollama.service --property=SubState --value)"
+final_pid="$(sudo systemctl show ollama.service --property=MainPID --value)"
+ollama_listeners="$(sudo ss -H -ltnp 'sport = :11434')"
+if [[ "${final_active}" != "active" || "${final_substate}" != "running" || \
+  "${final_pid}" != "${ollama_main_pid}" ]]; then
+  echo "Ollama service changed after readiness verification: " \
+    "ActiveState=${final_active}, SubState=${final_substate}, MainPID=${final_pid}." >&2
+  exit 1
+fi
+printf '%s\n' "${ollama_listeners}" | python3 "${SCRIPT_DIR}/validate_listener.py" \
+  --port 11434 --label Ollama --expected-pid "${ollama_main_pid}"
 
-lines = [line for line in sys.stdin.read().splitlines() if line.strip()]
-if not lines:
-    raise SystemExit("No TCP listener found on port 11434")
-for line in lines:
-    fields = line.split()
-    if len(fields) < 4:
-        raise SystemExit(f"Could not parse listener: {line!r}")
-    host = fields[3].rsplit(":", 1)[0].strip("[]")
-    try:
-        address = ipaddress.ip_address(host)
-    except ValueError as error:
-        raise SystemExit(f"Non-loopback Ollama listener: {fields[3]}") from error
-    if not address.is_loopback:
-        raise SystemExit(f"Non-loopback Ollama listener: {fields[3]}")
-'
-
-echo "Ollama ${REQUIRED_OLLAMA_VERSION} is verified and listening only on loopback."
+echo "Ollama ${REQUIRED_OLLAMA_VERSION} is verified as MainPID ${ollama_main_pid} on loopback."

@@ -19,6 +19,8 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from validate_listener import validate_ss_listeners
+
 
 OPENVIKING_URL = os.environ.get("OPENVIKING_URL", "http://127.0.0.1:1933").rstrip("/")
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
@@ -72,6 +74,40 @@ def require_ok(envelope: dict[str, Any], label: str) -> dict[str, Any]:
     return envelope
 
 
+def check_loopback_listener(base_url: str, expected_port: int, label: str) -> list[str]:
+    parsed_url = urllib.parse.urlsplit(base_url)
+    try:
+        address = ipaddress.ip_address(parsed_url.hostname or "")
+        actual_port = parsed_url.port
+    except ValueError as exc:
+        raise CheckError(
+            f"{label} URL must use a loopback IP and port {expected_port}: {base_url}"
+        ) from exc
+    if (
+        parsed_url.scheme != "http"
+        or not address.is_loopback
+        or actual_port != expected_port
+    ):
+        raise CheckError(
+            f"{label} URL must use a loopback IP and port {expected_port}: {base_url}"
+        )
+
+    try:
+        listeners = subprocess.run(
+            ["ss", "-H", "-ltn", f"sport = :{expected_port}"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+        return validate_ss_listeners(
+            listeners,
+            expected_port=expected_port,
+            label=label,
+        )
+    except (OSError, subprocess.CalledProcessError, ValueError) as exc:
+        raise CheckError(f"{label} loopback listener check failed: {exc}") from exc
+
+
 def check_gpu_runtime() -> dict[str, str]:
     if platform.system() != "Linux" or platform.machine() != "aarch64":
         raise CheckError(
@@ -111,41 +147,7 @@ def check_gpu_runtime() -> dict[str, str]:
 
 
 def check_ollama_models(marker: str) -> dict[str, Any]:
-    parsed_url = urllib.parse.urlsplit(OLLAMA_URL)
-    try:
-        ollama_address = ipaddress.ip_address(parsed_url.hostname or "")
-    except ValueError as exc:
-        raise CheckError(
-            f"OLLAMA_URL must use a loopback IP address: {OLLAMA_URL}"
-        ) from exc
-    if not ollama_address.is_loopback or parsed_url.port != 11434:
-        raise CheckError(f"OLLAMA_URL must be loopback port 11434: {OLLAMA_URL}")
-
-    try:
-        listeners = subprocess.run(
-            ["ss", "-H", "-ltn", "sport = :11434"],
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout.splitlines()
-    except (OSError, subprocess.CalledProcessError) as exc:
-        raise CheckError(f"Could not inspect the Ollama TCP listener: {exc}") from exc
-    if not listeners:
-        raise CheckError("No TCP listener found on port 11434")
-    listener_addresses: list[str] = []
-    for line in listeners:
-        fields = line.split()
-        if len(fields) < 4:
-            raise CheckError(f"Could not parse Ollama listener: {line!r}")
-        listener = fields[3]
-        host = listener.rsplit(":", 1)[0].strip("[]")
-        try:
-            address = ipaddress.ip_address(host)
-        except ValueError as exc:
-            raise CheckError(f"Non-loopback Ollama listener: {listener}") from exc
-        if not address.is_loopback:
-            raise CheckError(f"Non-loopback Ollama listener: {listener}")
-        listener_addresses.append(listener)
+    listener_addresses = check_loopback_listener(OLLAMA_URL, 11434, "Ollama")
 
     tags = request_json("GET", f"{OLLAMA_URL}/api/tags")
     models = {
@@ -266,6 +268,7 @@ def cleanup_smoke_root(smoke_root: str) -> dict[str, Any]:
 
 
 def run_openviking_e2e(smoke_root: str, smoke_uri: str, marker: str) -> dict[str, Any]:
+    listener_addresses = check_loopback_listener(OPENVIKING_URL, 1933, "OpenViking")
     health = require_ok(
         request_json("GET", f"{OPENVIKING_URL}/health", openviking=True, timeout=30),
         "OpenViking health",
@@ -328,6 +331,7 @@ def run_openviking_e2e(smoke_root: str, smoke_uri: str, marker: str) -> dict[str
     last_routes: dict[str, int] = {}
     last_hits: list[str] = []
     while time.monotonic() < deadline:
+        search_timeout = max(1.0, min(30.0, deadline - time.monotonic()))
         found = require_ok(
             request_json(
                 "POST",
@@ -339,6 +343,7 @@ def run_openviking_e2e(smoke_root: str, smoke_uri: str, marker: str) -> dict[str
                     "telemetry": {"summary": True},
                 },
                 openviking=True,
+                timeout=search_timeout,
             ),
             "OpenViking semantic find",
         )
@@ -360,8 +365,12 @@ def run_openviking_e2e(smoke_root: str, smoke_uri: str, marker: str) -> dict[str
                 raise CheckError(
                     f"cuVS route reported an invalid index size: {cuvs_summary}"
                 )
+            listener_addresses = check_loopback_listener(
+                OPENVIKING_URL, 1933, "OpenViking"
+            )
             return {
                 "auth_mode": health.get("auth_mode"),
+                "listeners": listener_addresses,
                 "smoke_uri": smoke_uri,
                 "routes": last_routes,
                 "index_size": index_size,
@@ -372,7 +381,9 @@ def run_openviking_e2e(smoke_root: str, smoke_uri: str, marker: str) -> dict[str
                     "overview_characters": len(overview),
                 },
             }
-        time.sleep(2)
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            time.sleep(min(2.0, remaining))
 
     raise CheckError(
         "known-result search never used the cuVS route within 180 seconds; "
