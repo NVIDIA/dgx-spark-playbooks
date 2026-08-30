@@ -1,0 +1,4 @@
+# Runtime entry points. The generated lock targets Python 3.12 on Linux aarch64.
+openviking==0.4.17
+cuvs-cu13==26.6.0
+cupy-cuda13x[ctk]==14.1.1

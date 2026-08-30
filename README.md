@@ -49,6 +49,7 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 - [NVFP4 Quantization](nvidia/nvfp4-quantization/)
 - [Ollama](nvidia/ollama/)
 - [Open WebUI with Ollama](nvidia/open-webui/)
+- [OpenViking with Ollama and NVIDIA cuVS](nvidia/openviking/)
 - [OpenClaw 🦞](nvidia/openclaw/)
 - [Secure Long Running AI Agents with OpenShell on DGX Spark](nvidia/openshell/)
 - [Portfolio Optimization](nvidia/portfolio-optimization/)
