@@ -43,8 +43,9 @@ You will have:
   rebuilds.
 - A reproducible Python 3.12 / Linux aarch64 environment installed from a fully pinned,
   hash-checked lock.
-- An end-to-end test that makes real embedding and VLM calls, writes a known OpenViking record,
-  retrieves it, and confirms through request telemetry that the dense query used cuVS.
+- An end-to-end test that makes real embedding and VLM calls, creates an isolated OpenViking
+  resource, verifies generated semantic output, retrieves it through cuVS, and deletes the test
+  resource before returning.
 
 ## When cuVS helps
 
@@ -67,9 +68,11 @@ and memory when benchmarking.
 ## Prerequisites
 
 - DGX Spark with current DGX OS (Ubuntu 24.04, Linux aarch64, glibc 2.39 or newer).
-- Current NVIDIA driver with CUDA 13 support and a working `nvidia-smi`.
+- NVIDIA driver 580.65.06 or newer for the RAPIDS 26.06 CUDA 13 stack, with a working
+  `nvidia-smi`.
 - Python 3.12 with the `venv` module.
-- `curl`, `git`, `sha256sum`, and a working `systemd --user` session.
+- `curl`, `git`, `sha256sum`, `iproute2` (`ss`), `zstd`, and working system and user systemd
+  sessions.
 - At least 35 GB of free disk space for Ollama, the models, and the Python environment.
 - Internet access to GitHub, PyPI, NVIDIA's Python index, and the Ollama model registry during setup.
 
@@ -90,16 +93,26 @@ and memory when benchmarking.
 | --- | --- |
 | OpenViking | [0.4.17](https://github.com/volcengine/OpenViking/releases/tag/v0.4.17) |
 | Ollama | [0.33.2](https://github.com/ollama/ollama/releases/tag/v0.33.2) |
+| NVIDIA driver | 580.65.06 or newer |
 | cuVS / RAFT / RMM | 26.6.0 |
 | CuPy | 14.1.1 |
 | CUDA Python toolkit meta-package | 13.0.3.0 |
 | Python | 3.12 |
+| pip bootstrap | 26.2.1 |
 | Embedding | [`qwen3-embedding:0.6b`](https://ollama.com/library/qwen3-embedding:0.6b) (1024 dimensions) |
 | VLM | [`qwen3.8:27b`](https://ollama.com/library/qwen3.8:27b) |
 
 The RAPIDS 26.06 stack is kept on the CUDA 13.0 dependency line. In particular,
 `nvidia-nvjitlink` is pinned to 13.0.88 so dependency resolution cannot silently move the
-environment to a newer CUDA minor release.
+environment to a newer CUDA minor release. NVIDIA's
+[RAPIDS install requirements](https://docs.rapids.ai/install/) specify driver 580.65.06 or newer
+for CUDA 13.
+
+`assets/pins.json` is the review point for the Ollama archive and model identities. It pins the
+1,543,307,550-byte `ollama-linux-arm64.tar.zst` archive to SHA256
+`6c648fd62bc8ea18d19aeb0900a03ff2d6a1fc830d901348d070fb93aca4630e`, and pins the current
+registry manifests for both model tags. Ollama tags are mutable: a digest change must be reviewed
+and updated intentionally rather than accepted automatically.
 
 ## Instructions
 
@@ -118,7 +131,7 @@ Expected results:
 
 - `uname -m` prints `aarch64`.
 - glibc is 2.39 or newer and Python is 3.12.
-- `nvidia-smi` lists the NVIDIA GPU and reports a driver that supports CUDA 13.
+- `nvidia-smi` lists the NVIDIA GPU and reports driver 580.65.06 or newer.
 
 Also confirm that no unexpected process is consuming most of unified memory:
 
@@ -136,27 +149,29 @@ cd dgx-spark-playbooks/nvidia/openviking/assets
 
 ## Step 3. Install the pinned Ollama release
 
-If Ollama 0.33.2 is already installed and running, skip the installer and continue with the model
-pulls below.
-
-Download the versioned upstream installer and verify it before execution:
+Review the explicit system service and installer, then run it:
 
 ```bash
-curl --fail --location \
-  https://github.com/ollama/ollama/releases/download/v0.33.2/install.sh \
-  --output /tmp/ollama-install-0.33.2.sh
-echo "25f64b810b947145095956533e1bdf56eacea2673c55a7e586be4515fc882c9f  /tmp/ollama-install-0.33.2.sh" \
-  | sha256sum --check
-OLLAMA_VERSION=0.33.2 sh /tmp/ollama-install-0.33.2.sh
+python3 -m json.tool pins.json
+sed -n '1,220p' ollama.service
+sed -n '1,300p' install-ollama.sh
+./install-ollama.sh
 ```
 
-The upstream installer uses `sudo` to install Ollama and create its system service. Verify the
-service and version:
+The script downloads the versioned 1.54 GB aarch64 archive as the current user and verifies its
+SHA256 before any `sudo` installation step. It rejects unsafe archive paths and a client version
+other than 0.33.2, installs under `/opt/ollama/0.33.2`, and installs the reviewed
+`ollama.service`. The service sets `OLLAMA_HOST=127.0.0.1:11434`, is explicitly restarted, and the
+script fails unless `ss` shows only loopback listeners. Existing commands and units are backed up
+before replacement when they differ.
+
+Verify the installed service and version:
 
 ```bash
-systemctl status ollama --no-pager
+sudo systemctl status ollama --no-pager
 ollama --version
-curl --fail http://127.0.0.1:11434/api/tags
+ss -H -ltn 'sport = :11434'
+curl --fail http://127.0.0.1:11434/api/version
 ```
 
 Pull the local embedding model and VLM:
@@ -167,7 +182,9 @@ ollama pull qwen3.8:27b
 ollama list
 ```
 
-The two exact model names must appear in `ollama list` before continuing.
+The two exact model names must appear in `ollama list` before continuing. `setup.sh` then reads
+`/api/tags` and verifies the complete manifest digests recorded in `pins.json`; a matching name
+alone is not sufficient.
 
 ## Step 4. Install and start OpenViking
 
@@ -186,14 +203,21 @@ Then run the setup script:
 
 The script:
 
-1. Refuses non-aarch64 Linux, Python versions other than 3.12, glibc older than 2.39, a missing
-   GPU/user systemd session, or an Ollama client/server version other than 0.33.2.
-2. Installs only prebuilt wheels from the hash-checked dependency lock under
-   `~/.local/share/openviking-cuvs/.venv`.
+1. Refuses non-aarch64 Linux, Python versions other than 3.12, glibc older than 2.39, NVIDIA
+   drivers older than 580.65.06, a missing GPU/user systemd session, a non-loopback Ollama
+   listener, or a client/server/model digest outside `pins.json`.
+2. Creates a fresh staged virtual environment and installs only prebuilt wheels from the
+   hash-checked dependency lock. Python 3.12's bundled `pip` bootstraps the exact `pip==26.2.1`
+   wheel from a separate hash-checked, binary-only, no-dependencies lock; there is no un-hashed
+   package upgrade.
 3. Writes `~/.openviking/ov.conf` only when it is absent or already identical. It never silently
    overwrites an existing configuration.
-4. Runs `openviking-server doctor` and `pip check`.
-5. Installs and starts `openviking-cuvs.service` in the user systemd manager.
+4. Runs `pip check`, verifies the installed runtime dependency closure against the exact lock, and
+   runs `openviking-server doctor` from the staged environment.
+5. Atomically swaps the staged environment into place, explicitly restarts
+   `openviking-cuvs.service`, and checks the new PID, command path, `/health`, and exact OpenViking
+   version. A failed cutover restores and restarts the prior environment; the failed stage is
+   preserved under `~/.local/share/openviking-cuvs/` for inspection.
 
 The lock uses the official PyPI and NVIDIA indexes by default. If those endpoints are inaccessible
 from a restricted network, optional mirrors can be supplied explicitly; the recorded SHA256 hashes
@@ -216,11 +240,16 @@ Do not substitute an unverified mirror or remove `--require-hashes` from the set
 The check is intentionally stronger than `GET /health`. It verifies:
 
 - CUDA, CuPy, cuVS, and the NVIDIA GPU are usable from the pinned environment.
-- Ollama returns one 1024-dimensional embedding and identifies a generated red image through the
-  VLM route.
-- OpenViking reports healthy model state.
-- A known record can be written with vector processing and retrieved by semantic search.
+- Ollama is still bound only to loopback, exposes the two pinned model digests, returns one
+  1024-dimensional embedding, and identifies a generated red image through the VLM route.
+- OpenViking reports the pinned runtime version.
+- A UUID-scoped resource is written with `mode=create` and `processing_mode=semantic_and_vectors`;
+  both `semantic_status` and `vector_status` must be `complete`.
+- Write telemetry records non-zero VLM tokens in the `resource_summarize` stage, and the generated
+  `.abstract.md` and `.overview.md` files contain observable semantic output.
 - Search telemetry reports `vector.cuvs.routes.cuvs >= 1` and a non-zero cuVS index size.
+- A `finally` cleanup issues recursive `DELETE /api/v1/fs?...&wait=true` for the UUID-scoped root.
+  Cleanup failures are reported even when the main E2E check also fails.
 
 A successful run ends with:
 
@@ -230,8 +259,8 @@ OPENVIKING_CUVS_E2E_OK
 
 Syntax, lock, and schema checks can be run on another machine, but they do not establish GPU
 compatibility. Only this successful E2E run on a DGX Spark proves that the CUDA 13 wheels load,
-both Ollama models answer, OpenViking writes and retrieves a vector, and the request takes the cuVS
-route.
+both Ollama models answer, OpenViking invokes its configured VLM semantic path, writes and
+retrieves a vector, cleans up the smoke resource, and takes the cuVS route.
 
 Auto mode may initially route a query to native search while the background GPU snapshot is being
 built. The verifier retries for up to three minutes and only succeeds after a real cuVS route. It
@@ -251,8 +280,14 @@ From the client computer, verify the tunnel:
 curl --fail http://127.0.0.1:1933/health
 ```
 
-Do not expose port 1933 or Ollama port 11434 directly to an untrusted LAN or the public internet.
-Use OpenViking authentication in addition to a protected tunnel when multiple users share a Spark.
+The supplied OpenViking configuration explicitly selects `auth_mode=dev` and does **not** configure
+an API key; `/health` reports `auth_mode=dev`. It is not an authenticated network service: the
+Spark OS account, loopback bind, and SSH tunnel are the security boundary. Do not expose port 1933
+or Ollama port 11434 directly to an untrusted LAN or the public internet. For a shared deployment,
+configure OpenViking
+authentication explicitly and verify it before changing either listener away from loopback. See
+the versioned
+[OpenViking authentication guide](https://github.com/volcengine/OpenViking/blob/v0.4.17/docs/en/guides/04-authentication.md).
 
 ## Operating and tuning the deployment
 
@@ -266,6 +301,9 @@ curl --fail http://127.0.0.1:1933/api/v1/observer/models
 ollama ps
 nvidia-smi
 ```
+
+`/api/v1/observer/models` is configuration inventory, not a live model-health guarantee. Use
+`openviking-server doctor` and the full verifier for active embedding and VLM probes.
 
 The provided `brute_force` / float32 configuration is the exact-search baseline. Evaluate CAGRA
 only on representative data and only after recording native and brute-force Recall@K, p50/p95/p99
@@ -312,11 +350,28 @@ ollama rm qwen3-embedding:0.6b
 ollama rm qwen3.8:27b
 ```
 
+The playbook also installs a system Ollama service and versioned runtime. If nothing else uses
+them, inspect the exact targets and then remove them separately:
+
+```bash
+sudo systemctl disable --now ollama.service
+sudo rm /etc/systemd/system/ollama.service
+sudo systemctl daemon-reload
+sudo rm /usr/local/bin/ollama
+sudo rm -rf /opt/ollama/0.33.2
+```
+
+Model data under `/var/lib/ollama/models` is deliberately preserved by those commands.
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
 | `setup.sh` rejects the platform | The lock targets DGX OS Ubuntu 24.04, Linux aarch64, Python 3.12, and glibc 2.39 | Update DGX OS or create and review a new lock for the actual platform; do not bypass the check |
+| `setup.sh` rejects the driver | RAPIDS 26.06 CUDA 13 requires NVIDIA driver 580.65.06 or newer | Install current DGX OS driver updates, reboot if required, and rerun `nvidia-smi` |
+| Ollama has a non-loopback listener | Another unit or environment overrides `OLLAMA_HOST` | Review `sudo systemctl cat ollama`, rerun `install-ollama.sh`, and confirm `ss -H -ltn 'sport = :11434'` lists only `127.0.0.1` or `::1` |
+| Ollama model digest mismatch | A mutable model tag now resolves to different content, or a different artifact was pulled | Do not accept it by name alone. Review the registry manifest/model change, then intentionally update `pins.json` or restore the pinned artifact |
+| A staged OpenViking cutover fails | Doctor, service startup, runtime version, or PID-path validation failed | Read the emitted rollback and failed-venv paths plus `journalctl --user -u openviking-cuvs -n 100`; the prior active environment is restarted automatically |
 | NVIDIA packages resolve to CUDA 13.3 | The constraints or lock were bypassed | Use `requirements-cu13.lock` with `--require-hashes`; confirm `nvidia-nvjitlink==13.0.88` |
 | `systemctl --user` cannot connect to the bus | No user systemd session is available | Log in through a normal local or SSH session. For an always-on service after logout, an administrator can enable linger with `sudo loginctl enable-linger "$USER"` |
 | OpenViking is healthy but E2E reports no cuVS route | Auto admission rejected GPU use, the snapshot is still building, or cuVS failed | Check the verifier's last `routes`, service logs, `ollama ps`, and `nvidia-smi`; stop competing workloads or reduce the corpus. Do not count native fallback as cuVS success |

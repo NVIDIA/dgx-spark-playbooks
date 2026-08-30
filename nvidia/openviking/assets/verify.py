@@ -4,24 +4,30 @@
 from __future__ import annotations
 
 import importlib.metadata
+import ipaddress
 import json
 import os
 import platform
 import re
+import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
+import uuid
+from pathlib import Path
 from typing import Any
 
 
 OPENVIKING_URL = os.environ.get("OPENVIKING_URL", "http://127.0.0.1:1933").rstrip("/")
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
 API_KEY = os.environ.get("OPENVIKING_API_KEY", "")
+PINS = json.loads(Path(__file__).with_name("pins.json").read_text(encoding="utf-8"))
+OPENVIKING_VERSION = str(PINS["openviking_version"])
 EMBEDDING_MODEL = "qwen3-embedding:0.6b"
 VLM_MODEL = "qwen3.8:27b"
-SMOKE_URI = "viking://resources/dgx-spark-openviking-cuvs-smoke.md"
-MARKER = "heliotrope-viking-7319 confirms the DGX Spark cuVS route"
+MODEL_DIGESTS = PINS["ollama"]["models"]
 RED_SQUARE_PNG = (
     "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAF0lEQVR4nGP4z8BAEiJN9aiG"
     "UQ1DSgMAkPn/Afnh+ngAAAAASUVORK5CYII="
@@ -39,6 +45,7 @@ def request_json(
     *,
     openviking: bool = False,
     timeout: float = 600,
+    allow_not_found: bool = False,
 ) -> dict[str, Any]:
     data = None if payload is None else json.dumps(payload).encode("utf-8")
     headers = {"Accept": "application/json"}
@@ -52,6 +59,8 @@ def request_json(
             return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
+        if allow_not_found and exc.code == 404:
+            return {"status": "ok", "result": {"already_absent": True}}
         raise CheckError(f"{method} {url} returned HTTP {exc.code}: {body}") from exc
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
         raise CheckError(f"{method} {url} failed: {exc}") from exc
@@ -86,28 +95,81 @@ def check_gpu_runtime() -> dict[str, str]:
     except Exception as exc:
         raise CheckError(f"CUDA device smoke failed: {exc}") from exc
 
+    installed_openviking = importlib.metadata.version("openviking")
+    if installed_openviking != OPENVIKING_VERSION:
+        raise CheckError(
+            f"expected OpenViking package {OPENVIKING_VERSION}, found {installed_openviking}"
+        )
+
     return {
         "device": str(name),
         "cuvs": importlib.metadata.version("cuvs-cu13"),
         "cupy": cupy.__version__,
-        "openviking": importlib.metadata.version("openviking"),
+        "openviking": installed_openviking,
         "python": platform.python_version(),
     }
 
 
-def check_ollama_models() -> dict[str, Any]:
-    tags = request_json("GET", f"{OLLAMA_URL}/api/tags")
-    names = {str(model.get("name", "")) for model in tags.get("models", [])}
-    missing = {EMBEDDING_MODEL, VLM_MODEL} - names
-    if missing:
+def check_ollama_models(marker: str) -> dict[str, Any]:
+    parsed_url = urllib.parse.urlsplit(OLLAMA_URL)
+    try:
+        ollama_address = ipaddress.ip_address(parsed_url.hostname or "")
+    except ValueError as exc:
         raise CheckError(
-            f"Ollama is missing required models: {sorted(missing)}; found {sorted(names)}"
+            f"OLLAMA_URL must use a loopback IP address: {OLLAMA_URL}"
+        ) from exc
+    if not ollama_address.is_loopback or parsed_url.port != 11434:
+        raise CheckError(f"OLLAMA_URL must be loopback port 11434: {OLLAMA_URL}")
+
+    try:
+        listeners = subprocess.run(
+            ["ss", "-H", "-ltn", "sport = :11434"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.splitlines()
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise CheckError(f"Could not inspect the Ollama TCP listener: {exc}") from exc
+    if not listeners:
+        raise CheckError("No TCP listener found on port 11434")
+    listener_addresses: list[str] = []
+    for line in listeners:
+        fields = line.split()
+        if len(fields) < 4:
+            raise CheckError(f"Could not parse Ollama listener: {line!r}")
+        listener = fields[3]
+        host = listener.rsplit(":", 1)[0].strip("[]")
+        try:
+            address = ipaddress.ip_address(host)
+        except ValueError as exc:
+            raise CheckError(f"Non-loopback Ollama listener: {listener}") from exc
+        if not address.is_loopback:
+            raise CheckError(f"Non-loopback Ollama listener: {listener}")
+        listener_addresses.append(listener)
+
+    tags = request_json("GET", f"{OLLAMA_URL}/api/tags")
+    models = {
+        str(model.get("name", "")): str(model.get("digest", ""))
+        .removeprefix("sha256:")
+        .lower()
+        for model in tags.get("models", [])
+        if isinstance(model, dict)
+    }
+    mismatches = {
+        name: {"expected": digest, "actual": models.get(name)}
+        for name, digest in MODEL_DIGESTS.items()
+        if models.get(name) != digest
+    }
+    if mismatches:
+        raise CheckError(
+            "Ollama model tag/digest mismatch. Tags are mutable; change pins.json only "
+            f"after intentional model review. Mismatches: {mismatches}"
         )
 
     embedded = request_json(
         "POST",
         f"{OLLAMA_URL}/api/embed",
-        {"model": EMBEDDING_MODEL, "input": MARKER, "keep_alive": "10m"},
+        {"model": EMBEDDING_MODEL, "input": marker, "keep_alive": "10m"},
     )
     embeddings = embedded.get("embeddings")
     if not isinstance(embeddings, list) or not embeddings or len(embeddings[0]) != 1024:
@@ -137,41 +199,145 @@ def check_ollama_models() -> dict[str, Any]:
     if re.search(r"\bred\b", content, flags=re.IGNORECASE) is None:
         raise CheckError(f"Ollama VLM probe returned unexpected content: {content!r}")
 
-    return {"embedding_dimension": len(embeddings[0]), "vlm_response": content.strip()}
+    return {
+        "embedding_dimension": len(embeddings[0]),
+        "listeners": listener_addresses,
+        "model_digests": {name: models[name] for name in MODEL_DIGESTS},
+        "vlm_response": content.strip(),
+    }
 
 
-def check_openviking_and_cuvs_route() -> dict[str, Any]:
-    require_ok(
-        request_json("GET", f"{OPENVIKING_URL}/health", openviking=True, timeout=30),
-        "OpenViking health",
-    )
-    models = require_ok(
+def read_generated_semantic(uri: str, label: str) -> str:
+    query = urllib.parse.urlencode({"uri": uri})
+    response = require_ok(
         request_json(
             "GET",
-            f"{OPENVIKING_URL}/api/v1/observer/models",
+            f"{OPENVIKING_URL}/api/v1/content/read?{query}",
             openviking=True,
             timeout=30,
         ),
-        "OpenViking model observer",
+        label,
     )
-    if not models.get("result", {}).get("is_healthy"):
-        raise CheckError(f"OpenViking model observer is unhealthy: {models}")
+    content = response.get("result")
+    if not isinstance(content, str) or len(content.strip()) < 20:
+        raise CheckError(
+            f"{label} did not contain generated semantic output: {content!r}"
+        )
+    if "is not generated" in content.lower():
+        raise CheckError(f"{label} is still a placeholder: {content!r}")
+    return content.strip()
+
+
+def cleanup_smoke_root(smoke_root: str) -> dict[str, Any]:
+    query = urllib.parse.urlencode(
+        {
+            "uri": smoke_root,
+            "recursive": "true",
+            "wait": "true",
+            "timeout": "300",
+        }
+    )
+    response = require_ok(
+        request_json(
+            "DELETE",
+            f"{OPENVIKING_URL}/api/v1/fs?{query}",
+            openviking=True,
+            timeout=330,
+            allow_not_found=True,
+        ),
+        "OpenViking smoke cleanup",
+    )
+    result = response.get("result", {})
+    if result.get("already_absent") is True:
+        return {"status": "already_absent"}
+    if result.get("uri") != smoke_root:
+        raise CheckError(
+            f"OpenViking cleanup returned the wrong URI: expected {smoke_root}, got {result}"
+        )
+    if result.get("semantic_status") != "complete":
+        raise CheckError(
+            f"OpenViking cleanup semantic refresh did not complete: {result}"
+        )
+    return {
+        "status": "deleted",
+        "semantic_status": result["semantic_status"],
+    }
+
+
+def run_openviking_e2e(smoke_root: str, smoke_uri: str, marker: str) -> dict[str, Any]:
+    health = require_ok(
+        request_json("GET", f"{OPENVIKING_URL}/health", openviking=True, timeout=30),
+        "OpenViking health",
+    )
+    if health.get("healthy") is not True or health.get("version") != OPENVIKING_VERSION:
+        raise CheckError(
+            f"Expected healthy OpenViking {OPENVIKING_VERSION}; received {health}"
+        )
 
     write = require_ok(
         request_json(
             "POST",
             f"{OPENVIKING_URL}/api/v1/content/write",
             {
-                "uri": SMOKE_URI,
-                "content": f"# DGX Spark cuVS smoke\n\n{MARKER}.\n",
-                "mode": "upsert",
+                "uri": smoke_uri,
+                "content": (
+                    "# DGX Spark cuVS verification\n\n"
+                    f"The unique verification marker is {marker}.\n\n"
+                    "This document checks all-local semantic processing with the configured "
+                    "Ollama vision-language model and dense-vector retrieval through cuVS.\n"
+                ),
+                "mode": "create",
                 "wait": True,
-                "timeout": 300,
-                "processing_mode": "vectors_only",
+                "timeout": 600,
+                "processing_mode": "semantic_and_vectors",
+                "telemetry": {"summary": True},
             },
             openviking=True,
+            timeout=630,
         ),
         "OpenViking content write",
+    )
+    write_result = write.get("result", {})
+    expected_write = {
+        "uri": smoke_uri,
+        "mode": "create",
+        "semantic_status": "complete",
+        "vector_status": "complete",
+    }
+    mismatches = {
+        key: {"expected": expected, "actual": write_result.get(key)}
+        for key, expected in expected_write.items()
+        if write_result.get(key) != expected
+    }
+    if mismatches:
+        raise CheckError(f"OpenViking write completion mismatch: {mismatches}")
+    queue_status = write_result.get("queue_status") or {}
+    for queue_name in ("Semantic", "Embedding"):
+        queue = queue_status.get(queue_name, {})
+        if int(queue.get("error_count", 0) or 0) != 0:
+            raise CheckError(f"OpenViking {queue_name} queue reported errors: {queue}")
+
+    write_summary = write.get("telemetry", {}).get("summary", {})
+    llm_tokens = write_summary.get("tokens", {}).get("llm", {})
+    stage_tokens = (
+        write_summary.get("tokens", {})
+        .get("stages", {})
+        .get("resource_summarize", {})
+        .get("llm", {})
+    )
+    if int(llm_tokens.get("total", 0) or 0) <= 0:
+        raise CheckError(f"OpenViking write recorded no VLM token use: {write_summary}")
+    if int(stage_tokens.get("total", 0) or 0) <= 0:
+        raise CheckError(
+            "OpenViking write recorded no resource_summarize VLM token use: "
+            f"{write_summary}"
+        )
+
+    abstract = read_generated_semantic(
+        f"{smoke_root}/.abstract.md", "OpenViking generated abstract"
+    )
+    overview = read_generated_semantic(
+        f"{smoke_root}/.overview.md", "OpenViking generated overview"
     )
 
     deadline = time.monotonic() + 180
@@ -183,7 +349,7 @@ def check_openviking_and_cuvs_route() -> dict[str, Any]:
                 "POST",
                 f"{OPENVIKING_URL}/api/v1/search/find",
                 {
-                    "query": MARKER,
+                    "query": marker,
                     "limit": 5,
                     "read_content": True,
                     "telemetry": {"summary": True},
@@ -197,7 +363,7 @@ def check_openviking_and_cuvs_route() -> dict[str, Any]:
             str(hit.get("uri", "")) for hit in resources if isinstance(hit, dict)
         ]
         known_result = any(
-            hit.get("uri") == SMOKE_URI or MARKER in str(hit.get("content", ""))
+            hit.get("uri") == smoke_uri or marker in str(hit.get("content", ""))
             for hit in resources
             if isinstance(hit, dict)
         )
@@ -211,10 +377,17 @@ def check_openviking_and_cuvs_route() -> dict[str, Any]:
                     f"cuVS route reported an invalid index size: {cuvs_summary}"
                 )
             return {
-                "smoke_uri": SMOKE_URI,
+                "auth_mode": health.get("auth_mode"),
+                "smoke_uri": smoke_uri,
                 "routes": last_routes,
                 "index_size": index_size,
-                "write_status": write.get("result", {}).get("status", "ok"),
+                "semantic_status": write_result["semantic_status"],
+                "vector_status": write_result["vector_status"],
+                "vlm": {
+                    "abstract_characters": len(abstract),
+                    "overview_characters": len(overview),
+                    "resource_summarize_tokens": int(stage_tokens["total"]),
+                },
             }
         time.sleep(2)
 
@@ -224,11 +397,42 @@ def check_openviking_and_cuvs_route() -> dict[str, Any]:
     )
 
 
+def check_openviking_and_cuvs_route(run_id: str, marker: str) -> dict[str, Any]:
+    smoke_root = f"viking://resources/dgx-spark-openviking-cuvs-smoke-{run_id}"
+    smoke_uri = f"{smoke_root}/document.md"
+    primary_error: BaseException | None = None
+    result: dict[str, Any] | None = None
+    cleanup: dict[str, Any] | None = None
+
+    try:
+        result = run_openviking_e2e(smoke_root, smoke_uri, marker)
+    except BaseException as exc:
+        primary_error = exc
+
+    try:
+        cleanup = cleanup_smoke_root(smoke_root)
+    except BaseException as cleanup_error:
+        if primary_error is not None:
+            raise CheckError(
+                f"E2E failed: {primary_error}; cleanup also failed: {cleanup_error}"
+            ) from primary_error
+        raise
+
+    if primary_error is not None:
+        raise primary_error
+    if result is None or cleanup is None:
+        raise CheckError("OpenViking E2E returned no result")
+    result["cleanup"] = cleanup
+    return result
+
+
 def main() -> int:
+    run_id = uuid.uuid4().hex
+    marker = f"heliotrope-viking-7319-{run_id} confirms the DGX Spark cuVS route"
     report = {
         "gpu_runtime": check_gpu_runtime(),
-        "ollama": check_ollama_models(),
-        "openviking": check_openviking_and_cuvs_route(),
+        "ollama": check_ollama_models(marker),
+        "openviking": check_openviking_and_cuvs_route(run_id, marker),
     }
     print(json.dumps(report, indent=2, sort_keys=True))
     print("OPENVIKING_CUVS_E2E_OK")
