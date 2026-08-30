@@ -310,6 +310,23 @@ if sudo systemctl is-enabled --quiet ollama.service; then
   service_was_enabled=true
 fi
 
+if sudo test -L /usr/local/bin; then
+  echo "Refusing symlinked command directory /usr/local/bin." >&2
+  exit 1
+elif sudo test -e /usr/local/bin; then
+  if ! sudo test -d /usr/local/bin; then
+    echo "Refusing non-directory command path /usr/local/bin." >&2
+    exit 1
+  fi
+else
+  sudo install -d -o root -g root -m 0755 /usr/local/bin
+fi
+command_dir_metadata="$(sudo stat --format='%u:%g:%a' /usr/local/bin)"
+if [[ "${command_dir_metadata}" != "0:0:755" ]]; then
+  echo "Refusing insecure command directory /usr/local/bin: ${command_dir_metadata}." >&2
+  exit 1
+fi
+
 if (sudo test -e "${OLLAMA_LINK}" || sudo test -L "${OLLAMA_LINK}") && \
   ! sudo test -L "${OLLAMA_LINK}" && ! sudo test -f "${OLLAMA_LINK}"; then
   echo "Refusing non-file command path ${OLLAMA_LINK}. Move it and rerun the installer." >&2
@@ -326,22 +343,6 @@ if sudo test -e "${OLLAMA_LINK}" || sudo test -L "${OLLAMA_LINK}"; then
     sudo cp -a "${OLLAMA_LINK}" "${link_backup}"
     echo "Backed up the previous Ollama command to ${link_backup}."
   fi
-fi
-if sudo test -L /usr/local/bin; then
-  echo "Refusing symlinked command directory /usr/local/bin." >&2
-  exit 1
-elif sudo test -e /usr/local/bin; then
-  if ! sudo test -d /usr/local/bin; then
-    echo "Refusing non-directory command path /usr/local/bin." >&2
-    exit 1
-  fi
-else
-  sudo install -d -o root -g root -m 0755 /usr/local/bin
-fi
-command_dir_metadata="$(sudo stat --format='%u:%g:%a' /usr/local/bin)"
-if [[ "${command_dir_metadata}" != "0:0:755" ]]; then
-  echo "Refusing insecure command directory /usr/local/bin: ${command_dir_metadata}." >&2
-  exit 1
 fi
 if [[ "${link_needs_update}" == true ]]; then
   link_changed=true
