@@ -20,7 +20,8 @@ if [[ "$(uname -s)" != "Linux" || "$(uname -m)" != "aarch64" ]]; then
   exit 1
 fi
 
-for command_name in cmp curl grep install ln mktemp nvidia-smi python3 readlink ss systemctl tr; do
+for command_name in cmp cp curl date grep install ln mkdir mktemp mv nvidia-smi python3 \
+  readlink rm seq sleep ss systemctl tr uname; do
   command -v "${command_name}" >/dev/null || {
     echo "${command_name} is required. Install current DGX Spark system updates first." >&2
     exit 1
@@ -190,15 +191,22 @@ if [[ -L "${USER_UNIT_PATH}" ]]; then
   echo "Refusing symlinked user unit ${USER_UNIT_PATH}." >&2
   exit 1
 fi
-if [[ -e "${USER_UNIT_PATH}" ]] && ! cmp --silent \
-  "${SCRIPT_DIR}/openviking-cuvs.service" "${USER_UNIT_PATH}"; then
-  if ! grep -Fq 'openviking-cuvs/.venv/bin/openviking-server' "${USER_UNIT_PATH}"; then
-    echo "Refusing to overwrite unrelated ${USER_UNIT_PATH}. Back it up or merge it first." >&2
-    exit 1
+if [[ -e "${USER_UNIT_PATH}" && ! -f "${USER_UNIT_PATH}" ]]; then
+  echo "Refusing non-file user unit ${USER_UNIT_PATH}." >&2
+  exit 1
+fi
+unit_had_previous=false
+unit_needs_update=true
+if [[ -e "${USER_UNIT_PATH}" ]]; then
+  unit_had_previous=true
+  if cmp --silent "${SCRIPT_DIR}/openviking-cuvs.service" "${USER_UNIT_PATH}"; then
+    unit_needs_update=false
+  else
+    if ! grep -Fq 'openviking-cuvs/.venv/bin/openviking-server' "${USER_UNIT_PATH}"; then
+      echo "Refusing to overwrite unrelated ${USER_UNIT_PATH}. Back it up or merge it first." >&2
+      exit 1
+    fi
   fi
-  unit_backup="${USER_UNIT_PATH}.backup-$(date -u +%Y%m%dT%H%M%SZ)"
-  cp -a "${USER_UNIT_PATH}" "${unit_backup}"
-  echo "Backed up the previous OpenViking unit to ${unit_backup}."
 fi
 
 if [[ -L "${INSTALL_ROOT}" || -L "${RELEASES_DIR}" ]]; then
@@ -217,27 +225,81 @@ cutover_started=false
 runtime_verified=false
 had_previous=false
 old_was_active=false
+old_was_enabled=false
 old_release=""
+unit_changed=false
+unit_backup=""
+service_touched=false
 
 cleanup() {
   status=$?
   trap - EXIT
   set +e
+  rollback_failed=false
 
-  if [[ ${status} -ne 0 && "${cutover_started}" == true && "${runtime_verified}" == false ]]; then
+  if [[ ${status} -ne 0 && ( \
+    "${cutover_started}" == true || \
+    "${unit_changed}" == true || \
+    "${service_touched}" == true \
+  ) && "${runtime_verified}" == false ]]; then
     systemctl --user stop openviking-cuvs.service >/dev/null 2>&1
     if [[ -L "${VENV}" && "$(readlink -f "${VENV}")" == "${staged_venv}" ]]; then
-      rm -- "${VENV}"
+      if ! rm -- "${VENV}"; then
+        echo "Failed to remove the failed OpenViking environment link ${VENV}." >&2
+        rollback_failed=true
+      fi
     fi
     if [[ -e "${ROLLBACK_VENV}" || -L "${ROLLBACK_VENV}" ]]; then
-      mv "${ROLLBACK_VENV}" "${VENV}"
-      echo "Restored the previous OpenViking environment." >&2
+      if mv "${ROLLBACK_VENV}" "${VENV}"; then
+        echo "Restored the previous OpenViking environment." >&2
+      else
+        echo "Failed to restore ${VENV} from ${ROLLBACK_VENV}." >&2
+        rollback_failed=true
+      fi
     fi
-    echo "Preserved the failed staged environment at ${staged_venv}." >&2
-  fi
 
-  if [[ ${status} -ne 0 && "${old_was_active}" == true ]]; then
-    systemctl --user restart openviking-cuvs.service
+    if [[ "${unit_changed}" == true ]]; then
+      if [[ "${unit_had_previous}" == true ]]; then
+        rm -f -- "${USER_UNIT_PATH}"
+        if ! mv -- "${unit_backup}" "${USER_UNIT_PATH}"; then
+          echo "Failed to restore ${USER_UNIT_PATH} from ${unit_backup}." >&2
+          rollback_failed=true
+        fi
+      elif ! rm -f -- "${USER_UNIT_PATH}"; then
+        echo "Failed to remove newly installed ${USER_UNIT_PATH}." >&2
+        rollback_failed=true
+      fi
+    fi
+
+    if ! systemctl --user daemon-reload; then
+      echo "Failed to reload user systemd while restoring OpenViking." >&2
+      rollback_failed=true
+    fi
+    if [[ "${old_was_enabled}" == true ]]; then
+      if ! systemctl --user enable openviking-cuvs.service; then
+        echo "Failed to restore the enabled state of openviking-cuvs.service." >&2
+        rollback_failed=true
+      fi
+    else
+      systemctl --user disable openviking-cuvs.service >/dev/null 2>&1 || true
+    fi
+    if [[ "${old_was_active}" == true ]]; then
+      if ! systemctl --user restart openviking-cuvs.service; then
+        echo "Failed to restart the previous OpenViking service." >&2
+        rollback_failed=true
+      fi
+    else
+      systemctl --user stop openviking-cuvs.service >/dev/null 2>&1 || true
+    fi
+
+    if [[ "${cutover_started}" == true ]]; then
+      echo "Preserved the failed staged environment at ${staged_venv}." >&2
+    fi
+    if [[ "${rollback_failed}" == true ]]; then
+      echo "OpenViking rollback was incomplete; inspect the paths above before retrying." >&2
+    else
+      echo "Previous OpenViking unit and service state restored." >&2
+    fi
   fi
   if [[ -L "${next_link}" ]]; then
     rm -- "${next_link}"
@@ -268,15 +330,28 @@ python3 -m venv "${staged_venv}"
   "${SCRIPT_DIR}/requirements-bootstrap.lock" \
   "${SCRIPT_DIR}/requirements-cu13.lock"
 
+if systemctl --user is-active --quiet openviking-cuvs.service; then
+  old_was_active=true
+fi
+if systemctl --user is-enabled --quiet openviking-cuvs.service; then
+  old_was_enabled=true
+fi
+
 install -m 0600 "${SCRIPT_DIR}/ov.conf" "${CONFIG_PATH}"
-install -m 0644 "${SCRIPT_DIR}/openviking-cuvs.service" "${USER_UNIT_PATH}"
+if [[ "${unit_needs_update}" == true ]]; then
+  if [[ "${unit_had_previous}" == true ]]; then
+    unit_backup="${USER_UNIT_PATH}.backup-$(date -u +%Y%m%dT%H%M%SZ).$$"
+    cp -a "${USER_UNIT_PATH}" "${unit_backup}"
+    echo "Backed up the previous OpenViking unit to ${unit_backup}."
+  fi
+  unit_changed=true
+  install -m 0644 "${SCRIPT_DIR}/openviking-cuvs.service" "${USER_UNIT_PATH}"
+fi
 OPENVIKING_CONFIG_FILE="${CONFIG_PATH}" \
   "${staged_venv}/bin/openviking-server" doctor
 
 old_pid="$(systemctl --user show openviking-cuvs.service --property MainPID --value 2>/dev/null || true)"
-if systemctl --user is-active --quiet openviking-cuvs.service; then
-  old_was_active=true
-fi
+service_touched=true
 systemctl --user stop openviking-cuvs.service >/dev/null 2>&1 || true
 ln -s "${staged_venv}" "${next_link}"
 if [[ -e "${VENV}" || -L "${VENV}" ]]; then
@@ -347,13 +422,19 @@ fi
 runtime_verified=true
 if [[ "${had_previous}" == true ]]; then
   if [[ -L "${ROLLBACK_VENV}" ]]; then
-    rm -- "${ROLLBACK_VENV}"
+    if ! rm -- "${ROLLBACK_VENV}"; then
+      echo "Warning: could not remove ${ROLLBACK_VENV}; inspect it before the next setup run." >&2
+    fi
   else
-    rm -rf -- "${ROLLBACK_VENV}"
+    if ! rm -rf -- "${ROLLBACK_VENV}"; then
+      echo "Warning: could not remove ${ROLLBACK_VENV}; inspect it before the next setup run." >&2
+    fi
   fi
   if [[ "${old_release}" == "${RELEASES_DIR}"/release.* && \
     "${old_release}" != "${staged_venv}" && -d "${old_release}" ]]; then
-    rm -rf -- "${old_release}"
+    if ! rm -rf -- "${old_release}"; then
+      echo "Warning: could not remove retired release ${old_release}." >&2
+    fi
   fi
 fi
 trap - EXIT

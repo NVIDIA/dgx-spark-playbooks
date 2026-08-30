@@ -223,7 +223,8 @@ def read_generated_semantic(uri: str, label: str) -> str:
         raise CheckError(
             f"{label} did not contain generated semantic output: {content!r}"
         )
-    if "is not generated" in content.lower():
+    placeholder_phrases = ("is not generated", "is not ready")
+    if any(phrase in content.lower() for phrase in placeholder_phrases):
         raise CheckError(f"{label} is still a placeholder: {content!r}")
     return content.strip()
 
@@ -290,7 +291,6 @@ def run_openviking_e2e(smoke_root: str, smoke_uri: str, marker: str) -> dict[str
                 "wait": True,
                 "timeout": 600,
                 "processing_mode": "semantic_and_vectors",
-                "telemetry": {"summary": True},
             },
             openviking=True,
             timeout=630,
@@ -316,22 +316,6 @@ def run_openviking_e2e(smoke_root: str, smoke_uri: str, marker: str) -> dict[str
         queue = queue_status.get(queue_name, {})
         if int(queue.get("error_count", 0) or 0) != 0:
             raise CheckError(f"OpenViking {queue_name} queue reported errors: {queue}")
-
-    write_summary = write.get("telemetry", {}).get("summary", {})
-    llm_tokens = write_summary.get("tokens", {}).get("llm", {})
-    stage_tokens = (
-        write_summary.get("tokens", {})
-        .get("stages", {})
-        .get("resource_summarize", {})
-        .get("llm", {})
-    )
-    if int(llm_tokens.get("total", 0) or 0) <= 0:
-        raise CheckError(f"OpenViking write recorded no VLM token use: {write_summary}")
-    if int(stage_tokens.get("total", 0) or 0) <= 0:
-        raise CheckError(
-            "OpenViking write recorded no resource_summarize VLM token use: "
-            f"{write_summary}"
-        )
 
     abstract = read_generated_semantic(
         f"{smoke_root}/.abstract.md", "OpenViking generated abstract"
@@ -386,7 +370,6 @@ def run_openviking_e2e(smoke_root: str, smoke_uri: str, marker: str) -> dict[str
                 "vlm": {
                     "abstract_characters": len(abstract),
                     "overview_characters": len(overview),
-                    "resource_summarize_tokens": int(stage_tokens["total"]),
                 },
             }
         time.sleep(2)

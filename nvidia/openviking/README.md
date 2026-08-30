@@ -154,16 +154,21 @@ Review the explicit system service and installer, then run it:
 ```bash
 python3 -m json.tool pins.json
 sed -n '1,220p' ollama.service
-sed -n '1,300p' install-ollama.sh
+sed -n '1,460p' install-ollama.sh
 ./install-ollama.sh
 ```
 
 The script downloads the versioned 1.54 GB aarch64 archive as the current user and verifies its
 SHA256 before any `sudo` installation step. It rejects unsafe archive paths and a client version
 other than 0.33.2, installs under `/opt/ollama/0.33.2`, and installs the reviewed
-`ollama.service`. The service sets `OLLAMA_HOST=127.0.0.1:11434`, is explicitly restarted, and the
-script fails unless `ss` shows only loopback listeners. Existing commands and units are backed up
-before replacement when they differ.
+`ollama.service`. Before switching the command or service, it makes the complete versioned payload
+root-owned, removes group/other write access, and compares every file hash, entry type, mode, and
+symlink target against a fresh extraction of the pinned archive. The same full-tree check runs on
+every reinstall, so an archive marker alone cannot authorize a modified library. The service sets
+`OLLAMA_HOST=127.0.0.1:11434`, is explicitly restarted, and the script fails unless `ss` shows only
+loopback listeners. Existing commands and units are backed up before replacement when they differ.
+If the version, readiness, or listener check fails, the prior command, unit, and service
+enabled/active state are restored; the verified versioned payload is retained for inspection.
 
 Verify the installed service and version:
 
@@ -216,8 +221,9 @@ The script:
    runs `openviking-server doctor` from the staged environment.
 5. Atomically swaps the staged environment into place, explicitly restarts
    `openviking-cuvs.service`, and checks the new PID, command path, `/health`, and exact OpenViking
-   version. A failed cutover restores and restarts the prior environment; the failed stage is
-   preserved under `~/.local/share/openviking-cuvs/` for inspection.
+   version. A failed cutover restores the prior environment, user unit, and service enabled/active
+   state before restarting it; the failed stage is preserved under
+   `~/.local/share/openviking-cuvs/` for inspection.
 
 The lock uses the official PyPI and NVIDIA indexes by default. If those endpoints are inaccessible
 from a restricted network, optional mirrors can be supplied explicitly; the recorded SHA256 hashes
@@ -244,9 +250,10 @@ The check is intentionally stronger than `GET /health`. It verifies:
   1024-dimensional embedding, and identifies a generated red image through the VLM route.
 - OpenViking reports the pinned runtime version.
 - A UUID-scoped resource is written with `mode=create` and `processing_mode=semantic_and_vectors`;
-  both `semantic_status` and `vector_status` must be `complete`.
-- Write telemetry records non-zero VLM tokens in the `resource_summarize` stage, and the generated
-  `.abstract.md` and `.overview.md` files contain observable semantic output.
+  the response fields must be `complete`, and any reported queue errors are rejected.
+- The generated `.abstract.md` and `.overview.md` files must contain real non-placeholder semantic
+  output. Together with the direct pinned-model VLM probe, this checks the configured local VLM and
+  OpenViking semantic path.
 - Search telemetry reports `vector.cuvs.routes.cuvs >= 1` and a non-zero cuVS index size.
 - A `finally` cleanup issues recursive `DELETE /api/v1/fs?...&wait=true` for the UUID-scoped root.
   Cleanup failures are reported even when the main E2E check also fails.
@@ -256,6 +263,12 @@ A successful run ends with:
 ```text
 OPENVIKING_CUVS_E2E_OK
 ```
+
+OpenViking v0.4.17 does not propagate the `content.write` request telemetry collector into its
+semantic/embedding queue threads. Its response completion fields and empty queue counters are
+therefore schema/error checks, not standalone proof that background work ran. This verifier uses
+the generated semantic sidecars as the semantic completion proof and a known UUID marker retrieved
+through a reported cuVS route as the vector completion proof.
 
 Syntax, lock, and schema checks can be run on another machine, but they do not establish GPU
 compatibility. Only this successful E2E run on a DGX Spark proves that the CUDA 13 wheels load,
@@ -371,7 +384,7 @@ Model data under `/var/lib/ollama/models` is deliberately preserved by those com
 | `setup.sh` rejects the driver | RAPIDS 26.06 CUDA 13 requires NVIDIA driver 580.65.06 or newer | Install current DGX OS driver updates, reboot if required, and rerun `nvidia-smi` |
 | Ollama has a non-loopback listener | Another unit or environment overrides `OLLAMA_HOST` | Review `sudo systemctl cat ollama`, rerun `install-ollama.sh`, and confirm `ss -H -ltn 'sport = :11434'` lists only `127.0.0.1` or `::1` |
 | Ollama model digest mismatch | A mutable model tag now resolves to different content, or a different artifact was pulled | Do not accept it by name alone. Review the registry manifest/model change, then intentionally update `pins.json` or restore the pinned artifact |
-| A staged OpenViking cutover fails | Doctor, service startup, runtime version, or PID-path validation failed | Read the emitted rollback and failed-venv paths plus `journalctl --user -u openviking-cuvs -n 100`; the prior active environment is restarted automatically |
+| A staged OpenViking cutover fails | Doctor, service startup, runtime version, or PID-path validation failed | Read the emitted rollback and failed-venv paths plus `journalctl --user -u openviking-cuvs -n 100`; the prior environment, unit, and enabled/active state are restored automatically |
 | NVIDIA packages resolve to CUDA 13.3 | The constraints or lock were bypassed | Use `requirements-cu13.lock` with `--require-hashes`; confirm `nvidia-nvjitlink==13.0.88` |
 | `systemctl --user` cannot connect to the bus | No user systemd session is available | Log in through a normal local or SSH session. For an always-on service after logout, an administrator can enable linger with `sudo loginctl enable-linger "$USER"` |
 | OpenViking is healthy but E2E reports no cuVS route | Auto admission rejected GPU use, the snapshot is still building, or cuVS failed | Check the verifier's last `routes`, service logs, `ollama ps`, and `nvidia-smi`; stop competing workloads or reduce the corpus. Do not count native fallback as cuVS success |

@@ -10,7 +10,9 @@ if [[ "$(uname -s)" != "Linux" || "$(uname -m)" != "aarch64" ]]; then
   exit 1
 fi
 
-for command_name in curl getent id ln python3 readlink sha256sum ss stat sudo systemctl tar unzstd; do
+for command_name in chmod chown cmp cp curl date getent groupadd id install ln mkdir mktemp mv \
+  python3 readlink rm sed seq sha256sum sleep ss stat sudo systemctl tar uname unzstd useradd \
+  usermod; do
   command -v "${command_name}" >/dev/null || {
     echo "${command_name} is required before installing Ollama." >&2
     exit 1
@@ -42,17 +44,92 @@ readonly SYSTEM_UNIT_PATH="/etc/systemd/system/ollama.service"
 
 work_dir="$(mktemp -d)"
 system_stage_created=false
+link_changed=false
+link_had_previous=false
+link_backup=""
+unit_changed=false
+unit_had_previous=false
+unit_backup=""
+service_touched=false
+service_was_active=false
+service_was_enabled=false
 cleanup() {
+  exit_status=$?
+  trap - EXIT
+  set +e
+
+  rollback_failed=false
+  if [[ "${exit_status}" -ne 0 && ( \
+    "${link_changed}" == true || \
+    "${unit_changed}" == true || \
+    "${service_touched}" == true \
+  ) ]]; then
+    echo "Installation failed; restoring the previous Ollama command, unit, and service state." >&2
+    sudo systemctl stop ollama.service >/dev/null 2>&1 || true
+
+    if [[ "${unit_changed}" == true ]]; then
+      if [[ "${unit_had_previous}" == true ]]; then
+        sudo rm -f -- "${SYSTEM_UNIT_PATH}"
+        if ! sudo mv -- "${unit_backup}" "${SYSTEM_UNIT_PATH}"; then
+          echo "Failed to restore ${SYSTEM_UNIT_PATH} from ${unit_backup}." >&2
+          rollback_failed=true
+        fi
+      elif ! sudo rm -f -- "${SYSTEM_UNIT_PATH}"; then
+        echo "Failed to remove newly installed ${SYSTEM_UNIT_PATH}." >&2
+        rollback_failed=true
+      fi
+    fi
+
+    if [[ "${link_changed}" == true ]]; then
+      sudo rm -f -- "${OLLAMA_LINK}"
+      if [[ "${link_had_previous}" == true ]] && \
+        ! sudo mv -- "${link_backup}" "${OLLAMA_LINK}"; then
+        echo "Failed to restore ${OLLAMA_LINK} from ${link_backup}." >&2
+        rollback_failed=true
+      fi
+    fi
+
+    if ! sudo systemctl daemon-reload; then
+      echo "Failed to reload systemd while restoring the previous Ollama service." >&2
+      rollback_failed=true
+    fi
+    if [[ "${service_was_enabled}" == true ]]; then
+      if ! sudo systemctl enable ollama.service; then
+        echo "Failed to restore the enabled state of ollama.service." >&2
+        rollback_failed=true
+      fi
+    elif ! sudo systemctl disable ollama.service >/dev/null 2>&1; then
+      # A previously absent or static unit may not support disable.
+      true
+    fi
+    if [[ "${service_was_active}" == true ]]; then
+      if ! sudo systemctl restart ollama.service; then
+        echo "Failed to restart the previous ollama.service." >&2
+        rollback_failed=true
+      fi
+    else
+      sudo systemctl stop ollama.service >/dev/null 2>&1 || true
+    fi
+
+    if [[ "${rollback_failed}" == true ]]; then
+      echo "Ollama rollback was incomplete; inspect the backup paths above before retrying." >&2
+    else
+      echo "Previous Ollama command, unit, and service state restored." >&2
+    fi
+  fi
+
   if [[ "${system_stage_created}" == true ]]; then
     sudo rm -rf -- "${SYSTEM_STAGE}"
   fi
   rm -rf -- "${work_dir}"
+  exit "${exit_status}"
 }
 trap cleanup EXIT
 
 archive_path="${work_dir}/ollama-linux-arm64.tar.zst"
 extract_path="${work_dir}/extract"
 mkdir -p "${extract_path}"
+chmod 0755 "${extract_path}"
 
 echo "Downloading Ollama ${REQUIRED_OLLAMA_VERSION} without elevated privileges..."
 curl --fail --location --show-error \
@@ -89,8 +166,106 @@ if not versions or versions[-1] != required:
     raise SystemExit(f"Expected exact Ollama client version {required}; found {versions}")
 ' "${REQUIRED_OLLAMA_VERSION}"
 
+verify_installed_tree() {
+  sudo python3 - "${extract_path}" "${INSTALL_PATH}" "${OLLAMA_ARCHIVE_SHA256}" <<'PY'
+from __future__ import annotations
+
+import hashlib
+import os
+import stat
+import sys
+from pathlib import Path
+
+expected_root = Path(sys.argv[1])
+installed_root = Path(sys.argv[2])
+expected_archive_hash = sys.argv[3]
+marker_name = ".archive-sha256"
+
+
+def digest(path: Path) -> str:
+    value = hashlib.sha256()
+    with path.open("rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            value.update(chunk)
+    return value.hexdigest()
+
+
+def collect(root: Path, *, installed: bool) -> dict[str, tuple[str, int, int, int, str | None]]:
+    root_stat = os.lstat(root)
+    if not stat.S_ISDIR(root_stat.st_mode):
+        raise SystemExit(f"Expected a directory, found {root}")
+
+    entries: dict[str, tuple[str, int, int, int, str | None]] = {
+        ".": ("directory", stat.S_IMODE(root_stat.st_mode), root_stat.st_uid, root_stat.st_gid, None)
+    }
+    for directory, directory_names, file_names in os.walk(root, followlinks=False):
+        for name in sorted(directory_names + file_names):
+            path = Path(directory, name)
+            relative = path.relative_to(root).as_posix()
+            if installed and relative == marker_name:
+                continue
+            metadata = os.lstat(path)
+            mode = stat.S_IMODE(metadata.st_mode)
+            if stat.S_ISLNK(metadata.st_mode):
+                kind = "symlink"
+                payload = os.readlink(path)
+            elif stat.S_ISDIR(metadata.st_mode):
+                kind = "directory"
+                payload = None
+            elif stat.S_ISREG(metadata.st_mode):
+                kind = "file"
+                payload = digest(path)
+            else:
+                raise SystemExit(f"Unsupported installed payload entry: {relative}")
+            entries[relative] = (kind, mode, metadata.st_uid, metadata.st_gid, payload)
+    return entries
+
+
+expected = collect(expected_root, installed=False)
+installed = collect(installed_root, installed=True)
+missing = sorted(expected.keys() - installed.keys())
+unexpected = sorted(installed.keys() - expected.keys())
+if missing or unexpected:
+    raise SystemExit(f"Installed Ollama tree differs from archive: missing={missing}, unexpected={unexpected}")
+
+for relative, expected_entry in expected.items():
+    expected_kind, expected_mode, _, _, expected_payload = expected_entry
+    actual_kind, actual_mode, actual_uid, actual_gid, actual_payload = installed[relative]
+    normalized_mode = expected_mode if expected_kind == "symlink" else expected_mode & ~0o022
+    if actual_kind != expected_kind or actual_payload != expected_payload:
+        raise SystemExit(f"Installed Ollama payload differs at {relative}")
+    if expected_kind != "symlink" and actual_mode != normalized_mode:
+        raise SystemExit(
+            f"Installed Ollama mode differs at {relative}: {actual_mode:04o} != {normalized_mode:04o}"
+        )
+    if (actual_uid, actual_gid) != (0, 0):
+        raise SystemExit(f"Installed Ollama entry is not root-owned: {relative}")
+    if expected_kind != "symlink" and actual_mode & 0o022:
+        raise SystemExit(f"Installed Ollama entry is writable by group or other: {relative}")
+
+marker = installed_root / marker_name
+marker_stat = os.lstat(marker)
+if not stat.S_ISREG(marker_stat.st_mode):
+    raise SystemExit(f"Installed archive marker is not a regular file: {marker}")
+if (marker_stat.st_uid, marker_stat.st_gid) != (0, 0):
+    raise SystemExit(f"Installed archive marker is not root-owned: {marker}")
+if stat.S_IMODE(marker_stat.st_mode) != 0o644:
+    raise SystemExit(f"Installed archive marker mode is not 0644: {marker}")
+if marker.read_bytes() != f"{expected_archive_hash}\n".encode():
+    raise SystemExit(f"Installed archive marker content is invalid: {marker}")
+
+print(f"Verified {len(installed)} root-owned Ollama payload entries against the pinned archive.")
+PY
+}
+
 if sudo test -L "${INSTALL_PARENT}"; then
   echo "Refusing symlinked installation parent ${INSTALL_PARENT}." >&2
+  exit 1
+fi
+sudo install -d -o root -g root -m 0755 "${INSTALL_PARENT}"
+install_parent_metadata="$(sudo stat --format='%u:%g:%a' "${INSTALL_PARENT}")"
+if [[ "${install_parent_metadata}" != "0:0:755" ]]; then
+  echo "Refusing insecure installation parent ${INSTALL_PARENT}: ${install_parent_metadata}." >&2
   exit 1
 fi
 if sudo test -L "${INSTALL_PATH}"; then
@@ -106,35 +281,49 @@ elif sudo test -e "${INSTALL_PATH}"; then
     echo "Refusing to reuse ${INSTALL_PATH}: its verified archive marker is missing or different." >&2
     exit 1
   fi
-  if ! sudo cmp --silent "${extract_path}/bin/ollama" "${INSTALL_PATH}/bin/ollama"; then
-    echo "Refusing to reuse ${INSTALL_PATH}: its Ollama executable differs from the verified archive." >&2
-    exit 1
-  fi
 else
-  sudo install -d -m 0755 "${INSTALL_PARENT}"
-  sudo install -d -m 0755 "${SYSTEM_STAGE}"
+  sudo install -d -o root -g root -m 0755 "${SYSTEM_STAGE}"
   system_stage_created=true
   sudo cp -a "${extract_path}/." "${SYSTEM_STAGE}/"
+  sudo chown -R --no-dereference root:root "${SYSTEM_STAGE}"
+  sudo chmod -R go-w "${SYSTEM_STAGE}"
   printf '%s\n' "${OLLAMA_ARCHIVE_SHA256}" >"${work_dir}/archive-sha256"
-  sudo install -m 0644 "${work_dir}/archive-sha256" "${SYSTEM_STAGE}/.archive-sha256"
+  sudo install -o root -g root -m 0644 \
+    "${work_dir}/archive-sha256" "${SYSTEM_STAGE}/.archive-sha256"
   sudo mv "${SYSTEM_STAGE}" "${INSTALL_PATH}"
   system_stage_created=false
 fi
+verify_installed_tree
 
-if sudo test -d "${OLLAMA_LINK}" && ! sudo test -L "${OLLAMA_LINK}"; then
-  echo "Refusing to replace directory ${OLLAMA_LINK}. Move it and rerun the installer." >&2
+if sudo systemctl is-active --quiet ollama.service; then
+  service_was_active=true
+fi
+if sudo systemctl is-enabled --quiet ollama.service; then
+  service_was_enabled=true
+fi
+
+if (sudo test -e "${OLLAMA_LINK}" || sudo test -L "${OLLAMA_LINK}") && \
+  ! sudo test -L "${OLLAMA_LINK}" && ! sudo test -f "${OLLAMA_LINK}"; then
+  echo "Refusing non-file command path ${OLLAMA_LINK}. Move it and rerun the installer." >&2
   exit 1
 fi
+link_needs_update=true
 if sudo test -e "${OLLAMA_LINK}" || sudo test -L "${OLLAMA_LINK}"; then
-  current_link="$(sudo readlink -f "${OLLAMA_LINK}")"
-  if [[ "${current_link}" != "${INSTALL_PATH}/bin/ollama" ]]; then
-    link_backup="${OLLAMA_LINK}.backup-$(date -u +%Y%m%dT%H%M%SZ)"
+  link_had_previous=true
+  current_link="$(sudo readlink -f "${OLLAMA_LINK}" 2>/dev/null || true)"
+  if sudo test -L "${OLLAMA_LINK}" && [[ "${current_link}" == "${INSTALL_PATH}/bin/ollama" ]]; then
+    link_needs_update=false
+  else
+    link_backup="${OLLAMA_LINK}.backup-$(date -u +%Y%m%dT%H%M%SZ).$$"
     sudo cp -a "${OLLAMA_LINK}" "${link_backup}"
     echo "Backed up the previous Ollama command to ${link_backup}."
   fi
 fi
 sudo install -d -m 0755 /usr/local/bin
-sudo ln -sfn "${INSTALL_PATH}/bin/ollama" "${OLLAMA_LINK}"
+if [[ "${link_needs_update}" == true ]]; then
+  link_changed=true
+  sudo ln -sfn "${INSTALL_PATH}/bin/ollama" "${OLLAMA_LINK}"
+fi
 if [[ "$(sudo readlink -f "${OLLAMA_LINK}")" != "${INSTALL_PATH}/bin/ollama" ]]; then
   echo "Ollama command link does not resolve to the verified installation." >&2
   exit 1
@@ -158,13 +347,27 @@ if sudo test -L "${SYSTEM_UNIT_PATH}"; then
   echo "Refusing symlinked system unit ${SYSTEM_UNIT_PATH}. Move it and rerun the installer." >&2
   exit 1
 fi
-if sudo test -e "${SYSTEM_UNIT_PATH}" && ! sudo cmp --silent \
-  "${SCRIPT_DIR}/ollama.service" "${SYSTEM_UNIT_PATH}"; then
-  unit_backup="${SYSTEM_UNIT_PATH}.backup-$(date -u +%Y%m%dT%H%M%SZ)"
-  sudo cp -a "${SYSTEM_UNIT_PATH}" "${unit_backup}"
-  echo "Backed up the previous Ollama unit to ${unit_backup}."
+if sudo test -e "${SYSTEM_UNIT_PATH}" && ! sudo test -f "${SYSTEM_UNIT_PATH}"; then
+  echo "Refusing non-file system unit ${SYSTEM_UNIT_PATH}. Move it and rerun the installer." >&2
+  exit 1
 fi
-sudo install -m 0644 "${SCRIPT_DIR}/ollama.service" "${SYSTEM_UNIT_PATH}"
+unit_needs_update=true
+if sudo test -e "${SYSTEM_UNIT_PATH}"; then
+  unit_had_previous=true
+  if sudo cmp --silent "${SCRIPT_DIR}/ollama.service" "${SYSTEM_UNIT_PATH}"; then
+    unit_needs_update=false
+  else
+    unit_backup="${SYSTEM_UNIT_PATH}.backup-$(date -u +%Y%m%dT%H%M%SZ).$$"
+    sudo cp -a "${SYSTEM_UNIT_PATH}" "${unit_backup}"
+    echo "Backed up the previous Ollama unit to ${unit_backup}."
+  fi
+fi
+if [[ "${unit_needs_update}" == true ]]; then
+  unit_changed=true
+  sudo install -o root -g root -m 0644 \
+    "${SCRIPT_DIR}/ollama.service" "${SYSTEM_UNIT_PATH}"
+fi
+service_touched=true
 sudo systemctl daemon-reload
 sudo systemctl enable ollama.service
 sudo systemctl restart ollama.service
