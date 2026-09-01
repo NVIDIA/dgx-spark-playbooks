@@ -1,4 +1,4 @@
-# OpenViking and cuVS versions tested by this playbook.
+# OpenViking and cuVS versions pinned by this playbook.
 openviking==0.4.17.1
 cuvs-cu13==26.6.0
 cupy-cuda13x[ctk]==14.1.1

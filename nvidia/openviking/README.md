@@ -56,10 +56,11 @@ specific to OpenViking and cuVS.
 - **Risk level**: Medium. The setup downloads a 27B model and creates local OpenViking data.
 - **Memory**: Ollama and cuVS share the Spark's unified memory. The configuration reserves 8 GiB
   outside cuVS admission.
-- **Rollback**: Stop the foreground server, then remove the dedicated environment and data paths.
+- **Rollback**: Stop the foreground server, remove the dedicated environment, and restore the
+  timestamped configuration backup if one was created.
 - **Last Updated**: 09/02/2026
 
-## Tested versions
+## Pinned versions
 
 | Component | Version |
 | --- | --- |
@@ -113,7 +114,7 @@ git clone https://github.com/NVIDIA/dgx-spark-playbooks.git
 cd dgx-spark-playbooks/nvidia/openviking/assets
 ```
 
-Create a dedicated environment and install the tested CUDA 13 package set:
+Create a dedicated environment and install the pinned CUDA 13 package set:
 
 ```bash
 python3 -m venv "$HOME/.venvs/openviking"
@@ -150,8 +151,10 @@ silently replacing it:
 ```bash
 python -m json.tool ov.conf >/dev/null
 mkdir -p "$HOME/.openviking"
+chmod 700 "$HOME/.openviking"
 if [ -f "$HOME/.openviking/ov.conf" ]; then
-  cp "$HOME/.openviking/ov.conf" "$HOME/.openviking/ov.conf.backup"
+  cp "$HOME/.openviking/ov.conf" \
+    "$HOME/.openviking/ov.conf.backup.$(date +%Y%m%d%H%M%S)"
 fi
 install -m 600 ov.conf "$HOME/.openviking/ov.conf"
 ```
@@ -166,6 +169,7 @@ openviking-server doctor
 Start OpenViking in the foreground so its logs remain visible:
 
 ```bash
+umask 077
 openviking-server --config "$HOME/.openviking/ov.conf"
 ```
 
@@ -235,6 +239,13 @@ rm "$HOME/.openviking/ov.conf"
 
 > [!WARNING]
 > Removing `~/.openviking/data` permanently deletes the local context database.
+
+If Step 3 backed up an existing configuration, restore the chosen backup explicitly:
+
+```bash
+cp "$HOME/.openviking/ov.conf.backup.<timestamp>" "$HOME/.openviking/ov.conf"
+chmod 600 "$HOME/.openviking/ov.conf"
+```
 
 Ollama is shared with other applications. Use the cleanup section of the
 [Ollama playbook](../ollama/README.md#step-9-cleanup-and-rollback) only when nothing else depends
