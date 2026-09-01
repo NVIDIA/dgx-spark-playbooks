@@ -23,10 +23,11 @@ in one context database. In this setup, OpenViking uses:
 - Its native local store for canonical data, scalar and sparse retrieval, and recovery.
 - [NVIDIA cuVS](https://docs.nvidia.com/cuvs/) for an optional GPU snapshot of dense vectors.
 
-The supplied configuration keeps `backend` set to `local` and enables cuVS auto mode. A dense
-query uses cuVS when the snapshot is ready and the unified-memory admission check passes. It falls
-back to the native index when GPU memory is tight or the query is better handled on the CPU. cuVS
-is an acceleration layer here, not a replacement for the rest of OpenViking's storage engine.
+The supplied configuration keeps `backend` set to `local` and enables cuVS auto mode. It sets both
+native crossover thresholds to zero so eligible filtered dense queries can exercise cuVS during
+validation. Queries can still fall back when the GPU snapshot is dirty, GPU memory admission
+fails, or the request uses a retrieval path cuVS does not handle. cuVS is an acceleration layer
+here, not a replacement for the rest of OpenViking's storage engine.
 
 ## What you'll accomplish
 
@@ -40,11 +41,13 @@ corpus, native search can be faster because GPU startup and snapshot constructio
 
 ## Prerequisites
 
-- A DGX Spark with current DGX OS and working NVIDIA drivers.
+- A DGX Spark with current DGX OS and NVIDIA driver 580.65.06 or newer, as required by the
+  [RAPIDS 26.06 CUDA 13 stack](https://docs.rapids.ai/install/#system-req).
 - Python 3.12 with the `venv` module.
 - `git` and `curl`.
 - At least 35 GB of free disk space for the models and Python environment.
-- Ollama installed by following Steps 1 and 2 in the [Ollama playbook](../ollama/README.md).
+- Ollama 0.32.12 or newer, installed by following Steps 1 and 2 in the
+  [Ollama playbook](../ollama/README.md). The minimum comes from the `qwen3.8:27b` model manifest.
 
 The [CUDA-X Data Science playbook](../cuda-x-data-science/README.md#step-1-verify-system-requirements)
 has the shared CUDA 13 environment check. This playbook only adds the packages and configuration
@@ -69,6 +72,7 @@ specific to OpenViking and cuVS.
 | CuPy | 14.1.1 |
 | CUDA Python packages | 13.0 |
 | Python | 3.12 |
+| Ollama | 0.32.12 or newer |
 | Embedding model | [`qwen3-embedding:0.6b`](https://ollama.com/library/qwen3-embedding:0.6b) |
 | VLM | [`qwen3.8:27b`](https://ollama.com/library/qwen3.8:27b) |
 
@@ -89,10 +93,21 @@ nvcc --version
 python3 --version
 ```
 
+Confirm that `nvidia-smi` reports driver 580.65.06 or newer.
+
 If Ollama is not already installed, complete Steps 1 and 2 in the
 [Ollama playbook](../ollama/README.md#step-1-verify-ollama-installation-status). That playbook owns
 the Ollama install, service, API test, tunnel, and removal flow. Return here instead of pulling its
 example chat model.
+
+Check the installed version:
+
+```bash
+ollama --version
+```
+
+The `qwen3.8:27b` manifest requires Ollama 0.32.12 or newer. If the installed version is older,
+repeat the install step from the shared playbook before pulling models.
 
 Pull the models used by OpenViking:
 
@@ -160,7 +175,9 @@ install -m 600 ov.conf "$HOME/.openviking/ov.conf"
 ```
 
 The file binds OpenViking to `127.0.0.1:1933`, points both model providers at local Ollama, and
-uses exact float32 brute-force search for the cuVS snapshot. Validate the model and storage setup:
+uses exact float32 brute-force search for the cuVS snapshot. Its two native crossover thresholds
+are zero specifically so the smoke test can reach cuVS despite OpenViking's implicit account
+filter. Validate the model and storage setup:
 
 ```bash
 openviking-server doctor
@@ -201,10 +218,18 @@ Auto mode may serve the first query from the native index while it builds a GPU 
 test retries for up to three minutes. A native fallback is valid runtime behavior, but it does not
 count as proof that cuVS worked.
 
+After validation, benchmark representative data before keeping this routing policy. Setting
+`auto_filter_native_threshold` and `auto_path_filter_native_threshold` back to the upstream
+defaults (`2000` and `200`) lets small filtered candidate sets use the native index; workload-tuned
+values may be better. Zero disables only these threshold-based native routes. It does not force
+sparse, hybrid, unsupported, dirty-snapshot, or memory-rejected requests through cuVS.
+
 ## Remote access
 
-OpenViking uses development authentication in this local example, so loopback plus the Spark OS
-account is the security boundary. Do not expose ports 1933 or 11434 directly to an untrusted LAN.
+This example sets `auth_mode` to `dev`, which gives every request ROOT-equivalent API access.
+Binding to `127.0.0.1` blocks direct remote network access, but it does not isolate local users:
+any process or account on the Spark that can reach port 1933 gets the same access. Use this mode
+only on a trusted, single-user Spark. Do not expose ports 1933 or 11434 directly to a LAN.
 
 To use NVIDIA Sync, follow the custom-app and tunnel steps in the
 [Ollama playbook](../ollama/README.md#step-4-access-nvidia-sync-settings), but create an
@@ -213,11 +238,16 @@ To use NVIDIA Sync, follow the custom-app and tunnel steps in the
 Alternatively, forward the port with SSH:
 
 ```bash
-ssh -N -L 1933:127.0.0.1:1933 <username>@<spark-address>
+ssh -N -L 127.0.0.1:1933:127.0.0.1:1933 <username>@<spark-address>
 curl --fail http://127.0.0.1:1933/health
 ```
 
-For a shared deployment, configure authentication before changing the listener. See the
+NVIDIA Sync and SSH forwarding extend the unauthenticated endpoint to the client machine. Anyone
+who can reach the client-side forwarded port while the tunnel is active has ROOT-equivalent API
+access, so keep the client trusted and stop the tunnel when finished.
+
+For any shared or multi-user deployment, configure authentication before use, even if the server
+remains on loopback. See the
 [OpenViking authentication guide](https://github.com/volcengine/OpenViking/blob/v0.4.17.1/docs/en/guides/04-authentication.md).
 
 ## Cleanup

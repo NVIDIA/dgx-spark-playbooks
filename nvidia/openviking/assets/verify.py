@@ -72,10 +72,15 @@ def delete_smoke_root(root_uri: str) -> None:
     query = urllib.parse.urlencode(
         {"uri": root_uri, "recursive": "true", "wait": "true", "timeout": "300"}
     )
-    require_ok(
+    response = require_ok(
         request_json("DELETE", f"/api/v1/fs?{query}", timeout=330),
         "smoke cleanup",
     )
+    result = response.get("result")
+    if not isinstance(result, dict) or result.get("uri") != root_uri:
+        raise VerificationError(f"smoke cleanup returned the wrong result: {result}")
+    if result.get("semantic_status") != "complete":
+        raise VerificationError(f"smoke cleanup did not complete: {result}")
 
 
 def verify(root_uri: str, document_uri: str, marker: str) -> dict[str, Any]:
@@ -118,7 +123,10 @@ def verify(root_uri: str, document_uri: str, marker: str) -> dict[str, Any]:
     deadline = time.monotonic() + 180
     last_routes: dict[str, int] = {}
     last_hits: list[str] = []
-    while time.monotonic() < deadline:
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
         response = require_ok(
             request_json(
                 "POST",
@@ -129,7 +137,7 @@ def verify(root_uri: str, document_uri: str, marker: str) -> dict[str, Any]:
                     "read_content": True,
                     "telemetry": {"summary": True},
                 },
-                timeout=30,
+                timeout=min(30.0, remaining),
             ),
             "semantic search",
         )
@@ -162,7 +170,9 @@ def verify(root_uri: str, document_uri: str, marker: str) -> dict[str, Any]:
                 "routes": last_routes,
                 "index_size": index_size,
             }
-        time.sleep(2)
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            time.sleep(min(2.0, remaining))
 
     raise VerificationError(
         "known-result search did not use cuVS within 180 seconds; "
@@ -176,16 +186,16 @@ def main() -> int:
     document_uri = f"{root_uri}/document.md"
     marker = f"heliotrope-viking-{run_id}"
     result: dict[str, Any] | None = None
-    primary_error: BaseException | None = None
+    primary_error: Exception | None = None
 
     try:
         result = verify(root_uri, document_uri, marker)
-    except BaseException as exc:
+    except Exception as exc:
         primary_error = exc
 
     try:
         delete_smoke_root(root_uri)
-    except BaseException as cleanup_error:
+    except Exception as cleanup_error:
         if primary_error is not None:
             raise VerificationError(
                 f"verification failed: {primary_error}; cleanup failed: {cleanup_error}"
