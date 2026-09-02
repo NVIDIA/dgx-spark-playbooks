@@ -37,13 +37,13 @@ download_if_needed "https://huggingface.co/TheBloke/deepseek-coder-6.7B-instruct
 download_if_needed "https://huggingface.co/Qwen/Qwen3-Embedding-4B-GGUF/resolve/main/Qwen3-Embedding-4B-Q8_0.gguf" "Qwen3-Embedding-4B-Q8_0.gguf"
 
 # Comment next three lines if you want to use gpt-oss-20b
-# download_if_needed "https://huggingface.co/ggml-org/gpt-oss-120b-GGUF/resolve/main/gpt-oss-120b-mxfp4-00001-of-00003.gguf" "gpt-oss-120b-mxfp4-00001-of-00003.gguf"
+download_if_needed "https://huggingface.co/ggml-org/gpt-oss-120b-GGUF/resolve/main/gpt-oss-120b-mxfp4-00001-of-00003.gguf" "gpt-oss-120b-mxfp4-00001-of-00003.gguf"
 
-# download_if_needed "https://huggingface.co/ggml-org/gpt-oss-120b-GGUF/resolve/main/gpt-oss-120b-mxfp4-00002-of-00003.gguf" "gpt-oss-120b-mxfp4-00002-of-00003.gguf"
+download_if_needed "https://huggingface.co/ggml-org/gpt-oss-120b-GGUF/resolve/main/gpt-oss-120b-mxfp4-00002-of-00003.gguf" "gpt-oss-120b-mxfp4-00002-of-00003.gguf"
 
-# download_if_needed "https://huggingface.co/ggml-org/gpt-oss-120b-GGUF/resolve/main/gpt-oss-120b-mxfp4-00003-of-00003.gguf" "gpt-oss-120b-mxfp4-00003-of-00003.gguf"
+download_if_needed "https://huggingface.co/ggml-org/gpt-oss-120b-GGUF/resolve/main/gpt-oss-120b-mxfp4-00003-of-00003.gguf" "gpt-oss-120b-mxfp4-00003-of-00003.gguf"
 
 # Uncomment next line if you want to use gpt-oss-20b
-download_if_needed "https://huggingface.co/ggml-org/gpt-oss-20b-GGUF/resolve/main/gpt-oss-20b-mxfp4.gguf" "gpt-oss-20b-mxfp4.gguf"
+# download_if_needed "https://huggingface.co/ggml-org/gpt-oss-20b-GGUF/resolve/main/gpt-oss-20b-mxfp4.gguf" "gpt-oss-20b-mxfp4.gguf"
 
 echo "All models downloaded."
