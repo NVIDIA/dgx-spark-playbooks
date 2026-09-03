@@ -1,0 +1,17 @@
+# OpenViking and cuVS versions pinned by this playbook.
+openviking==0.4.17.1
+cuvs-cu13==26.6.0
+cupy-cuda13x[ctk]==14.1.1
+
+# Keep the CUDA-facing dependency chain on CUDA 13.0.
+cuda-bindings==13.0.3
+cuda-pathfinder==1.3.4
+cuda-python==13.0.3
+cuda-toolkit==13.0.3.0
+libcuvs-cu13==26.6.0
+libraft-cu13==26.6.0
+librmm-cu13==26.6.0
+nvidia-nccl-cu13==2.30.7
+nvidia-nvjitlink==13.0.88
+pylibraft-cu13==26.6.0
+rmm-cu13==26.6.0
