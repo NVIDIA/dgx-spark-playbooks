@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  finetunine:
+    image: nvcr.io/nvidia/pytorch:25.11-py3
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      resources:
+        reservations:
+          generic_resources:
+            - discrete_resource_spec:
+                kind: 'NVIDIA_GPU'
+                value: 1
+    environment:
+      - UCX_NET_DEVICES=enp1s0f1np1
+      - NCCL_SOCKET_IFNAME=enp1s0f1np1
+      - NCCL_DEBUG=INFO
+      - TORCH_NCCL_ASYNC_ERROR_HANDLING=1
+      - GLOO_SOCKET_IFNAME=enp1s0f1np1
+      - CUDA_DEVICE_MAX_CONNECTIONS=1
+      - CUDA_VISIBLE_DEVICES=0
+    entrypoint: /opt/pytorch-ft-entrypoint.sh
+    volumes:
+      - ${PWD}:/workspace
+      - ${PWD}/pytorch-ft-entrypoint.sh:/opt/pytorch-ft-entrypoint.sh
+      - ~/.cache/huggingface/:/root/.cache/huggingface/
+      - ~/.ssh:/tmp/.ssh:ro
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    networks:
+      - host
+    healthcheck:
+      test: ["CMD", "service", "ssh", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+
+networks:
+  host:
+    name: host
+    external: true

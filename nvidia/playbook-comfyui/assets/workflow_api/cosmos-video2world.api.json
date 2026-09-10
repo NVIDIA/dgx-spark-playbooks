@@ -1,0 +1,98 @@
+{
+  "1": {
+    "inputs": {
+      "unet_name": "cosmos_predict2_14B_video2world_720p_16fps.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": { "title": "Load Cosmos-Predict2 14B Video2World Model" }
+  },
+  "2": {
+    "inputs": {
+      "clip_name": "oldt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "type": "cosmos",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": { "title": "Load Old T5-XXL Text Encoder (Cosmos)" }
+  },
+  "3": {
+    "inputs": {
+      "vae_name": "wan_2.1_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": { "title": "Load VAE (shared with Wan 2.1)" }
+  },
+  "4": {
+    "inputs": {
+      "text": "A red ball rolling down a wooden ramp and bouncing off a wall, physics simulation, realistic lighting",
+      "clip": ["2", 0]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "CLIP Text Encode (Positive Prompt)" }
+  },
+  "5": {
+    "inputs": {
+      "text": "",
+      "clip": ["2", 0]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "CLIP Text Encode (Negative Prompt)" }
+  },
+  "10": {
+    "inputs": {
+      "image": "input_image.png",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": { "title": "Load Start Image" }
+  },
+  "6": {
+    "inputs": {
+      "width": 1280,
+      "height": 704,
+      "length": 93,
+      "batch_size": 1,
+      "vae": ["3", 0],
+      "start_image": ["10", 0]
+    },
+    "class_type": "CosmosPredict2ImageToVideoLatent",
+    "_meta": { "title": "Cosmos Image-to-Video Latent (720p, 93 frames)" }
+  },
+  "7": {
+    "inputs": {
+      "seed": 42,
+      "steps": 30,
+      "cfg": 4,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1.0,
+      "model": ["1", 0],
+      "positive": ["4", 0],
+      "negative": ["5", 0],
+      "latent_image": ["6", 0]
+    },
+    "class_type": "KSampler",
+    "_meta": { "title": "KSampler" }
+  },
+  "8": {
+    "inputs": {
+      "samples": ["7", 0],
+      "vae": ["3", 0]
+    },
+    "class_type": "VAEDecode",
+    "_meta": { "title": "VAE Decode" }
+  },
+  "9": {
+    "inputs": {
+      "fps": 16,
+      "lossless": false,
+      "quality": 85,
+      "method": "default",
+      "filename_prefix": "cosmos_v2w_output",
+      "images": ["8", 0]
+    },
+    "class_type": "SaveAnimatedWEBP",
+    "_meta": { "title": "Save Animated WEBP" }
+  }
+}

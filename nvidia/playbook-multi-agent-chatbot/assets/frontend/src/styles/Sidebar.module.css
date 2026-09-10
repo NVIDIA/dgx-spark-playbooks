@@ -1,0 +1,815 @@
+/*
+# SPDX-FileCopyrightText: Copyright (c) 1993-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+*/
+.sidebar {
+  width: 320px;
+  height: auto;
+  max-height: 90vh;
+  background-color: white;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  position: absolute;
+  top: 60px;
+  left: 20px;
+  z-index: 5;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  pointer-events: auto;
+  transform-origin: top;
+  animation: menuExpand 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+:global(.dark) .sidebar {
+  background-color: #1f2937;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.sidebar.closing {
+  animation: menuCollapse 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes menuExpand {
+  0% {
+    opacity: 0;
+    transform: scaleY(0.3) translateY(-40px);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleY(1) translateY(0);
+  }
+}
+
+@keyframes menuCollapse {
+  0% {
+    opacity: 1;
+    transform: scaleY(1) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: scaleY(0.3) translateY(40px);
+  }
+}
+
+.sidebarOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: transparent;
+  z-index: 5;
+  display: block;
+  pointer-events: none;
+  animation: fadeIn 0.2s ease forwards;
+}
+
+.sidebarOverlay.closing {
+  animation: fadeOut 0.2s ease forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.toggleSidebarButton {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 10;
+  background-color: white;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  font-size: 18px;
+  transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  color: #1f2937;
+}
+
+:global(.dark) .toggleSidebarButton {
+  background-color: #1f2937;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  color: white;
+}
+
+.toggleSidebarButton.active {
+  transform: rotate(180deg);
+}
+
+.closeSidebarButton {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  color: #718096;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.closeSidebarButton:hover {
+  color: #4a5568;
+  background-color: #f3f4f6;
+}
+
+:global(.dark) .closeSidebarButton {
+  color: #9ca3af;
+}
+
+:global(.dark) .closeSidebarButton:hover {
+  color: #e5e7eb;
+  background-color: #374151;
+}
+
+.sidebarHeader {
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 16px;
+}
+
+:global(.dark) .sidebarHeader {
+  border-bottom-color: #374151;
+}
+
+.title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin: 0;
+}
+
+:global(.dark) .title {
+  color: #e5e7eb;
+}
+
+.sidebarSection {
+  margin-bottom: 16px;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 16px;
+}
+
+:global(.dark) .sidebarSection {
+  border-bottom-color: #374151;
+}
+
+.sidebarSection:last-child {
+  border-bottom: none;
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  padding: 8px 0;
+}
+
+.sectionHeader h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #4a5568;
+}
+
+:global(.dark) .sectionHeader h3 {
+  color: #e5e7eb;
+}
+
+.sectionContent {
+  padding-top: 8px;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+.sectionContent.expanded {
+  max-height: 1000px;
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.arrowDown, .arrowUp {
+  font-size: 12px;
+  color: #718096;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+:global(.dark) .arrowDown, :global(.dark) .arrowUp {
+  color: #9ca3af;
+}
+
+.arrowUp {
+  transform: rotate(180deg);
+}
+
+.configItem {
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.configItem label {
+  font-size: 0.875rem;
+  color: #4a5568;
+  margin-bottom: 4px;
+}
+
+:global(.dark) .configItem label {
+  color: #e5e7eb;
+}
+
+.select {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  background-color: #f9fafb;
+  font-size: 0.875rem;
+  color: #4a5568;
+  width: 100%;
+}
+
+:global(.dark) .select {
+  background-color: #374151;
+  border-color: #4b5563;
+  color: #e5e7eb;
+}
+
+.toolItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.toolItem input[type="checkbox"] {
+  margin-right: 8px;
+}
+
+.toolItem label {
+  font-size: 0.875rem;
+  color: #4a5568;
+}
+
+:global(.dark) .toolItem label {
+  color: #e5e7eb;
+}
+
+.toggleSwitch {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 24px;
+}
+
+.toggleSwitch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggleSlider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #e2e8f0;
+  transition: .4s;
+  border-radius: 24px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+:global(.dark) .toggleSlider {
+  background-color: #374151;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.toggleSlider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+input:checked + .toggleSlider {
+  background-color: #76B900;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+input:checked + .toggleSlider:before {
+  transform: translateX(24px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.toolLabel {
+  font-size: 14px;
+  color: #1f2937;
+}
+
+:global(.dark) .toolLabel {
+  color: #e5e7eb;
+}
+
+.chatList {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px;
+}
+
+.chatList::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 0;
+  right: 0;
+  height: 36px;
+  background: rgba(118, 185, 0, 0.08);
+  border: 1px solid rgba(118, 185, 0, 0.2);
+  border-radius: 8px;
+  transform: translateY(calc(var(--highlight-offset, 0) - 3px));
+  transition: transform 0.2s ease-out;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.chatItem {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  border-radius: 8px;
+  height: 36px;
+  cursor: pointer;
+  z-index: 1;
+  transition: background-color 0.2s ease;
+}
+
+.chatItem:hover {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+.chatName {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.2s ease;
+  color: #1f2937;
+  line-height: 24px;
+  padding-top: 1px;
+}
+
+:global(.dark) .chatName {
+  color: #ffffff;
+}
+
+.chatItem.active .chatName {
+  color: #76B900;
+  font-weight: 600;
+}
+
+.chatActions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.chatItem:hover .chatActions {
+  opacity: 1;
+}
+
+.chatActionButton {
+  background: none;
+  border: none;
+  color: #718096;
+  padding: 4px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.chatActionButton:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  color: #1f2937;
+}
+
+.loadingText, .noChatText {
+  color: #718096;
+  font-size: 0.875rem;
+  text-align: center;
+  padding: 8px;
+}
+
+:global(.dark) .loadingText, :global(.dark) .noChatText {
+  color: #9ca3af;
+}
+
+.activeIndicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #76B900;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.chatInfo {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  cursor: pointer;
+}
+
+.chatDate {
+  font-size: 0.75rem;
+  color: #718096;
+}
+
+:global(.dark) .chatDate {
+  color: #9ca3af;
+}
+
+.actionButton {
+  width: 100%;
+  padding: 10px 16px;
+  background-color: #76B900;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin-top: 8px;
+}
+
+.actionButton:hover {
+  background-color: #669f00;
+}
+
+.refreshButton {
+  padding: 6px 12px;
+  background-color: #e2e8f0;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+:global(.dark) .refreshButton {
+  background-color: #374151;
+  color: #e5e7eb;
+}
+
+.refreshButton:hover {
+  background-color: #cbd5e0;
+}
+
+:global(.dark) .refreshButton:hover {
+  background-color: #4b5563;
+}
+
+.refreshButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.buttonGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.uploadDocumentsButton {
+  padding: 8px 12px;
+  background-color: #76B900;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-weight: 500;
+}
+
+.uploadDocumentsButton:hover {
+  background-color: #669f00;
+}
+
+:global(.dark) .uploadDocumentsButton {
+  background-color: #76B900;
+}
+
+:global(.dark) .uploadDocumentsButton:hover {
+  background-color: #669f00;
+}
+
+.sourcesContainer {
+  margin-top: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 8px;
+}
+
+:global(.dark) .sourcesContainer {
+  background-color: #374151;
+  border-color: #4b5563;
+}
+
+.sourceItem {
+  display: flex;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.sourceItem input[type="checkbox"] {
+  margin-right: 8px;
+}
+
+.sourceItem label {
+  font-size: 14px;
+  cursor: pointer;
+}
+
+:global(.dark) .sourceItem label {
+  color: #e5e7eb;
+}
+
+.noSources {
+  color: #718096;
+  font-size: 14px;
+  padding: 8px 0;
+}
+
+:global(.dark) .noSources {
+  color: #9ca3af;
+}
+
+.modelSelect {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  background-color: #f9fafb;
+  font-size: 0.875rem;
+  color: #4a5568;
+  width: 100%;
+  margin-top: 4px;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23007CB2%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px top 50%;
+  background-size: 12px auto;
+}
+
+:global(.dark) .modelSelect {
+  background-color: #374151;
+  border-color: #4b5563;
+  color: #e5e7eb;
+}
+
+.modelSelect:hover {
+  border-color: #cbd5e0;
+}
+
+:global(.dark) .modelSelect:hover {
+  border-color: #6b7280;
+}
+
+.modelSelect:focus {
+  outline: none;
+  border-color: #76B900;
+  box-shadow: 0 0 0 3px rgba(118, 185, 0, 0.2);
+}
+
+:global(.dark) .modelSelect:focus {
+  box-shadow: 0 0 0 3px rgba(118, 185, 0, 0.4);
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    width: 280px;
+  }
+}
+
+.newChatButton {
+  width: 100%;
+  padding: 12px;
+  background-color: #76B900;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(118, 185, 0, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.newChatButton::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.1);
+  transform: translate(-50%, -50%) scale(0);
+  border-radius: 50%;
+  transition: transform 0.5s ease;
+}
+
+.newChatButton:hover {
+  background-color: #669f00;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(118, 185, 0, 0.3);
+}
+
+.newChatButton:hover::before {
+  transform: translate(-50%, -50%) scale(2);
+}
+
+:global(.dark) .newChatButton {
+  box-shadow: 0 2px 8px rgba(118, 185, 0, 0.4);
+}
+
+:global(.dark) .newChatButton:hover {
+  box-shadow: 0 4px 12px rgba(118, 185, 0, 0.5);
+}
+
+.newChatButton svg {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.3s ease;
+}
+
+.newChatButton:hover svg {
+  transform: rotate(90deg);
+}
+
+.chatButtonsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.clearChatsButton {
+  width: 100%;
+  padding: 12px;
+  background-color: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.clearChatsButton:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+  box-shadow: none;
+  color: #d1d5db;
+}
+
+.clearChatsButton:disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.clearChatsButton::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.1);
+  transform: translate(-50%, -50%) scale(0);
+  border-radius: 50%;
+  transition: transform 0.5s ease;
+}
+
+.clearChatsButton:hover:not(:disabled) {
+  background-color: #b91c1c;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+}
+
+.clearChatsButton:hover:not(:disabled)::before {
+  transform: translate(-50%, -50%) scale(2);
+}
+
+:global(.dark) .clearChatsButton {
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.4);
+}
+
+:global(.dark) .clearChatsButton:hover:not(:disabled) {
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.5);
+}
+
+:global(.dark) .clearChatsButton:disabled {
+  background-color: #4b5563;
+  color: #6b7280;
+}
+
+.clearChatsButton svg {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.3s ease;
+}
+
+.clearChatsButton:hover:not(:disabled) svg {
+  transform: scale(1.1);
+}
+
+:global(.dark) .chatItem:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+:global(.dark) .chatList::before {
+  background: rgba(118, 185, 0, 0.15);
+  border-color: rgba(118, 185, 0, 0.3);
+} 

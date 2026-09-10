@@ -1,0 +1,14 @@
+#!/usr/bin/env sh
+set -eu
+
+if [ -n "${DGX_ASSIST_BIN:-}" ]; then
+    exec "$DGX_ASSIST_BIN" "$@"
+fi
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+PROJECT_CLI="$SCRIPT_DIR/../../../../.dgx-station/bin/dgx-assist"
+if [ -x "$PROJECT_CLI" ]; then
+    exec "$PROJECT_CLI" "$@"
+fi
+printf '%s\n' 'dgx-assist is not installed for this project; rerun assets/install.sh install' >&2
+exit 127

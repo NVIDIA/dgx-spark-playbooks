@@ -1,0 +1,24 @@
+data:
+  dataset_id: data
+hyperparameters:
+  batch_size: 4
+  correctness_reward: 5.0
+  enable_grpo: true
+  format_reward: 2.0
+  learning_rate: 1.0e-05
+  num_generations: 2
+  optimizer: adamw_torch
+  output_dir: saved_model
+  steps: 5
+model:
+  finetune_attention_modules: true
+  finetune_language_layers: true
+  finetune_mlp_modules: true
+  finetune_vision_layers: true
+  lora_config:
+    alpha: 64
+    dropout: 0.05
+    rank: 32
+  max_seq_length: 16384
+  model_id: unsloth/Qwen2.5-VL-7B-Instruct
+  use_lora: true

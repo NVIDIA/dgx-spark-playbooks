@@ -1,0 +1,8 @@
+bcrypt==5.0.0
+cffi==2.0.0
+cryptography==46.0.5
+invoke==2.2.1
+paramiko==4.0.0
+pycparser==3.0
+PyNaCl==1.6.2
+scp==0.15.0

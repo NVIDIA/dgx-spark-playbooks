@@ -1,0 +1,76 @@
+[project]
+name = "cufolio"
+version = "25.10"
+description = "Quantitative Portfolio Optimization developer example"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy==2.2.6",
+    "pandas==2.3.2",
+    "cvxpy==1.7.3",
+    "scikit-learn==1.7.1",
+    "seaborn==0.13.2",
+    "yfinance>=0.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black==25.9.0",
+    "isort",
+    "flake8",
+    "pre-commit==4.3.0",
+]
+cuda12 = [
+    "cuml-cu12==25.10.*",
+    "cuopt-cu12==25.10.*",
+]
+cuda13 = [
+    "cuml-cu13==25.10.*",
+    "cuopt-cu13==25.10.*",
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py310']
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.setuptools]
+packages = ["cufolio"]
+py-modules = []
+
+[tool.setuptools.package-dir]
+cufolio = "src"
+
+[tool.setuptools.package-data]
+"*" = ["*.csv", "*.pkl", "*.parquet"]
+
+[tool.uv]
+managed = true
+conflicts = [
+    [
+        { extra = "cuda12" },
+        { extra = "cuda13" },
+    ],
+]
+
+[[tool.uv.index]]
+name = "nvidia"
+url = "https://pypi.nvidia.com"
+
+[tool.uv.sources]
+cuml-cu12 = { index = "nvidia" }
+cuopt-cu12 = { index = "nvidia" }
+cuml-cu13 = { index = "nvidia" }
+cuopt-cu13 = { index = "nvidia" }
+
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.1.0",
+]

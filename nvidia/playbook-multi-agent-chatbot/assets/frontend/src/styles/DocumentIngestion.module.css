@@ -1,0 +1,136 @@
+/*
+# SPDX-FileCopyrightText: Copyright (c) 1993-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+*/
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+}}
+
+.section {
+  background: white;
+  color: black;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  width: 350px;
+  flex-shrink: 0;
+  animation: fadeIn 0.8s cubic-bezier(0.4,0.2,0.2,1) both; 
+}
+
+.ingestForm {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.uploadSection {
+  padding: 1.5rem;
+  border: 2px dashed #e2e8f0;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.2s;
+  /* background-color: #29526d;  */
+}
+
+.uploadSection:hover {
+  border-color: #4299e1;
+}
+
+.fileInput {
+  display: none;
+}
+
+/* choose files button*/
+.customFileLabel {
+  padding: 0.25rem 1rem;
+  background-color: #f5f6fa;
+  color: #222;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: background 0.2s, border 0.2s, color 0.2s;
+  font-size: 0.98rem;
+  margin-bottom: 0.5em;
+  display: inline-block;
+  text-align: center;
+}
+.customFileLabel:hover {
+  background-color: #ffffff;
+  color: #111;
+  border: 1px solid var(--primary);
+}
+.customFileLabel:active, .customFileLabel:focus {
+  outline: 2px solid #76B900;
+}
+
+.fileName {
+  display: block;
+  margin-top: 0.5em;
+  color: #222;
+  text-align: center;
+  font-size: 1rem;
+  margin-bottom: 0.5em;
+}
+
+.directoryInput {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 2px;
+  font-size: 1rem;
+}
+
+.helpText {
+  color: #718096;
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+  text-align: center;
+}
+
+.ingestButton {
+  padding: 0.75rem 1.5rem;
+  background-color: #48bb78;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.ingestButton:hover {
+  background-color: #38a169;
+}
+
+.ingestButton:disabled {
+  background-color: #cbd5e0;
+  cursor: not-allowed;
+}
+
+.messageContainer {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background-color: #f7fafc;
+} 

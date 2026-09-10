@@ -1,0 +1,484 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Import NVIDIA Build typography patterns with Inter font */
+@import url('../styles/nvidia-build-typography.css');
+
+:root {
+  --foreground-rgb: 255, 255, 255;
+  --background-rgb: 0, 0, 0;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: rgb(var(--background-rgb));
+  scroll-behavior: smooth;
+}
+
+/* Base page container styles */
+.container {
+  max-width: 90rem;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@media (min-width: 1024px) {
+  .container {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .animate-fadeIn {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+
+  /* NVIDIA green utility text color */
+  .text-nvidia-green {
+    color: hsl(var(--nvidia-green));
+  }
+
+  /* Accent color for native form controls (checkbox/radio) */
+  .selection-accent {
+    accent-color: hsl(var(--nvidia-green));
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* Venture-backed startup modern tab styles */
+  .startup-tabs {
+    @apply relative max-w-4xl mx-auto p-1.5 bg-black/5 dark:bg-white/5 
+           backdrop-blur-lg border border-white/10 dark:border-white/5 
+           rounded-full shadow-xl overflow-hidden;
+  }
+  
+  .startup-tab-indicator {
+    @apply absolute h-full bg-primary/5 dark:bg-primary/10 rounded-full 
+           transition-all duration-300 ease-out;
+    margin: 4px;
+    height: calc(100% - 8px);
+  }
+  
+  .startup-tab {
+    @apply flex-1 flex items-center justify-center gap-3 py-3 font-medium 
+           z-10 text-sm transition-all duration-200 hover:text-primary/90;
+    letter-spacing: 0.01em;
+  }
+  
+  .startup-tab-active {
+    @apply text-primary font-semibold;
+    position: relative;
+  }
+  
+  .startup-tab-active::after {
+    content: "";
+    position: absolute;
+    bottom: -2px;
+    left: 25%;
+    width: 50%;
+    height: 2px;
+    @apply bg-primary rounded-full;
+  }
+  
+  .startup-tab-icon {
+    @apply flex items-center justify-center w-8 h-8 rounded-full 
+           bg-gradient-to-br from-primary/20 to-primary/5 text-primary;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  }
+  
+  .startup-tab-active .startup-tab-icon {
+    @apply from-primary/30 to-primary/15;
+    transform: scale(1.05);
+  }
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 7%;
+    --foreground: 0 0% 98%;
+
+    --card: 0 0% 9%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 98%;
+
+    /* Use NVIDIA green as the brand primary in dark mode */
+    --primary: 81 100% 36%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 65%;
+
+    --accent: 0 0% 12%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 18%;
+    --input: 0 0% 18%;
+    --ring: 81 100% 36%;
+
+    --radius: 0.75rem;
+
+    --nvidia-green: 81 100% 36%;
+    --nvidia-green-dark: 81 100% 30%;
+    --nvidia-green-light: 81 100% 42%;
+  }
+
+  .light {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 9%;
+
+    --card: 0 0% 98%;
+    --card-foreground: 0 0% 9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 9%;
+
+    /* Use a more subtle primary in light mode */
+    --primary: 81 60% 45%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 0 0% 9%;
+
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 210 40% 96%;
+    --accent-foreground: 0 0% 9%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 214 32% 80%;
+
+    --radius: 0.75rem;
+
+    --nvidia-green: 81 100% 36%;
+    --nvidia-green-dark: 81 100% 30%;
+    --nvidia-green-light: 81 100% 42%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Modern UI Elements */
+.glass-card {
+  @apply bg-card/80 backdrop-blur-md shadow-xl;
+  border: 1px solid;
+  border-color: rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+}
+
+.light .glass-card {
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow: 0 6px 14px -6px rgba(0, 0, 0, 0.10);
+}
+
+.glass-card:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 16px 20px -6px rgba(0, 0, 0, 0.10), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+}
+
+.light .glass-card:hover {
+  border-color: rgba(0, 0, 0, 0.15);
+}
+
+.glass-card h2 {
+  letter-spacing: 0.01em;
+}
+
+.glass-card p {
+  line-height: 1.6;
+}
+
+.gradient-border {
+  position: relative;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.gradient-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+  padding: 1px;
+  background: linear-gradient(
+    to right,
+    hsl(var(--nvidia-green)),
+    hsl(var(--nvidia-green-light)),
+    hsl(var(--nvidia-green-dark))
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.gradient-text {
+  background: linear-gradient(to right, hsl(var(--nvidia-green)), hsl(var(--nvidia-green-light)));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;
+}
+
+.gradient-bg {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--nvidia-green-dark)) 0%,
+    hsl(var(--nvidia-green)) 50%,
+    hsl(var(--nvidia-green-light)) 100%
+  );
+}
+
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px -6px rgba(0, 0, 0, 0.10), 0 6px 8px -6px rgba(0, 0, 0, 0.08);
+}
+
+.animate-glow {
+  animation: glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes glow {
+  from {
+    box-shadow: 0 0 5px rgba(118, 185, 0, 0.2), 0 0 10px rgba(118, 185, 0, 0.1);
+  }
+  to {
+    box-shadow: 0 0 10px rgba(118, 185, 0, 0.3), 0 0 20px rgba(118, 185, 0, 0.2);
+  }
+}
+
+/* Modern Table Styles */
+.modern-table {
+  @apply w-full border-collapse;
+}
+
+.modern-table th {
+  @apply p-2 text-left font-medium text-muted-foreground text-xs md:text-sm tracking-wide;
+}
+
+.modern-table td {
+  @apply p-2 text-foreground text-sm;
+}
+
+.modern-table tr {
+  @apply border-b border-border/50 transition-colors;
+}
+
+.modern-table tbody tr:hover {
+  @apply bg-muted/30;
+}
+
+/* Light mode row selection highlight using NVIDIA green */
+.light .row-selected {
+  background-color: hsl(var(--nvidia-green) / 0.08);
+}
+
+.light .row-selected:hover {
+  background-color: hsl(var(--nvidia-green) / 0.12);
+}
+
+/* Slider Styles */
+.slider-thumb::-webkit-slider-thumb {
+  appearance: none;
+  height: 18px;
+  width: 18px;
+  border-radius: 50%;
+  background: hsl(var(--nvidia-green));
+  border: 2px solid hsl(var(--background));
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.slider-thumb::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.slider-thumb::-moz-range-thumb {
+  height: 18px;
+  width: 18px;
+  border-radius: 50%;
+  background: hsl(var(--nvidia-green));
+  border: 2px solid hsl(var(--background));
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.slider-thumb::-moz-range-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Button Styles */
+.btn-primary {
+  @apply px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md text-sm 
+         hover:bg-primary/90 transition-colors flex items-center gap-2 shadow-md;
+}
+
+.btn-secondary {
+  @apply px-4 py-2 bg-secondary text-secondary-foreground font-medium rounded-md text-sm 
+         hover:bg-secondary/90 transition-colors flex items-center gap-2;
+}
+
+.btn-outline {
+  @apply px-4 py-2 bg-transparent border border-border text-foreground font-medium rounded-md text-sm 
+         hover:bg-muted transition-colors flex items-center gap-2;
+}
+
+.btn-destructive {
+  @apply px-4 py-2 bg-destructive/20 text-destructive font-medium rounded-md text-sm 
+         hover:bg-destructive/30 transition-colors flex items-center gap-2;
+}
+
+.btn-icon {
+  @apply p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors;
+}
+
+/* Dropdown Menu Fixes */
+.dropdown-menu {
+  max-height: 80vh;
+  overflow-y: auto;
+  z-index: 50;
+}
+
+.dropdown-container {
+  position: relative;
+}
+
+/* Light mode: soften elevation globally to reduce heavy shadows */
+.light .shadow-sm { box-shadow: 0 1px 2px rgba(0,0,0,0.06) !important; }
+.light .shadow, 
+.light .shadow-md { box-shadow: 0 2px 6px rgba(0,0,0,0.08) !important; }
+.light .shadow-lg { box-shadow: 0 6px 14px -6px rgba(0,0,0,0.10) !important; }
+.light .shadow-xl { box-shadow: 0 10px 18px -8px rgba(0,0,0,0.12) !important; }
+.light .shadow-2xl { box-shadow: 0 12px 22px -10px rgba(0,0,0,0.14) !important; }
+
+/* Light mode: tune specific custom elements */
+.light .glass-card:hover { box-shadow: 0 10px 18px -8px rgba(0,0,0,0.12) !important; }
+.light .startup-tab-icon { box-shadow: 0 1px 3px rgba(0,0,0,0.06) !important; }
+
+/* Progress bar indeterminate animation - smooth sliding with gradient shine */
+@keyframes progress {
+  0% {
+    width: 0%;
+    margin-left: 0%;
+  }
+  50% {
+    width: 40%;
+    margin-left: 30%;
+  }
+  100% {
+    width: 0%;
+    margin-left: 100%;
+  }
+}
+
+.animate-progress {
+  animation: progress 1.8s ease-in-out infinite;
+}
+
+/* Progress bar shimmer effect for determinate progress */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.progress-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.15) 50%,
+    transparent 100%
+  );
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+/* Enhanced skeleton shimmer with directional sweep */
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 25%,
+    hsl(var(--muted-foreground) / 0.08) 50%,
+    hsl(var(--muted)) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+/* Pulse animation for status indicators */
+@keyframes status-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.95);
+  }
+}
+
+.status-pulse {
+  animation: status-pulse 2s ease-in-out infinite;
+}

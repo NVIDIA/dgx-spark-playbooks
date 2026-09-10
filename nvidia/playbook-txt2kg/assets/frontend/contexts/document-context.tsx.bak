@@ -1,0 +1,341 @@
+"use client"
+
+import type React from "react"
+
+import { createContext, useContext, useState, useEffect } from "react"
+import { type Triple, processTextWithChunking, triplesToGraph } from "@/utils/text-processing"
+import { useRouter } from "next/navigation"
+
+export type Document = {
+  id: string
+  name: string
+  status: "New" | "Processing" | "Processed" | "Error"
+  uploadStatus: "Uploading" | "Uploaded"
+  size: string
+  file: File
+  content?: string
+  triples?: Triple[]
+  graph?: {
+    nodes: Array<{ id: string; label: string }>
+    edges: Array<{ source: string; target: string; label: string }>
+  }
+  error?: string
+  rawResponse?: string
+  chunkCount?: number
+}
+
+type DocumentContextType = {
+  documents: Document[]
+  addDocuments: (files: File[]) => void
+  deleteDocuments: (documentIds: string[]) => void
+  clearDocuments: () => void
+  processDocuments: () => Promise<void>
+  isProcessing: boolean
+  updateTriples: (documentId: string, triples: Triple[]) => void
+  addTriple: (documentId: string, triple: Triple) => void
+  editTriple: (documentId: string, index: number, triple: Triple) => void
+  deleteTriple: (documentId: string, index: number) => void
+  openGraphVisualization: (documentId?: string) => Promise<void>
+}
+
+const DocumentContext = createContext<DocumentContextType | undefined>(undefined)
+
+export function DocumentProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
+  const [documents, setDocuments] = useState<Document[]>([])
+  const [isInitialized, setIsInitialized] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [apiKey, setApiKey] = useState<string | null>(null)
+
+  // Load API key from localStorage on client-side only
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedApiKey = localStorage.getItem("XAI_API_KEY");
+      if (storedApiKey) {
+        setApiKey(storedApiKey);
+      }
+    }
+  }, []);
+
+  // Load from localStorage on client-side only
+  useEffect(() => {
+    if (!isInitialized) {
+      try {
+        const savedDocuments = localStorage.getItem('txt2kg_documents')
+        if (savedDocuments) {
+          const parsedDocuments = JSON.parse(savedDocuments)
+          
+          // Reconstruct documents with placeholder File objects
+          const reconstructedDocs = parsedDocuments.map((doc: any) => {
+            // Create a blob from the content if available
+            let file: File;
+            if (doc.content) {
+              // Create a File object from the content string we previously saved
+              const blob = new Blob([doc.content], { type: 'text/plain' });
+              file = new File([blob], doc.name, { type: 'text/plain' });
+            } else {
+              // Create an empty placeholder if no content is available
+              file = new File([], doc.name, { type: 'text/plain' });
+            }
+            
+            return {
+              ...doc,
+              file
+            };
+          });
+          
+          console.log(`Restored ${reconstructedDocs.length} documents from localStorage`);
+          setDocuments(reconstructedDocs);
+        }
+      } catch (error) {
+        console.error('Error loading documents from localStorage:', error);
+      }
+      
+      setIsInitialized(true);
+    }
+  }, [isInitialized]);
+
+  // Save documents to localStorage whenever they change, but only after initialization
+  useEffect(() => {
+    if (isInitialized) {
+      try {
+        if (documents.length > 0) {
+          // Serialize documents for localStorage storage
+          // We need to ensure large documents don't exceed localStorage limits
+          // Focus on saving processed data (triples & graph) rather than raw content for large files
+          const documentsToSave = documents.map(doc => {
+            // Don't save content for very large documents to avoid localStorage limits
+            // But keep it for smaller ones to avoid reprocessing
+            const shouldSaveContent = !doc.content || doc.content.length < 100000;
+            
+            return {
+              ...doc,
+              // Omit the actual File object as it can't be serialized
+              file: {
+                name: doc.file.name,
+                size: doc.file.size,
+                type: doc.file.type
+              },
+              // Only include content for smaller documents
+              content: shouldSaveContent ? doc.content : undefined
+            };
+          });
+          
+          localStorage.setItem('txt2kg_documents', JSON.stringify(documentsToSave));
+          console.log(`Saved ${documents.length} documents to localStorage`);
+        } else {
+          // Clear localStorage if documents array is empty
+          localStorage.removeItem('txt2kg_documents');
+          console.log('Cleared documents from localStorage');
+        }
+      } catch (error) {
+        console.error('Error saving documents to localStorage:', error);
+      }
+    }
+  }, [documents, isInitialized])
+
+  const addDocuments = (files: File[]) => {
+    const newDocuments = files.map((file) => ({
+      id: crypto.randomUUID(),
+      name: file.name,
+      status: "New" as const,
+      uploadStatus: "Uploaded" as const,
+      size: (file.size / 1024).toFixed(2), // Convert to KB
+      file,
+    }))
+
+    setDocuments((prev) => [...prev, ...newDocuments])
+  }
+
+  const deleteDocuments = (documentIds: string[]) => {
+    setDocuments((prev) => prev.filter((doc) => !documentIds.includes(doc.id)))
+  }
+
+  const clearDocuments = () => {
+    setDocuments([])
+  }
+
+  const updateDocumentStatus = (id: string, status: Document["status"], updates: Partial<Document> = {}) => {
+    setDocuments((prev) => prev.map((doc) => (doc.id === id ? { ...doc, status, ...updates } : doc)))
+  }
+
+  const updateTriples = (documentId: string, triples: Triple[]) => {
+    setDocuments((prev) =>
+      prev.map((doc) => {
+        if (doc.id === documentId) {
+          const graph = triplesToGraph(triples)
+          return { ...doc, triples, graph }
+        }
+        return doc
+      }),
+    )
+  }
+
+  const addTriple = (documentId: string, triple: Triple) => {
+    setDocuments((prev) =>
+      prev.map((doc) => {
+        if (doc.id === documentId && doc.triples) {
+          const newTriples = [...doc.triples, triple]
+          const graph = triplesToGraph(newTriples)
+          return { ...doc, triples: newTriples, graph }
+        }
+        return doc
+      }),
+    )
+  }
+
+  const editTriple = (documentId: string, index: number, triple: Triple) => {
+    setDocuments((prev) =>
+      prev.map((doc) => {
+        if (doc.id === documentId && doc.triples) {
+          const newTriples = [...doc.triples]
+          newTriples[index] = triple
+          const graph = triplesToGraph(newTriples)
+          return { ...doc, triples: newTriples, graph }
+        }
+        return doc
+      }),
+    )
+  }
+
+  const deleteTriple = (documentId: string, index: number) => {
+    setDocuments((prev) =>
+      prev.map((doc) => {
+        if (doc.id === documentId && doc.triples) {
+          const newTriples = doc.triples.filter((_, i) => i !== index)
+          const graph = triplesToGraph(newTriples)
+          return { ...doc, triples: newTriples, graph }
+        }
+        return doc
+      }),
+    )
+  }
+
+  const readFileContent = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = (e) => resolve(e.target?.result as string)
+      reader.onerror = (e) => reject(e)
+      reader.readAsText(file)
+    })
+  }
+
+  const extractTriplesFromChunk = async (chunk: string): Promise<Triple[]> => {
+    console.log(`Extracting triples from chunk of length: ${chunk.length}`)
+    
+    // Create headers with API key if available
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    }
+    
+    // Add API key to headers if available
+    if (apiKey) {
+      headers["X-API-Key"] = apiKey
+    }
+
+    const response = await fetch("/api/extract-triples", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ text: chunk }),
+    })
+
+    console.log("API response status:", response.status)
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      console.error("API error:", data)
+      
+      // Handle specific API key errors
+      if (data.code === "API_KEY_MISSING" || data.code === "API_KEY_INVALID") {
+        console.error("API key issue:", data.error)
+        
+        // Show the API key prompt modal
+        if (typeof window !== 'undefined' && 'showApiKeyPrompt' in window) {
+          // @ts-ignore - This is defined globally in the ApiKeyPrompt component
+          window.showApiKeyPrompt()
+        }
+        
+        throw new Error(`API key error: ${data.error}`)
+      }
+      
+      throw new Error(data.error || "Failed to extract triples")
+    }
+
+    console.log("API response data:", data)
+    console.log("Triples count:", data.triples?.length || 0)
+
+    return data.triples || []
+  }
+
+  const processDocuments = async () => {
+    if (isProcessing) return
+    setIsProcessing(true)
+    console.log("Starting document processing...")
+
+    try {
+      // Process each document that is in "New" status
+      const newDocs = documents.filter((doc) => doc.status === "New")
+      console.log(`Processing ${newDocs.length} new documents`)
+
+      for (const doc of newDocs) {
+        try {
+          console.log(`Processing document: ${doc.name}`)
+          // Update status to Processing
+          updateDocumentStatus(doc.id, "Processing")
+
+          // Read file content
+          const content = await readFileContent(doc.file)
+          console.log(`Read content from ${doc.name}, length: ${content.length}`)
+
+          // Extract triples using chunking for large documents
+          const chunkSize = 4000 // Adjust based on model's context window
+          const overlapSize = 200
+
+          // Process the text with chunking
+          const triples = await processTextWithChunking(content, extractTriplesFromChunk, chunkSize, overlapSize)
+
+          console.log(`Extracted ${triples.length} triples from ${doc.name}`)
+
+          // Convert triples to graph
+          const graph = triplesToGraph(triples)
+          console.log(`Created graph with ${graph.nodes.length} nodes and ${graph.edges.length} edges`)
+
+          // Update document with content, triples and graph
+          updateDocumentStatus(doc.id, "Processed", {
+            content,
+            triples,
+            graph,
+            chunkCount: content.length > chunkSize ? Math.ceil(content.length / (chunkSize - overlapSize)) : 1,
+          })
+          console.log(`Document ${doc.name} processed successfully`)
+        } catch (error) {
+          console.error(`Error processing document ${doc.name}:`, error)
+          updateDocumentStatus(doc.id, "Error", {
+            error: error instanceof Error ? error.message : "Unknown error",
+          })
+        }
+      }
+    } finally {
+      setIsProcessing(false)
+      console.log("Document processing completed")
+    }
+  }
+
+  const openGraphVisualization = async (documentId?: string) => {
+    // Find the document to visualize
+    const doc = documentId
+      ? documents.find((d) => d.id === documentId && d.status === "Processed" && d.triples && d.triples.length > 0)
+      : documents.find((d) => d.status === "Processed" && d.triples && d.triples.length > 0)
+
+    if (!doc || !doc.triples) {
+      console.warn("No suitable document found for graph visualization")
+      return
+    }
+
+    try {
+      // Always store in localStorage as a backup
+      localStorage.setItem("graphTriples", JSON.stringify(doc.triples))
+      localStorage.setItem("graphDocumentName", doc.name)
+
+      console.log(`

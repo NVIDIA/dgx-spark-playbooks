@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv
+env/
+venv/
+volumes/
+*.pyc
+.DS_Store
+app.log
+uploads/
+indices/
+models/
+backend/.python-version
+backend/config.json
+
+# frontend
+frontend/node_modules/
+frontend/.next/
+frontend/build/
+node_modules/

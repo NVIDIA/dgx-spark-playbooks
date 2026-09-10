@@ -1,0 +1,21 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install required packages
+RUN pip install --no-cache-dir \
+    aiohttp \
+    asyncio \
+    statistics
+
+# Copy benchmark script
+COPY vllm_llama3_benchmark.py /app/
+
+# Create results directory
+RUN mkdir -p /app/results
+
+# Make script executable
+RUN chmod +x /app/vllm_llama3_benchmark.py
+
+# Default command
+CMD ["python", "/app/vllm_llama3_benchmark.py", "--url", "http://vllm-llama3-8b:8001", "--output", "/app/results/benchmark_results.json"]
