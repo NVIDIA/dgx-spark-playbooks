@@ -20,10 +20,11 @@ cd ComfyUI/
 echo "=== Installing ComfyUI dependencies ==="
 pip3 install -r requirements.txt
 
-echo "=== Downloading DreamShaper 8 checkpoint ==="
-cd models/checkpoints/
-wget -nc https://huggingface.co/Lykon/DreamShaper/resolve/main/DreamShaper_8_pruned.safetensors
-cd ../../
+echo "=== Downloading Z-Image-Turbo models (about 20 GB) ==="
+BASE=https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files
+wget -nc -P models/diffusion_models/ "$BASE/diffusion_models/z_image_turbo_bf16.safetensors"
+wget -nc -P models/text_encoders/ "$BASE/text_encoders/qwen_3_4b.safetensors"
+wget -nc -P models/vae/ "$BASE/vae/ae.safetensors"
 
 echo "=== Setup complete. ==="
 echo "To start the server, run the launch.sh command from the playbook."
