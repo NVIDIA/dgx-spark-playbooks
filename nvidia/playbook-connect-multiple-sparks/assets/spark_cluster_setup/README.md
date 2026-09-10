@@ -9,7 +9,7 @@ Clone the client-hardware-playbooks repo from GitHub
 ### Step 2. Switch to the multi spark cluster setup scripts directory
 
 ```bash
-cd client-hardware-playbooks/nvidia/playbook-connect-multiple-sparks/assets/spark_cluster_setup
+cd ${GITLAB_REPO_NAME}/nvidia/playbook-connect-multiple-sparks/assets/spark_cluster_setup
 ```
 
 ### Step 3. Create or edit a JSON config file with your cluster information

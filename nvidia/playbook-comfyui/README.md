@@ -29,7 +29,7 @@ ComfyUI is an open-source, node-based web application for AI image and video gen
 
 Install and run ComfyUI on your hardware platform, then generate images (and optionally video) from a browser UI on port 8188.
 
-Start with the **Image Gen Quick Start** tab for a lighter host Python install with Stable Diffusion 1.5. Use the **Video Gen Workflow** tab for container-based FLUX / Wan / HunyuanVideo / Cosmos / ControlNet workflows.
+Start with the **Image Gen Quick Start** tab for a lighter host Python install with Z-Image-Turbo. Use the **Video Gen Workflow** tab for container-based FLUX / Wan / HunyuanVideo / Cosmos / ControlNet workflows.
 
 ## What to know before starting
 
@@ -58,7 +58,7 @@ Use the matrix below to confirm your hardware platform, OS, memory, and whether 
 **Hardware requirements**
 
 - Supported hardware platform — see Supported hardware platforms matrix above
-- Image Gen Quick Start (host Python): at least ~20 GB free disk; ~8 GB GPU memory for Stable Diffusion–class models
+- Image Gen Quick Start (host Python): at least ~30 GB free disk; ~24 GB GPU memory for Z-Image-Turbo (12 GB diffusion model plus an 8 GB text encoder, before activations)
 - Video Gen Workflow (container + tiered models): at least ~70 GB free disk for Tier 1 (~230 GB for all tiers); peak GPU memory about **~80 GB / ~100 GB / ~120 GB** for Tiers 1–3 (see that tab)
 
 **Software requirements**
@@ -86,13 +86,13 @@ For Image Gen Quick Start, clone [ComfyUI on GitHub](https://github.com/comfyano
   - Model downloads are large and may fail due to network or auth issues
   - Port 8188 must be reachable for the web UI
 - **Rollback:** Remove the virtual environment and clone (Image Gen Quick Start), or stop/remove the container and optionally delete `models/` (Video Gen Workflow) — non-destructive to the host OS
-- **Last Updated:** 07/27/2026
-  - Image Gen Quick Start and Video Gen Workflow tabs; start with image gen, then scale to tiered video models
+- **Last Updated:** 09/10/2026
+  - Image Gen Quick Start now uses the Z-Image-Turbo template
 
 ## Image Gen Quick Start
 
 > [!NOTE]
-> These instructions target **Linux**. This tab is a lightweight host Python install for Stable Diffusion–class image generation — a good first try on any supported hardware platform. For FLUX, Wan, HunyuanVideo, Cosmos, and playbook workflows, continue to the **Video Gen Workflow** tab.
+> These instructions target **Linux**. This tab is a lightweight host Python install for Z-Image-Turbo text-to-image generation — a good first try on any supported hardware platform. For FLUX, Wan, HunyuanVideo, Cosmos, and playbook workflows, continue to the **Video Gen Workflow** tab.
 
 ## Quick start (optional)
 
@@ -164,15 +164,17 @@ pip install -r requirements.txt
 
 This installs all necessary dependencies including web interface components and model handling libraries.
 
-## Step 6. Download model checkpoint that will be used in Step 9
+## Step 6. Download the models that will be used in Step 9
+
+Z-Image-Turbo ships as three separate files — a diffusion model, a text encoder, and a VAE — each in its own directory under `models/`.
 
 ```bash
-cd models/checkpoints/
-wget https://huggingface.co/Lykon/DreamShaper/resolve/main/DreamShaper_8_pruned.safetensors
-cd ../../
+wget -P models/diffusion_models/ https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/diffusion_models/z_image_turbo_bf16.safetensors
+wget -P models/text_encoders/ https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/text_encoders/qwen_3_4b.safetensors
+wget -P models/vae/ https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/vae/ae.safetensors
 ```
 
-The download will be approximately 2GB and may take several minutes depending on network speed.
+The downloads total about 20 GB (12 GB diffusion model, 8 GB text encoder, 335 MB VAE) and may take several minutes depending on network speed.
 
 ## Step 7. Launch ComfyUI server
 
@@ -210,12 +212,15 @@ Test the installation with a basic image generation workflow:
    > - **Windows:** Set your network profile to **Private** (not Public) so the device can reach others on the network. See [Make a Wi-Fi network public or private in Windows](https://support.microsoft.com/en-us/help/4043043/windows-10-make-network-public-private).
 2. Load a starter workflow:
    1. Click **Templates** on the left side of the menu (skip this if the template window pops up automatically)
-   2. Choose **Getting Started** on the left side of the template window
-   3. Choose **1.1 Starter-Text to Image**
+   2. Choose **Image** on the left side of the template window
+   3. Choose **Z-Image-Turbo: Text to Image**, the first template
    4. Click the **Run** button at the top right
 3. Monitor GPU usage with `nvidia-smi` in a separate terminal
 
 The image generation should complete within 30 seconds.
+
+> [!NOTE]
+> This is also how the Step 6 downloads were determined, and how to adapt these instructions to any other template. A template whose weights are missing reports each one as an error naming both the Hugging Face source and the `models/` subdirectory it belongs in (`diffusion_models/`, `text_encoders/`, `vae/`, and so on). Open the link in a browser, click **Copy download link**, and `wget` it into that directory.
 
 ## Step 10. Optional - Cleanup and rollback
 
@@ -243,7 +248,7 @@ To rollback during installation, press `Ctrl+C` to stop the server and remove th
 > | **2 — Intermediate** | ~180 GB | ~100 GB |
 > | **3 — Advanced** | ~230 GB | ~120 GB (Hunyuan 1080p) |
 >
-> Match the tier to your hardware platform’s available memory. On unified-memory platforms, start with Tier 1 and reduce resolution or frame count if you hit memory pressure. For a lighter Stable Diffusion–only start (~8 GB class), use the **Image Gen Quick Start** tab.
+> Match the tier to your hardware platform’s available memory. On unified-memory platforms, start with Tier 1 and reduce resolution or frame count if you hit memory pressure. For a lighter single-image start (~24 GB class), use the **Image Gen Quick Start** tab.
 
 ## Step 1. Verify your environment
 
