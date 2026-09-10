@@ -5,16 +5,12 @@
 ## Table of Contents
 
 - [Overview](#overview)
-- [Two Sparks Stacked Topology](#two-sparks-stacked-topology)
-- [Three Sparks Ring Topology](#three-sparks-ring-topology)
-  - [Option 1: Automatically configure SSH](#option-1-automatically-configure-ssh)
-  - [Option 2: Manually discover and configure SSH](#option-2-manually-discover-and-configure-ssh)
-- [Multiple Sparks Through Switch Topology](#multiple-sparks-through-switch-topology)
-  - [Step 3.1. Verify negotiated Link speed](#step-31-verify-negotiated-link-speed)
-  - [4.1 Script for Cluster networking configuration](#41-script-for-cluster-networking-configuration)
-  - [4.2 Manual Cluster networking configuration](#42-manual-cluster-networking-configuration)
-  - [Option 1: Automatically configure SSH](#option-1-automatically-configure-ssh)
-  - [Option 2: Manually discover and configure SSH](#option-2-manually-discover-and-configure-ssh)
+- [Connect the Devices](#connect-the-devices)
+  - [Two-device direct link](#two-device-direct-link)
+  - [Three-device direct ring](#three-device-direct-ring)
+  - [Two-to-four-device switch](#two-to-four-device-switch)
+- [Configure with NVIDIA Sync](#configure-with-nvidia-sync)
+- [Configure Manually](#configure-manually)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -23,975 +19,361 @@
 
 ## Basic idea
 
-Configure multiple nodes of multi-node capable hardware for high-speed inter-node
-communication using 200GbE QSFP connections. Choose a **stacked** (two nodes),
-**ring** (three nodes), or **switch** (two or more nodes) topology. This setup
-enables distributed workloads by establishing network connectivity and configuring
-SSH authentication.
+You can connect two or more DGX Spark devices into a high-speed cluster to run workloads that won't fit on a single device. Configuring the cluster takes more than just plugging in cables. Setting up the DGX Spark ConnectX-7 network by hand has many steps and can be confusing.
 
-> [!TIP]
-> **Recommended setup:** Use [NVIDIA Sync Cluster Assistant](https://docs.nvidia.com/sync/latest/cluster-assistant.html) for supported DGX Spark clusters: two or three directly connected systems, or two to four systems connected through a switch. After the QSFP cabling is in place, Cluster Assistant configures the ConnectX-7 network, validates the links, and sets up inter-device SSH.
->
-> If Cluster Assistant reports that setup completed successfully, do not repeat the manual network or SSH configuration in this playbook. Continue to your workload playbook, such as [NCCL](https://build.nvidia.com/playbooks/nccl). Use the topology tabs here only when you need a manual setup path or troubleshooting. For compatibility with downstream helper scripts, choose to standardize user information when Cluster Assistant prompts you.
+This playbook shows you how to create a cluster of two to four DGX Spark devices with the NVIDIA Sync Cluster Assistant ([see demo video](https://www.youtube.com/watch?v=MehBUQtb9qM)).
+NVIDIA Sync streamlines the software and network configuration so you can get to a functioning cluster without configuring each device from a terminal.
+
+When you finish, choose a workload playbook to set up on your cluster.
+
 
 ## What you'll accomplish
 
-You'll physically connect multi-node capable hardware platforms with QSFP cables,
-configure network interfaces for cluster communication, and establish passwordless
-SSH between nodes to create a functional distributed computing environment.
-
-Pick the tab that matches your topology:
-
-- **Two Sparks Stacked Topology** — direct QSFP link between two nodes
-- **Three Sparks Ring Topology** — three-node ring over QSFP without a switch
-- **Multiple Sparks Through Switch Topology** — expandable cluster through a managed QSFP switch
+- You will physically connect your devices directly with QSFP cables or through a switch and QSFP cables.
+- You will use [NVIDIA Sync Cluster Assistant](https://docs.nvidia.com/sync/latest/cluster-assistant.html) to set up and test the ConnectX-7 network.
 
 ## What to know before starting
 
 **Required:**
 
-- Basic understanding of distributed computing concepts
-- Working with network interface configuration and netplan
-- Experience with SSH key management
+- How to [plug a QSFP cable into a DGX Spark or GB10 device](https://docs.nvidia.com/dgx/dgx-spark/spark-clustering.html#plugging-in-a-qsfp-cable)
+- Access to the switch settings and the switch maker's setup guide, if you use a switch
+- How to [set up a DGX Spark or GB10 device](https://docs.nvidia.com/dgx/dgx-spark/first-boot.html) on the same network as the computer that runs NVIDIA Sync
 
-**Optional (switch topology only):**
+**Suggested:**
 
-- Experience configuring a managed QSFP network switch (ports, bridging, link speed, MTU). Refer to your switch manuals to:
-  - Connect to the switch for port and feature management
-  - Enable or disable QSFP ports and create a software bridge
-  - Configure link speed manually and disable auto-negotiation if needed
-  - Configure MTU on the switch ports
+- A basic grasp of [ConnectX-7 networking](https://docs.nvidia.com/dgx/dgx-spark/spark-clustering.html)
 
 ## Supported hardware platforms
 
-Use the matrix below to confirm your hardware platform, recommended default local settings, and whether multi-node applies.
+Check the table below to see if this playbook is for your hardware.
 
 | Hardware platform | OS | Memory | Recommended default local settings | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- | :---- |
-| **DGX Spark** | DGX OS (Linux) | 128 GB Unified Memory | Stacked, ring, or switch QSFP (200GbE); netplan + passwordless SSH | ✅ (QSFP) |
+| **DGX Spark** | DGX OS (Linux) | 128 GB Unified Memory | Direct or switch QSFP links | ✅ (200GbE QSFP) |
 
 ## Prerequisites
 
 **Hardware requirements**
 
-- Supported hardware platform — see Supported hardware platforms matrix above
-- Multiple multi-node capable hardware platforms (two for stacked; three for ring; two or more for switch)
-- One QSFP cable per node for 200GbE connection. Use a [recommended QSFP cable](https://marketplace.nvidia.com/en-us/enterprise/personal-ai-supercomputers/qsfp-cable-0-4m-for-dgx-spark/) or similar
-- The same username on all systems
-- Switch topology only: a managed QSFP56-DD / QSFP56 switch that can provide 200Gbps to each node
+- Two to four DGX Spark or GB10 devices
+- The QSFP cables listed for your layout in **Connect the Devices**
+- A switch with one 200 Gbit/s Ethernet link for each device, if you use a switch. Some 400 Gbit/s ports must be split into 200 Gbit/s ports before you set up the cluster.
 
 **Software requirements**
 
-- SSH access available to all systems
-- Root or sudo access on all systems: `sudo whoami`
-- All systems updated to the latest OS and firmware (see Resources)
-- Network tooling for interface discovery: `ibdev2netdev`
-- `avahi-utils` on all systems, for the automatic SSH setup option: `avahi-browse --version`
+- Each device must be on the same local network as your laptop, and you must know its IP address or mDNS name
+- You must have a user name and password with `sudo` privileges on each device
+- Each DGX Spark or GB10 device is updated to the [April 2026 DGX OS release](https://docs.nvidia.com/dgx/dgx-spark/release-notes.html#april-2026-release)
 
 ## Ancillary files
 
-All required assets are in [this playbook's assets folder](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/playbook-connect-multiple-sparks/assets).
+These files are **only** needed if you follow the manual instructions.
+You can find them in [this playbook's assets folder](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/playbook-connect-multiple-sparks/assets).
 
-- [`discover-sparks`](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/playbook-connect-multiple-sparks/assets/discover-sparks) — automatic node discovery and SSH key distribution
-- [`spark_cluster_setup`](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/playbook-connect-multiple-sparks/assets/spark_cluster_setup) — automatic network configuration, validation, and NCCL sanity test
-- [`performance_benchmarking_guide.md`](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/playbook-connect-multiple-sparks/assets/performance_benchmarking_guide.md) — performance benchmarking guidance
+- [`discover-sparks`](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/playbook-connect-multiple-sparks/assets/discover-sparks) — node discovery and SSH key setup for the manual path
+- [`spark_cluster_setup`](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/playbook-connect-multiple-sparks/assets/spark_cluster_setup) — network setup, SSH setup, and an NCCL test for the manual path
 
 ## Time & risk
 
-- **Estimated time:** 2 HOURS including validation
-- **Risk level:** Medium
-  - Involves network reconfiguration on every node
-  - Switch topology also depends on correct switch port and bridge configuration
-- **Rollback:** Network changes can be reversed by removing netplan configs or IP assignments (see Cleanup in each topology tab)
-- **Last Updated:** 08/12/2026
-  - Added NVIDIA Sync Cluster Assistant as the recommended setup path and clarified when to skip manual configuration
+- **Estimated time:** 10 minutes using NVIDIA Sync
+- **Risk level:** Low with NVIDIA Sync; medium with manual setup
+- **Rollback:** Delete the cluster in NVIDIA Sync. For manual setup, follow the rollback steps in **Configure Manually**.
+- **Last Updated:** 09/09/2026
+  - Made NVIDIA Sync the main path and moved cabling into its own tab.
 
-## Two Sparks Stacked Topology
+## Connect the Devices
 
-> [!TIP]
-> **Use NVIDIA Sync Cluster Assistant (recommended).** For a two-Spark direct cluster, follow the [Cluster Assistant guide](https://docs.nvidia.com/sync/latest/cluster-assistant.html) instead of the manual network and SSH setup below. Choose to standardize user information when prompted so downstream helper scripts can use the same username on both systems.
->
-> If Cluster Assistant reports that setup completed successfully, skip this manual tab and continue to the [NCCL playbook](https://build.nvidia.com/playbooks/nccl) or your workload playbook. Use the steps below only for manual setup or troubleshooting.
+## Step 1. Pick a cluster layout
 
-## Step 1. Ensure the same username on both systems
+Pick one layout before you connect the cables.
 
-On both systems check the username and make sure it's the same:
+| Devices | Layout | Cables |
+| --- | --- | --- |
+| Two | Direct | One cable between the devices |
+| Three | Direct ring | Three cables; each device links to the other two |
+| Two, three, or four | Switch | One cable and one 200 Gbit/s link from each device to the switch |
 
-```bash
-## Check current username
-whoami
-```
+Do not mix direct and switch links. Use only one cable for each link. Four devices require a switch.
 
-If usernames don't match, create a new user (e.g., nvidia) on both systems and login in with the new user:
+## Step 2. Check the devices and cables
 
-```bash
-## Create nvidia user and add to sudo group
-sudo useradd -m nvidia
-sudo usermod -aG sudo nvidia
+1. Turn on each DGX Spark.
+2. Make sure each device is on the same local network as the computer that runs NVIDIA Sync.
+3. Update each device to the current DGX Spark system software.
+4. Use a supported QSFP112 DAC cable in Ethernet mode. See [QSFP ports and cables](https://docs.nvidia.com/dgx/dgx-spark/spark-clustering.html#the-qsfp-ports-and-cables) for the approved cable list.
+5. Place the devices within reach of the cables.
 
-## Set password for nvidia user
-sudo passwd nvidia
+## Step 3. Connect your layout
 
-## Switch to nvidia user
-su - nvidia
-```
+Use these steps each time you plug in a cable:
 
-## Step 2. Physical hardware connection
-
-Connect the QSFP cable between both DGX Spark systems using any QSFP interface
-on each device. Make sure to use the same physical port on each device to prevent issues with NCCL tests.
-This establishes the 200GbE direct connection required for high-speed inter-node communication.
-Upon connection between the two nodes, you will see an output like the one below: in this example
-the interfaces showing as 'Up' are **enp1s0f1np1** / **enP2p1s0f1np1** (each physical port has two logical interface).
-
-Example output:
-```bash
-## Check QSFP interface availability on both nodes
-nvidia@dxg-spark-1:~$ ibdev2netdev
-roceP2p1s0f0 port 1 ==> enP2p1s0f0np0 (Down)
-roceP2p1s0f1 port 1 ==> enP2p1s0f1np1 (Up)
-rocep1s0f0 port 1 ==> enp1s0f0np0 (Down)
-rocep1s0f1 port 1 ==> enp1s0f1np1 (Up)
-```
-
-> [!NOTE] 
-> If none of the interfaces are showing as 'Up', please check the QSFP cable connection, reboot the systems and try again.
-> The interfaces showing as 'Up' depend on which port you are using to connect the two nodes. Each physical port has two logical interfaces, for example, enp1s0f1np1 and enP2p1s0f1np1 refer to the same physical port.
-
-## Step 3. Network interface configuration
-
-Choose one option to setup the network interfaces. Option 1 and 2 are mutually exclusive.
-
-> [!NOTE] 
-> Full bandwidth can be achieved with just one QSFP cable.
-> When two QSFP cables are connected, all four interfaces must be assigned IP addresses to obtain full bandwidth.
-
-**Option 1: Manual IP Assignment with the netplan configure file**
-
-On node 1:
-```bash
-## Create the netplan configuration file
-sudo tee /etc/netplan/40-cx7.yaml > /dev/null <<EOF
-network:
-  version: 2
-  ethernets:
-    enp1s0f1np1:
-      addresses:
-        - 192.168.100.10/24
-      dhcp4: no
-    enP2p1s0f1np1:
-      addresses:
-        - 192.168.101.10/24
-      dhcp4: no
-EOF
-
-## Set appropriate permissions
-sudo chmod 600 /etc/netplan/40-cx7.yaml
-
-## Apply the configuration
-sudo netplan apply
-```
-
-On node 2:
-```bash
-## Create the netplan configuration file
-sudo tee /etc/netplan/40-cx7.yaml > /dev/null <<EOF
-network:
-  version: 2
-  ethernets:
-    enp1s0f1np1:
-      addresses:
-        - 192.168.100.11/24
-      dhcp4: no
-    enP2p1s0f1np1:
-      addresses:
-        - 192.168.101.11/24
-      dhcp4: no
-EOF
-
-## Set appropriate permissions
-sudo chmod 600 /etc/netplan/40-cx7.yaml
-
-## Apply the configuration
-sudo netplan apply
-```
-
-
-**Option 2: Manual IP Assignment with command line**
-
-> [!NOTE]
-> Using this option, the IPs assigned to the interfaces will change if you reboot the system.
-
-Use the "(Up)" interfaces. In this example, we'll use **enp1s0f1np1** and **enP2p1s0f1np1**.
-
-On Node 1:
-```bash
-## Assign static IP and bring up interface.
-sudo ip addr add 192.168.100.10/24 dev enp1s0f1np1
-sudo ip link set enp1s0f1np1 up
-
-sudo ip addr add 192.168.101.10/24 dev enP2p1s0f1np1
-sudo ip link set enP2p1s0f1np1 up
-```
-
-Repeat the same process for Node 2, but using IP **192.168.100.11/24** and **192.168.101.11/24**. Ensure to use the correct interface name using `ibdev2netdev` command.
-```bash
-## Assign static IP and bring up interface.
-sudo ip addr add 192.168.100.11/24 dev enp1s0f1np1
-sudo ip link set enp1s0f1np1 up
-
-sudo ip addr add 192.168.101.11/24 dev enP2p1s0f1np1
-sudo ip link set enP2p1s0f1np1 up
-```
-
-You can verify the IP assignment on both nodes by running the following command on each node:
-```bash
-## Check the interfaces showing as "(Up)" in your output, eg. enp1s0f1np1 and enP2p1s0f1np1
-ip addr show enp1s0f1np1
-ip addr show enP2p1s0f1np1
-```
-
-## Step 4. Set up passwordless SSH authentication
-
-#### Option 1: Automatically configure SSH
-
-Run the DGX Spark [**discover-sparks.sh**](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/playbook-connect-multiple-sparks/assets/discover-sparks) script from one of the nodes to automatically discover and configure SSH:
-
-```bash
-bash ./discover-sparks
-```
-
-Expected output similar to the below, with different IPs and node names. The first time you run the script, you'll be prompted for your password for each node.
-```
-Found: 192.168.100.10 (dgx-spark-1.local)
-Found: 192.168.100.11 (dgx-spark-2.local)
-
-Setting up bidirectional SSH access (local <-> remote nodes)...
-You may be prompted for your password for each node.
-
-SSH setup complete! Both local and remote nodes can now SSH to each other without passwords.
-```
-
-> [!NOTE]
-> If you encounter any errors, please follow Option 2 below to manually configure SSH and debug the issue.
-
-#### Option 2: Manually discover and configure SSH
-
-You will need to find the IP addresses for the CX-7 interfaces that are up. On both nodes, run the following command to find the IP addresses and take note of them for the next step. You only need the IP address of one of the interfaces for configuring the SSH keys eg. **enp1s0f1np1**
-```bash
-  ip addr show enp1s0f1np1
-```
-
-Example output:
-```
-## In this example, we are using interface enp1s0f1np1.
-nvidia@dgx-spark-1:~$ ip addr show enp1s0f1np1
-    4: enp1s0f1np1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP group default qlen 1000
-        link/ether 3c:6d:66:cc:b3:b7 brd ff:ff:ff:ff:ff:ff
-        inet **192.168.100.10**/24 brd 192.168.100.255 scope global noprefixroute enp1s0f1np1
-          valid_lft forever preferred_lft forever
-        inet6 fe80::3e6d:66ff:fecc:b3b7/64 scope link
-          valid_lft forever preferred_lft forever
-```
-
-In this example, the IP address for Node 1 is **192.168.100.10**. Repeat the process for Node 2.
-
-On both nodes, run the following commands to enable passwordless SSH:
-```bash
-## Copy your SSH public key to both nodes. Please replace the IP addresses with the ones you found in the previous step.
-ssh-copy-id -i ~/.ssh/id_rsa.pub <username>@<IP for Node 1>
-ssh-copy-id -i ~/.ssh/id_rsa.pub <username>@<IP for Node 2>
-```
-
-## Step 5. Verify Multi-Node Communication
-
-Test basic multi-node functionality:
-
-```bash
-## Test hostname resolution across nodes
-ssh <IP for Node 1> hostname
-ssh <IP for Node 2> hostname
-```
-
-## Step 6. Cleanup and Rollback
+1. Turn each DGX Spark so that the back faces you.
+2. Pick either QSFP port. The ports work the same with NVIDIA Sync.
+3. Hold the cable with its pull tab facing up.
+4. Push the cable into the port until it is fully seated.
 
 > [!WARNING]
-> These steps will reset network configuration.
+> Do not force a cable into a port. If it does not slide in, stop and check the pull tab and port alignment.
 
-```bash
-## Rollback network configuration (if using Option 1) on both nodes.
-sudo rm /etc/netplan/40-cx7.yaml
-sudo netplan apply
+See [Plugging in a QSFP Cable](https://docs.nvidia.com/dgx/dgx-spark/spark-clustering.html#plugging-in-a-qsfp-cable) for a port image and more help.
 
-## Rollback network configuration (if using Option 2) on both nodes.
-## Node 1:
-sudo ip addr del 192.168.100.10/24 dev enp1s0f1np1  # Adjust the interface name to the one you used in step 3.
-sudo ip addr del 192.168.101.10/24 dev enP2p1s0f1np1  # Adjust the interface name to the one you used in step 3.
+Choose only one of the layouts below.
 
-## Node 2:
-sudo ip addr del 192.168.100.11/24 dev enp1s0f1np1  # Adjust the interface name to the one you used in step 3.
-sudo ip addr del 192.168.101.11/24 dev enP2p1s0f1np1  # Adjust the interface name to the one you used in step 3.
-```
+### Two-device direct link
 
-## Three Sparks Ring Topology
+Connect one device to the other with one QSFP cable.
 
-> [!TIP]
-> **Use NVIDIA Sync Cluster Assistant (recommended).** For a three-Spark direct ring, follow the [Cluster Assistant guide](https://docs.nvidia.com/sync/latest/cluster-assistant.html) instead of the manual network and SSH setup below. Choose to standardize user information when prompted so downstream helper scripts can use the same username on every system.
->
-> If Cluster Assistant reports that setup completed successfully, skip this manual tab and continue to the [NCCL playbook](https://build.nvidia.com/playbooks/nccl) or your workload playbook. Use the steps below only for manual setup or troubleshooting.
+### Three-device direct ring
 
-## Step 1. Ensure the same username on all systems
+Use three QSFP cables to make a ring:
 
-On all systems check the username and make sure it's the same:
+1. Connect device 1 to device 2.
+2. Connect device 2 to device 3.
+3. Connect device 3 to device 1.
 
-```bash
-## Check current username
-whoami
-```
+Each device in the ring should have one cable in each QSFP port.
 
-If usernames don't match, create a new user (e.g., nvidia) on all systems and log in with the new user:
+### Two-to-four-device switch
 
-```bash
-## Create nvidia user and add to sudo group
-sudo useradd -m nvidia
-sudo usermod -aG sudo nvidia
+Set up the switch before you run NVIDIA Sync:
 
-## Set password for nvidia user
-sudo passwd nvidia
-
-## Switch to nvidia user
-su - nvidia
-```
-
-## Step 2. Physical hardware connection
-
-Connect the QSFP cables between the three DGX Spark systems in a ring topology.
-Here, Port0 is the CX7 port next to the Ethernet port and Port1 is the CX7 port further away from it.
-1. Node1 (Port0) to Node2 (Port1)
-2. Node2 (Port0) to Node3 (Port1)
-3. Node3 (Port0) to Node1 (Port1)
+1. Check that the switch, ports, and cables support 200 Gbit/s Ethernet links.
+2. Set each Spark-facing port for 200 Gbit/s. A 400 Gbit/s port may need to be split into two 200 Gbit/s ports.
+3. Put all Spark-facing ports on the same Layer 2 network. Depending on the switch, this may be a bridge or VLAN.
+4. If the switch reports hardware-offload status, confirm that the Spark-facing ports use the switch chip instead of the switch CPU.
+5. Keep the default MTU for switch connections.
+6. Apply or save the switch configuration.
 
 > [!NOTE]
-> Double check that the connections are correct otherwise the network configuration might fail.
+> Changing how a high-speed port is split may restart other links that use the same port group. Set the port mode before you rely on those links.
 
-This establishes the 200GbE direct connection required for high-speed inter-node communication.
-Upon connection between the three nodes, you will see an output like the one below on all nodes: in this example the interface showing as 'Up' is **enp1s0f0np0** / **enP2p1s0f0np0** and **enp1s0f1np1** / **enP2p1s0f1np1** (each physical port has two logical interfaces).
+Connect and check the devices:
 
-Example output:
-```bash
-## Check QSFP interface availability on all nodes
-nvidia@dgx-spark-1:~$ ibdev2netdev
-rocep1s0f0 port 1 ==> enp1s0f0np0 (Up)
-rocep1s0f1 port 1 ==> enp1s0f1np1 (Up)
-roceP2p1s0f0 port 1 ==> enP2p1s0f0np0 (Up)
-roceP2p1s0f1 port 1 ==> enP2p1s0f1np1 (Up)
-```
+1. Connect one QSFP cable from each DGX Spark to the switch.
+2. Check the switch interface for each Spark.
+3. Confirm that each link is up at 200 Gbit/s.
+4. If a link is down or runs at the wrong speed, check the cable type, port mode, auto-negotiation, and FEC.
 
-> [!NOTE] 
-> If all of the interfaces are not showing as 'Up', please check the QSFP cable connection, reboot the systems and try again.
+Switch settings and port names differ by maker and model. Follow the switch maker's guide for the exact steps. Do not use commands written for a different switch model.
 
-## Step 3. Network interface configuration
+For MikroTik CRS804 and CRS812 switches, see [MikroTik wired interface compatibility](https://help.mikrotik.com/docs/spaces/ROS/pages/220233794/MikroTik%2Bwired%2Binterface%2Bcompatibility) and [MikroTik bridge configuration](https://help.mikrotik.com/docs/spaces/ROS/pages/328068/Bridging%2Band%2BSwitching).
 
-Choose one option to set up the network interfaces. The options are mutually exclusive. Option 1 is recommended to avoid complexity of network setup.
+## Step 4. Continue with NVIDIA Sync
 
-> [!NOTE] 
-> Each CX7 port provides full 200GbE bandwidth.
-> In a three node ring topology all four interfaces on each node must be assigned an IP address to form a symmetric cluster.
+Follow **Configure with NVIDIA Sync**. NVIDIA Sync will check the devices and detected layout before it sets up the cluster network.
 
-**Option 1: Automatic IP Assignment with script**
+## Configure with NVIDIA Sync
 
-We have created a script [here on GitHub](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/playbook-connect-multiple-sparks/assets/spark_cluster_setup) which automates the following:
-1. Interface network configuration for all DGX Sparks
-2. Set up passwordless authentication between the DGX Sparks
-3. Verify multi-node communication
-4. Run NCCL Bandwidth tests
+## Step 1. Make sure the devices are properly connected
+
+Follow the instructions in the **Connect the Devices** tab.
+
+## Step 2. Install NVIDIA Sync on your laptop
+
+Install NVIDIA Sync on your Windows, macOS, or Ubuntu laptop.
+
+::spark-download
+
+- **Windows:** Open the `.exe` file and follow the setup steps.
+- **macOS:** Open `nvidia-sync.dmg`, move NVIDIA Sync to the Applications folder, and open it.
+- **Ubuntu:** Follow the [NVIDIA Sync install guide](https://docs.nvidia.com/sync/latest/getting-started.html#installation-and-onboarding).
+
+## Step 3. Add each DGX Spark to NVIDIA Sync
+
+Make sure your laptop can reach each DGX Spark on the local network.
+
+For each device:
+
+1. Open NVIDIA Sync and select **Add New**.
+2. Pick the device if its mDNS name appears. If it does not, select **Add device manually**.
+3. Enter the device name or IP address, user name, and password.
+4. Select **Add**.
+
+Each DGX Spark should now appear in NVIDIA Sync.
+
+## Step 4. Start the NVIDIA Sync Cluster Assistant
+
+1. Open **Settings**.
+2. Select **Cluster Assistant**.
+3. Select **Add New Cluster**.
+4. Name the cluster.
+5. Pick the devices that you connected.
+
+## Step 5. NVIDIA Sync checks the devices
+
+After you select the devices, NVIDIA Sync checks:
+
+- SSH access
+- The hardware and system software
+- `sudo` access
+
+If a required check fails, fix the issue and try again.
+
+If `sudo` requires a password, enter the password for that device. NVIDIA Sync uses the password for setup and does not save or log it.
+
+NVIDIA Sync also compares the user name, user ID, and group ID on each device. Matching values are optional, but they can make later work easier. Choose whether to make them match, then go on.
+
+## Step 6. NVIDIA Sync checks the physical connections and network plan
+
+Once the device checks are complete, NVIDIA Sync checks:
+
+- The detected ConnectX-7 interfaces and cables
+- The negotiated speed of each link
+- The current network setup and any changes it must make
+
+If NVIDIA Sync finds the wrong layout, check the cables in **Connect the Devices** and try again.
+
+Review the network plan. If NVIDIA Sync will change the network, or if a link is not set to 200 Gbit/s, it will tell you.
+
+Select **Confirm Network Configuration** to apply the plan.
+
+## Step 7. NVIDIA Sync tests each link
+
+NVIDIA Sync runs a speed test on each link. A link turns green when it meets the 184 Gbit/s lower bound.
+
+If a link does not pass, fix the cable or switch setting and select **Run Test Again**. You can go on after a warning, but the cluster may run below its best speed.
+
+## Step 8. NVIDIA Sync sets up inter-device SSH
+
+Let NVIDIA Sync set up key-based SSH between the devices. It adds an SSH alias for each device.
+
+This step can take a few minutes. If one device times out after five minutes, try the step again.
+
+## Step 9. Save the cluster details to a text file
+
+When NVIDIA Sync shows the success page:
+
+1. Select **Copy** to copy the network details.
+2. Save the details in a file for later use.
+3. Select **See Example Workloads**.
+
+The ConnectX-7 network and inter-device SSH are now ready.
+
+## Next steps
+
+Set up a workload on the cluster:
+
+- [NCCL](https://build.nvidia.com/playbooks/nccl)
+- [Fine-tune with PyTorch](https://build.nvidia.com/spark/multi-sparks-distributed-finetuning)
+- [vLLM](https://build.nvidia.com/spark/vllm)
+
+Cluster Assistant sets up the network. It does not install or run the workload.
+
+## Delete the cluster with NVIDIA Sync
+
+Delete the cluster before you change its devices or cable layout:
+
+1. Open **Settings** in NVIDIA Sync.
+2. Select **Clusters**.
+3. Pick the cluster.
+4. Open the overflow menu (**...**).
+5. Select **Delete**.
+
+This removes the node-to-node SSH setup and the cluster from NVIDIA Sync.
+
+## Configure Manually
 
 > [!NOTE]
-> If you use the script steps below, you can skip rest of the setup instructions in this playbook.
+> Use this tab to configure the cluster without NVIDIA Sync. The helper changes the network and SSH settings on each device. It also installs the tools needed for an NCCL test and runs that test.
 
-Use the steps below to run the script:
+## Step 1. Connect the devices
+
+Follow **Connect the Devices** for your direct, ring, or switch layout.
+
+If you use a switch, set it up before you run the helper. Put all device ports in one Layer 2 bridge and make sure each link can run at 200 Gbit/s.
+
+## Step 2. Get the cluster setup files
+
+On one DGX Spark, clone this repo and open the helper folder:
 
 ```bash
-## Clone the repository
 git clone https://github.com/NVIDIA/dgx-spark-playbooks
-
-## Enter the script directory
 cd client-hardware-playbooks/nvidia/playbook-connect-multiple-sparks/assets/spark_cluster_setup
-
-## Check the README.md for steps to run the script and configure the cluster networking
 ```
 
-**Option 2: Manual IP Assignment with the netplan configuration file**
+## Step 3. Add the device login details
 
-On node 1:
-```bash
-## Create the netplan configuration file
-sudo tee /etc/netplan/40-cx7.yaml > /dev/null <<EOF
-network:
-  version: 2
-  ethernets:
-    enp1s0f0np0:
-      dhcp4: false
-      addresses:
-        - 192.168.0.1/24
-    enP2p1s0f0np0:
-      dhcp4: false
-      addresses:
-        - 192.168.1.1/24
-    enp1s0f1np1:
-      dhcp4: false
-      addresses:
-        - 192.168.2.1/24
-    enP2p1s0f1np1:
-      dhcp4: false
-      addresses:
-        - 192.168.3.1/24
-EOF
+Pick the sample file that matches the number of devices:
 
-## Set appropriate permissions
-sudo chmod 600 /etc/netplan/40-cx7.yaml
+- `config/spark_config_b2b.json` for two devices
+- `config/spark_config_ring.json` for three devices
+- `config/spark_config_switch.json` for four devices
 
-## Apply the configuration
-sudo netplan apply
-```
-
-On node 2:
-```bash
-## Create the netplan configuration file
-sudo tee /etc/netplan/40-cx7.yaml > /dev/null <<EOF
-network:
-  version: 2
-  ethernets:
-    enp1s0f0np0:
-      dhcp4: false
-      addresses:
-        - 192.168.4.1/24
-    enP2p1s0f0np0:
-      dhcp4: false
-      addresses:
-        - 192.168.5.1/24
-    enp1s0f1np1:
-      dhcp4: false
-      addresses:
-        - 192.168.0.2/24
-    enP2p1s0f1np1:
-      dhcp4: false
-      addresses:
-        - 192.168.1.2/24
-EOF
-
-## Set appropriate permissions
-sudo chmod 600 /etc/netplan/40-cx7.yaml
-
-## Apply the configuration
-sudo netplan apply
-```
-
-On node 3:
-```bash
-## Create the netplan configuration file
-sudo tee /etc/netplan/40-cx7.yaml > /dev/null <<EOF
-network:
-  version: 2
-  ethernets:
-    enp1s0f0np0:
-      dhcp4: false
-      addresses:
-        - 192.168.2.2/24
-    enP2p1s0f0np0:
-      dhcp4: false
-      addresses:
-        - 192.168.3.2/24
-    enp1s0f1np1:
-      dhcp4: false
-      addresses:
-        - 192.168.4.2/24
-    enP2p1s0f1np1:
-      dhcp4: false
-      addresses:
-        - 192.168.5.2/24
-EOF
-
-## Set appropriate permissions
-sudo chmod 600 /etc/netplan/40-cx7.yaml
-
-## Apply the configuration
-sudo netplan apply
-```
-
-## Step 4. Set up passwordless SSH authentication
-
-### Option 1: Automatically configure SSH
-
-Run the DGX Spark [**discover-sparks.sh**](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/playbook-connect-multiple-sparks/assets/discover-sparks) script from one of the nodes to automatically discover and configure SSH:
+Copy the sample to a new file. This example uses two devices:
 
 ```bash
-curl -O https://raw.githubusercontent.com/NVIDIA/client-hardware-playbooks/refs/heads/main/nvidia/playbook-connect-multiple-sparks/assets/discover-sparks
-bash ./discover-sparks
+cp config/spark_config_b2b.json config/my-cluster.json
 ```
 
-Expected output similar to the below, with different IPs and node names. You may see more than one IP for each node as four interfaces (**enp1s0f0np0**, **enP2p1s0f0np0**, **enp1s0f1np1** and **enP2p1s0f1np1**) have IP addresses assigned. This is expected and does not cause any issues. The first time you run the script, you'll be prompted for your password for each node.
-```
-Found: 192.168.0.1 (dgx-spark-1.local)
-Found: 192.168.0.2 (dgx-spark-2.local)
-Found: 192.168.3.2 (dgx-spark-3.local)
-
-Setting up bidirectional SSH access (local <-> remote nodes)...
-You may be prompted for your password for each node.
-
-SSH setup complete! All nodes can now SSH to each other without passwords.
-```
-
-> [!NOTE]
-> If you encounter any errors, please follow Option 2 below to manually configure SSH and debug the issue.
-
-### Option 2: Manually discover and configure SSH
-
-You will need to find the IP addresses for the CX-7 interfaces that are up. On all nodes, run the following command to find the IP addresses and take note of them for the next step.
-```bash
-  ip addr show enp1s0f0np0
-  ip addr show enp1s0f1np1
-```
-
-Example output:
-```
-## In this example, we are using interface enp1s0f1np1.
-nvidia@dgx-spark-1:~$ ip addr show enp1s0f1np1
-    4: enp1s0f1np1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP group default qlen 1000
-        link/ether 3c:6d:66:cc:b3:b7 brd ff:ff:ff:ff:ff:ff
-        inet **192.168.1.1**/24 brd 192.168.1.255 scope link noprefixroute enp1s0f1np1
-          valid_lft forever preferred_lft forever
-        inet6 fe80::3e6d:66ff:fecc:b3b7/64 scope link
-          valid_lft forever preferred_lft forever
-```
-
-In this example, the IP address for Node 1 is **192.168.1.1**. Repeat the process for other nodes.
-
-On all nodes, run the following commands to enable passwordless SSH:
-```bash
-## Copy your SSH public key to all nodes. Please replace the IP addresses with the ones you found in the previous step.
-ssh-copy-id -i ~/.ssh/id_rsa.pub <username>@<IP for Node 1>
-ssh-copy-id -i ~/.ssh/id_rsa.pub <username>@<IP for Node 2>
-ssh-copy-id -i ~/.ssh/id_rsa.pub <username>@<IP for Node 3>
-```
-
-## Step 5. Verify Multi-Node Communication
-
-Test basic multi-node functionality:
-
-```bash
-## Test hostname resolution across nodes
-ssh <IP for Node 1> hostname
-ssh <IP for Node 2> hostname
-ssh <IP for Node 3> hostname
-```
-
-## Step 6. Run NCCL tests
-
-Now your cluster is set up to run distributed workloads across three nodes. Try running the NCCL bandwidth test.
-
-Use the steps below to run the script which will run the NCCL test on the cluster:
-
-```bash
-## Clone the repository
-git clone https://github.com/NVIDIA/dgx-spark-playbooks
-
-## Enter the script directory
-cd client-hardware-playbooks/nvidia/playbook-connect-multiple-sparks/assets/spark_cluster_setup
-
-## Check the README.md in the script directory for steps to run the NCCL tests with "--run-nccl-test" option
-```
-
-## Step 7. Cleanup and Rollback
+Edit `config/my-cluster.json`. For each device, add its management IP address, SSH port, user name, and password.
 
 > [!WARNING]
-> These steps will reset network configuration.
+> The JSON file stores passwords as plain text. Keep the file private and delete it when setup is done.
+
+## Step 4. Check the cluster
+
+Run the checks before you change the network:
 
 ```bash
-## Rollback network configuration
-sudo rm /etc/netplan/40-cx7.yaml
-sudo netplan apply
+bash spark_cluster_setup.sh -c config/my-cluster.json --pre-validate-only
 ```
 
-## Multiple Sparks Through Switch Topology
+The check should end with `Pre-setup validations completed successfully.` Fix any error before you go on.
 
-> [!TIP]
-> **Use NVIDIA Sync Cluster Assistant (recommended for two to four Sparks).** For a supported switch-connected cluster, follow the [Cluster Assistant guide](https://docs.nvidia.com/sync/latest/cluster-assistant.html) instead of the manual network and SSH setup below. Configure the switch and cabling as described in that guide, and choose to standardize user information when prompted so downstream helper scripts can use the same username on every system.
->
-> If Cluster Assistant reports that setup completed successfully, skip this manual tab and continue to the [NCCL playbook](https://build.nvidia.com/playbooks/nccl) or your workload playbook. Cluster Assistant supports a maximum of four systems; use the manual steps below for larger clusters or for troubleshooting.
+## Step 5. Set up the cluster
 
-## Step 1. Ensure the same username on all systems
-
-On all systems check and make sure the usernames are the same:
+Run the helper from its own folder:
 
 ```bash
-## Check current username
-whoami
+bash spark_cluster_setup.sh -c config/my-cluster.json --run-setup
 ```
 
-If usernames don't match, create a new user (e.g., nvidia) on all systems and login in with the new user:
+The helper will:
+
+1. Check the devices and cable layout.
+2. Set IP addresses on the ConnectX-7 network.
+3. Set up key-based SSH between the devices.
+4. Check the links between the devices.
+5. Install the tools needed for the NCCL test and run it.
+
+The setup should print `Spark cluster setup completed successfully.` The test should then print `NCCL test completed.`
+
+## Step 6. Remove the password file
+
+After setup works, delete the JSON file that holds the passwords:
 
 ```bash
-## Create nvidia user and add to sudo group
-sudo useradd -m nvidia
-sudo usermod -aG sudo nvidia
-
-## Set password for nvidia user
-sudo passwd nvidia
-
-## Switch to nvidia user
-su - nvidia
+rm config/my-cluster.json
 ```
 
-## Step 2. Switch management
+## Next steps
 
-Most QSFP switches offer some form of management interface, either through CLI or UI. Refer to the documentation and connect to the management interface. Make sure that the ports on the switch are enabled. You will need to ensure that the switch is configured to provide 200Gbps connection to each DGX Spark. If not done already, refer to the [Overview](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/playbook-connect-multiple-sparks/overview) of this playbook for the prior knowledge and pre-requisites required for this playbook.
+Open the workload playbook you want to use. The [NCCL playbook](https://build.nvidia.com/playbooks/nccl) can run a fuller network test.
 
-## Step 3. Physical hardware connection
+## Roll back the manual setup
 
-Connect the QSFP cables between DGX Spark systems and the switch(QSFP56-DD/QSFP56 ports) using one CX7 port on each Spark system. It is recommended to use the same CX7 port on all Spark systems for easier network configuration and avoiding NCCL test failures. In this playbook the second port (the one further from the ethernet port) is used. This should establish the 200Gbps connection required for high-speed inter-node communication. You will see an output like the one below on all sparks. In this example the interfaces showing as 'Up' are **enp1s0f1np1** and **enP2p1s0f1np1** (each physical port has two logical interfaces).
+Follow [Inspect and Verify a ConnectX-7 Cluster Network Plan](https://docs.nvidia.com/sync/latest/cluster-network-inspection.html) to inspect the network before you remove its Netplan file.
 
-Example output:
-```bash
-## Check QSFP interface availability on all nodes
-nvidia@dxg-spark-1:~$ ibdev2netdev
-rocep1s0f0 port 1 ==> enp1s0f0np0 (Down)
-rocep1s0f1 port 1 ==> enp1s0f1np1 (Up)
-roceP2p1s0f0 port 1 ==> enP2p1s0f0np0 (Down)
-roceP2p1s0f1 port 1 ==> enP2p1s0f1np1 (Up)
-```
-
-> [!NOTE]
-> If none of the interfaces are showing as 'Up', please check the QSFP cable connection, reboot the systems and try again.
-> The interfaces showing as 'Up' depend on which port you are using to connect the nodes to the switch. Each physical port has two logical interfaces, for example, Port 1 has two interfaces - enp1s0f1np1 and enP2p1s0f1np1. Please disregard enp1s0f0np0 and enP2p1s0f0np0, and use enp1s0f1np1 and enP2p1s0f1np1 only.
-
-### Step 3.1. Verify negotiated Link speed
-
-The link speed might not default to 200Gbps with auto-negotiation. To confirm, run the command below on all sparks and check that the speed is shown as 200000Mb/s. If it shows lesser than that value, then the link speed needs to be set to 200Gbps manually in the switch port configuration and auto-negotiation should be disabled. Refer to the switch's manual/documentation to disable auto-negotiation and set the link speed manually to 200Gbps (eg. 200G-baseCR4)
-
-Example output:
-```bash
-nvidia@dxg-spark-1:~$ sudo ethtool enp1s0f1np1 | grep Speed
-	Speed: 100000Mb/s
-
-nvidia@dxg-spark-1:~$ sudo ethtool enP2p1s0f1np1 | grep Speed
-	Speed: 100000Mb/s
-```
-
-After setting the correct speed on the switch ports. Verify the link speed on all the DGX Sparks again.
-
-Example output:
-```bash
-nvidia@dxg-spark-1:~$ sudo ethtool enp1s0f1np1 | grep Speed
-	Speed: 200000Mb/s
-
-nvidia@dxg-spark-1:~$ sudo ethtool enP2p1s0f1np1 | grep Speed
-	Speed: 200000Mb/s
-```
-
-## Step 4. Network Interface Configuration
-
-> [!NOTE]
-> Full bandwidth can be achieved with just one QSFP cable.
-
-For a clustered setup, all DGX sparks:
-1. Should be accessible for management (eg. SSH and run commands)
-2. Should be able to access internet (eg. to download models/utilities)
-3. Should be able to talk to each other using TCP/IP over CX7. The steps below help configure that.
-
-It is recommended to use the Ethernet/WiFi network for management and internet traffic and keep it separate from the CX7 network to avoid CX7 bandwidth from being used for non-workload traffic.
-
-The supported way to configure a cluster with switch requires configuring a bridge (or using the default bridge) on the switch and adding all the ports of interest (ports connected to DGX sparks) to it through the switch management interface.
-1. This way, all ports are part of a single layer-2 domain which is required for cluster networking configuration
-2. Some switches have restriction that Hardware offloading can only be enabled on one bridge, so keeping all ports in a single bridge is required
-
-Once you are done creating/adding ports to the bridge, you should be ready to configure networking on the DGX Spark side.
-
-### 4.1 Script for Cluster networking configuration
-
-We have created a script [here on GitHub](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/playbook-connect-multiple-sparks/assets/spark_cluster_setup) which automates the following:
-1. Interface network IP configuration for all DGX Sparks
-2. Set up password-less authentication between the DGX Sparks
-3. Verify multi-node communication
-4. Run NCCL Bandwidth tests
-
-> [!NOTE]
-> You can use the script or continue with the manual configurations in the following sections. If you use the script, you can skip the rest of the setup sections in this playbook.
-
-Use the steps below to run the script:
-
-```bash
-## Clone the repository
-git clone https://github.com/NVIDIA/dgx-spark-playbooks
-
-## Enter the script directory
-cd client-hardware-playbooks/nvidia/playbook-connect-multiple-sparks/assets/spark_cluster_setup
-
-## Check the README.md in the script directory for steps to run the script and configure the cluster networking with "--run-setup" argument
-```
-
-### 4.2 Manual Cluster networking configuration
-
-In this case, you can choose one of the options to assign the IPs to the CX7 logical interfaces. Options 1 and 2 are mutually exclusive.
-1. DHCP server on the switch (recommended, if it is supported)
-2. Manual IP addressing (netplan will be different on each node but provides more control and deterministic IPs)
-
-#### Option 1: Configure DHCP server on the switch
-
-1. Configure the DHCP server on the switch with a subnet large enough to assign IPs to all sparks. A /24 subnet should work well for configuration and any future expansion.
-2. Configure the 'UP' CX7 interfaces in the DGX sparks to acquire IP using DHCP. For eg. if the logical interfaces **enp1s0f1np1** / **enP2p1s0f1np1** are 'UP' then create a netplan like below on all sparks.
-
-```bash
-## Create the netplan configuration file
-sudo tee /etc/netplan/40-cx7.yaml > /dev/null <<EOF
-network:
-  version: 2
-  ethernets:
-    enp1s0f1np1:
-      dhcp4: true
-    enP2p1s0f1np1:
-      dhcp4: true
-EOF
-
-## Set appropriate permissions
-sudo chmod 600 /etc/netplan/40-cx7.yaml
-
-## Apply the configuration
-sudo netplan apply
-```
-
-3. Confirm that the interfaces get IPs assigned
-
-```bash
-## In this example, we are using interface enp1s0f1np1. Similarly check enP2p1s0f1np1.
-nvidia@dgx-spark-1:~$ ip addr show enp1s0f1np1 | grep -w inet
-    inet 100.100.100.4/24 brd 100.100.100.255 scope global noprefixroute enp1s0f1np1
-```
-
-#### Option 2: Manual IP Assignment with the netplan configuration file
-
-> [!NOTE]
-> `enp1s0f1np1` and `enP2p1s0f1np1` are assigned to **different subnets** (`192.168.100.x/24` and `192.168.101.x/24` respectively). This is required — assigning two distinct network interfaces to the same subnet causes networking and software conflicts (e.g., routing ambiguity and NCCL communication failures).
-
-On node 1:
-```bash
-## Create the netplan configuration file
-sudo tee /etc/netplan/40-cx7.yaml > /dev/null <<EOF
-network:
-  version: 2
-  ethernets:
-    enp1s0f1np1:
-      addresses:
-        - 192.168.100.1/24
-      dhcp4: no
-    enP2p1s0f1np1:
-      addresses:
-        - 192.168.101.1/24
-      dhcp4: no
-EOF
-
-## Set appropriate permissions
-sudo chmod 600 /etc/netplan/40-cx7.yaml
-
-## Apply the configuration
-sudo netplan apply
-```
-
-On node 2:
-```bash
-## Create the netplan configuration file
-sudo tee /etc/netplan/40-cx7.yaml > /dev/null <<EOF
-network:
-  version: 2
-  ethernets:
-    enp1s0f1np1:
-      addresses:
-        - 192.168.100.2/24
-      dhcp4: no
-    enP2p1s0f1np1:
-      addresses:
-        - 192.168.101.2/24
-      dhcp4: no
-EOF
-
-## Set appropriate permissions
-sudo chmod 600 /etc/netplan/40-cx7.yaml
-
-## Apply the configuration
-sudo netplan apply
-```
-
-On node 3:
-```bash
-## Create the netplan configuration file
-sudo tee /etc/netplan/40-cx7.yaml > /dev/null <<EOF
-network:
-  version: 2
-  ethernets:
-    enp1s0f1np1:
-      addresses:
-        - 192.168.100.3/24
-      dhcp4: no
-    enP2p1s0f1np1:
-      addresses:
-        - 192.168.101.3/24
-      dhcp4: no
-EOF
-
-## Set appropriate permissions
-sudo chmod 600 /etc/netplan/40-cx7.yaml
-
-## Apply the configuration
-sudo netplan apply
-```
-
-On node 4:
-```bash
-## Create the netplan configuration file
-sudo tee /etc/netplan/40-cx7.yaml > /dev/null <<EOF
-network:
-  version: 2
-  ethernets:
-    enp1s0f1np1:
-      addresses:
-        - 192.168.100.4/24
-      dhcp4: no
-    enP2p1s0f1np1:
-      addresses:
-        - 192.168.101.4/24
-      dhcp4: no
-EOF
-
-## Set appropriate permissions
-sudo chmod 600 /etc/netplan/40-cx7.yaml
-
-## Apply the configuration
-sudo netplan apply
-```
-
-## Step 5. Set up passwordless SSH authentication
-
-### Option 1: Automatically configure SSH
-
-Run the DGX Spark [**discover-sparks.sh**](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/playbook-connect-multiple-sparks/assets/discover-sparks) script from one of the nodes to automatically discover and configure SSH:
-
-```bash
-curl -O https://raw.githubusercontent.com/NVIDIA/client-hardware-playbooks/refs/heads/main/nvidia/playbook-connect-multiple-sparks/assets/discover-sparks
-bash ./discover-sparks
-```
-
-Expected output similar to the below, with different IPs and node names. You may see up to two IPs for each node as two interfaces (eg. **enp1s0f1np1** and **enP2p1s0f1np1**) have IP addresses assigned. This is expected and does not cause any issues. The first time you run the script, you'll be prompted for your password for each node.
-```
-Found: 192.168.100.1 (dgx-spark-1.local)
-Found: 192.168.100.2 (dgx-spark-2.local)
-Found: 192.168.100.3 (dgx-spark-3.local)
-Found: 192.168.100.4 (dgx-spark-4.local)
-
-Setting up bidirectional SSH access (local <-> remote nodes)...
-You may be prompted for your password for each node.
-
-SSH setup complete! All local and remote nodes can now SSH to each other without passwords.
-```
-
-> [!NOTE]
-> If you encounter any errors, please follow Option 2 below to manually configure SSH and debug the issue.
-
-### Option 2: Manually discover and configure SSH
-
-You will need to find the IP addresses for the CX-7 interfaces that are up. On all nodes, run the following command to find the IP addresses and take note of them for the next step.
-```bash
-  ip addr show enp1s0f1np1
-```
-
-Example output:
-```
-## In this example, we are using interface enp1s0f1np1.
-nvidia@dgx-spark-1:~$ ip addr show enp1s0f1np1
-    4: enp1s0f1np1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP group default qlen 1000
-        link/ether 3c:6d:66:cc:b3:b7 brd ff:ff:ff:ff:ff:ff
-        inet **192.168.100.1**/24 brd 192.168.100.255 scope global noprefixroute enp1s0f1np1
-          valid_lft forever preferred_lft forever
-        inet6 fe80::3e6d:66ff:fecc:b3b7/64 scope link
-          valid_lft forever preferred_lft forever
-```
-
-In this example, the IP address for Node 1 is **192.168.100.1**. Repeat the process for other nodes.
-
-On all nodes, run the following commands to enable passwordless SSH:
-```bash
-## Copy your SSH public key to all nodes. Replace the IP addresses with the ones you found in the previous step.
-ssh-copy-id -i ~/.ssh/id_rsa.pub <username>@<IP for Node 1>
-ssh-copy-id -i ~/.ssh/id_rsa.pub <username>@<IP for Node 2>
-ssh-copy-id -i ~/.ssh/id_rsa.pub <username>@<IP for Node 3>
-ssh-copy-id -i ~/.ssh/id_rsa.pub <username>@<IP for Node 4>
-```
-
-## Step 6. Verify Multi-Node Communication
-
-Test basic multi-node functionality from the head node:
-
-```bash
-## Test hostname resolution across nodes
-ssh <IP for Node 1> hostname
-ssh <IP for Node 2> hostname
-ssh <IP for Node 3> hostname
-ssh <IP for Node 4> hostname
-```
-
-## Step 7. Running Tests and Workloads
-
-Now your cluster is set up to run distributed workloads across the nodes. Try running the [NCCL playbook](https://build.nvidia.com/spark/nccl/stacked-sparks).
-
-> [!NOTE]
-> Wherever the playbook asks to run a command on **two nodes**, just run it on **all nodes**.
-> Make sure to adapt the *mpirun* NCCL command which you run on the **head node** to accommodate **all nodes**. This example shows four nodes.
-
-Example mpirun command for NCCL:
-```bash
-## Set network interface environment variables (use your Up interface from the previous step)
-export UCX_NET_DEVICES=enp1s0f1np1
-export NCCL_SOCKET_IFNAME=enp1s0f1np1
-export OMPI_MCA_btl_tcp_if_include=enp1s0f1np1
-
-## Run the all_gather performance test across all nodes (eg. 4 nodes) (replace the IP addresses with the ones you found in the previous step)
-mpirun -np 4 -H <IP for Node 1>:1,<IP for Node 2>:1,<IP for Node 3>:1,<IP for Node 4>:1 \
-  --mca plm_rsh_agent "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" \
-  -x LD_LIBRARY_PATH=$LD_LIBRARY_PATH \
-  $HOME/nccl-tests/build/all_gather_perf
-```
-
-## Step 8. Cleanup and Rollback
-
-> [!WARNING]
-> These steps will reset network configuration.
-
-```bash
-## Rollback network configuration
-sudo rm /etc/netplan/40-cx7.yaml
-sudo netplan apply
-```
-
-> [!NOTE]
-> If disconnecting the switch, then make sure to do the following
-> 1. Re-enable auto-negotiation to avoid issues later if the switch is used for different purposes.
-> 2. Remove the DHCP server configuration on the switch if you used that to assign IPs to Sparks.
-> 3. If you created a new bridge, move the ports back to the default bridge and delete the new bridge.
+If you used a switch, also undo any port, bridge, DHCP, link speed, or MTU changes in the switch maker's tool.
 
 ## Troubleshooting
 
 ## Common issues
 
-The **Hardware platform** column shows where an issue is most relevant. "All hardware platforms" applies to every supported platform.
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| A device does not appear in NVIDIA Sync | The device is off, on another network, or cannot accept SSH connections | Turn on the device. Make sure it and the computer that runs NVIDIA Sync are on the same local network. Test direct SSH access. |
+| The GB10 check fails | The selected system is not a DGX Spark or GB10 device | Remove the unsupported system from the cluster. Cluster Assistant supports only DGX Spark and GB10 devices. |
+| The software check fails | A device has an old system release | Update each device. Cluster Assistant requires the April 2026 system release or later. |
+| The password check fails | NVIDIA Sync cannot use `sudo` on a device | Select **Fix Now** and enter the device password. Check that the user has `sudo` access. |
+| Cluster Assistant finds the wrong layout | A cable is loose, the layout is not supported, or the Spark-facing switch ports are not on the same Layer 2 network | Reseat each cable and compare the links with **Connect the Devices**. Do not mix direct and switch links. For a switch, check that every Spark-facing port is up and on the same Layer 2 network. Then run the layout check again. |
+| A switch link is down or is not 200 Gbit/s | The cable is not supported, the switch port uses the wrong mode, or the two ends do not agree on link settings | Check the cable and port mode. A 400 Gbit/s port may need to be split into two 200 Gbit/s ports. If the link stays down, check auto-negotiation and FEC in the switch maker's guide. |
+| The cluster connects but data transfer is slow | A link can report 200 Gbit/s while the switch sends traffic through its CPU or the link records errors | Check hardware-offload status, switch CPU use, and port error counters. Test traffic in both directions. If the issue remains, contact the switch maker or NVIDIA support. |
+| SSH setup times out | One device took more than five minutes | Retry the SSH step in Cluster Assistant. |
+| The manual pre-check fails | A management IP, SSH login, password, or `sudo` setting is wrong | Fix the value in `config/my-cluster.json`, test SSH to each management IP, and run `--pre-validate-only` again. |
+| No ConnectX-7 interface is up | A cable or port is not active | Reseat the cables, confirm the layout, reboot the devices, and run `ibdev2netdev` again. |
+| The manual helper reports an APT error | A package source or signing key is broken | Fix the APT source or key error on that device, then run the helper again. |
+| The NCCL test cannot load `libnccl.so.2` | NCCL is not ready on every device | Follow the [NCCL playbook](https://build.nvidia.com/playbooks/nccl) on every device, then run the test again. |
 
-| Symptom | Hardware platform | Cause | Fix |
-|---------|-------------------|-------|-----|
-| "Network unreachable" errors | All hardware platforms | Network interfaces not configured | Verify netplan config and run `sudo netplan apply` |
-| SSH authentication failures | All hardware platforms | SSH keys not properly distributed | Re-run `./discover-sparks` and enter passwords when prompted |
-| Nodes not visible in cluster | All hardware platforms | Network connectivity issue | Verify QSFP cable connection; check IP configuration with `ibdev2netdev` and `ip addr show` |
-| Discovery script fails writing keys | All hardware platforms | `~/.ssh` directory missing | Run `mkdir -p ~/.ssh && chmod 700 ~/.ssh` on all nodes, then retry |
-| Discovery script exits with `avahi-browse not found` | All hardware platforms | `avahi-utils` not installed | Install `avahi-utils` on all nodes, then re-run the script |
-| No interfaces show as `Up` | All hardware platforms | Cable or port issue | Reseat the QSFP cables, confirm topology wiring, reboot, and re-check `ibdev2netdev` |
-| "APT update" errors (for example, `E: The list of sources could not be read.`) | All hardware platforms | APT sources errors, conflicting sources, or signing keys | Check APT and Ubuntu documentation to fix the APT sources or keys conflicts |
-| NCCL test failures (for example, `libnccl.so.2: cannot open shared object file`) | All hardware platforms | NCCL not configured on all nodes | Follow the NCCL playbook on **all** nodes before running the NCCL test |
-
-For latest known issues, see the documentation linked under **Resources** for your hardware platform.
+For more Cluster Assistant help, see the [NVIDIA Sync troubleshooting guide](https://docs.nvidia.com/sync/latest/cluster-assistant.html#troubleshooting).

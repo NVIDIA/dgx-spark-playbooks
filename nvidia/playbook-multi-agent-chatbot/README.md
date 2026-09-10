@@ -114,7 +114,7 @@ newgrp docker
 
 ```bash
 git clone https://github.com/NVIDIA/dgx-spark-playbooks
-cd client-hardware-playbooks/nvidia/playbook-multi-agent-chatbot/assets
+cd dgx-spark-playbooks/nvidia/playbook-multi-agent-chatbot/assets
 ```
 
 ## Step 3. Run the model download script
