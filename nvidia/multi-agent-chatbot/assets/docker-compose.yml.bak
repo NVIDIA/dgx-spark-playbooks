@@ -37,7 +37,7 @@ services:
       - ETCD_ENDPOINTS=etcd:2379
       - MINIO_ADDRESS=minio:9000
       - MILVUS_ADDRESS=milvus:19530
-      - MODELS=gpt-oss-20b
+      - MODELS=gpt-oss-120b #,gpt-oss-20b
 
   frontend:
     container_name: frontend
