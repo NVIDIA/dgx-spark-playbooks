@@ -1,0 +1,125 @@
+{
+  "3": {
+    "inputs": {
+      "seed": 42,
+      "steps": 20,
+      "cfg": 6,
+      "sampler_name": "uni_pc",
+      "scheduler": "simple",
+      "denoise": 1.0,
+      "model": ["54", 0],
+      "positive": ["50", 0],
+      "negative": ["50", 1],
+      "latent_image": ["50", 2]
+    },
+    "class_type": "KSampler",
+    "_meta": { "title": "KSampler" }
+  },
+  "6": {
+    "inputs": {
+      "text": "The scene comes to life with gentle motion, cinematic camera movement",
+      "clip": ["38", 0]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "CLIP Text Encode (Positive Prompt)" }
+  },
+  "7": {
+    "inputs": {
+      "text": "low quality, blurry, distorted, watermark",
+      "clip": ["38", 0]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "CLIP Text Encode (Negative Prompt)" }
+  },
+  "8": {
+    "inputs": {
+      "samples": ["3", 0],
+      "vae": ["39", 0]
+    },
+    "class_type": "VAEDecode",
+    "_meta": { "title": "VAE Decode" }
+  },
+  "28": {
+    "inputs": {
+      "fps": 16,
+      "lossless": false,
+      "quality": 85,
+      "method": "default",
+      "filename_prefix": "wan_i2v_output",
+      "images": ["8", 0]
+    },
+    "class_type": "SaveAnimatedWEBP",
+    "_meta": { "title": "Save Animated WEBP" }
+  },
+  "37": {
+    "inputs": {
+      "unet_name": "wan2.1_i2v_720p_14B_bf16.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": { "title": "Load Wan 2.1 I2V 14B 720P Model" }
+  },
+  "38": {
+    "inputs": {
+      "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "type": "wan",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": { "title": "Load UMT5-XXL Text Encoder" }
+  },
+  "39": {
+    "inputs": {
+      "vae_name": "wan_2.1_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": { "title": "Load Wan 2.1 VAE" }
+  },
+  "49": {
+    "inputs": {
+      "clip_name": "clip_vision_h.safetensors"
+    },
+    "class_type": "CLIPVisionLoader",
+    "_meta": { "title": "Load CLIP Vision Model" }
+  },
+  "50": {
+    "inputs": {
+      "width": 1280,
+      "height": 720,
+      "length": 81,
+      "batch_size": 1,
+      "positive": ["6", 0],
+      "negative": ["7", 0],
+      "vae": ["39", 0],
+      "clip_vision_output": ["51", 0],
+      "start_image": ["52", 0]
+    },
+    "class_type": "WanImageToVideo",
+    "_meta": { "title": "Wan Image-to-Video Conditioning" }
+  },
+  "51": {
+    "inputs": {
+      "crop": "none",
+      "clip_vision": ["49", 0],
+      "image": ["52", 0]
+    },
+    "class_type": "CLIPVisionEncode",
+    "_meta": { "title": "CLIP Vision Encode" }
+  },
+  "52": {
+    "inputs": {
+      "image": "input_image.png",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": { "title": "Load Input Image" }
+  },
+  "54": {
+    "inputs": {
+      "shift": 8,
+      "model": ["37", 0]
+    },
+    "class_type": "ModelSamplingSD3",
+    "_meta": { "title": "Model Sampling (shift=8)" }
+  }
+}

@@ -1,0 +1,77 @@
+#
+# SPDX-FileCopyrightText: Copyright (c) 1993-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+ARG UBUNTU_VERSION=22.04
+
+ARG CUDA_VERSION=13.0.1
+ARG BASE_CUDA_DEV_CONTAINER=nvcr.io/nvidia/cuda:${CUDA_VERSION}-devel-ubuntu${UBUNTU_VERSION}
+
+ARG BASE_CUDA_RUN_CONTAINER=nvcr.io/nvidia/cuda:${CUDA_VERSION}-runtime-ubuntu${UBUNTU_VERSION}
+
+FROM ${BASE_CUDA_DEV_CONTAINER} AS build
+
+ARG CUDA_DOCKER_ARCH="121"
+
+RUN apt-get update && \
+    apt-get install -y build-essential cmake python3 python3-pip git libcurl4-openssl-dev libgomp1
+
+WORKDIR /app
+
+RUN git clone https://github.com/ggml-org/llama.cpp.git . \
+    && git checkout 5d8bb90
+
+RUN if [ "${CUDA_DOCKER_ARCH}" != "default" ]; then \
+    export CMAKE_ARGS="-DCMAKE_CUDA_ARCHITECTURES=121"; \
+    fi && \
+    cmake -B build -DGGML_CUDA_ENABLE_UNIFIED_MEMORY=1 -DGGML_NATIVE=OFF -DGGML_CUDA=ON -DGGML_BACKEND_DL=ON -DLLAMA_BUILD_TESTS=OFF ${CMAKE_ARGS} -DCMAKE_EXE_LINKER_FLAGS=-Wl,--allow-shlib-undefined . &&   \
+    cmake --build build --config Release -j$(nproc)
+
+RUN mkdir -p /app/lib && \
+    find build -name "*.so" -exec cp {} /app/lib \;
+
+RUN mkdir -p /app/full \
+    && cp build/bin/* /app/full \
+    && cp *.py /app/full \
+    && cp -r gguf-py /app/full \
+    && cp -r requirements /app/full \
+    && cp requirements.txt /app/full \
+    && cp .devops/tools.sh /app/full/tools.sh
+
+FROM ${BASE_CUDA_RUN_CONTAINER} AS base
+
+RUN apt-get update \
+    && apt-get install -y libgomp1 curl\
+    && apt autoremove -y \
+    && apt clean -y \
+    && rm -rf /tmp/* /var/tmp/* \
+    && find /var/cache/apt/archives /var/lib/apt/lists -not -name lock -type f -delete \
+    && find /var/cache -type f -delete
+
+COPY --from=build /app/lib/ /app
+
+
+FROM base
+
+ENV LLAMA_ARG_HOST=0.0.0.0
+
+COPY --from=build /app/full/llama-server /app
+
+WORKDIR /app
+
+HEALTHCHECK CMD [ "curl", "-f", "http://localhost:8000/health" ]
+
+ENTRYPOINT [ "/app/llama-server" ]
+CMD ["--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,151 @@
+{
+  "1": {
+    "inputs": {
+      "unet_name": "flux1-canny-dev.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": { "title": "Load FLUX.1 Canny Dev Model" }
+  },
+  "2": {
+    "inputs": {
+      "clip_name1": "t5xxl_fp16.safetensors",
+      "clip_name2": "clip_l.safetensors",
+      "type": "flux"
+    },
+    "class_type": "DualCLIPLoader",
+    "_meta": { "title": "DualCLIPLoader (T5-XXL + CLIP-L)" }
+  },
+  "3": {
+    "inputs": {
+      "vae_name": "ae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": { "title": "Load VAE" }
+  },
+  "4": {
+    "inputs": {
+      "text": "A futuristic cyberpunk cityscape at night, neon lights, rain-soaked streets, highly detailed",
+      "clip": ["2", 0]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "CLIP Text Encode (Positive Prompt)" }
+  },
+  "5": {
+    "inputs": {
+      "guidance": 30.0,
+      "conditioning": ["4", 0]
+    },
+    "class_type": "FluxGuidance",
+    "_meta": { "title": "FLUX Guidance (30 for canny-dev)" }
+  },
+  "6": {
+    "inputs": {
+      "text": "",
+      "clip": ["2", 0]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "CLIP Text Encode (Negative - empty)" }
+  },
+  "10": {
+    "inputs": {
+      "image": "reference_image.png",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": { "title": "Load Reference Image" }
+  },
+  "11": {
+    "inputs": {
+      "preprocessor": "CannyEdgePreprocessor",
+      "resolution": 1024,
+      "image": ["10", 0]
+    },
+    "class_type": "AIO_Preprocessor",
+    "_meta": { "title": "Canny Edge Preprocessor" }
+  },
+  "15": {
+    "inputs": {
+      "positive": ["5", 0],
+      "negative": ["6", 0],
+      "vae": ["3", 0],
+      "pixels": ["11", 0]
+    },
+    "class_type": "InstructPixToPixConditioning",
+    "_meta": { "title": "Apply Canny Image Conditioning" }
+  },
+  "20": {
+    "inputs": {
+      "max_shift": 1.15,
+      "base_shift": 0.5,
+      "width": 1024,
+      "height": 1024,
+      "model": ["1", 0]
+    },
+    "class_type": "ModelSamplingFlux",
+    "_meta": { "title": "Model Sampling FLUX" }
+  },
+  "21": {
+    "inputs": {
+      "model": ["20", 0],
+      "conditioning": ["15", 0]
+    },
+    "class_type": "BasicGuider",
+    "_meta": { "title": "Basic Guider (positive conditioning)" }
+  },
+  "22": {
+    "inputs": { "noise_seed": 42 },
+    "class_type": "RandomNoise",
+    "_meta": { "title": "Random Noise" }
+  },
+  "23": {
+    "inputs": { "sampler_name": "euler" },
+    "class_type": "KSamplerSelect",
+    "_meta": { "title": "Sampler Select (Euler)" }
+  },
+  "24": {
+    "inputs": {
+      "scheduler": "simple",
+      "steps": 28,
+      "denoise": 1.0,
+      "model": ["20", 0]
+    },
+    "class_type": "BasicScheduler",
+    "_meta": { "title": "Basic Scheduler (28 steps)" }
+  },
+  "26": {
+    "inputs": {
+      "noise": ["22", 0],
+      "guider": ["21", 0],
+      "sampler": ["23", 0],
+      "sigmas": ["24", 0],
+      "latent_image": ["15", 2]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": { "title": "Advanced Sampler" }
+  },
+  "27": {
+    "inputs": {
+      "samples": ["26", 0],
+      "vae": ["3", 0]
+    },
+    "class_type": "VAEDecode",
+    "_meta": { "title": "VAE Decode" }
+  },
+  "28": {
+    "inputs": {
+      "filename_prefix": "flux_controlnet_output",
+      "images": ["27", 0]
+    },
+    "class_type": "SaveImage",
+    "_meta": { "title": "Save Image" }
+  },
+  "29": {
+    "inputs": {
+      "filename_prefix": "controlnet_preprocessed",
+      "images": ["11", 0]
+    },
+    "class_type": "SaveImage",
+    "_meta": { "title": "Save Preprocessed Canny Image" }
+  }
+}

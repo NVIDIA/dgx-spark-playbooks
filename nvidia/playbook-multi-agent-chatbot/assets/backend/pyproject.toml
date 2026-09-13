@@ -1,0 +1,27 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Backend API server for chatbot application"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.116.1",
+    "langchain>=0.3.27",
+    "langchain-milvus>=0.2.1",
+    "langchain-mcp-adapters>=0.1.0",
+    "langchain-nvidia-ai-endpoints>=0.3.13",
+    "langchain-openai>=0.3.28",
+    "langchain-text-splitters>=0.3.9",
+    "langchain-unstructured>=0.1.6",
+    "langgraph>=0.6.0",
+    "mcp>=0.1.0",
+    "pydantic>=2.11.7",
+    "pypdf2>=3.0.1",
+    "python-dotenv>=1.1.1",
+    "python-multipart>=0.0.20",
+    "asyncpg>=0.29.0",
+    "requests>=2.28.0",
+    "unstructured[pdf]>=0.18.11",
+    "uvicorn>=0.35.0",
+    "websockets>=15.0.1",
+]

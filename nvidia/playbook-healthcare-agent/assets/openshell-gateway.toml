@@ -1,0 +1,19 @@
+# Managed by playbook-healthcare-agent.
+# Native OpenShell configuration for the package-managed local gateway.
+
+[openshell]
+version = 1
+
+[openshell.gateway]
+bind_address = "127.0.0.1:17670"
+compute_drivers = ["docker"]
+disable_tls = false
+
+[openshell.gateway.auth]
+allow_unauthenticated_users = false
+
+[openshell.gateway.mtls_auth]
+enabled = true
+
+[openshell.drivers.docker]
+socket_path = "/var/run/docker.sock"

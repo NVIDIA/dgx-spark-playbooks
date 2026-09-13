@@ -1,0 +1,668 @@
+# Run Healthcare Agents with Local Inference
+
+> Sandboxed FHIR analysis and protein structures with OpenClaw
+
+## Table of Contents
+
+- [Overview](#overview)
+  - [How it works](#how-it-works)
+  - [Notice and disclaimers](#notice-and-disclaimers)
+- [Instructions](#instructions)
+- [Troubleshooting](#troubleshooting)
+
+---
+
+## Overview
+
+## Basic idea
+
+This playbook deploys a healthcare AI agent system on your **hardware platform**. Six agents (one coordinator and five specialists) query patient records, identify clinical care gaps, and predict 3D protein structures. LLM inference (Nemotron 3 Super) and protein-structure prediction (OpenFold3) run on the local GPU, and patient data never passes through a hosted LLM, OpenFold3, or PubChem. An OpenShell sandbox enforces implicit-deny networking, so only a small whitelist of external endpoints — the SMART Health IT FHIR test server, PubChem reference lookups, and viewer CDNs — is reachable for read-only metadata and front-end assets. See the **Security** table below for the full allowed-endpoint list.
+
+Clinical knowledge lives in editable Markdown skill files. Change a lab threshold, add a drug to a classification list, or update a quality measure definition — it takes effect on the next query, no retraining required.
+
+> [!CAUTION]
+> This experience is for demonstration and research use only. It is not a regulated medical device and must not be used as the sole basis for diagnosis or treatment. Test data is synthetic (Synthea). All clinical decisions must be made by qualified clinicians. Follow your organization's privacy and security requirements before connecting real patient data.
+
+### How it works
+
+The system has four layers.
+
+**Inference** — Nemotron 3 Super (120B MoE) runs locally via Ollama in a Docker container on the hardware platform GPU. No cloud APIs, no data transfer. Inside the sandbox, agents call `inference.local`, a virtual hostname that OpenShell routes to Ollama over the Docker bridge network.
+
+**Orchestration** — OpenClaw coordinates five specialist agents. The coordinator receives the user's question, writes and executes Python scripts directly, and delegates to specialists when the query spans multiple domains.
+
+| Agent | Role | Example |
+|-------|------|---------|
+| **Coordinator** | Receives questions, writes Python, executes analysis | "Find all diabetic patients and get their latest HbA1c" |
+| patient-data | Finds patients, retrieves demographics and conditions | "Look up patient Aaron697" |
+| labs-vitals | Lab results, vitals, blood pressure (component observations) | "Get their latest eGFR and potassium" |
+| medications | Active prescriptions, drug class matching | "Which patients are on an ACE inhibitor?" |
+| analyst | Python analysis, care gaps, CMS quality measures, charts | "Generate a histogram of A1c values" |
+| molecular | 3D protein-ligand visualization via OpenFold3 + PubChem | "Show atorvastatin bound to its target" |
+
+**Knowledge** — Editable Markdown skill files provide clinical context that agents read at query time. For example, from `skills/clinical-knowledge/SKILL.md`:
+
+| Lab | Normal | Concerning | Notes |
+|-----|--------|------------|-------|
+| HbA1c | < 7.0% (diabetic target) | > 9.0% = poor control | ADA 2024 guidelines |
+| eGFR | > 90 | < 60 = moderate CKD | CKD-EPI 2021 equation |
+| BP | < 120/80 | ≥ 140/90 = uncontrolled HTN | ACC/AHA 2024 |
+
+Change `9.0%` to `8.5%` and the next care gap query uses the stricter threshold. Other editable items include LOINC lab codes (`fhir-basics`), SNOMED condition codes, drug classification lists, and CMS quality measure definitions (`clinical-knowledge`).
+
+**Security** — OpenShell enforces an implicit-deny sandbox. Only these endpoints are reachable:
+
+| Rule | Target | Purpose |
+|------|--------|---------|
+| LLM inference | `https://inference.local` (port 443) | Routed to Ollama (never leaves the machine). HTTPS only — plain `http://inference.local` is denied. |
+| FHIR data | `r4.smarthealthit.org` | Patient data queries (read-only) |
+| PubChem | `pubchem.ncbi.nlm.nih.gov` | Drug SMILES lookup (read-only) |
+| OpenFold3 | Docker bridge IP, port 8000 | Protein structure prediction |
+| CDN | `code.jquery.com`, `3dmol.org`, `unpkg.com` | JavaScript for 3D viewers (read-only) |
+| Everything else | `*` | **Denied** |
+
+> [!NOTE]
+> Additional rules for GitHub, npm, and PyPI are included for build dependencies during sandbox setup. These are setup-only and not used at runtime.
+
+Patient data flows from FHIR → sandbox → Python execution. It never passes through the LLM, OpenFold3, or PubChem.
+
+## What you'll accomplish
+
+By the end of this playbook you will have six healthcare agents running inside a sandboxed environment on your **hardware platform**, with local inference, editable clinical knowledge, and verified network isolation.
+
+- Serve Nemotron 3 Super (120B MoE) locally via Ollama
+- Deploy six agents (coordinator + five specialists) with OpenClaw inside an OpenShell sandbox
+- Query FHIR patient data, identify care gaps, and generate charts
+- Predict 3D protein structures using OpenFold3 NIM
+- Edit a skill file and see the change take effect immediately
+- Verify implicit-deny networking — confirm unauthorized endpoints are blocked
+
+## What to know before starting
+
+**Required:**
+
+- Basic use of the Linux terminal and SSH
+- Familiarity with Docker (`docker run`, `docker compose`)
+
+**Optional:**
+
+- Domain knowledge is not required — the skill files provide clinical context so the LLM does not need medical fine-tuning
+- Experience with FHIR, OpenClaw, or OpenShell
+
+## Supported hardware platforms
+
+Use the matrix below to confirm your hardware platform, recommended default local settings, and whether multi-node applies.
+
+| Hardware platform | OS | Memory | Recommended default local settings | Multi-node capable hardware |
+| :---- | :---- | :---- | :---- | :---- |
+| **DGX Station** | DGX OS (Linux) | ~284 GB HBM3e (GB300) | Ollama (Docker) + Nemotron 3 Super; OpenFold3 NIM; OpenClaw in OpenShell sandbox | — |
+
+## Prerequisites
+
+**Hardware requirements**
+
+- Supported hardware platform — see Supported hardware platforms matrix above
+- A GPU with **at least 150 GB free GPU memory** to host Nemotron 3 Super (~94 GB resident) plus OpenFold3 (~40–80 GB on-demand). On dual-GPU hardware platforms, target the large-memory GPU; a ~98 GB discrete GPU is too small to load Nemotron 3 Super safely.
+- **At least 200 GB available storage** on `/` for model downloads and containers (86 GB Ollama model + ~10 GB Docker images + working space). Verify with `df -h /` before starting.
+
+**Software requirements**
+
+- Docker with NVIDIA Container Toolkit: `docker info --format '{{.ServerVersion}}'`
+- Node.js v22+: `node --version` (if an older image reports v18 or Node is missing, see Step 1 of Instructions)
+- OpenShell CLI >= 0.0.44: `openshell --version` (binary installs to `~/.local/bin/openshell` — add to PATH; see Step 1 of Instructions)
+- NVIDIA NGC API key from [ngc.nvidia.com](https://ngc.nvidia.com/setup/api-key) (free) **and** Docker authentication for `nvcr.io` (`docker login nvcr.io`) so the OpenFold3 NIM image pull succeeds — see Step 2 of Instructions
+- Network access to `nvcr.io` (NGC registry), `ollama.com` (model downloads), and `r4.smarthealthit.org` (FHIR data server)
+- Web browser access to `http://<HARDWARE_PLATFORM_IP>:18789`
+
+> [!NOTE]
+> This playbook runs Ollama as a Docker container; you do **not** need to install Ollama on the host. If host Ollama is already running (for example from another agent playbook), stop it before Step 3 of Instructions to free port 11434, or override `OLLAMA_PORT` in `.env`.
+
+If OpenShell is not yet installed, install it with the official installer (`curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh`) — this provides both the `openshell` CLI and the `openshell-gateway` daemon, which is all this playbook needs. You do **not** need the NemoClaw playbook. See Step 1 of Instructions for Docker, NVIDIA runtime, and Node.js prerequisites.
+
+## Ancillary files
+
+All required assets can be found [in this playbook repository](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/playbook-healthcare-agent/). Copy the `assets/` directory to the hardware platform in Step 2 of Instructions.
+
+- `Makefile` — One-command operations: `make up`, `make setup`, `make check`, `make test`
+- `sandbox-policy.yaml` — OpenShell network policy (L7 endpoint whitelist)
+- `skills/` — Editable Markdown skill files the agents read at query time
+- `agents/` — Specialist agent definitions (one `.md` per agent)
+- `docker-compose.yml` — Ollama and OpenFold3 NIM services
+
+Supporting scripts (`setup_sandbox.sh`, `check_sandbox_config.sh`, `build_viewer.py`) are called by the Makefile.
+
+## Time & risk
+
+- **Estimated time:** 60 MIN on first run (dominated by the ~86 GB Nemotron 3 Super model download). Under 5 minutes on subsequent runs with the model cached. Active hands-on time is ~15 minutes.
+- **Risk level:** Medium — agents execute Python code inside an OpenShell sandbox. Filesystem, network, and process access are restricted. Use a clean environment for the demo.
+  - Large model downloads (~86 GB) may fail on slow or unstable connections
+  - OpenFold3 NIM takes ~3 minutes to load — the healthcheck waits automatically
+  - Clinical outputs can be incomplete or incorrect and require qualified professional review
+- **Rollback:** `openshell sandbox delete clinical-sandbox`, `make down`, `make clean` (see Cleanup in Instructions).
+- **Last Updated:** 08/05/2026
+  - Deploy six healthcare agents with local Nemotron 3 Super, OpenFold3, and OpenShell sandbox isolation on supported hardware platforms
+
+### Notice and disclaimers
+
+#### Quick start safety check
+
+**Use only a clean environment.** Run this demo on a fresh device or VM with no personal data, confidential information, or sensitive credentials. Keep it isolated like a sandbox.
+
+By installing this demo, you accept responsibility for all third-party components, including reviewing their licenses, terms, and security posture. Read and accept before you install or use.
+
+#### What you're getting
+
+This experience is provided "AS IS" for demonstration purposes only — no warranties, no guarantees. This is a demo, not a production-ready solution. It is not a regulated medical device. Test data is synthetic (Synthea). All clinical decisions must be made by qualified clinicians.
+
+#### Key risks with AI agents
+
+- **Data leakage** — Any materials the agent accesses could be exposed, leaked, or stolen.
+- **Malicious code execution** — The agent or its connected tools could expose your system to malicious code or cyber-attacks.
+- **Unintended actions** — The agent might modify or delete files, send messages, or access services without explicit approval.
+- **Prompt injection and manipulation** — External inputs or connected content could hijack the agent's behavior in unexpected ways.
+
+#### Participant acknowledgement
+
+By participating in this demo, you acknowledge that you are solely responsible for your configuration and for any data, accounts, and tools you connect. To the maximum extent permitted by law, NVIDIA is not responsible for any loss of data, device damage, security incidents, or other harm arising from your configuration or use of these demo materials, including OpenClaw or any connected tools or services.
+
+## Instructions
+
+> [!IMPORTANT]
+> This playbook requires Docker (with NVIDIA runtime), Node.js v22, and OpenShell CLI >= 0.0.44 — both the `openshell` CLI **and** the `openshell-gateway` daemon, which the official OpenShell installer provides together (Step 1). You do **not** need the NemoClaw playbook: this playbook only uses the OpenShell binaries, and running the full NemoClaw stack first leaves services (host Ollama on 11434, `nemoclaw-vllm` on 8000, `openclaw-gateway` on 18789) that collide with this playbook — Step 1 and Step 3 explain how to clear them if you already ran it. Ollama runs as a Docker container here (host Ollama is not required and will conflict with port 11434, see Step 3).
+
+> [!NOTE]
+> Steps 1–3 are prerequisites. Steps 4–5 configure infrastructure and deploy the agent. Steps 6–9 are the demo. Steps 10–11 are cleanup and next steps.
+
+## Step 1. Verify your environment
+
+Confirm your hardware platform has the required software and free disk space:
+
+```bash
+## OpenShell installs to ~/.local/bin, which is not on the default
+## non-interactive PATH. Add it before running anything below.
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+export PATH="$HOME/.local/bin:$PATH"
+
+nvidia-smi
+docker info --format '{{.ServerVersion}}'
+node --version
+ollama --version 2>/dev/null || echo "ollama not installed (OK — Docker provides it)"
+openshell --version
+df -h /
+```
+
+Expected: a large-memory Blackwell GPU on the supported hardware platform, Docker >= 23.0.1, **Node.js v22.x**, OpenShell >= 0.0.44, and **at least 200 GB free** on `/` (86 GB model + Docker images + working space).
+
+> [!WARNING]
+> If `openshell --version` says `command not found` but the binary exists at `~/.local/bin/openshell`, it just isn't on PATH. Run the `export PATH=...` line above and re-source `~/.bashrc`. Without this, every `openshell` and `make` command in later steps fails.
+
+**If OpenShell is not installed at all**, install it with the official installer — this installs both the `openshell` CLI and the `openshell-gateway` daemon, which is everything this playbook needs (no NemoClaw required):
+
+```bash
+curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh
+source ~/.bashrc            # put ~/.local/bin on PATH
+openshell --version         # should show >= 0.0.44
+```
+
+> [!TIP]
+> `make prereq` (run from `~/clinical-intelligence` after Step 2) bundles all of the checks below — Docker, Node version, OpenShell, disk space, GPU, port 11434, and NGC auth — into one command.
+
+**If `node --version` reports v18.x, older, or `command not found`**, install Node.js v22 before continuing:
+
+```bash
+## Download the NodeSource setup script first, then run it with sudo.
+## Running it inline with `| sudo bash` does not work — the sudo context
+## needs to own the entire script execution.
+curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh
+sudo bash /tmp/nodesource_setup.sh
+sudo apt-get install -y nodejs
+node --version   # should now show v22.x
+```
+
+**Host Ollama must not be on port 11434.** This playbook runs Ollama in a Docker container that binds 11434 on the host. Run **both** of these:
+
+```bash
+## Always run — succeeds silently if no service exists, stops the host
+## Ollama daemon if NemoClaw or another playbook left one running.
+sudo systemctl stop ollama 2>/dev/null || true
+sudo systemctl disable ollama 2>/dev/null || true
+
+## Verify nothing else owns 11434.
+ss -tlnp 2>/dev/null | grep 11434 || echo 'port 11434 free'
+```
+
+Expected: `port 11434 free`. If the line still shows a listener, something else (an old `ollama serve`, another container, etc.) owns the port — stop it, or change `OLLAMA_PORT` in `.env` (Step 2) to a free port such as `11435`. `make setup` sources `.env` and configures the sandbox provider against the override.
+
+**Stale OpenShell gateway?** Do not kill the package-managed gateway. Step 4
+uses its systemd user service and replaces a stale CLI registration with the
+authenticated HTTPS endpoint. If a legacy `--disable-tls` process is still
+running, the setup helper detects it and asks you to stop that one process.
+
+```bash
+systemctl --user status openshell-gateway.service --no-pager || true
+openshell gateway list
+```
+
+**Previously ran the NemoClaw playbook?** NemoClaw installs `openclaw-gateway.service` as a systemd user service that binds port 18789. If it is still running, `make setup` fails with "Port 18789 is already in use". Stop and disable it before proceeding — `make setup` will also do this automatically, but stopping it here avoids a confusing error:
+
+```bash
+systemctl --user stop    openclaw-gateway.service 2>/dev/null || true
+systemctl --user disable openclaw-gateway.service 2>/dev/null || true
+## Verify the port is free
+ss -tlnp | grep 18789 || echo 'port 18789 free'
+```
+
+## Step 2. Copy the assets and configure
+
+The playbook assets include the Docker Compose file, agent definitions, skill files, and setup scripts. Locate the `assets/` directory shipped with this playbook and copy it to `~/clinical-intelligence`:
+
+```bash
+## Find the playbook directory first. Try the common locations:
+PLAYBOOK_DIR=""
+for d in ~/client-hardware-playbooks/nvidia/playbook-healthcare-agent \
+         /opt/client-hardware-playbooks/nvidia/playbook-healthcare-agent \
+         /usr/local/share/client-hardware-playbooks/nvidia/playbook-healthcare-agent; do
+  if [ -d "$d/assets" ]; then PLAYBOOK_DIR="$d"; break; fi
+done
+
+if [ -z "$PLAYBOOK_DIR" ]; then
+  echo "ERROR: assets/ not found. Locate it manually:"
+  echo "  find / -type d -path '*playbook-healthcare-agent/assets' 2>/dev/null"
+  echo "Then re-run with PLAYBOOK_DIR set."
+else
+  (
+    set -e
+    INSTALL_DIR="$HOME/clinical-intelligence"
+    mkdir -p "$INSTALL_DIR"
+#    # Copy the contents (including dotfiles) into a stable install root. Using
+#    # assets/. avoids creating INSTALL_DIR/assets when this step is re-run.
+    cp -a "$PLAYBOOK_DIR/assets/." "$INSTALL_DIR/"
+    cd "$INSTALL_DIR"
+#    # Preserve an existing configured NGC key on repeat runs.
+    if [ ! -f .env ]; then
+      cp .env.example .env
+    fi
+    nano .env
+#    # Set: NGC_API_KEY=nvapi-...
+  )
+fi
+```
+
+> [!IMPORTANT]
+> If the catalog tarball did not include `assets/`, pull the playbook directly from the repo:
+> ```bash
+> git clone https://github.com/NVIDIA/dgx-spark-playbooks ~/client-hardware-playbooks
+> # Then re-run the Step 2 block above. It will find this clone, copy the
+> # asset contents without nesting assets/, and preserve an existing .env.
+> ```
+
+The NGC API key is required to **download** the OpenFold3 NIM image from `nvcr.io` and to **run** it at runtime. Get one for free at [ngc.nvidia.com](https://ngc.nvidia.com/setup/api-key).
+
+Authenticate Docker against NGC so the OpenFold3 image pull succeeds (without this you get a raw HTML 401 from nginx):
+
+```bash
+make ngc-login
+## or, equivalent manual command:
+## echo "$NGC_API_KEY" | docker login nvcr.io --username '$oauthtoken' --password-stdin
+```
+
+## Step 3. Start Nemotron 3 Super and OpenFold3
+
+Ollama serves Nemotron 3 Super for LLM inference. OpenFold3 NIM handles protein structure prediction. Both run as Docker containers with GPU access.
+
+If you are connected via SSH, start a `tmux` or `screen` session first so the download survives a disconnection:
+
+```bash
+tmux new -s clinical
+```
+
+Start the services:
+
+```bash
+docker compose up -d ollama openfold3
+```
+
+> [!IMPORTANT]
+> **Previously ran the NemoClaw playbook?** NemoClaw's `nemoclaw-vllm` inference container binds host port **8000** — the same port OpenFold3 needs. If OpenFold3 fails to start with a "port is already allocated" / "address already in use" error on 8000, either stop the NemoClaw container:
+> ```bash
+> docker stop nemoclaw-vllm && docker rm nemoclaw-vllm
+> ```
+> or give OpenFold3 a different host port by setting `OPENFOLD_PORT=8001` in `.env` (Step 2). `docker-compose.yml`, `make status`, and the test suite all honor the override. Check what holds 8000 with `ss -tlnp | grep :8000`.
+
+> [!NOTE]
+> First run downloads Nemotron 3 Super (~86 GB). This takes 15–25 minutes on a fast connection, up to an hour on slower links. Monitor with `docker compose logs -f ollama`. If interrupted, re-run — it resumes where it left off.
+
+> [!TIP]
+> **Multi-GPU hardware platforms:** docker-compose pins both Ollama and OpenFold3 to GPU 0 by default (set `LLM_GPU` and `OPENFOLD_GPU` in `.env` to override). On a dual-GPU hardware platform, set `LLM_GPU` and `OPENFOLD_GPU` to the index of the **large-memory GPU** because Nemotron-3-Super (~94 GB resident) does not fit safely on a ~98 GB discrete GPU. Find the large-memory GPU index with: `nvidia-smi --query-gpu=index,name,memory.total --format=csv,noheader`
+
+Pull the model into Ollama:
+
+```bash
+docker compose up model-pull
+```
+
+Wait for all services to report healthy:
+
+```bash
+make status
+```
+
+Expected:
+
+```
+  Ollama (port 11434):     ✓ healthy
+  OpenFold3 (port 8000):  ✓ healthy
+```
+
+OpenFold3 takes ~3 minutes to load model weights on startup. If it shows "down (may still be loading)", wait and check again.
+
+> [!TIP]
+> `make up` runs all of the above (container start + model pull) in one command but does not block on health. Run `make status` separately to verify services are healthy.
+
+## Step 4. Start the OpenShell gateway
+
+OpenShell's Linux package owns the gateway lifecycle through
+`openshell-gateway.service`. The checked-in TOML pins the Docker driver while
+keeping TLS and local mTLS authentication enabled. The helper also tests Docker
+from the systemd user manager's credential context; this catches a login that
+has the `docker` group while an older user manager does not.
+
+```bash
+bash scripts/ensure_openshell_gateway.sh
+
+## Remote/headless Linux: keep the package user service alive after SSH logout.
+sudo loginctl enable-linger "$USER"
+loginctl show-user "$USER" -p Linger --value  # expected: yes
+```
+
+Under the hood this uses the supported lifecycle and registration:
+
+```bash
+systemctl --user enable openshell-gateway.service
+systemctl --user restart openshell-gateway.service
+openshell gateway add https://127.0.0.1:17670 --local --name openshell
+openshell gateway select openshell
+openshell -g openshell status
+openshell -g openshell gateway info --output json
+```
+
+Expected: `Status: Connected`, `Authentication: Authenticated`, and a healthy
+Docker compute driver. `Connected` alone is not sufficient because the health
+RPC is public. For service failures, run
+`journalctl --user -u openshell-gateway.service --no-pager -n 50`.
+
+If the helper says the systemd user manager cannot access Docker, fully end all
+login sessions and log back in—or reboot—after Docker-group membership was
+assigned, then rerun. If linger is already enabled, use a maintenance reboot:
+logout does not recreate a lingering manager. Restarting only the gateway
+cannot refresh the manager's inherited groups.
+
+> [!NOTE]
+> Step 4 configures OpenShell infrastructure (gateway). Step 5 deploys the healthcare agent into this infrastructure.
+
+## Step 5. Deploy the healthcare agent
+
+`make setup` automates six operations:
+1. Creates the `clinical-sandbox` OpenShell sandbox with the network policy from `sandbox-policy.yaml`
+2. Creates the inference provider and configures routing to Ollama (previously a manual step)
+3. Installs Python packages (requests, pandas, matplotlib) inside the sandbox
+4. Copies agent definitions from `agents/` and skill files from `skills/` into the sandbox workspace
+5. Deploys the OpenClaw configuration (`openclaw.json`, `IDENTITY.md`) and registers specialist agents
+6. Starts the OpenClaw gateway and runs a smoke test
+
+```bash
+make setup
+```
+
+When complete, you will see `=== Setup Complete ===`. If setup fails, re-run `make setup` — it recreates the sandbox from scratch, so all config is fresh.
+
+Verify the sandbox config matches the repo:
+
+```bash
+make check
+```
+
+All checks should pass. If any skills or config files are stale, `make check` tells you what to fix.
+
+Run the quick test suite:
+
+```bash
+make test
+```
+
+> [!TIP]
+> `make setup` runs `bash scripts/setup_sandbox.sh` (loopback bind — use the SSH tunnel from Step 6 for remote browsers). For direct local-browser access on the hardware platform itself, run `make setup-local` instead, which calls `bash scripts/setup_sandbox.sh --local`. See `RUNBOOK.md` in the assets for the manual step-by-step equivalent.
+
+## Step 6. Open the dashboard
+
+**Remote access** (run this from your machine, not the hardware platform). This forwards port 18789 so you can open the dashboard in a local browser:
+
+```bash
+ssh -f -N -L 18789:localhost:18789 your-user@your-hardware-platform-ip
+```
+
+**Cursor / VS Code:** Open the **Ports** tab in the bottom panel, click **Forward a Port**, enter **18789**.
+
+Then open `http://localhost:18789/` in your browser.
+
+**Local** (keyboard and monitor on the hardware platform): Open `http://localhost:18789/`.
+
+You should see the OpenClaw dashboard with **Health: OK**. Click **Chat**.
+
+Setup is done. The next steps are the demo.
+
+## Step 7. Run healthcare queries
+
+All queries execute inside the OpenShell sandbox — only whitelisted endpoints are reachable. You will verify this in Step 9.
+
+Paste the first query. The first response takes 30–60 seconds while the 120B model loads into GPU memory — this is normal and only happens once per session.
+
+```
+Find all diabetic patients and get their latest HbA1c. Generate a histogram with a red dashed line at 9%. Use dark background with green bars.
+```
+
+The agent reads its skill files (`fhir-basics`, `clinical-knowledge`, `analysis-methods`), imports the FHIR helpers library, writes a Python script, queries the FHIR server, and generates the chart — all inside the sandbox.
+
+You should see ~48 diabetic patients and an A1c histogram with a 9% threshold line. The agent includes a clickable link to the chart in its response. You can also browse all visualizations at `http://localhost:18789/__openclaw__/canvas/`.
+
+Stay in the same session for follow-ups:
+
+```
+Which of those diabetic patients also have hypertension? For the overlap, get their eGFR. Flag anyone with eGFR below 60 as kidney disease risk.
+```
+
+You should see ~24 with both conditions, ~12 flagged as kidney disease risk.
+
+```
+Of those kidney disease risk patients, which ones are not on an ACE inhibitor or ARB?
+```
+
+You should see ~12 patients missing guideline-recommended therapy (100% care gap in the synthetic data).
+
+## Step 8. Visualize a drug target
+
+```
+Show me the 3D protein structure of atorvastatin bound to its target
+```
+
+The molecular agent looks up atorvastatin's target protein (HMG-CoA reductase), fetches the drug's SMILES from PubChem, sends the protein sequence to OpenFold3 for structure prediction, and generates an interactive 3D viewer with confidence scores (pLDDT, pTM, ipTM).
+
+You should see an interactive 3D viewer with the protein ribbon structure and atorvastatin ligand. The agent includes a clickable link. Confidence scores appear in the viewer header — pLDDT > 70 indicates a good prediction.
+
+## Step 9. Understand sandbox isolation
+
+The sandbox policy (`sandbox-policy.yaml`) enforces implicit-deny networking at Layer 7. Every outbound connection is blocked unless an explicit rule allows it. The policy also restricts HTTP methods — FHIR and PubChem are limited to read-only (GET/HEAD), OpenFold3 accepts only POST to specific prediction paths.
+
+Confirm that unauthorized endpoints are blocked. From inside the sandbox (connect with `openshell sandbox connect clinical-sandbox`), run:
+
+```bash
+curl --max-time 5 https://google.com
+```
+
+Expected: connection refused or `CONNECT tunnel failed, response 403`. The allowed endpoints are:
+
+| Endpoint | Purpose | Allowed methods |
+|----------|---------|----------------|
+| `https://inference.local` (port 443 only) | LLM calls to Ollama | All (OpenAI protocol) |
+| `r4.smarthealthit.org` | FHIR patient data | GET, HEAD |
+| `pubchem.ncbi.nlm.nih.gov` | Drug SMILES lookup | GET, HEAD |
+| OpenFold3 NIM (Docker bridge) | Structure prediction | POST `/biology/openfold/**`, GET `/v1/health/*` |
+| CDN (jquery, 3dmol, unpkg) | JavaScript for 3D viewers | GET |
+
+Everything else is denied. Additional rules for GitHub, npm, and PyPI are included in `sandbox-policy.yaml` for build dependencies during sandbox setup — these are setup-only and not used at runtime.
+
+> [!NOTE]
+> `inference.local` is HTTPS-only. Plain `http://inference.local/...` returns `policy_denied` because the OpenShell L7 proxy enforces the TLS-terminated CONNECT path. All skills, helper scripts, and `_sandbox` curls in this repo use `https://inference.local` with `-k` (the proxy presents a self-signed cert).
+
+Patient data flows from FHIR → sandbox Python execution. It never passes through the LLM, OpenFold3, or PubChem.
+
+Inspect a skill file to see the editable clinical knowledge:
+
+```bash
+head -30 skills/clinical-knowledge/SKILL.md
+```
+
+Skill files are Markdown. Edit a threshold or drug classification — it takes effect on the next query, no retraining. Try changing the HbA1c threshold from `9.0%` to `7.0%` and re-running the diabetes query to see the difference.
+
+## Step 10. Cleanup
+
+> [!WARNING]
+> This removes the sandbox and stops all services.
+
+```bash
+openshell sandbox delete clinical-sandbox
+make down
+```
+
+The package-managed OpenShell gateway is shared infrastructure and remains
+running. Stop it explicitly with `systemctl --user stop openshell-gateway` only
+when you intend to stop OpenShell for every local playbook.
+
+To also remove downloaded models and volumes:
+
+```bash
+make clean
+```
+
+## Step 11. Next steps
+
+1. **Edit a skill** — change a lab reference range in `skills/clinical-knowledge/SKILL.md` and re-run the same prompt to see the effect.
+2. **Add an agent** — create a `.md` in `agents/`, register in `openclaw.json`, redeploy with `make setup`.
+3. **Connect a real FHIR server** — replace the test server URL, add OAuth2 authentication, and update `sandbox-policy.yaml` with explicit path-level rules for the FHIR resources the agent needs.
+4. **Swap models** — try `qwen2.5:72b` or another Ollama model by editing `.env` and `openclaw.json`.
+5. **Verify after changes** — run `make check` after any config or skill file change to catch stale sandbox copies.
+6. **Full agent validation** — `make test-full` runs all test levels including end-to-end agent queries (~20 min).
+7. **Monitor GPU** — `nvidia-smi` shows memory allocation across Nemotron 3 Super and OpenFold3.
+
+## Troubleshooting
+
+#### Docker and infrastructure
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `make up` hangs on model pull | Nemotron-3-Super is ~86 GB and takes 15–25 min on first download (longer on slow links) | Wait. Check progress with `docker compose logs -f ollama`. If interrupted, re-run — it resumes where it left off. |
+| `OpenFold3: ✗ down` in `make status` | OpenFold3 takes ~3 minutes to load model weights on startup | Wait and re-run `make status`. Check logs with `docker compose logs -f openfold3`. |
+| OpenFold3 crash-loops with `NIMProfileIDNotFound: Profile not found for this model` | The NIM matches your GPU by PCI device ID against its bundled `model_manifest.yaml`, and some Blackwell SKUs are absent — e.g. a `31c3:10de` GB300 or the RTX PRO 6000 `2bb4:10de` (note: `31c2:10de` GB300 units *are* listed and run natively). | Check your id and patch the manifest only if it's missing — see **"OpenFold3: GPU not recognized"** below the tables. |
+| `failed to bind host port for 0.0.0.0:11434` on `docker compose up ollama` | Host Ollama is already listening on 11434 (common after the NemoClaw playbook) | Stop host Ollama: `sudo systemctl stop ollama && sudo systemctl disable ollama`. Or override in `.env`: `OLLAMA_PORT=11435` — `make setup` and `setup_sandbox.sh` source `.env` and configure the sandbox provider against the new port. |
+| `failed to bind host port for 0.0.0.0:8000` / "address already in use" on `docker compose up openfold3` | NemoClaw's `nemoclaw-vllm` container already holds port 8000 (common after the NemoClaw playbook) | Stop it: `docker stop nemoclaw-vllm && docker rm nemoclaw-vllm`. Or override in `.env`: `OPENFOLD_PORT=8001` — `docker-compose.yml`, `make status`, and the tests honor it. Inspect with `ss -tlnp \| grep :8000`. |
+| `unauthorized: <html><head><title>401 Authorization Required` when pulling `nvcr.io/nim/openfold/openfold3` | Docker is not authenticated against NGC; `NGC_API_KEY` in `.env` is the runtime credential, not the pull credential | Run `make ngc-login` (reads `NGC_API_KEY` from `.env`). Manual equivalent: `echo "$NGC_API_KEY" \| docker login nvcr.io -u '$oauthtoken' --password-stdin`. |
+| OpenFold3 crashes with `device >= 0 && device < num_gpus INTERNAL ASSERT FAILED` | OpenFold3's PyTorch backend rejects multi-GPU containers; `count: all` exposes both GPUs on a dual-GPU hardware platform | `docker-compose.yml` pins to `LLM_GPU`/`OPENFOLD_GPU` (default `0`). On dual-GPU hardware platforms, set both to the **large-memory GPU** index in `.env` and `docker compose up -d --force-recreate openfold3`. |
+| `NGC_API_KEY not set` error | `.env` file missing or NGC key not configured | Run `cp .env.example .env` and edit to add your NGC API key from [ngc.nvidia.com](https://ngc.nvidia.com/setup/api-key). |
+| `exec format error` when pulling containers | Container architecture mismatch (x86 container on ARM64) | Ensure you're using ARM64-compatible containers. OpenFold3 (v1.3.0+) and Ollama support ARM64. Check with `docker inspect --format '{{.Architecture}}' <image>`. |
+| Sandbox policy validation fails on startup | `landlock: hard_requirement` aborts if filesystem paths can't be enforced | Check that all paths in `sandbox-policy.yaml` exist on the system. If running on a non-standard OS image, try `compatibility: best_effort` temporarily to diagnose. |
+| `node: command not found` or OpenShell rejects the Node version | Node.js missing, or an older image ships v18; OpenShell/OpenClaw need v22+ | Download the setup script first, then run it — piping straight into `sudo bash` fails: `curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh && sudo bash /tmp/nodesource_setup.sh && sudo apt-get install -y nodejs`. `make prereq` validates the version automatically. |
+
+#### Gateway and sandbox
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `openshell status` shows `Connected` plus `Authentication: Failed` | A plaintext registration reached the public health RPC but supplied no identity to protected RPCs | Run `bash scripts/ensure_openshell_gateway.sh`. It uses the package service and re-registers `https://127.0.0.1:17670` with the generated local mTLS bundle. Do not accept `Connected` by itself. |
+| Package gateway loops with `no compute driver configured` while `docker info` works in the shell | The long-running systemd user manager was created before the user received Docker-group membership, so its service children cannot open `/var/run/docker.sock` | Fully end all login sessions and log back in, or reboot, then rerun `bash scripts/ensure_openshell_gateway.sh`. If `loginctl show-user "$USER" -p Linger --value` is `yes`, use a maintenance reboot because logout does not recreate the lingering manager. Restarting only the gateway, `newgrp`, changing socket permissions, or running the gateway as root does not repair the manager's credentials. |
+| Package gateway works over SSH but stops after disconnect | The host is using a systemd user service with linger disabled, so the last logout stops the user manager and all its services | After the gateway passes its checks, run `sudo loginctl enable-linger "$USER"` and verify `loginctl show-user "$USER" -p Linger --value` prints `yes`. This is the native OpenShell Linux service model. |
+| OpenShell gateway service does not start | Package service failed or its HTTPS registration is stale | Check `systemctl --user status openshell-gateway` and `journalctl --user -u openshell-gateway --no-pager -n 50`, then rerun the setup helper. |
+| `openshell sandbox create` fails with "port already forwarded" or hangs on `--forward 18789` | Stale port forward from a previously deleted sandbox is still registered | List forwards: `openshell forward list`. Stop each one bound to `:18789`: `openshell forward stop 18789 <sandbox-name>`. `setup_sandbox.sh` does this automatically before re-creating the sandbox. |
+| Stale OpenShell gateway from another playbook is still registered | A previous playbook selected another gateway name or a legacy plaintext endpoint | Run the setup helper to select the managed `openshell` HTTPS/mTLS registration. Use `openshell gateway list -o json` to inspect registrations; do not kill the shared package service. |
+| Port 18789 not accessible remotely | SSH tunnel not active or port forward dead inside sandbox | Check with `openshell forward list`. If dead: `openshell forward stop 18789 clinical-sandbox && openshell forward start -d 18789 clinical-sandbox`. Then re-establish SSH tunnel from your machine. |
+| `requests` library doesn't work in sandbox | Sandbox Python uses curl subprocess for HTTP, not the requests library | This is by design. All HTTP calls in agent scripts must use `subprocess.run(["curl", ...])` and `json.loads()`. The `fhir_helpers.py` library handles this automatically. |
+
+#### Inference and model
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Agent returns empty response or timeout | Model unloaded from GPU memory after idle timeout | Send a warmup message first. Check `OLLAMA_KEEP_ALIVE` is set to `4h` in docker-compose.yml. |
+| `curl: (7) Failed to connect` to inference.local | OpenShell inference provider not configured or Ollama not running | Verify Ollama: `curl -sf http://localhost:${OLLAMA_PORT:-11434}/`. Re-run `make setup` — it configures the inference provider automatically. |
+| Sandbox cannot reach host Ollama (only Docker bridge IP times out) | Host Ollama's systemd unit binds to `127.0.0.1` by default | Add a systemd override binding to all interfaces: `sudo systemctl edit ollama` and insert `[Service]` then `Environment="OLLAMA_HOST=0.0.0.0"`, then `sudo systemctl daemon-reload && sudo systemctl restart ollama`. Docker Ollama (the default in this playbook) already binds to `0.0.0.0`. |
+| OpenFold3 returns error for molecular visualization | Protein sequence too long or malformed input | OpenFold3 supports sequences up to 4096 amino acids (PyTorch backend) or 2048 (TensorRT). Check the protein sequence in `build_viewer.py`'s drug-target table. |
+
+#### Agent and skills
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `make setup` fails | Setup did not complete successfully | Re-run `make setup` — the script recreates the sandbox from scratch with fresh config. Ensure you're on OpenShell >= 0.0.44. |
+| `make check` shows stale skills | Workspace skill copies don't match the repo after an update | The check output tells you which skills are stale. Re-run `make setup` or manually copy from `/sandbox/clinical-intelligence/skills/` to `~/.openclaw/workspace/skills/` inside the sandbox. |
+| ENOENT errors for memory files in logs | OpenClaw tries to read daily memory files that don't exist | Create the memory directory: `mkdir -p ~/.openclaw/workspace/memory && touch ~/.openclaw/workspace/MEMORY.md` inside the sandbox. `make check` detects this. |
+| Agent writes code from scratch instead of using helpers | Stale IDENTITY.md or analysis-methods skill in workspace | Run `make check` to verify. If stale, the workspace IDENTITY.md doesn't have the `fhir_helpers` import instruction. |
+| Agent uses wrong LOINC code for eGFR | Agent used its own training knowledge instead of reading the skill file | Run `make check` to verify skills are synced. The fhir-basics skill lists `33914-3` for eGFR. If the workspace copy is stale, the model uses its own (often wrong) LOINC codes. |
+
+#### Demo and queries
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| FHIR queries return 0 patients | Wrong SNOMED code format | Use bare codes: `code=44054006`, not `code=http://snomed.info/sct\|44054006`. The skill files contain the correct patterns. |
+| Charts not visible in dashboard | Canvas directory not accessible or file not saved to correct path | Charts must be saved to `~/.openclaw/canvas/`. View canvas at `http://localhost:18789/__openclaw__/canvas/`. |
+| `make test-full` fails on L4/L5 agent tests | Agent query timed out, FHIR server unreachable from sandbox, or Ollama model unloaded | Check step by step: (1) `make status` — are Ollama and OpenFold3 healthy? (2) `make check` — are skills and config synced? (3) Send a warmup message in the dashboard to reload the model. (4) Run `make test --level 3` first to isolate whether the issue is infrastructure, config, or agent-level. |
+
+#### OpenFold3: GPU not recognized
+
+The `openfold3` NIM selects a compute profile by matching your GPU's **PCI device ID** against the `model_manifest.yaml` bundled inside the image. If your GPU's id is not in the manifest, the NIM finds no profile and crash-loops with `NIMProfileIDNotFound`.
+
+This affects specific Blackwell board SKUs whose ids the shipped manifest omits. **GB300 units vary**: some report `31c2:10de` (which *is* in the manifest — these run natively), while others report `31c3:10de` (absent — these crash). The RTX PRO 6000 Max-Q (`2bb4:10de`) is also absent on some dual-GPU hardware platforms. So **do not assume a fixed id — check yours first**, and only patch if it is genuinely missing.
+
+This is a manifest gap in the **NIM image**, not a playbook defect — it is tracked upstream so the OpenFold3 NIM team can add the missing ids (`31c3:10de`, `2bb4:10de`) to the shipped manifest. Until that ships, patch the manifest locally:
+
+```bash
+## 1. Find YOUR GPU's PCI id. lspci prints it vendor:device, e.g. "[10de:31c3]"
+##    -> your device id is 31c3. (nvidia-smi --query-gpu=pci.device_id -> 0x31C3.)
+lspci -nn | grep -i nvidia
+
+## 2. Copy the manifest out of the image and list the ids it recognizes. The
+##    manifest keys profiles by "gpu_device: <device>:10de" — device-first, the
+##    REVERSE of lspci's vendor:device order.
+cid=$(docker create nvcr.io/nim/openfold/openfold3:latest)
+docker cp "$cid":/opt/nim/etc/default/model_manifest.yaml /tmp/model_manifest.yaml
+docker rm "$cid"
+grep gpu_device /tmp/model_manifest.yaml          # ids the NIM already recognizes
+
+## 3. ONLY if YOUR id is NOT listed in step 2: remap an existing same-architecture
+##    profile's gpu_device to yours (device-first order). Substitute your real ids
+##    — the example below is for a 31c3 GB300 borrowing the manifest's 31c2 profile:
+sed -i 's/31c2:10de/31c3:10de/g' /tmp/model_manifest.yaml   # <-- use YOUR ids
+
+## 4. Move the patched manifest to a persistent path (NOT /tmp, which is cleared
+##    on reboot) and mount it over the image copy so it survives recreates:
+mkdir -p ./assets/openfold3 && mv /tmp/model_manifest.yaml ./assets/openfold3/
+##    then add to the openfold3 service in docker-compose.yml:
+##      volumes:
+##        - ./assets/openfold3/model_manifest.yaml:/opt/nim/etc/default/model_manifest.yaml:ro
+
+## 5. A real NGC_API_KEY (not the .env placeholder) is required — the NIM
+##    downloads TRT engines from NGC at startup. Then recreate the container:
+docker compose up -d --force-recreate openfold3
+```
+
+After patching, `make status` should show OpenFold3 healthy; in a full local run `make test` passed 55/55 (exact results depend on your environment).
+
+> [!WARNING]
+> Only patch if your GPU's id is genuinely absent from the manifest (step 2). On
+> a unit whose id is already listed (e.g. a `31c2` GB300), running the example
+> `sed` blindly would rename the very profile your GPU matches and *cause* the
+> `NIMProfileIDNotFound` crash it is meant to prevent.
+
+> [!NOTE]
+> Remapping a `gpu_device` id makes the NIM log a `Checksum mismatch` warning for
+> that profile. It is currently non-fatal (the NIM still loads), but the NIM warns
+> it *"will become an error in a future version"* — another reason the durable fix
+> is to have the OpenFold3 NIM team add `31c3:10de` (GB300) and `2bb4:10de`
+> (RTX PRO 6000) to the shipped manifest rather than relying on this patch.
+
+For latest known issues, see the documentation linked under **Resources** for your hardware platform.

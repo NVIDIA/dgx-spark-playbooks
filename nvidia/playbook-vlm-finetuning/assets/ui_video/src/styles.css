@@ -1,0 +1,178 @@
+/*
+#
+# SPDX-FileCopyrightText: Copyright (c) 1993-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+*/
+
+/* VLM Fine-tuning Streamlit App Styles */
+:root {
+    --nvidia-green: #76b900;
+}
+
+/* Set maximum page width - multiple selectors for compatibility */
+.main .block-container,
+.block-container,
+.main > div,
+section.main > div {
+    max-width: 1200px !important;
+    margin: 0 auto !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+}
+
+/* h3 {
+    color:#76b900 !important;
+} */
+
+.main > div {
+    padding-top: 1rem;
+}
+
+/* Global button styling - applies to ALL buttons */
+.stButton > button,
+button[kind="primary"],
+button[kind="secondary"] {
+    width: 100% !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    padding: 12px 20px !important;
+    border-radius: 8px !important;
+    border: none !important;
+    transition: all 0.3s ease !important;
+    cursor: pointer !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+}
+
+/* Primary button styling */
+.stButton > button[kind="primary"],
+button[kind="primary"] {
+    background: linear-gradient(135deg, #32864c 0%, #6edd93 100%) !important;
+    /* background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important; */
+    color: white !important;
+}
+
+/* Primary button hover effect */
+.stButton > button[kind="primary"]:hover,
+button[kind="primary"]:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
+}
+
+/* Secondary button styling */
+.stButton > button[kind="secondary"],
+button[kind="secondary"] {
+    background: linear-gradient(135deg, #b6fb93 0%, #57f586 100%) !important;
+    /* background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%) !important; */
+    /* color: white !important; */
+    color: darkslategray !important;
+}
+
+/* Regular button styling */
+.stButton > button:not([kind]) {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%) !important;
+    color: white !important;
+}
+
+/* Button hover effect for all buttons */
+.stButton > button:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
+}
+
+/* Button active/pressed state */
+.stButton > button:active {
+    transform: translateY(0px) !important;
+}
+
+/* Metric card styling */
+.metric-card {
+    background-color: #f0f2f6;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    border-left: 4px solid #ff6b6b;
+}
+
+/* Center images and maintain aspect ratio */
+.stImage > img {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    max-width: 500px;
+    height: auto;
+    max-height: 300px
+}
+
+/* Larger text input for questions */
+.stTextInput > div > div > input {
+    font-size: 18px !important;
+    padding: 10px !important;
+}
+
+/* Larger inference button */
+.inference-button button, 
+.inference-button .stButton > button {
+    padding: 20px !important;
+    height: 200px !important;
+    min-height: 100% !important;
+    max-height: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    line-height: 1.2 !important;
+    white-space: nowrap !important;
+    font-size: large !important;
+}
+
+
+.card {
+    background-color: #1F2022;
+    color: #bdc3c7;
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+    /* outline: 2px solid var(--nvidia-green); */
+    box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+    text-align: left;
+    height: 300px;
+    overflow-y: auto;
+    margin-bottom: 1rem;
+}
+
+.card--empty {
+    text-align: center;
+    font-style: italic;
+    height: 300px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Wandb iframe wrapper for cropping */
+.wandb-wrapper {
+    overflow: hidden;
+    position: relative;
+    border-radius: 15px;
+    height: var(--visible-height, 320px);
+}
+
+/* Wandb iframe styling */
+.wandb-iframe {
+    border: none;
+    width: 100%;
+    position: absolute;
+    left: 0;
+    height: var(--iframe-height, 600px);
+    top: var(--shift-up, -230px);
+}

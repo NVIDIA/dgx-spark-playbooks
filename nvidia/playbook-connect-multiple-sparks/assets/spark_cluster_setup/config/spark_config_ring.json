@@ -1,0 +1,22 @@
+{
+    "nodes_info": [
+        {
+            "ip_address": "NODE_1_MGMT_IP_ADDRESS",
+            "port": 22,
+            "user": "user_name",
+            "password": "password"
+        },
+        {
+            "ip_address": "NODE_2_MGMT_IP_ADDRESS",
+            "port": 22,
+            "user": "user_name",
+            "password": "password"
+        },
+        {
+            "ip_address": "NODE_3_MGMT_IP_ADDRESS",
+            "port": 22,
+            "user": "user_name",
+            "password": "password"
+        }
+    ]
+}

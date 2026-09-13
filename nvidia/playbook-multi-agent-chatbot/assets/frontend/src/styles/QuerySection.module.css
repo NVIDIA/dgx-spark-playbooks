@@ -1,0 +1,962 @@
+/*
+# SPDX-FileCopyrightText: Copyright (c) 1993-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+*/
+.section {
+  background: white;
+  border-radius: 8px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.configSelect {
+  margin-bottom: 1.5rem;
+}
+
+.configSelect select {
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+  margin-left: 0.5rem;
+}
+
+.queryForm textarea {
+  width: 100%;
+  padding: 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  font-size: 1rem;
+  resize: vertical;
+}
+
+.submitButton, .streamingCancelButton {
+  padding: 0.75rem 1.5rem;
+  border-radius: 4px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.submitButton {
+  background-color: #4299e1;
+  color: white;
+}
+
+.submitButton:hover {
+  background-color: #3182ce;
+}
+
+.streamingCancelButton {
+  background-color: #f56565;
+  color: white;
+}
+
+.streamingCancelButton:hover {
+  background-color: #e53e3e;
+}
+
+.responseContainer {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+}
+
+.streamingIndicator {
+  color: #718096;
+  font-size: 0.875rem;
+  margin-left: 0.5rem;
+}
+
+.responseText {
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.chatContainer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #f9fafb;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+  flex: 1;
+  padding: 20px;
+  margin-bottom: 0;
+  gap: 20px;
+  transition: all 0.3s ease;
+}
+
+:global(.dark) .chatContainer {
+  background: #111827;
+}
+
+.configBar {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  background-color: #ffffff;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.configSelect {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+}
+
+.configSelect select {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  margin-left: 8px;
+  background-color: #f9fafb;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.messagesContainer {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background-color: #f9fafb;
+  transition: all 0.3s ease;
+}
+
+:global(.dark) .messagesContainer {
+  background-color: #111827;
+}
+
+.messageWrapper {
+  display: flex;
+  margin-bottom: 8px;
+  align-items: flex-start;
+  width: 100%;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+  opacity: 0;
+  transform: translateY(20px);
+  animation: messageAppear 0.3s ease forwards;
+}
+
+@keyframes messageAppear {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.userMessageWrapper {
+  justify-content: flex-end;
+}
+
+.assistantMessageWrapper {
+  justify-content: flex-start;
+}
+
+.avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 8px;
+  font-size: 14px;
+  flex-shrink: 0;
+  color: white;
+}
+
+.message {
+  padding: 12px 16px;
+  /* max-width: 80%; */
+  /* max-width: 100%; */
+  word-break: break-word;
+  line-height: 1.5;
+  font-size: 17px;
+}
+
+.userMessage {
+  background-color: #76B900;
+  color: white;
+  padding: 12px 16px;
+  border-radius: 12px;
+  margin-left: auto;
+  max-width: 80%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+:global(.dark) .userMessage {
+  background-color: #76B900;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.assistantMessage {
+  background-color: white;
+  color: #1f2937;
+  padding: 12px 16px;
+  border-radius: 12px;
+  margin-right: auto;
+  max-width: 80%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+:global(.dark) .assistantMessage {
+  background-color: #1f2937;
+  color: #e5e7eb;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* MARKDOWN FORMATTING START */
+.markdown {
+  /* make long words/URLs wrap instead of blowing out the bubble */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.5;
+  font-size: 17px;           /* match your .message */
+}
+
+/* Typography */
+.markdown :global(p) { margin: 0 0 .6rem; }
+.markdown :global(h1) { margin: .4rem 0 .6rem; line-height: 1.25; }
+.markdown :global(h2) { margin: .4rem 0 .6rem; line-height: 1.25; }
+.markdown :global(h3) { margin: .4rem 0 .6rem; line-height: 1.25; }
+.markdown :global(h4) { margin: .4rem 0 .6rem; line-height: 1.25; }
+.markdown :global(h5) { margin: .4rem 0 .6rem; line-height: 1.25; }
+.markdown :global(h6) { margin: .4rem 0 .6rem; line-height: 1.25; }
+.markdown :global(ul) { margin: 0 0 .6rem 1.2rem; }
+.markdown :global(ol) { margin: 0 0 .6rem 1.2rem; }
+.markdown :global(li) { margin: .2rem 0; }
+
+/* Links & images */
+.markdown :global(a) { text-decoration: underline; }
+.markdown :global(img) { max-width: 100%; height: auto; border-radius: 8px; }
+
+/* Inline code */
+.markdown :global(code) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: rgba(0,0,0,.06);
+  padding: .15rem .35rem;
+  border-radius: 6px;
+}
+
+/* Code blocks */
+/* .markdown :global(pre) {
+  margin: .6rem 0;
+  padding: .75rem;
+  border-radius: 10px;
+  background: rgba(0,0,0,.06);
+  background-color: rgba(0, 0, 0, 0.191);
+  /* choose ONE of these behaviors: wrap or scroll */
+  /* white-space: pre-wrap;      wraps long lines in code blocks */
+  /* word-break: break-word; */
+  /* overflow-x: auto;           keeps horizontal scroll for very wide content 
+} */
+
+
+.markdown :global(pre) {
+  margin: .6rem 0;
+  padding: .75rem;
+  border-radius: 10px;
+  background-color: rgba(198, 198, 198, 0.015); /* your dark bg */
+  border: 1px solid rgba(0, 0, 0, 0.1); /* light stroke */
+  /* box-shadow: 0 1px 1px #76b900; */
+  box-shadow: none;
+
+  /* wrapping */
+  white-space: pre-wrap !important;   /* wrap long lines */
+  overflow-x: hidden !important;     /* prevent horizontal scrollbar */
+  overflow-wrap: anywhere;
+  word-break: break-word;  /* break long tokens */
+}
+
+:global(.dark) .markdown :global(pre) {
+  background-color: rgba(0, 0, 0, 0.19); /* your dark bg */
+  border: none; /* remove stroke in dark mode */
+  box-shadow: none; /* or adjust if you want */
+}
+
+/* Tables (from GFM) */
+.markdown :global(table) { width: 100%; border-collapse: collapse; display: block; overflow-x: auto; }
+.markdown :global(th), .markdown :global(td) { border: 1px solid rgba(0,0,0,.1); padding: .4rem .6rem; }
+
+/* minimal helpers */
+.markdown { overflow-wrap: anywhere; }
+/* .markdown :global(pre) { overflow-x: auto; } lets wide code scroll instead of stretching the bubble */
+:global(.dark) .markdown pre code .token { opacity: 1 !important; }
+/* keep wrapping solid */
+.markdown :global(pre code) { white-space: inherit !important; }
+:global(.dark) .markdown pre code .token.tag,
+:global(.dark) .markdown pre code .token.prolog,
+:global(.dark) .markdown pre code .token.doctype {
+  color: #E3E3E3 !important; /* bright tags */
+}
+
+:global(.dark) .markdown pre code .token.punctuation {
+  color: #99CFCF !important; /* accent punctuation */
+}
+
+/* Remove opacity dimming if Prism theme uses it */
+:global(.dark) .markdown pre code .token {
+  opacity: 1 !important;
+}
+/* MARKDOWN FORMATTING END */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+.inputContainer {
+  display: flex;
+  padding: 12px 16px 4px 16px;
+  position: relative;
+  justify-content: center;
+  align-items: center;
+  background-color: #f9fafb;
+  margin-top: 0;
+  margin-bottom: 0;
+  width: 100%;
+  opacity: 0;
+  transform: translateY(20px);
+  animation: messageAppear 0.8s ease forwards;
+  animation-delay: 0.8s;
+  transition: all 0.3s ease;
+  gap: 12px;
+}
+
+:global(.dark) .inputContainer {
+  background-color: #111827;
+  /* background-color: greenyellow; */
+}
+
+.inputWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 600px;
+}
+
+.messageInput {
+  width: 100%;
+  max-width: 600px;
+  padding: 12px 50px 12px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  resize: none;
+  font-size: 16px;
+  outline: none;
+  min-height: 80px;
+  max-height: 120px;
+  overflow-y: auto;
+  background-color: white;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  margin-bottom: 4px;
+  opacity: 0;
+  transform: translateY(20px);
+  animation: messageAppear 0.8s ease forwards;
+  animation-delay: 0.8s;
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+  line-height: 24px;
+  display: block;
+  padding-top: 28px;
+  color: var(--foreground);
+}
+
+:global(.dark) .messageInput {
+  background-color: #1f2937;
+  border-color: #374151;
+  color: #e5e7eb;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.messageInput::placeholder {
+  color: #9ca3af;
+  opacity: 1;
+}
+
+:global(.dark) .messageInput::placeholder {
+  color: #6b7280;
+  opacity: 1;
+}
+
+.messageInput::-webkit-scrollbar {
+  width: 3px;
+}
+
+.messageInput::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 16px 0;
+}
+
+.messageInput::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 1.5px;
+}
+
+.messageInput::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e0;
+}
+
+.messageInput:focus {
+  border-color: #76B900;
+  box-shadow: 0 0 0 2px rgba(118, 185, 0, 0.2);
+}
+
+.sendButton, .streamingCancelButton {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  color: white;
+  position: absolute;
+  right: calc(50% - 280px);
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  visibility: hidden;
+  padding: 0;
+}
+
+/* Quick appear animation for all button shows */
+@keyframes buttonAppear {
+  from {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-30%);
+  }
+  to {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(-50%);
+  }
+}
+
+.sendButton.show, .streamingCancelButton.show {
+  animation: buttonAppear 0.3s ease forwards;
+}
+
+.sendButton {
+  background-color: #76B900;
+}
+
+.sendButton:hover {
+  background-color: #669f00;
+}
+
+.sendButton:disabled {
+  background-color: #cbd5e0;
+  cursor: not-allowed;
+}
+
+.streamingCancelButton {
+  background-color: #f56565;
+  transition: background-color 0.3s ease;
+}
+
+.streamingCancelButton:hover {
+  background-color: #e53e3e;
+}
+
+.typingIndicator {
+  display: flex;
+  gap: 4px;
+  padding: 12px 16px;
+  background-color: white;
+  border-radius: 12px;
+  margin-right: auto;
+  max-width: 80%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  opacity: 0;
+  transform: translateY(20px);
+  animation: messageAppear 0.3s ease forwards;
+  transition: all 0.3s ease;
+}
+
+:global(.dark) .typingIndicator {
+  background-color: #1f2937;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.typingIndicator span {
+  height: 8px;
+  width: 8px;
+  margin: 0 2px;
+  background-color: #999;
+  border-radius: 50%;
+  display: inline-block;
+  animation: bounce 1.4s infinite ease-in-out both;
+}
+
+.typingIndicator span:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.typingIndicator span:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes bounce {
+  0%, 80%, 100% { 
+    transform: scale(0);
+  } 40% { 
+    transform: scale(1.0);
+  }
+}
+
+@media (max-width: 768px) {
+  .messageWrapper {
+    max-width: 80%;
+  }
+  
+  .messageInput {
+    max-width: 85%;
+  }
+  
+  .sendButton, .streamingCancelButton {
+    right: 25px;
+  }
+}
+
+.querySection {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  min-height: 100vh;
+  padding: 20px;
+  padding-left: 80px;
+  padding-bottom: 0;
+  background-color: #f9fafb;
+  transition: all 0.3s ease;
+  margin: 0;
+}
+
+:global(.dark) .querySection {
+  background-color: #111827;
+}
+
+.textarea {
+  flex: 1;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  resize: none;
+  min-height: 48px;
+  max-height: 200px;
+  font-family: inherit;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #1f2937;
+  background-color: #f9fafb;
+  transition: all 0.3s ease;
+}
+
+:global(.dark) .textarea {
+  background-color: #374151;
+  border-color: #4b5563;
+  color: #e5e7eb;
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: #76B900;
+  box-shadow: 0 0 0 3px rgba(118, 185, 0, 0.2);
+}
+
+:global(.dark) .textarea:focus {
+  box-shadow: 0 0 0 3px rgba(118, 185, 0, 0.4);
+}
+
+.sendButton {
+  padding: 0 16px;
+  background-color: #76B900;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sendButton:hover {
+  background-color: #669f00;
+}
+
+.sendButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  background-color: #76B900;
+  border-radius: 50%;
+  animation: bounce 1.4s infinite ease-in-out;
+}
+
+:global(.dark) .dot {
+  background-color: #76B900;
+}
+
+.dot:nth-child(1) { animation-delay: -0.32s; }
+.dot:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0); }
+  40% { transform: scale(1); }
+}
+
+/* Adding styles for tool calling interface */
+.toolCallingWrapper {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 16px;
+  width: 100%;
+  height: 350px !important;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+  opacity: 0;
+  transform: translateY(20px);
+  animation: messageAppear 0.3s ease forwards;
+  background-color: blue !important;
+}
+
+.toolCallingHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background-color: #374151;
+  border-radius: 8px 8px 8px 8px;
+  margin-bottom: 0;
+}
+
+.dark .toolCallingHeader {
+  background-color: #374151;
+}
+
+.toolCallingLabel {
+  color: #9ca3af;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.toolName {
+  color: #e5e7eb;
+  font-size: 14px;
+  font-weight: 500;
+  background-color: #4b5563;
+  padding: 4px 12px;
+  border-radius: 6px;
+}
+
+.dark .toolName {
+  color: #e5e7eb;
+  background-color: #4b5563;
+}
+
+.toolMessage {
+  background-color: #1f2937;
+  border-radius: 0 0 8px 8px;
+  padding: 0;
+  margin-top: 0;
+}
+
+.dark .toolMessage {
+  background-color: #1f2937;
+}
+
+.toolMessageLabel {
+  color: #9ca3af;
+  font-size: 14px;
+  font-weight: 400;
+  padding: 12px 16px 8px 16px;
+  border-bottom: 1px solid #374151;
+  margin-bottom: 0;
+}
+/* 
+.toolMessageContent {
+  padding: 16px;
+  color: #e5e7eb;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-x: auto;
+}
+
+
+.toolMessageContent pre {
+  margin: 0;
+  padding: 0;
+  background: pink !important;
+  border: none !important;
+  box-shadow: none !important;
+} */
+
+/* .toolMessageContent code {
+  background: pink !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  font-size: inherit;
+  color: var(--foreground) !important;
+} */
+
+/* Updated tool calling styles for pinned output, wider width, and scrollable content */
+.pinnedToolOutput {
+
+  position: relative;
+  top: 20px;
+  transition: opacity 0.4s  ease-in-out;
+  justify-content: center;
+  min-height: 56px; /* Reserve space for fade, adjust as needed */
+  height: min-content;
+  align-items: center;
+  align-self: center;
+  width: min(800px, 90%);
+  /* background-color: #1f2937; */
+  /* border-radius: 8px; */
+  /* box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); */
+  z-index: 1;
+  opacity: 1;
+  /* Remove animation, only use opacity for fade */
+}
+
+.pinnedToolOutputHidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/*this is very helpful if showing tool preview*/
+.pinnedToolOutput .toolContent {
+  max-height: 300px;
+  min-height: fit-content;
+  overflow-y: auto;
+} 
+
+
+/* hit the highlighter root (which is a DIV because of PreTag="div") */
+.pinnedToolOutput .toolContent :global(.react-syntax-highlighter),
+.pinnedHighlighter {
+  overflow-y: auto !important;
+  margin: 0 !important;
+  padding: 12px !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: var(--foreground) !important;
+} 
+
+ .pinnedToolOutput .toolContent :global(.react-syntax-highlighter > code) {
+  display: block !important;
+  white-space: pre-wrap !important; /* wrap long lines if desired */
+} 
+
+.dark .pinnedToolOutput {
+  background-color: #1f2937;
+}
+
+.toolHeader {
+  border-color: #76B900;
+  box-shadow: 0 0 0 2px rgba(118, 185, 0, 0.2);
+  padding: 12px 16px;
+  background-color: var(--primary-dark);
+  opacity: 0.6;
+  border-radius: 8px;
+  /* border-bottom: 1px solid #4b5563; */
+}
+
+.dark .toolHeader {
+  background-color: #374151;
+}
+
+.toolLabel {
+  color: #e5e7eb;
+  font-size: 14px;
+  font-weight: 500;
+}
+/* 
+.toolContent {
+  max-height: 300px !important;
+  height: 300px !important;
+  overflow-y: auto;
+  padding: 16px;
+  color: #e5e7eb;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.dark .toolContent {
+  color: #e5e7eb;
+}
+
+.toolContent::-webkit-scrollbar {
+  width: 6px;
+}
+
+.toolContent::-webkit-scrollbar-track {
+  background: #374151;
+  border-radius: 3px;
+}
+
+.toolContent::-webkit-scrollbar-thumb {
+  background: #6b7280;
+  border-radius: 3px;
+}
+
+.toolContent::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Fixed SyntaxHighlighter height constraints to respect container bounds *
+  max-height: 250px !important;
+  overflow-y: auto !important;
+  margin: 0 !important;
+  padding: 12px !important;
+}
+
+.toolContent code[class*="language-"] {
+  display: block !important;
+  white-space: pre-wrap !important;
+}
+
+.toolContent div[data-language] {
+  max-height: 250px !important;
+  overflow-y: auto !important;
+}
+
+.toolContent .react-syntax-highlighter-line-number {
+  display: none !important;
+}
+
+
+ */
+
+/* Copyable code block wrapper */
+.codeBlock {
+  position: relative;
+}
+
+.copyButton {
+  position: absolute;
+  right: 8px;
+  z-index: 1;
+  font-size: 12px;
+  color: var(--primary);
+  /* color: #111827; */
+  cursor: pointer;
+  transition: opacity .15s ease, background .2s ease, transform .1s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex-direction: column;
+}
+
+
+.copyButton:hover {
+  transform: translateY(-1px);
+  .copyButtonIcon {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+}
+
+.copyButton:active {
+  transform: translateY(0);
+}
+
+/* ::global(.dark) .copyButton {
+  color: var(--foreground);
+}  */
+
+.copyButtonIcon {
+  width: 16px;
+  height: 16px;
+  color: currentColor;
+}
+
+.copyButtonLabel {
+  font-size: 10px;
+  margin-bottom: 4px;
+}
+
+.disclaimer {
+  text-align: center;
+  font-size: 10px;
+  color: #6b7280;
+  padding: 2px 16px;
+  margin: -12px auto 0 auto;
+  max-width: 600px;
+  line-height: 1.4;
+  opacity: 0.8;
+  transition: color 0.3s ease;
+}
+
+:global(.dark) .disclaimer {
+  color: #9ca3af;
+}
+
+.info {
+  color: #3b82f6;
+  font-weight: 500;
+}
+
+:global(.dark) .info {
+  color: #60a5fa;
+}
+
+.warning {
+  color: #f59e0b;
+  font-weight: 500;
+}
+
+:global(.dark) .warning {
+  color: #fbbf24;
+}
+

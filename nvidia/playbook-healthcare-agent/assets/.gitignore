@@ -1,0 +1,7 @@
+.env
+.DS_Store
+sandbox-policy-local.yaml
+test-results/
+.venv/
+__pycache__/
+*.pyc

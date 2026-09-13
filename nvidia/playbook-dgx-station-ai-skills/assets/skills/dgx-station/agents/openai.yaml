@@ -1,0 +1,6 @@
+interface:
+  display_name: "DGX Station"
+  short_description: "Inspect and guide DGX Station development"
+  default_prompt: >-
+    Use $dgx-station to inspect this DGX Station and answer my platform
+    question from pinned NVIDIA guidance.

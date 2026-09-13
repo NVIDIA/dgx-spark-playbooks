@@ -1,0 +1,106 @@
+{
+  "1": {
+    "inputs": {
+      "unet_name": "hidream_i1_full_fp16.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": { "title": "Load HiDream-I1 Full Model (17B)" }
+  },
+  "2": {
+    "inputs": {
+      "clip_name1": "clip_l_hidream.safetensors",
+      "clip_name2": "clip_g_hidream.safetensors",
+      "clip_name3": "t5xxl_fp8_e4m3fn_scaled.safetensors",
+      "clip_name4": "llama_3.1_8b_instruct_fp8_scaled.safetensors"
+    },
+    "class_type": "QuadrupleCLIPLoader",
+    "_meta": { "title": "Quadruple CLIP Loader (CLIP-L + CLIP-G + T5-XXL + Llama-3.1-8B)" }
+  },
+  "3": {
+    "inputs": {
+      "vae_name": "ae_hidream.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": { "title": "Load VAE" }
+  },
+  "4": {
+    "inputs": {
+      "clip": ["2", 0],
+      "clip_l": "An astronaut riding a horse on Mars, with Earth visible in the sky, oil painting style by Rembrandt, dramatic chiaroscuro lighting",
+      "clip_g": "An astronaut riding a horse on Mars, with Earth visible in the sky, oil painting style by Rembrandt, dramatic chiaroscuro lighting",
+      "t5xxl": "An astronaut riding a horse on Mars, with Earth visible in the sky, oil painting style by Rembrandt, dramatic chiaroscuro lighting",
+      "llama": "An astronaut riding a horse on Mars, with Earth visible in the sky, oil painting style by Rembrandt, dramatic chiaroscuro lighting"
+    },
+    "class_type": "CLIPTextEncodeHiDream",
+    "_meta": { "title": "HiDream Text Encode (4 Encoders)" }
+  },
+  "5": {
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 1
+    },
+    "class_type": "EmptySD3LatentImage",
+    "_meta": { "title": "Empty Latent (1024x1024)" }
+  },
+  "6": {
+    "inputs": {
+      "noise": ["10", 0],
+      "guider": ["7", 0],
+      "sampler": ["8", 0],
+      "sigmas": ["9", 0],
+      "latent_image": ["5", 0]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": { "title": "Advanced Sampler" }
+  },
+  "7": {
+    "inputs": {
+      "model": ["1", 0],
+      "conditioning": ["4", 0]
+    },
+    "class_type": "BasicGuider",
+    "_meta": { "title": "Basic Guider" }
+  },
+  "8": {
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": { "title": "Sampler Select (Euler)" }
+  },
+  "9": {
+    "inputs": {
+      "scheduler": "simple",
+      "steps": 28,
+      "denoise": 1.0,
+      "model": ["1", 0]
+    },
+    "class_type": "BasicScheduler",
+    "_meta": { "title": "Basic Scheduler (28 steps)" }
+  },
+  "10": {
+    "inputs": {
+      "noise_seed": 42
+    },
+    "class_type": "RandomNoise",
+    "_meta": { "title": "Random Noise" }
+  },
+  "11": {
+    "inputs": {
+      "samples": ["6", 0],
+      "vae": ["3", 0]
+    },
+    "class_type": "VAEDecode",
+    "_meta": { "title": "VAE Decode" }
+  },
+  "12": {
+    "inputs": {
+      "filename_prefix": "hidream_output",
+      "images": ["11", 0]
+    },
+    "class_type": "SaveImage",
+    "_meta": { "title": "Save Image" }
+  }
+}

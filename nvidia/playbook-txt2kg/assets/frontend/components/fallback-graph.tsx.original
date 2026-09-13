@@ -1,0 +1,961 @@
+"use client"
+
+import type React from "react"
+
+import { useEffect, useRef, useState, useCallback } from "react"
+import type { Triple } from "@/utils/text-processing"
+import { Maximize2, Minimize2, ZoomIn, ZoomOut, Move, Filter, Play, Pause } from "lucide-react"
+
+interface FallbackGraphProps {
+  triples: Triple[]
+  fullscreen?: boolean
+}
+
+interface Node {
+  id: string
+  label: string
+  x: number
+  y: number
+  vx: number
+  vy: number
+  radius: number
+  color: string
+  connections: number
+}
+
+interface Link {
+  source: string
+  target: string
+  label: string
+}
+
+export function FallbackGraph({ triples, fullscreen = false }: FallbackGraphProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [isFullscreen, setIsFullscreen] = useState(fullscreen)
+  const [isBrowserFullscreen, setIsBrowserFullscreen] = useState(false)
+  const [hoveredNode, setHoveredNode] = useState<string | null>(null)
+  const [selectedNode, setSelectedNode] = useState<string | null>(null)
+  const [zoom, setZoom] = useState(1)
+  const [offset, setOffset] = useState({ x: 0, y: 0 })
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
+  const [simulation, setSimulation] = useState<{
+    nodes: Node[]
+    links: Link[]
+    isRunning: boolean
+    iteration: number
+  } | null>(null)
+  const [nodeLimit, setNodeLimit] = useState(75) // Default node limit
+  const [showNodeLimitWarning, setShowNodeLimitWarning] = useState(false)
+  const [allNodesCount, setAllNodesCount] = useState(0)
+  const [tooltipText, setTooltipText] = useState("")
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
+  const [showTooltip, setShowTooltip] = useState(false)
+  const [simulationPaused, setSimulationPaused] = useState(true) // Start with simulation paused
+
+  // Handle browser fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsBrowserFullscreen(!!document.fullscreenElement)
+    }
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange)
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange)
+    }
+  }, [])
+
+  // Toggle browser fullscreen
+  const toggleFullscreen = useCallback(() => {
+    if (!containerRef.current) return
+
+    if (!document.fullscreenElement) {
+      // Enter fullscreen
+      containerRef.current.requestFullscreen().catch((err) => {
+        console.error(`Error attempting to enable fullscreen: ${err.message}`)
+      })
+    } else {
+      // Exit fullscreen
+      document.exitFullscreen().catch((err) => {
+        console.error(`Error attempting to exit fullscreen: ${err.message}`)
+      })
+    }
+  }, [])
+
+  const handleZoomIn = useCallback(() => {
+    setZoom((prev) => Math.min(3, prev + 0.1))
+  }, [])
+
+  const handleZoomOut = useCallback(() => {
+    setZoom((prev) => Math.max(0.1, prev - 0.1))
+  }, [])
+
+  const handleResetView = useCallback(() => {
+    setZoom(1)
+    setOffset({ x: 0, y: 0 })
+    setSelectedNode(null)
+
+    // Restart simulation
+    setSimulation((prev) => (prev ? { ...prev, isRunning: true, iteration: 0 } : null))
+  }, [])
+
+  const handleIncreaseNodeLimit = useCallback(() => {
+    setNodeLimit((prev) => Math.min(prev + 50, 500))
+  }, [])
+
+  const handleDecreaseNodeLimit = useCallback(() => {
+    setNodeLimit((prev) => Math.max(25, prev - 25))
+  }, [])
+
+  const toggleNodeLimit = useCallback(() => {
+    setNodeLimit((prev) => (prev === 75 ? 150 : 75))
+  }, [])
+
+  // Handle tooltip display
+  const handleButtonMouseEnter = useCallback((e: React.MouseEvent, text: string) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    setTooltipText(text)
+    setTooltipPosition({
+      x: rect.left + rect.width / 2,
+      y: rect.bottom + 5,
+    })
+    setShowTooltip(true)
+  }, [])
+
+  const handleButtonMouseLeave = useCallback(() => {
+    setShowTooltip(false)
+  }, [])
+
+  // Initialize the simulation with a subset of nodes
+  useEffect(() => {
+    if (!triples.length) return
+
+    // Extract unique entities and count their connections
+    const entityConnections = new Map<string, number>()
+
+    triples.forEach((triple) => {
+      // Count subject connections
+      if (entityConnections.has(triple.subject)) {
+        entityConnections.set(triple.subject, entityConnections.get(triple.subject)! + 1)
+      } else {
+        entityConnections.set(triple.subject, 1)
+      }
+
+      // Count object connections
+      if (entityConnections.has(triple.object)) {
+        entityConnections.set(triple.object, entityConnections.get(triple.object)! + 1)
+      } else {
+        entityConnections.set(triple.object, 1)
+      }
+    })
+
+    // Sort entities by connection count (most connected first)
+    const sortedEntities = Array.from(entityConnections.entries()).sort((a, b) => b[1] - a[1])
+
+    // Store total node count
+    setAllNodesCount(sortedEntities.length)
+
+    // Show warning if we're limiting nodes
+    setShowNodeLimitWarning(sortedEntities.length > nodeLimit)
+
+    // Take only the top N entities
+    const topEntities = sortedEntities.slice(0, nodeLimit).map(([id]) => id)
+
+    // Create a Set for faster lookups
+    const includedEntities = new Set(topEntities)
+
+    // Create nodes
+    const nodes: Node[] = topEntities.map((id) => {
+      const connectionCount = entityConnections.get(id) || 0
+
+      return {
+        id,
+        label: id,
+        x: Math.random() * 800 - 400,
+        y: Math.random() * 800 - 400,
+        vx: 0,
+        vy: 0,
+        radius: Math.max(5, Math.min(12, 5 + connectionCount * 0.5)),
+        color: "#76B900",
+        connections: connectionCount,
+      }
+    })
+
+    // Create links (only between included entities)
+    const links: Link[] = triples
+      .filter((triple) => includedEntities.has(triple.subject) && includedEntities.has(triple.object))
+      .map((triple) => ({
+        source: triple.subject,
+        target: triple.object,
+        label: triple.predicate,
+      }))
+
+    setSimulation({
+      nodes,
+      links,
+      isRunning: !simulationPaused, // Use the simulationPaused state to determine initial running state
+      iteration: 0,
+    })
+  }, [triples, nodeLimit, simulationPaused])
+
+  // Run the simulation with optimizations
+  useEffect(() => {
+    if (!simulation || !simulation.isRunning) return
+
+    let animationFrameId: number
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const ctx = canvas.getContext("2d")
+    if (!ctx) return
+
+    // Force simulation parameters
+    const strength = -30 // Repulsive force between nodes
+    const linkDistance = 100 // Desired distance between connected nodes
+    const linkStrength = 0.1 // Strength of the links
+    const friction = 0.9 // Friction to slow down nodes
+    const gravity = 0.1 // Force pulling nodes to the center
+    const maxIterations = 300 // Maximum number of iterations
+
+    // Create a node lookup map for faster access
+    const nodeMap = new Map(simulation.nodes.map((node) => [node.id, node]))
+
+    const tick = () => {
+      // Apply forces
+      const { nodes, links, iteration } = simulation
+
+      // Stop if we've reached max iterations
+      if (iteration >= maxIterations) {
+        setSimulation((prev) => (prev ? { ...prev, isRunning: false } : null))
+        return
+      }
+
+      // Optimization: Use a grid-based approach for repulsion
+      // Divide space into cells and only calculate forces between nodes in nearby cells
+      const cellSize = 100
+      const grid = new Map<string, Node[]>()
+
+      // Place nodes in grid cells
+      for (const node of nodes) {
+        const cellX = Math.floor(node.x / cellSize)
+        const cellY = Math.floor(node.y / cellSize)
+        const cellKey = `${cellX},${cellY}`
+
+        if (!grid.has(cellKey)) {
+          grid.set(cellKey, [])
+        }
+
+        grid.get(cellKey)!.push(node)
+      }
+
+      // Apply repulsive forces between nodes in same or adjacent cells
+      for (const node of nodes) {
+        const cellX = Math.floor(node.x / cellSize)
+        const cellY = Math.floor(node.y / cellSize)
+
+        // Check current cell and adjacent cells
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dy = -1; dy <= 1; dy++) {
+            const neighborCellKey = `${cellX + dx},${cellY + dy}`
+            const neighborNodes = grid.get(neighborCellKey) || []
+
+            for (const otherNode of neighborNodes) {
+              if (node.id === otherNode.id) continue
+
+              const dx = otherNode.x - node.x
+              const dy = otherNode.y - node.y
+              const distance = Math.sqrt(dx * dx + dy * dy) || 1
+
+              // Skip if too far
+              if (distance > cellSize * 1.5) continue
+
+              const force = strength / (distance * distance)
+
+              // Avoid extreme forces at very close distances
+              const maxForce = 5
+              const limitedForce = Math.max(-maxForce, Math.min(maxForce, force))
+
+              const fx = (limitedForce * dx) / distance
+              const fy = (limitedForce * dy) / distance
+
+              node.vx -= fx
+              node.vy -= fy
+            }
+          }
+        }
+      }
+
+      // Apply attractive forces along links
+      for (const link of links) {
+        const sourceNode = nodeMap.get(link.source)
+        const targetNode = nodeMap.get(link.target)
+
+        if (sourceNode && targetNode) {
+          const dx = targetNode.x - sourceNode.x
+          const dy = targetNode.y - sourceNode.y
+          const distance = Math.sqrt(dx * dx + dy * dy) || 1
+          const force = (distance - linkDistance) * linkStrength
+
+          const fx = (force * dx) / distance
+          const fy = (force * dy) / distance
+
+          sourceNode.vx += fx
+          sourceNode.vy += fy
+          targetNode.vx -= fx
+          targetNode.vy -= fy
+        }
+      }
+
+      // Apply gravity towards center
+      for (const node of nodes) {
+        node.vx += (-node.x * gravity) / 100
+        node.vy += (-node.y * gravity) / 100
+      }
+
+      // Apply velocity with friction and update positions
+      for (const node of nodes) {
+        node.vx *= friction
+        node.vy *= friction
+        node.x += node.vx
+        node.y += node.vy
+      }
+
+      // Check if simulation has stabilized
+      const isStable = nodes.every((node) => Math.abs(node.vx) < 0.1 && Math.abs(node.vy) < 0.1)
+
+      if (isStable) {
+        setSimulation((prev) => (prev ? { ...prev, isRunning: false } : null))
+      } else {
+        setSimulation((prev) => (prev ? { ...prev, iteration: prev.iteration + 1 } : null))
+      }
+
+      // Draw the graph
+      drawGraph()
+
+      if (!isStable && iteration < maxIterations) {
+        animationFrameId = requestAnimationFrame(tick)
+      }
+    }
+
+    const drawGraph = () => {
+      if (!ctx || !canvas || !simulation) return
+
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+      const { nodes, links } = simulation
+      const centerX = canvas.width / 2
+      const centerY = canvas.height / 2
+
+      // Draw links
+      ctx.lineWidth = 1
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.2)"
+
+      for (const link of links) {
+        const sourceNode = nodeMap.get(link.source)
+        const targetNode = nodeMap.get(link.target)
+
+        if (sourceNode && targetNode) {
+          // Transform coordinates based on zoom and offset
+          const sx = centerX + (sourceNode.x + offset.x) * zoom
+          const sy = centerY + (sourceNode.y + offset.y) * zoom
+          const tx = centerX + (targetNode.x + offset.x) * zoom
+          const ty = centerY + (targetNode.y + offset.y) * zoom
+
+          // Highlight links connected to hovered/selected node
+          if (
+            hoveredNode === sourceNode.id ||
+            hoveredNode === targetNode.id ||
+            selectedNode === sourceNode.id ||
+            selectedNode === targetNode.id
+          ) {
+            ctx.strokeStyle = "rgba(118, 185, 0, 0.6)"
+            ctx.lineWidth = 2
+          } else {
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.2)"
+            ctx.lineWidth = 1
+          }
+
+          ctx.beginPath()
+          ctx.moveTo(sx, sy)
+          ctx.lineTo(tx, ty)
+          ctx.stroke()
+
+          // Draw arrow
+          const angle = Math.atan2(ty - sy, tx - sx)
+          const arrowLength = 8
+
+          ctx.beginPath()
+          ctx.moveTo(tx, ty)
+          ctx.lineTo(tx - arrowLength * Math.cos(angle - Math.PI / 6), ty - arrowLength * Math.sin(angle - Math.PI / 6))
+          ctx.lineTo(tx - arrowLength * Math.cos(angle + Math.PI / 6), ty - arrowLength * Math.sin(angle + Math.PI / 6))
+          ctx.closePath()
+          ctx.fillStyle = "rgba(118, 185, 0, 0.6)"
+          ctx.fill()
+
+          // Draw link label for hovered connections
+          if (
+            hoveredNode === sourceNode.id ||
+            hoveredNode === targetNode.id ||
+            selectedNode === sourceNode.id ||
+            selectedNode === targetNode.id
+          ) {
+            const midX = (sx + tx) / 2
+            const midY = (sy + ty) / 2
+
+            // Background for label
+            ctx.font = "10px Inter, sans-serif"
+            const labelWidth = ctx.measureText(link.label).width + 8
+            ctx.fillStyle = "rgba(0, 0, 0, 0.7)"
+            ctx.fillRect(midX - labelWidth / 2, midY - 10, labelWidth, 20)
+
+            // Label text
+            ctx.fillStyle = "white"
+            ctx.textAlign = "center"
+            ctx.textBaseline = "middle"
+            ctx.fillText(link.label, midX, midY)
+          }
+        }
+      }
+
+      // Draw nodes
+      for (const node of nodes) {
+        // Transform coordinates based on zoom and offset
+        const x = centerX + (node.x + offset.x) * zoom
+        const y = centerY + (node.y + offset.y) * zoom
+        const radius = node.radius * zoom
+
+        // Node circle
+        ctx.beginPath()
+        ctx.arc(x, y, radius, 0, Math.PI * 2)
+
+        // Highlight hovered or selected node
+        if (node.id === hoveredNode || node.id === selectedNode) {
+          // Glow effect
+          ctx.fillStyle = "#76B900"
+        } else {
+          ctx.fillStyle = "rgba(118, 185, 0, 0.8)"
+        }
+
+        ctx.fill()
+
+        // Draw node border
+        if (node.id === selectedNode) {
+          ctx.strokeStyle = "white"
+          ctx.lineWidth = 2
+          ctx.stroke()
+        }
+
+        // Draw node label
+        ctx.font =
+          node.id === hoveredNode || node.id === selectedNode ? "bold 12px Inter, sans-serif" : "11px Inter, sans-serif"
+
+        ctx.fillStyle = "rgba(255, 255, 255, 0.9)"
+        ctx.textAlign = "center"
+        ctx.textBaseline = "middle"
+
+        // Only show labels for hovered, selected, or nodes with many connections
+        // Always show labels for important nodes (those with many connections)
+        // and always show for hovered/selected nodes
+        const isImportantNode = node.connections > 2
+        const isHighlightedNode = node.id === hoveredNode || node.id === selectedNode
+
+        if (isImportantNode || isHighlightedNode) {
+          // Background for label
+          const labelWidth = ctx.measureText(node.label).width + 8
+          const labelHeight = 20
+
+          // Always add background for important nodes
+          ctx.fillStyle = "rgba(0, 0, 0, 0.8)"
+          ctx.fillRect(x - labelWidth / 2, y + radius + 4, labelWidth, labelHeight)
+
+          // Text color
+          ctx.fillStyle = isHighlightedNode ? "white" : "rgba(255, 255, 255, 0.9)"
+          ctx.fillText(node.label, x, y + radius + 14)
+        }
+      }
+    }
+
+    // Start the simulation
+    animationFrameId = requestAnimationFrame(tick)
+
+    return () => {
+      cancelAnimationFrame(animationFrameId)
+    }
+  }, [simulation, hoveredNode, selectedNode, zoom, offset])
+
+  // Handle canvas resize
+  useEffect(() => {
+    const handleResize = () => {
+      const canvas = canvasRef.current
+      if (!canvas) return
+
+      const container = canvas.parentElement
+      if (!container) return
+
+      canvas.width = container.clientWidth
+      canvas.height = container.clientHeight
+    }
+
+    handleResize()
+    window.addEventListener("resize", handleResize)
+
+    return () => {
+      window.removeEventListener("resize", handleResize)
+    }
+  }, [isFullscreen, isBrowserFullscreen])
+
+  // Handle mouse interactions
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas || !simulation) return
+
+    const getMousePosition = (e: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect()
+      const x = e.clientX - rect.left
+      const y = e.clientY - rect.top
+      return { x, y }
+    }
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!simulation) return
+
+      const { x, y } = getMousePosition(e)
+      const centerX = canvas.width / 2
+      const centerY = canvas.height / 2
+
+      // Check if mouse is over any node
+      let hovered = null
+      for (const node of simulation.nodes) {
+        const nodeX = centerX + (node.x + offset.x) * zoom
+        const nodeY = centerY + (node.y + offset.y) * zoom
+        const distance = Math.sqrt(Math.pow(x - nodeX, 2) + Math.pow(y - nodeY, 2))
+
+        if (distance < node.radius * zoom) {
+          hovered = node.id
+          break
+        }
+      }
+
+      setHoveredNode(hovered)
+
+      // Handle dragging
+      if (isDragging) {
+        const dx = (x - dragStart.x) / zoom
+        const dy = (y - dragStart.y) / zoom
+
+        setOffset((prev) => ({
+          x: prev.x + dx,
+          y: prev.y + dy,
+        }))
+
+        setDragStart({ x, y })
+      }
+    }
+
+    const handleMouseDown = (e: MouseEvent) => {
+      const { x, y } = getMousePosition(e)
+
+      // Check if clicking on a node
+      const centerX = canvas.width / 2
+      const centerY = canvas.height / 2
+
+      let clickedNode = null
+      for (const node of simulation.nodes) {
+        const nodeX = centerX + (node.x + offset.x) * zoom
+        const nodeY = centerY + (node.y + offset.y) * zoom
+        const distance = Math.sqrt(Math.pow(x - nodeX, 2) + Math.pow(y - nodeY, 2))
+
+        if (distance < node.radius * zoom) {
+          clickedNode = node.id
+          break
+        }
+      }
+
+      if (clickedNode) {
+        // Toggle selection if clicking on a node
+        setSelectedNode((prev) => (prev === clickedNode ? null : clickedNode))
+      } else {
+        // Start dragging the canvas
+        setIsDragging(true)
+        setDragStart({ x, y })
+      }
+    }
+
+    const handleMouseUp = () => {
+      setIsDragging(false)
+    }
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault()
+
+      // Adjust zoom level
+      const delta = -Math.sign(e.deltaY) * 0.1
+      const newZoom = Math.max(0.1, Math.min(3, zoom + delta))
+
+      setZoom(newZoom)
+    }
+
+    canvas.addEventListener("mousemove", handleMouseMove)
+    canvas.addEventListener("mousedown", handleMouseDown)
+    canvas.addEventListener("mouseup", handleMouseUp)
+    canvas.addEventListener("mouseleave", handleMouseUp)
+    canvas.addEventListener("wheel", handleWheel, { passive: false })
+
+    return () => {
+      canvas.removeEventListener("mousemove", handleMouseMove)
+      canvas.removeEventListener("mousedown", handleMouseDown)
+      canvas.removeEventListener("mouseup", handleMouseUp)
+      canvas.removeEventListener("mouseleave", handleMouseUp)
+      canvas.removeEventListener("wheel", handleWheel)
+    }
+  }, [simulation, isDragging, dragStart, zoom, offset])
+
+  // Handle canvas resize when fullscreen changes
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const container = canvas.parentElement
+    if (!container) return
+
+    canvas.width = container.clientWidth
+    canvas.height = container.clientHeight
+
+    // Force redraw with full highlighting and labels
+    if (simulation) {
+      // Instead of a simplified redraw, call the main drawing function
+      // which includes all highlighting and labels
+      const nodeMap = new Map(simulation.nodes.map((node) => [node.id, node]))
+
+      const drawFullGraph = () => {
+        const ctx = canvas.getContext("2d")
+        if (!ctx) return
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+        const { nodes, links } = simulation
+        const centerX = canvas.width / 2
+        const centerY = canvas.height / 2
+
+        // Draw links with proper highlighting
+        for (const link of links) {
+          const sourceNode = nodeMap.get(link.source)
+          const targetNode = nodeMap.get(link.target)
+
+          if (sourceNode && targetNode) {
+            // Transform coordinates based on zoom and offset
+            const sx = centerX + (sourceNode.x + offset.x) * zoom
+            const sy = centerY + (sourceNode.y + offset.y) * zoom
+            const tx = centerX + (targetNode.x + offset.x) * zoom
+            const ty = centerY + (targetNode.y + offset.y) * zoom
+
+            // Highlight links connected to selected node
+            if (
+              hoveredNode === sourceNode.id ||
+              hoveredNode === targetNode.id ||
+              selectedNode === sourceNode.id ||
+              selectedNode === targetNode.id
+            ) {
+              ctx.strokeStyle = "rgba(118, 185, 0, 0.6)"
+              ctx.lineWidth = 2
+            } else {
+              ctx.strokeStyle = "rgba(255, 255, 255, 0.2)"
+              ctx.lineWidth = 1
+            }
+
+            ctx.beginPath()
+            ctx.moveTo(sx, sy)
+            ctx.lineTo(tx, ty)
+            ctx.stroke()
+
+            // Draw arrow
+            const angle = Math.atan2(ty - sy, tx - sx)
+            const arrowLength = 8
+
+            ctx.beginPath()
+            ctx.moveTo(tx, ty)
+            ctx.lineTo(
+              tx - arrowLength * Math.cos(angle - Math.PI / 6),
+              ty - arrowLength * Math.sin(angle - Math.PI / 6),
+            )
+            ctx.lineTo(
+              tx - arrowLength * Math.cos(angle + Math.PI / 6),
+              ty - arrowLength * Math.sin(angle + Math.PI / 6),
+            )
+            ctx.closePath()
+            ctx.fillStyle = "rgba(118, 185, 0, 0.6)"
+            ctx.fill()
+
+            // Draw link label for selected connections
+            if (
+              hoveredNode === sourceNode.id ||
+              hoveredNode === targetNode.id ||
+              selectedNode === sourceNode.id ||
+              selectedNode === targetNode.id
+            ) {
+              const midX = (sx + tx) / 2
+              const midY = (sy + ty) / 2
+
+              // Background for label
+              ctx.font = "10px Inter, sans-serif"
+              const labelWidth = ctx.measureText(link.label).width + 8
+              ctx.fillStyle = "rgba(0, 0, 0, 0.7)"
+              ctx.fillRect(midX - labelWidth / 2, midY - 10, labelWidth, 20)
+
+              // Label text
+              ctx.fillStyle = "white"
+              ctx.textAlign = "center"
+              ctx.textBaseline = "middle"
+              ctx.fillText(link.label, midX, midY)
+            }
+          }
+        }
+
+        // Draw nodes with proper highlighting
+        for (const node of nodes) {
+          // Transform coordinates based on zoom and offset
+          const x = centerX + (node.x + offset.x) * zoom
+          const y = centerY + (node.y + offset.y) * zoom
+          const radius = node.radius * zoom
+
+          // Node circle
+          ctx.beginPath()
+          ctx.arc(x, y, radius, 0, Math.PI * 2)
+
+          // Highlight hovered or selected node
+          if (node.id === hoveredNode || node.id === selectedNode) {
+            // Glow effect
+            ctx.fillStyle = "#76B900"
+          } else {
+            ctx.fillStyle = "rgba(118, 185, 0, 0.8)"
+          }
+
+          ctx.fill()
+
+          // Draw node border
+          if (node.id === selectedNode) {
+            ctx.strokeStyle = "white"
+            ctx.lineWidth = 2
+            ctx.stroke()
+          }
+
+          // Draw node label
+          ctx.font =
+            node.id === hoveredNode || node.id === selectedNode
+              ? "bold 12px Inter, sans-serif"
+              : "11px Inter, sans-serif"
+
+          ctx.fillStyle = "rgba(255, 255, 255, 0.9)"
+          ctx.textAlign = "center"
+          ctx.textBaseline = "middle"
+
+          // Always show labels for important nodes
+          const isImportantNode = node.connections > 2
+          const isHighlightedNode = node.id === hoveredNode || node.id === selectedNode
+
+          if (isImportantNode || isHighlightedNode) {
+            // Background for label
+            const labelWidth = ctx.measureText(node.label).width + 8
+            const labelHeight = 20
+
+            // Always add background for important nodes
+            ctx.fillStyle = "rgba(0, 0, 0, 0.8)"
+            ctx.fillRect(x - labelWidth / 2, y + radius + 4, labelWidth, labelHeight)
+
+            // Text color
+            ctx.fillStyle = isHighlightedNode ? "white" : "rgba(255, 255, 255, 0.9)"
+            ctx.fillText(node.label, x, y + radius + 14)
+          }
+        }
+      }
+
+      drawFullGraph()
+    }
+  }, [isFullscreen, isBrowserFullscreen, simulation, zoom, offset, hoveredNode, selectedNode])
+
+  // Add toggle function for simulation pause/play
+  const toggleSimulation = useCallback(() => {
+    setSimulationPaused(!simulationPaused);
+    setSimulation(prev => prev ? { ...prev, isRunning: simulationPaused } : null);
+  }, [simulationPaused]);
+
+  return (
+    <div className="relative h-full" ref={containerRef}>
+      <div className={`bg-gray-900 rounded-lg overflow-hidden ${isFullscreen ? "h-full" : "h-[400px]"}`}>
+        <canvas ref={canvasRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
+
+        {/* Info panel */}
+        <div className="absolute bottom-2 left-2 text-xs bg-black/70 px-3 py-2 rounded flex items-center gap-2">
+          <span className="text-gray-400">Force-Directed Graph</span>
+          {simulation?.isRunning && (
+            <span className="text-primary animate-pulse">
+              Simulating... {Math.round((simulation.iteration / 300) * 100)}%
+            </span>
+          )}
+        </div>
+
+        {/* Node limit warning */}
+        {showNodeLimitWarning && (
+          <div className="absolute top-2 left-2 text-xs bg-black/70 px-3 py-2 rounded flex items-center gap-2">
+            <span className="text-yellow-400">
+              Showing {nodeLimit} of {allNodesCount} nodes
+            </span>
+            <button
+              onClick={handleIncreaseNodeLimit}
+              className="px-2 py-0.5 bg-primary/20 text-primary rounded hover:bg-primary/30"
+              title="Show more nodes"
+            >
+              Show more
+            </button>
+          </div>
+        )}
+
+        {/* Controls */}
+        <div className="absolute top-2 right-2 flex flex-col gap-2">
+          <button
+            onClick={toggleFullscreen}
+            className="p-2 bg-black/70 hover:bg-black/90 text-white rounded-full z-10"
+            type="button"
+            onMouseEnter={(e) =>
+              handleButtonMouseEnter(e, isBrowserFullscreen ? "Exit fullscreen" : "Enter fullscreen")
+            }
+            onMouseLeave={handleButtonMouseLeave}
+          >
+            {isBrowserFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          </button>
+
+          {/* Add play/pause simulation button */}
+          <button
+            onClick={toggleSimulation}
+            className="p-2 bg-black/70 hover:bg-black/90 text-white rounded-full z-10"
+            type="button"
+            onMouseEnter={(e) => handleButtonMouseEnter(e, simulationPaused ? "Start simulation" : "Pause simulation")}
+            onMouseLeave={handleButtonMouseLeave}
+          >
+            {simulationPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+          </button>
+
+          <button
+            onClick={handleZoomIn}
+            className="p-2 bg-black/70 hover:bg-black/90 text-white rounded-full z-10"
+            type="button"
+            onMouseEnter={(e) => handleButtonMouseEnter(e, "Zoom in")}
+            onMouseLeave={handleButtonMouseLeave}
+          >
+            <ZoomIn className="h-4 w-4" />
+          </button>
+
+          <button
+            onClick={handleZoomOut}
+            className="p-2 bg-black/70 hover:bg-black/90 text-white rounded-full z-10"
+            type="button"
+            onMouseEnter={(e) => handleButtonMouseEnter(e, "Zoom out")}
+            onMouseLeave={handleButtonMouseLeave}
+          >
+            <ZoomOut className="h-4 w-4" />
+          </button>
+
+          <button
+            onClick={handleResetView}
+            className="p-2 bg-black/70 hover:bg-black/90 text-white rounded-full z-10"
+            type="button"
+            onMouseEnter={(e) => handleButtonMouseEnter(e, "Reset view")}
+            onMouseLeave={handleButtonMouseLeave}
+          >
+            <Move className="h-4 w-4" />
+          </button>
+
+          <button
+            onClick={toggleNodeLimit}
+            className="p-2 bg-black/70 hover:bg-black/90 text-white rounded-full z-10"
+            type="button"
+            onMouseEnter={(e) => handleButtonMouseEnter(e, "Toggle node limit")}
+            onMouseLeave={handleButtonMouseLeave}
+          >
+            <Filter className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Node limit controls */}
+        {showNodeLimitWarning && (
+          <div className="absolute bottom-2 right-2 bg-black/70 rounded px-2 py-1 flex items-center gap-2">
+            <button
+              onClick={handleDecreaseNodeLimit}
+              className="text-white text-xs px-2 py-0.5 bg-gray-700 rounded hover:bg-gray-600"
+              disabled={nodeLimit <= 25}
+              type="button"
+              onMouseEnter={(e) => handleButtonMouseEnter(e, "Show fewer nodes")}
+              onMouseLeave={handleButtonMouseLeave}
+            >
+              -
+            </button>
+            <span className="text-xs text-white">{nodeLimit} nodes</span>
+            <button
+              onClick={handleIncreaseNodeLimit}
+              className="text-white text-xs px-2 py-0.5 bg-gray-700 rounded hover:bg-gray-600"
+              disabled={nodeLimit >= 500}
+              type="button"
+              onMouseEnter={(e) => handleButtonMouseEnter(e, "Show more nodes")}
+              onMouseLeave={handleButtonMouseLeave}
+            >
+              +
+            </button>
+          </div>
+        )}
+
+        {/* Selected node info */}
+        {selectedNode && (
+          <div className="absolute top-2 left-2 bg-black/80 text-white text-sm px-4 py-3 rounded max-w-xs">
+            <h3 className="font-bold text-primary mb-1">{selectedNode}</h3>
+            <div className="text-xs text-gray-300">
+              {simulation?.links.filter((link) => link.source === selectedNode || link.target === selectedNode)
+                .length || 0}{" "}
+              connections
+            </div>
+            <div className="mt-2 text-xs">
+              {simulation?.links
+                .filter((link) => link.source === selectedNode)
+                .map((link, i) => (
+                  <div key={`out-${i}`} className="flex items-center gap-1 mb-1">
+                    <span className="text-gray-400">→</span>
+                    <span className="text-primary">{link.label}</span>
+                    <span className="text-gray-300">→</span>
+                    <span>{link.target}</span>
+                  </div>
+                ))}
+
+              {simulation?.links
+                .filter((link) => link.target === selectedNode)
+                .map((link, i) => (
+                  <div key={`in-${i}`} className="flex items-center gap-1 mb-1">
+                    <span>{link.source}</span>
+                    <span className="text-gray-300">→</span>
+                    <span className="text-primary">{link.label}</span>
+                    <span className="text-gray-400">→</span>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {/* Tooltip */}
+        {showTooltip && (
+          <div
+            className="absolute bg-black/90 text-white text-xs px-2 py-1 rounded pointer-events-none z-50"
+            style={{
+              left: `${tooltipPosition.x}px`,
+              top: `${tooltipPosition.y}px`,
+              transform: "translateX(-50%)",
+            }}
+          >
+            {tooltipText}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
