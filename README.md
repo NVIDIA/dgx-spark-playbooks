@@ -68,6 +68,7 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 - [Accelerate Portfolio Optimization with cuOpt](nvidia/playbook-portfolio-optimization/)
 - [Fine-Tune with PyTorch](nvidia/playbook-pytorch-fine-tune/)
 - [Build a RAG Application with AI Workbench](nvidia/playbook-rag-ai-workbench/)
+- [Run OpenViking with Ollama and NVIDIA cuVS](nvidia/openviking/)
 - [Serve LLMs with SGLang](nvidia/playbook-sglang/)
 - [LLM Inference with SGLang](nvidia/playbook-sglang-inference/)
 - [Accelerate Single-Cell RNA Data Analysis](nvidia/playbook-single-cell/)
