@@ -2,7 +2,7 @@
 
 This repository contains benchmarking information, setup instructions, and example runs for evaluating AI workloads on NVIDIA DGX Spark.
 
-It covers a wide range of frameworks and workloads including large language models (LLMs), diffusion models, fine-tuning, and more using tools such as TensorRT-LLM, vLLM, SGLang, Llama.cpp, and others.
+It covers a wide range of frameworks and workloads including large language models (LLMs), diffusion models, fine-tuning, and more using tools such as TensorRT-LLM, vLLM, SGLang, llama.cpp, and others.
 
 Before running any benchmarks, ensure the following prerequisites are met for your selected workload:
 
@@ -24,7 +24,7 @@ Before running any benchmarks, ensure the following prerequisites are met for yo
 - **[SGLang](#sglang)**
   - [Offline](#offline-benchmark-2)
   - [Online](#online-benchmark-2)
-- **[Llama.cpp](#llamacpp)**
+- **[llama.cpp](#llamacpp)**
   - [Offline](#offline-benchmark-3)
   - [Online](#online-benchmark-3)
 - **[Image generation](#image-generation)** (Flux and SDXL)
@@ -433,7 +433,7 @@ python3 -m sglang.bench_serving \
 
 ---
 
-## Llama.cpp
+## llama.cpp
 
 ### What this measures
 
@@ -460,10 +460,10 @@ docker run --rm -it \
   nvcr.io/nvidia/pytorch:25.12-py3
 ```
 
-#### 2) Clone and build the latest Llama.cpp
+#### 2) Clone and build the latest llama.cpp
 ```bash
 # -------------------------------
-# Clone and build Llama.cpp
+# Clone and build llama.cpp
 # -------------------------------
 git clone https://github.com/ggml-org/llama.cpp
 cd llama.cpp
@@ -503,7 +503,7 @@ export MAX_TOKENS=$((ISL + OSL))
 ### Offline Benchmark
 ```bash
 # -------------------------------
-# Llama.cpp Offline Benchmark
+# llama.cpp Offline Benchmark
 # -------------------------------
 ./build/bin/llama-bench \
   -m models/$MODEL_HANDLE \
@@ -520,7 +520,7 @@ export MAX_TOKENS=$((ISL + OSL))
 #### Terminal 1 - run the server
 ```bash
 # -------------------------------
-# Launch Llama.cpp Server
+# Launch llama.cpp Server
 # -------------------------------
 ./build/bin/llama-server \
   --model models/$MODEL_HANDLE \
