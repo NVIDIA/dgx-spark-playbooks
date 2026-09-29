@@ -130,7 +130,11 @@ def initialize_state(config):
     if st.session_state["mode"] == "inference":
         st.session_state["base"]["process"] = start_vllm_server(
             config["model_id"], "base", config["max_seq_length"], st.session_state["base"]["port"])
-        finetuned_model_path = get_last_checkpoint(config["finetuned_model_id"])
+        finetuned_model_path = (
+            get_last_checkpoint(config["finetuned_model_id"])
+            if os.path.isdir(config["finetuned_model_id"])
+            else None
+        )
         if finetuned_model_path is not None:
             st.session_state["finetuned"]["process"] = start_vllm_server(
                 finetuned_model_path, "finetuned", config["max_seq_length"], st.session_state["finetuned"]["port"])

@@ -118,7 +118,7 @@ Clone the playbook assets and open the assets directory:
 
 ```bash
 git clone https://github.com/NVIDIA/dgx-spark-playbooks
-cd client-hardware-playbooks/nvidia/playbook-cuda-x-data-science/assets
+cd dgx-spark-playbooks/nvidia/playbook-cuda-x-data-science/assets
 ```
 
 Place the `kaggle.json` file created in Step 1 in this assets folder (same directory as the notebooks).

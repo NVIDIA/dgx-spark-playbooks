@@ -104,7 +104,7 @@ Clone the playbook repository and navigate to the assets directory:
 
 ```bash
 git clone https://github.com/NVIDIA/dgx-spark-playbooks
-cd client-hardware-playbooks/nvidia/playbook-kernel-dev-ft/assets
+cd dgx-spark-playbooks/nvidia/playbook-kernel-dev-ft/assets
 ```
 
 Build the development container. This creates a Docker image based on NVIDIA's PyTorch NGC container with additional libraries for model loading and benchmarking:

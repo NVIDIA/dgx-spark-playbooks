@@ -141,10 +141,16 @@ docker run --gpus all -it --rm --ipc=host \
 ## Step 4. Install dependencies inside the container
 
 ```bash
-pip install transformers peft datasets trl bitsandbytes
+pip install transformers peft datasets trl bitsandbytes "torchao>=0.16.0"
 ```
 
 ## Step 5. Authenticate with Hugging Face
+
+Before authenticating, open the Hugging Face page for the Meta Llama model used
+by your selected recipe. Review and accept the license terms, request access,
+and wait until Hugging Face confirms that access has been granted to the same
+account associated with your token. Signing in with `hf auth login` does not
+request or grant access to a gated model.
 
 ```bash
 hf auth login
@@ -156,7 +162,7 @@ Enter your Hugging Face token when prompted. Choose `n` when asked to add creden
 
 ```bash
 git clone https://github.com/NVIDIA/dgx-spark-playbooks
-cd client-hardware-playbooks/nvidia/playbook-pytorch-fine-tune/assets
+cd dgx-spark-playbooks/nvidia/playbook-pytorch-fine-tune/assets
 ```
 
 ## Step 7. Run a fine-tuning recipe
@@ -349,7 +355,7 @@ Clone the playbook assets onto every node (or share them from a common working d
 
 ```bash
 git clone https://github.com/NVIDIA/dgx-spark-playbooks
-cd client-hardware-playbooks/nvidia/playbook-pytorch-fine-tune/assets
+cd dgx-spark-playbooks/nvidia/playbook-pytorch-fine-tune/assets
 chmod +x pytorch-ft-entrypoint.sh
 ```
 

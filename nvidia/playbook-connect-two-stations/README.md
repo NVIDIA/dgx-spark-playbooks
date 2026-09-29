@@ -140,8 +140,8 @@ All required assets can be found [in the playbook repository](https://github.com
 Clone the playbook repository on your control host and create the local environment file.
 
 ```bash
-git clone https://github.com/NVIDIA/dgx-spark-playbooks client-hardware-playbooks
-cd client-hardware-playbooks/nvidia/playbook-connect-two-stations/assets
+git clone https://github.com/NVIDIA/dgx-spark-playbooks
+cd dgx-spark-playbooks/nvidia/playbook-connect-two-stations/assets
 cp 00_env.local.example 00_env.local
 ```
 

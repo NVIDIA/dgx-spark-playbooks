@@ -45,7 +45,8 @@ Use the matrix below to confirm your hardware platform, recommended default loca
 
 | Hardware platform | OS | Memory | Recommended default local settings | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- | :---- |
-| **RTX or RTX PRO** | Windows (ComfyUI desktop / portable); Linux paths noted for outputs | Dedicated VRAM (size varies by GPU) | ComfyUI from [comfy.org](https://comfy.org) · starter text-to-image template · FLUX.2-Dev · LTX-2 Image to Video · prefer lower-precision weights that fit your VRAM | — |
+| **GeForce RTX** | Windows (ComfyUI desktop / portable); Linux paths noted for outputs | Dedicated VRAM (size varies by GPU) | ComfyUI from [comfy.org](https://comfy.org) · starter text-to-image template · FLUX.2-Dev · LTX-2 Image to Video · prefer lower-precision weights that fit your VRAM | — |
+| **RTX PRO** | Windows (ComfyUI desktop / portable); Linux paths noted for outputs | Dedicated VRAM (size varies by GPU) | ComfyUI from [comfy.org](https://comfy.org) · starter text-to-image template · FLUX.2-Dev · LTX-2 Image to Video · prefer lower-precision weights that fit your VRAM | — |
 
 ## Prerequisites
 

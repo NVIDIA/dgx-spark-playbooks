@@ -118,7 +118,7 @@ Clone the playbook assets and start the containerized environment:
 
 ```bash
 git clone https://github.com/NVIDIA/dgx-spark-playbooks
-cd client-hardware-playbooks/nvidia/playbook-portfolio-optimization/assets
+cd dgx-spark-playbooks/nvidia/playbook-portfolio-optimization/assets
 bash ./setup/start_playbook.sh
 ```
 

@@ -170,9 +170,9 @@ fi
 # Execute the command
 echo ""
 echo "Starting services..."
-echo "Running: $CMD $PROFILES up -d"
+echo "Running: $CMD $PROFILES up -d --build"
 cd $(dirname "$0")
-eval "$CMD $PROFILES up -d"
+eval "$CMD $PROFILES up -d --build"
 
 echo ""
 echo "=========================================="

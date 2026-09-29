@@ -1,10 +1,10 @@
 # Optimized multi-stage Dockerfile for faster builds
 # Stage 1: Dependencies
-FROM node:18-slim AS deps
+FROM node:20-slim AS deps
 WORKDIR /app
 
 # Install pnpm
-RUN npm install -g pnpm --force --yes
+RUN npm install -g pnpm@10.34.4 --force --yes
 
 # Copy dependency files
 COPY ./frontend/package.json ./frontend/pnpm-lock.yaml* ./
@@ -19,11 +19,11 @@ RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
     fi
 
 # Stage 2: Builder
-FROM node:18-slim AS builder
+FROM node:20-slim AS builder
 WORKDIR /app
 
 # Install pnpm
-RUN npm install -g pnpm --force --yes
+RUN npm install -g pnpm@10.34.4 --force --yes
 
 # Copy node_modules from deps stage
 COPY --from=deps /app/node_modules ./node_modules
@@ -41,7 +41,7 @@ RUN --mount=type=cache,target=/app/.next/cache \
     pnpm build
 
 # Stage 3: Production runtime
-FROM node:18-slim AS runner
+FROM node:20-slim AS runner
 WORKDIR /app
 
 ENV NODE_ENV production

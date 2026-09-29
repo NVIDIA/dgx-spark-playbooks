@@ -1,6 +1,6 @@
 # Build a Multi-GPU AI PC
 
-> Homogeneous dual-GPU setups for Llama.cpp tensor parallel and ComfyUI multi-GPU diffusion
+> Homogeneous dual-GPU setups for llama.cpp tensor parallel and ComfyUI multi-GPU diffusion
 
 
 ## Table of Contents
@@ -53,7 +53,8 @@ Use the matrix below to confirm your hardware platform, recommended default loca
 
 | Hardware platform | OS | Memory | Recommended default local settings | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- | :---- |
-| **RTX or RTX PRO** | Windows 11 (primary); Linux for llama.cpp CLI | Dedicated VRAM (homogeneous dual discrete GPUs) | Tensor parallel (`-sm tensor`) for LLMs; MultiGPU CFG Split for ComfyUI | — |
+| **GeForce RTX** | Windows 11 (primary); Linux for llama.cpp CLI | Dedicated VRAM (homogeneous dual discrete GPUs) | Tensor parallel (`-sm tensor`) for LLMs; MultiGPU CFG Split for ComfyUI | — |
+| **RTX PRO** | Windows 11 (primary); Linux for llama.cpp CLI | Dedicated VRAM (homogeneous dual discrete GPUs) | Tensor parallel (`-sm tensor`) for LLMs; MultiGPU CFG Split for ComfyUI | — |
 
 ## Prerequisites
 

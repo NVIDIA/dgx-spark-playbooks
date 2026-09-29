@@ -78,11 +78,11 @@ By the end of this playbook you will have a working AI agent inside an OpenShell
 
 ## Supported hardware platforms
 
-Use the matrix below to confirm your hardware platform, OS, memory, and whether multi-node applies. The same base NemoClaw workflow applies across supported hardware platforms. Multi-node inference requires multi-node capable hardware.
+Use the matrix below to confirm your hardware platform, OS, memory, and multi-node workflow. The **Instructions** tab covers single-node setup on both platforms. The **Multi-node** tab covers two DGX Stations.
 
-| Hardware platform | OS | Memory  | Multi-node capable hardware |
+| Hardware platform | OS | Memory  | Multi-node workflow |
 | :---- | :---- | :---- | :---- |
-| **DGX Spark** | DGX OS (Linux) | 128 GB Unified Memory | — |
+| **DGX Spark** | DGX OS (Linux) | 128 GB Unified Memory | [Separate two-Spark guide](https://docs.nvidia.com/nemoclaw/latest/user-guide/openclaw/inference/local-inference/set-up-vllm-on-two-dgx-sparks) (Experimental; evaluation only) |
 | **DGX Station** | DGX OS (Linux) | Large HBM + Grace DRAM | ✅ (dual-node fabric) |
 
 
@@ -93,7 +93,7 @@ Use the matrix below to confirm your hardware platform, OS, memory, and whether 
 - Supported hardware platform — see Supported hardware platforms matrix above
 - Keyboard and monitor attached, or SSH access
 - Sufficient storage for the model download, vLLM container, and temporary download space (large Express models can require hundreds of GB)
-- Multi-node capable hardware: validated fabric connectivity between nodes (see the **Multi-node** tab)
+- DGX Station multi-node setup: validated fabric connectivity between nodes (see the **Multi-node** tab)
 
 **Software requirements**
 
@@ -117,7 +117,7 @@ Expected: Ubuntu 24.04 (or your platform's supported OS), a detected NVIDIA GPU,
 |------|------------------|
 | **Telegram bot token** (optional) | Create with [@BotFather](https://t.me/BotFather) (`/newbot`). You can paste it during **onboarding** or when you run **`nemoclaw <sandbox> channels add telegram`** later. |
 | **Brave Search API key** (optional) | From [Brave Search API](https://brave.com/search/api/) if you enable web search during onboarding, or to add it later by re-running onboarding with `BRAVE_API_KEY` set. |
-| **Hugging Face access token** (multi-node only) | Required to download gated models when following the **Multi-node** tab. |
+| **Hugging Face access token** (DGX Station multi-node only) | Required to download gated models when following the **Multi-node** tab. |
 
 ## Find model recipes
 
@@ -173,8 +173,8 @@ All required assets are handled by the NemoClaw installer. No manual cloning is 
 
 - **Estimated time:** 30–60 MIN for a first full pass (install, onboard, model download depending on choice and network). Large Express models can add substantial download time. Optional Brave, Telegram, and cloudflared steps add time if you do them in a second session. Multi-node model download and first start can take more than an hour.
 - **Risk level:** Medium — you are running an AI agent in a sandbox; risks are reduced by isolation but not eliminated. Use a clean environment and do not connect sensitive data or production accounts.
-- **Last Updated:** 07/27/2026
-  - Removed Agent-ready Models tab (model selection lives in Express Install); clarified Station Express recommends Nemotron 3 Ultra with DeepSeek-V4-Flash also supported; restored single upstream coding-agent starter prompt; Multi-node scoped to DGX Station
+- **Last Updated:** 09/17/2026
+  - Clarified Brave search verification, DGX Spark installer choices, and LKG release behavior; linked the Experimental two-Spark guide.
 
 ## Instructions
 
@@ -440,13 +440,20 @@ If you prefer to perform the setup directly in a terminal, continue with Phase 1
 
 ### Step 1. Install NemoClaw
 
-This single command handles everything: installs Node.js (if needed), installs OpenShell, clones the last known good (LKG) NemoClaw release automatically, builds the CLI, and creates a sandbox.
+This single command handles everything: installs Node.js (if needed), installs OpenShell, clones the last known good (LKG) NemoClaw release automatically, builds the CLI, and creates a sandbox. The LKG release can lag the newest release tag; the installer follows this maintained release by default.
 
 ```bash
 curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash
 ```
 
-After you accept the third-party software notice, the installer may detect your hardware platform and offer **Express Install** with recommended settings (managed local vLLM, a maintained Express model, sandbox name `my-assistant`, and Balanced policy). Express Install is supported on **DGX Spark** and **DGX Station**. Press **Enter** or enter `Y` to accept, or enter `n` to choose custom onboarding in Step 2.
+After you accept the third-party software notice, the installer detects your hardware platform. On **DGX Spark**, interactive Express installation asks which inference setup to use unless you set a model override:
+
+1. **Managed vLLM with automatic serving-profile selection** (default): NemoClaw selects a serving profile for your system.
+2. **Qwen3.6 35B-A3B NVFP4 with the fixed catalog-backed vLLM profile**: use the fixed single-host profile.
+
+Press **Enter** at `Choose 1 or 2 [1]:` to keep option 1. The **Express Install** prompt follows.
+
+Express Install is supported on **DGX Spark** and **DGX Station**. It offers recommended settings: managed local vLLM, a maintained Express model, sandbox name `my-assistant`, and Balanced policy. At `Run express install with these settings? [Y/n]:`, press **Enter** or enter `Y` to accept, or enter `n` to choose custom onboarding in Step 2.
 
 > [!NOTE]
 > Express Install selects the maintained Express model and policy for your detected hardware platform. Download size and load time vary by model — large Express models can require hundreds of GB of storage. To skip the Express prompt before running the installer, set `NEMOCLAW_NO_EXPRESS=1`; setting `NEMOCLAW_PROVIDER` also bypasses Express Install and uses that provider.
@@ -621,7 +628,13 @@ BRAVE_API_KEY=<your-brave-search-api-key> \
 > [!NOTE]
 > `--recreate-sandbox` clearly describes the intentional rebuild needed to add web search. Reserve `--fresh` for recovery from a failed or interrupted onboarding session — it discards the wizard state and starts over, which is not the right tool for adding a feature to an already-created sandbox.
 
-To confirm web search is enabled, relaunch your OpenClaw WebUI or terminal UI. Ask the agent for something that needs **live web search**. If requests still fail, recheck **`policy-list`** and re-read the onboard output for Brave/API errors.
+To confirm web search is enabled, relaunch your OpenClaw Web UI or terminal UI and explicitly ask the agent to use its search tool:
+
+> Use the Brave search plugin's search tool (not a URL fetch) to search for 'NVIDIA DGX Spark' and show me the first result title.
+
+A successful check returns a live search result title. The `brave` preset allows requests to `api.search.brave.com`; it does not grant general web access. Under the Balanced policy, requests to other sites still require matching policy rules. If the agent fetches a page instead of using its search tool, it can report a `403` policy denial even when Brave is configured correctly.
+
+If the search tool itself fails, check `policy-list` for the `brave` preset and review the onboarding output for Brave API errors.
 
 > [!NOTE]
 > **Messaging channels (Telegram and others) are optional.** Skip them during onboarding if you only need the Web UI or terminal. Full Telegram setup (and optional cloudflared for remote Web UI) is at the bottom of this page under **Optional — Set up Messaging Channel (Telegram)**.
@@ -634,7 +647,7 @@ To confirm web search is enabled, relaunch your OpenClaw WebUI or terminal UI. A
 
 Setting up NemoClaw Agents generally requires three steps: Configure NemoClaw security policy, Run Agent Workflow Prompt, and Personalize the Workflow for your own use case.
 
-Check out these [Example NemoClaw Agents](https://build.nvidia.com/spark/nemoclaw-applications) for reference. Consider sharing your NemoClaw agent setup with the community on the [NVIDIA Developer Forums](https://forums.developer.nvidia.com/).
+Check out these [Example NemoClaw Agents](https://build.nvidia.com/playbooks/nemoclaw-applications) for reference. Consider sharing your NemoClaw agent setup with the community on the [NVIDIA Developer Forums](https://forums.developer.nvidia.com/).
 
 ---
 
@@ -647,6 +660,8 @@ To check whether a newer NemoClaw LKG release is available, run:
 ```bash
 nemoclaw update --check
 ```
+
+The output's `Latest maintained version` is the LKG release, which can be older than the newest release tag. If you manually installed a newer release, `Update available: no` is expected: your installed version is already ahead of LKG.
 
 To update the host-side NemoClaw CLI to the current LKG release without prompts, run:
 
@@ -833,7 +848,7 @@ You should see `● cloudflared` with a `trycloudflare.com` public URL.
 ## Multi-node inference for NemoClaw
 
 > [!NOTE]
-> **Multi-node currently applies to DGX Station only.** Single-node setup for all supported hardware platforms is covered in the **Instructions** tab.
+> **The instructions in this tab apply to DGX Station only.** Single-node setup for all supported hardware platforms is covered in the **Instructions** tab. For two DGX Sparks, see [Set Up vLLM on Two DGX Sparks](https://docs.nvidia.com/nemoclaw/latest/user-guide/openclaw/inference/local-inference/set-up-vllm-on-two-dgx-sparks). That profile is **Experimental** and intended for evaluation while physical two-node validation is pending; the Station commands below do not apply to Spark hardware.
 
 Deploy **NVIDIA Nemotron 3 Ultra** across two DGX Station nodes, then point NemoClaw on the head node at that shared vLLM endpoint.
 

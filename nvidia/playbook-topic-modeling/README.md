@@ -83,8 +83,21 @@ All required assets can be found [in the playbook repository](https://github.com
   - Large dataset download (~14 GB) may take time depending on network speed
   - Embedding generation requires significant GPU memory
 - **Rollback:** Delete the downloaded dataset and any generated embedding files; optionally remove the conda environment
-- **Last Updated:** 08/03/2026
-  - Install RAPIDS cuML accelerators and run BERTopic topic modeling with interactive visualizations
+- **Last Updated:** 09/13/2026
+  - Added missing BERTopic diagram PNG so the notebook intro cell renders correctly
+  - Replaced st.tabs with radio selector to fix deck.gl map initialization and redraw
+  - Switched to str(fig) to prevent the map from being clipped inside Streamlit's layout
+  - Added offline mode (inlines deck.gl/d3/Arrow/jQuery/fonts) and a "Download standalone HTML" button
+  - Added static matplotlib fallback with topic label slider for WebGL-free environments
+  - Added caching on UMAP/datamap calls so toggling display options doesn't re-run fits
+  - Added torch.cuda.init() before cuml/cudf imports in both app and notebook
+  - Removed in-notebook !wget that unnecessarily re-downloaded several GB on each run
+  - Datamap now plots 70% of documents for a richer visual
+  - Notebook re-run clean top to bottom (cells 1–16), kernel set to Python (rapids-25.10)
+  - Marked run_app.sh executable
+  - README: switched to pip (avoids conda slow solves and missing package errors), pinned torchaudio==2.9.0, registers Jupyter kernel
+  - README: corrects dataset size to 6 GB, reorders steps 10–13 to match execution order
+  - README: adds Troubleshooting section (blank map, OOM, LFS errors, HF cache, pip conflicts, cache invalidation)
 
 ## Instructions
 
@@ -127,7 +140,13 @@ Note: `datamapplot` will upgrade dask/distributed — the next command pins them
 python -m pip install \
   transformers datasets sentence-transformers \
   umap-learn hdbscan==0.8.40 bertopic matplotlib \
-  scikit-learn==1.4.2 datamapplot streamlit
+  scikit-learn==1.4.2 datamapplot streamlit "nbformat>=4.2.0" ipykernel
+```
+
+Register the conda environment as a Jupyter kernel:
+
+```bash
+python -m ipykernel install --user --name rapids-25.10 --display-name "Python (rapids-25.10)"
 ```
 
 Pin dask/distributed back to RAPIDS-compatible versions:
@@ -151,24 +170,10 @@ These packages provide:
 
 ## Step 5. Install visualization packages
 
-Install JupyterLab and visualization libraries for interactive topic exploration:
+Install JupyterLab and visualization libraries directly into the conda environment:
 
 ```bash
-conda install -c conda-forge \
-    notebook=7.5.0 \
-    jupyterlab=4.5.0 \
-    ipywidgets=8.1.8 \
-    jupyterlab-widgets=3.0.16 \
-    bokeh=3.8.1 \
-    colorcet=3.1.0 \
-    datashader=0.18.2 \
-    plotly=6.5.0
-```
-
-If conda reports `PackagesNotFoundError` for `jupyterlab-widgets`, install it with pip:
-
-```bash
-python -m pip install jupyterlab-widgets
+python -m pip install jupyterlab ipywidgets jupyterlab-widgets bokeh colorcet datashader plotly
 ```
 
 ## Step 6. Install compatible PyTorch
@@ -176,7 +181,7 @@ python -m pip install jupyterlab-widgets
 Install PyTorch with CUDA 13.0 support for GPU-accelerated embedding generation:
 
 ```bash
-python -m pip install torch==2.9.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu130
+python -m pip install torch==2.9.0 torchvision torchaudio==2.9.0 --index-url https://download.pytorch.org/whl/cu130
 ```
 
 ## Step 7. Clone the repository and download the dataset
@@ -185,7 +190,7 @@ Clone the playbook repository and download the Amazon Electronics Reviews datase
 
 ```bash
 git clone https://github.com/NVIDIA/dgx-spark-playbooks
-cd client-hardware-playbooks/nvidia/playbook-topic-modeling/assets
+cd dgx-spark-playbooks/nvidia/playbook-topic-modeling/assets
 ```
 
 Download the dataset (~14 GB compressed):
@@ -225,21 +230,11 @@ ssh -N -L YYYY:localhost:XXXX username@remote_host
 - `-N`: Prevents SSH from executing a remote command
 - `-L`: Specifies local port forwarding
 
-## (Optional) Launch the interactive dashboard
-
-As an alternative to the notebook, run the Streamlit dashboard for live UMAP/HDBSCAN tuning. From the assets directory (with the dataset already downloaded in Step 7):
-
-```bash
-./run_app.sh
-```
-
-Then open the URL it prints (default `http://localhost:8501`). The script auto-selects the `rapids-25.10` conda env; override with `PYTHON=/path/to/python ./run_app.sh` if needed.
-
 ## Step 10. Select the rapids-25.10 kernel
 
 In JupyterLab, open the notebook `video_notebook_for_GPU_Accelerated_Machine_Learning_BERTopic_1M.ipynb`.
 
-Select the **rapids-25.10** kernel from the kernel selector in the top right corner of the notebook interface.
+Select the **Python (rapids-25.10)** kernel from the kernel selector in the top right corner of the notebook interface.
 
 ## Step 11. Execute all cells
 
@@ -262,6 +257,17 @@ After the notebook completes, you'll have:
 - **Heatmap**: Topic similarity matrix
 - **Document datamap**: Visual clustering of documents by topic
 
+## (Optional) Launch the interactive dashboard
+
+As an alternative to the notebook, run the Streamlit dashboard for live UMAP/HDBSCAN tuning. From the assets directory (with the dataset already downloaded in Step 7):
+
+```bash
+chmod +x run_app.sh
+./run_app.sh
+```
+
+Then open the URL it prints (default `http://localhost:8501`). The script auto-selects the `rapids-25.10` conda env; override with `PYTHON=/path/to/python ./run_app.sh` if needed.
+
 ## Step 13. Cleanup (optional)
 
 Remove the conda environment when finished:
@@ -283,8 +289,8 @@ Remove generated embedding files and the cloned playbook directory if you no lon
 ## Optional: remove Hugging Face cache (embedding cache from the notebook)
 rm -rf ~/.cache/huggingface
 
-## From the parent of client-hardware-playbooks/, remove the cloned repo
-rm -rf client-hardware-playbooks/
+## From the parent of dgx-spark-playbooks/, remove the cloned repo
+rm -rf dgx-spark-playbooks/
 ```
 
 ## Step 14. Next steps

@@ -45,7 +45,7 @@ Use the matrix below to confirm your hardware platform, recommended default loca
 
 | Hardware platform | OS | Memory | Recommended default local settings | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- | :---- |
-| **DGX Spark** | DGX OS (Linux) | 128 GB unified memory | Ollama backend with `llama3.2-vision:11b`; Live VLM WebUI installed with `pipx` | — |
+| **DGX Spark** | DGX OS (Linux) | 128 GB unified memory | Ollama backend with `gemma3:4b`; Live VLM WebUI installed with `pipx` | — |
 
 ## Prerequisites
 
@@ -84,8 +84,8 @@ No local ancillary files are required. The application and supporting documentat
   - The self-signed HTTPS certificate requires a one-time browser exception
   - Model downloads consume storage and network bandwidth
 - **Rollback:** Stop the application, then optionally uninstall it with `pipx uninstall live-vlm-webui`. This does not remove Ollama or downloaded models.
-- **Last Updated:** 08/03/2026
-  - Added current Live VLM WebUI setup, supported hardware guidance, and links for finding compatible vision models
+- **Last Updated:** 09/07/2026
+  - Changed the validated default vision model to `gemma3:4b` and added troubleshooting for incompatible Ollama model architectures
 
 ## Instructions
 
@@ -112,11 +112,11 @@ Expected output includes a JSON response with a `data` array. The array can be e
 Download the model used by this workflow:
 
 ```bash
-ollama pull llama3.2-vision:11b
+ollama pull gemma3:4b
 curl http://localhost:11434/v1/models
 ```
 
-The second command should list `llama3.2-vision:11b`. The model download can take several minutes depending on network speed.
+The second command should list `gemma3:4b`. The model download can take several minutes depending on network speed.
 
 ## Step 3. Install Live VLM WebUI
 
@@ -168,7 +168,7 @@ In the **VLM API Configuration** section:
 
 1. Set **API Base URL** to `http://localhost:11434/v1`.
 2. Refresh the model list.
-3. Select `llama3.2-vision:11b`.
+3. Select `gemma3:4b`.
 4. Leave **Max Tokens** at its default for the first test.
 5. Set **Frame Interval** to 60 if you want less frequent analysis.
 
@@ -225,7 +225,8 @@ ollama rm <MODEL_NAME>
 | Camera access is denied | The browser does not have camera permission or the page was opened over HTTP | Open `https://<HARDWARE_IP>:8090` and grant camera permission in browser settings |
 | Camera works, but analysis fails with `InvalidStateError` | WebRTC traffic is passing through an SSH TCP tunnel | Connect the browser directly to the hardware platform over the local network; WebRTC requires direct connectivity |
 | The interface cannot connect to the VLM | Ollama is stopped or the API URL is incorrect | Run `sudo systemctl start ollama`, verify `curl http://localhost:11434/v1/models`, and set the API Base URL to `http://localhost:11434/v1` |
-| No models appear in the model list | No vision model is installed or the model list has not refreshed | Run `ollama pull llama3.2-vision:11b`, then refresh the model list |
+| No models appear in the model list | No vision model is installed or the model list has not refreshed | Run `ollama pull gemma3:4b`, then refresh the model list |
+| A model appears in the model list, but inference fails with HTTP 500 and `unknown model architecture: 'mllama'` | The installed Ollama runner cannot load the selected model architecture on this platform | Switch to a vision model compatible with the installed Ollama runner. The validated default for this DGX Spark workflow is `gemma3:4b`; pull it with `ollama pull gemma3:4b`, refresh the model list, and restart the analysis |
 | Responses take several seconds per frame | The selected model or analysis frequency exceeds available resources | Increase **Frame Interval**, reduce **Max Tokens**, or select a smaller supported vision model |
 | GPU statistics show `N/A` | GPU monitoring cannot access the NVIDIA driver | Run `nvidia-smi` and resolve driver access before restarting Live VLM WebUI |
 | Port 8090 is already in use | Another process is listening on the default port | Identify the process with `sudo lsof -i :8090`, then stop it if it is safe to do so |

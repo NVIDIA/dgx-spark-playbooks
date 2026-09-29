@@ -104,6 +104,7 @@ This playbook includes **GPU-accelerated LLM inference** with Ollama:
 - **FP8 quantization**: Efficient memory usage with minimal quality loss
 - **Large context support**: Up to 32K tokens context length
 - **Continuous batching**: High throughput for multiple requests
+- **Structured extraction**: The app requests schema-constrained triples, asks Nemotron models to use detailed thinking-off mode, and stores only parsed JSON triples
 
 ### Default Ollama Configuration
 - Model: `llama3.1:8b`

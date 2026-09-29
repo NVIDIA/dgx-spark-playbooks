@@ -74,7 +74,7 @@ Use the matrix below to confirm your hardware platform, OS, memory, and whether 
 | Hardware platform | OS | Memory  | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- |
 | **DGX Spark** | DGX OS (Linux) | 128 GB Unified Memory | — |
-| **RTX** | Linux, Windows, WSL | Dedicated VRAM (size varies) | — |
+| **GeForce RTX** | Linux, Windows, WSL | Dedicated VRAM (size varies) | — |
 
 
 > [!NOTE]
@@ -303,9 +303,9 @@ Agent-ready models are tuned for **agentic workloads** — tool calling, reasoni
 | Hardware platform | Recommended model | Example handle / tag | Inference path |
 | ----------------- | ----------------- | -------------------- | -------------- |
 | **DGX Spark** | Agent-ready Qwen3.6-35B-A3B (NVFP4) | `nvidia/Qwen3.6-35B-A3B-NVFP4` | vLLM — see [Serve LLMs with vLLM → Agent-ready Models](https://build.nvidia.com/playbooks/vllm/agent-ready-models) |
-| **RTX** (24GB+ VRAM) | Qwen3.6 27B | `qwen/qwen3.6-27b` (LM Studio) or `qwen3.6:27b` (Ollama) | LM Studio, Ollama, or vLLM |
-| **RTX** (12–16GB VRAM) | Qwen 3.5 9B / Gemma 4 12B | backend-specific tags | LM Studio or Ollama |
-| **RTX** (6–8GB VRAM) | Qwen 3.5 4B | backend-specific tags | LM Studio or Ollama |
+| **GeForce RTX** (24GB+ VRAM) | Qwen3.6 27B | `qwen/qwen3.6-27b` (LM Studio) or `qwen3.6:27b` (Ollama) | LM Studio, Ollama, or vLLM |
+| **GeForce RTX** (12–16GB VRAM) | Qwen 3.5 9B / Gemma 4 12B | backend-specific tags | LM Studio or Ollama |
+| **GeForce RTX** (6–8GB VRAM) | Qwen 3.5 4B | backend-specific tags | LM Studio or Ollama |
 
 Only platforms listed in the Supported hardware platforms table (Overview) are listed above.
 

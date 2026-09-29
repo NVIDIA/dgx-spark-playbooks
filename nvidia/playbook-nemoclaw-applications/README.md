@@ -29,11 +29,11 @@
 - [NemoClaw Policy Setup](#nemoclaw-policy-setup)
 - [Troubleshooting](#troubleshooting)
   - [General sandbox & policy issues](#general-sandbox-policy-issues)
-  - [[NemoClaw Policy Setup](https://build.nvidia.com/playbooks/nemoclaw-example-agents/policy-setup)](#nemoclaw-policy-setuphttpsbuildnvidiacomplaybooksnemoclaw-example-agentspolicy-setup)
-  - [[Daily Personal News Digest](https://build.nvidia.com/playbooks/nemoclaw-example-agents/news-digest)](#daily-personal-news-digesthttpsbuildnvidiacomplaybooksnemoclaw-example-agentsnews-digest)
-  - [[Software Development Agent](https://build.nvidia.com/playbooks/nemoclaw-example-agents/developer-agent)](#software-development-agenthttpsbuildnvidiacomplaybooksnemoclaw-example-agentsdeveloper-agent)
-  - [[Deck Reviewer](https://build.nvidia.com/playbooks/nemoclaw-example-agents/deck-reviewer)](#deck-reviewerhttpsbuildnvidiacomplaybooksnemoclaw-example-agentsdeck-reviewer)
-  - [[Calendar Negotiator](https://build.nvidia.com/playbooks/nemoclaw-example-agents/calendar-negotiator)](#calendar-negotiatorhttpsbuildnvidiacomplaybooksnemoclaw-example-agentscalendar-negotiator)
+  - [[NemoClaw Policy Setup](https://build.nvidia.com/playbooks/nemoclaw-applications/policy-setup)](#nemoclaw-policy-setuphttpsbuildnvidiacomplaybooksnemoclaw-applicationspolicy-setup)
+  - [[Daily Personal News Digest](https://build.nvidia.com/playbooks/nemoclaw-applications/news-digest)](#daily-personal-news-digesthttpsbuildnvidiacomplaybooksnemoclaw-applicationsnews-digest)
+  - [[Software Development Agent](https://build.nvidia.com/playbooks/nemoclaw-applications/developer-agent)](#software-development-agenthttpsbuildnvidiacomplaybooksnemoclaw-applicationsdeveloper-agent)
+  - [[Deck Reviewer](https://build.nvidia.com/playbooks/nemoclaw-applications/deck-reviewer)](#deck-reviewerhttpsbuildnvidiacomplaybooksnemoclaw-applicationsdeck-reviewer)
+  - [[Calendar Negotiator](https://build.nvidia.com/playbooks/nemoclaw-applications/calendar-negotiator)](#calendar-negotiatorhttpsbuildnvidiacomplaybooksnemoclaw-applicationscalendar-negotiator)
 
 ---
 
@@ -55,12 +55,12 @@ All applications run inside the **OpenShell sandbox** that NemoClaw created duri
 
 You'll run four practical NemoClaw workflows on your **hardware platform**:
 
-- **[Daily Personal News Digest](https://build.nvidia.com/playbooks/nemoclaw-example-agents/news-digest)** — a scheduled morning briefing that wakes up on a cron, sweeps the topics you care about across an allowlisted set of sources, and posts a structured digest (Top 3, headlines by topic, deep dive, skip-the-noise, on-your-radar, local) to your Telegram home channel.
-- **[Software Development Agent](https://build.nvidia.com/playbooks/nemoclaw-example-agents/developer-agent)** — reads a single project directory, builds an execution plan for the features you specify, implements them, reviews its own work, and writes a `develop-and-review.md` you can read before merging. No outbound network beyond the local inference endpoint.
-- **[Deck Reviewer](https://build.nvidia.com/playbooks/nemoclaw-example-agents/deck-reviewer)** — a Doc & Deck Red-Team that scans the artifact you're about to send for inconsistent numbers, unsourced claims, missing data, accessibility issues, and prior-version contradictions, then returns a severity-ranked punch list with proposed edits.
-- **[Calendar Negotiator](https://build.nvidia.com/playbooks/nemoclaw-example-agents/calendar-negotiator)** — a scheduling chief-of-staff that turns "when can we meet?" threads into a confirmed meeting on your calendar, respecting your focus blocks, energy patterns, and time-zone fairness with the other party.
+- **[Daily Personal News Digest](https://build.nvidia.com/playbooks/nemoclaw-applications/news-digest)** — a scheduled morning briefing that wakes up on a cron, sweeps the topics you care about across an allowlisted set of sources, and posts a structured digest (Top 3, headlines by topic, deep dive, skip-the-noise, on-your-radar, local) to your Telegram home channel.
+- **[Software Development Agent](https://build.nvidia.com/playbooks/nemoclaw-applications/developer-agent)** — reads a single project directory, builds an execution plan for the features you specify, implements them, reviews its own work, and writes a `develop-and-review.md` you can read before merging. No outbound network beyond the local inference endpoint.
+- **[Deck Reviewer](https://build.nvidia.com/playbooks/nemoclaw-applications/deck-reviewer)** — a Doc & Deck Red-Team that scans the artifact you're about to send for inconsistent numbers, unsourced claims, missing data, accessibility issues, and prior-version contradictions, then returns a severity-ranked punch list with proposed edits.
+- **[Calendar Negotiator](https://build.nvidia.com/playbooks/nemoclaw-applications/calendar-negotiator)** — a scheduling chief-of-staff that turns "when can we meet?" threads into a confirmed meeting on your calendar, respecting your focus blocks, energy patterns, and time-zone fairness with the other party.
 
-A separate **[NemoClaw Policy Setup](https://build.nvidia.com/playbooks/nemoclaw-example-agents/policy-setup)** tab covers shared Telegram channel wiring for the Daily Personal News Digest, for Calendar Negotiator when you use proxy delivery, and optionally for Software Development Agent and Deck Reviewer "ready for review" notifications. Telegram uses long-polling — no public tunnel is required. The **Troubleshooting** tab collects symptom/cause/fix entries specific to these workflows.
+A separate **[NemoClaw Policy Setup](https://build.nvidia.com/playbooks/nemoclaw-applications/policy-setup)** tab covers shared Telegram channel wiring for the Daily Personal News Digest, for Calendar Negotiator when you use proxy delivery, and optionally for Software Development Agent and Deck Reviewer "ready for review" notifications. Telegram uses long-polling — no public tunnel is required. The **Troubleshooting** tab collects symptom/cause/fix entries specific to these workflows.
 
 For each application you will be able to read the live policy YAML (`openshell policy get --full`), apply or remove maintained presets with `nemoclaw policy-add` / `policy-remove` (no rebuild required for network changes), and bind host directories into the sandbox with `nemoclaw share mount` (hot — no rebuild required for mounts either). Tightening `filesystem_policy` itself, when you want a kernel-enforced write boundary inside the sandbox, is the only step that still requires `nemoclaw rebuild` (workspace state is preserved automatically).
 
@@ -91,7 +91,7 @@ Use the matrix below to confirm your hardware platform, recommended default loca
 - Supported hardware platform — see Supported hardware platforms matrix above
 - A working NemoClaw install and sandbox (see [Run NemoClaw with a Local LLM](https://build.nvidia.com/playbooks/nemoclaw))
 - A running OpenShell gateway and a sandbox created by the NemoClaw onboard wizard (`nemoclaw list` shows at least one sandbox)
-- For Telegram delivery (News Digest, or Calendar Negotiator in proxy / proxy-auto mode): a Telegram bot wired into the sandbox. If you skipped Telegram during onboard, follow the messaging-channel steps in [Run NemoClaw with a Local LLM](https://build.nvidia.com/playbooks/nemoclaw), then see **[NemoClaw Policy Setup](https://build.nvidia.com/playbooks/nemoclaw-example-agents/policy-setup)** for shared egress wiring. Calendar Negotiator in propose-only mode does not need Telegram.
+- For Telegram delivery (News Digest, or Calendar Negotiator in proxy / proxy-auto mode): a Telegram bot wired into the sandbox. If you skipped Telegram during onboard, follow the messaging-channel steps in [Run NemoClaw with a Local LLM](https://build.nvidia.com/playbooks/nemoclaw), then see **[NemoClaw Policy Setup](https://build.nvidia.com/playbooks/nemoclaw-applications/policy-setup)** for shared egress wiring. Calendar Negotiator in propose-only mode does not need Telegram.
 
 **Software requirements**
 
@@ -111,11 +111,11 @@ Expected: your sandbox appears in the list and `status` reports the sandbox as *
 | Item | Where to get it | Used by |
 |------|----------------|---------|
 | Sandbox name from NemoClaw onboard (e.g. `my-assistant`) | `nemoclaw list` | All applications |
-| Telegram bot token and numeric user ID | [@BotFather](https://t.me/BotFather) (`/newbot`), `@userinfobot` on Telegram for your user ID | [Policy Setup](https://build.nvidia.com/playbooks/nemoclaw-example-agents/policy-setup), [News Digest](https://build.nvidia.com/playbooks/nemoclaw-example-agents/news-digest), [Calendar Negotiator](https://build.nvidia.com/playbooks/nemoclaw-example-agents/calendar-negotiator); optional for [Software Development Agent](https://build.nvidia.com/playbooks/nemoclaw-example-agents/developer-agent) and [Deck Reviewer](https://build.nvidia.com/playbooks/nemoclaw-example-agents/deck-reviewer) |
-| Allowlist of news source hostnames to add under `network_policies` | Pick the sites you trust | [News Digest](https://build.nvidia.com/playbooks/nemoclaw-example-agents/news-digest) |
-| A host directory containing the project you want built and reviewed | A copy/clone of the project, e.g. `~/nemoclaw-projects/my-app/` | [Software Development Agent](https://build.nvidia.com/playbooks/nemoclaw-example-agents/developer-agent) |
-| A queue folder, a canonical corpus folder, and a `profile.yaml` for red-team rules | Curate from prior decks, brand guide, and canonical metric files, e.g. `~/nemoclaw-redteam/` | [Deck Reviewer](https://build.nvidia.com/playbooks/nemoclaw-example-agents/deck-reviewer) |
-| A `calendar.ics` export and a `profile.yaml` with working hours, focus blocks, and timezone | Export from your real calendar (Google: *Settings → Import & export*) into `~/nemoclaw-calendar/` | [Calendar Negotiator](https://build.nvidia.com/playbooks/nemoclaw-example-agents/calendar-negotiator) |
+| Telegram bot token and numeric user ID | [@BotFather](https://t.me/BotFather) (`/newbot`), `@userinfobot` on Telegram for your user ID | [Policy Setup](https://build.nvidia.com/playbooks/nemoclaw-applications/policy-setup), [News Digest](https://build.nvidia.com/playbooks/nemoclaw-applications/news-digest), [Calendar Negotiator](https://build.nvidia.com/playbooks/nemoclaw-applications/calendar-negotiator); optional for [Software Development Agent](https://build.nvidia.com/playbooks/nemoclaw-applications/developer-agent) and [Deck Reviewer](https://build.nvidia.com/playbooks/nemoclaw-applications/deck-reviewer) |
+| Allowlist of news source hostnames to add under `network_policies` | Pick the sites you trust | [News Digest](https://build.nvidia.com/playbooks/nemoclaw-applications/news-digest) |
+| A host directory containing the project you want built and reviewed | A copy/clone of the project, e.g. `~/nemoclaw-projects/my-app/` | [Software Development Agent](https://build.nvidia.com/playbooks/nemoclaw-applications/developer-agent) |
+| A queue folder, a canonical corpus folder, and a `profile.yaml` for red-team rules | Curate from prior decks, brand guide, and canonical metric files, e.g. `~/nemoclaw-redteam/` | [Deck Reviewer](https://build.nvidia.com/playbooks/nemoclaw-applications/deck-reviewer) |
+| A `calendar.ics` export and a `profile.yaml` with working hours, focus blocks, and timezone | Export from your real calendar (Google: *Settings → Import & export*) into `~/nemoclaw-calendar/` | [Calendar Negotiator](https://build.nvidia.com/playbooks/nemoclaw-applications/calendar-negotiator) |
 
 ## Ancillary files
 
@@ -123,9 +123,9 @@ All policy snippets and example prompts in this playbook are inline in the appli
 
 ## Time & risk
 
-- **Estimated time:** 30–45 MIN to walk through all four applications. Each application individually takes 5–10 minutes once the prerequisites are in place. Plan an extra 10 minutes for the one-time [Policy Setup](https://build.nvidia.com/playbooks/nemoclaw-example-agents/policy-setup) tab if you have not enabled Telegram yet.
+- **Estimated time:** 30–45 MIN to walk through all four applications. Each application individually takes 5–10 minutes once the prerequisites are in place. Plan an extra 10 minutes for the one-time [Policy Setup](https://build.nvidia.com/playbooks/nemoclaw-applications/policy-setup) tab if you have not enabled Telegram yet.
 - **Risk level:** **Medium.** Every application grants the agent additional capability beyond the default sandbox — outbound network for the news digest, filesystem access for code review, deck red-team, and calendar negotiation. Risk is reduced by tight per-application policies (host-level `chmod` on read-only source data backed by `share mount`'s SSHFS permission passthrough, scoped sandbox directories so the agent only sees one mounted tree at a time, explicit egress allowlists via `nemoclaw policy-add` presets, and in-prompt safety rules that survive single-message overrides) but is not eliminated. **Do not point these recipes at sensitive data, production accounts, or personal files** without reviewing the policy first.
-- **Rollback:** Each application tab includes a rollback section that either reverts the policy (network changes are hot-reloadable) or destroys and recreates the sandbox with the original policy. The [Troubleshooting](https://build.nvidia.com/playbooks/nemoclaw-example-agents/troubleshooting) tab covers common stuck-state recovery. You can always run `nemoclaw uninstall` to remove everything.
+- **Rollback:** Each application tab includes a rollback section that either reverts the policy (network changes are hot-reloadable) or destroys and recreates the sandbox with the original policy. The [Troubleshooting](https://build.nvidia.com/playbooks/nemoclaw-applications/troubleshooting) tab covers common stuck-state recovery. You can always run `nemoclaw uninstall` to remove everything.
 - **Last Updated:** 08/03/2026
   - Clarified Telegram uses long-polling (no public tunnel required); companion link for messaging setup; supported hardware platforms matrix for example agent workflows
 
@@ -137,7 +137,7 @@ This is a cron-style workflow: the agent wakes up on a schedule, fetches updates
 
 ## Step 1. Policy setup
 
-Start from the [NemoClaw Policy Setup](https://build.nvidia.com/playbooks/nemoclaw-example-agents/policy-setup) tab's working Telegram channel (channel plugin + `api.telegram.org` egress). Then **add network egress for the sources you want the agent to read** by applying a small custom preset with `nemoclaw policy-add --from-file`. The preset is additive and hot-reloads — you do **not** need to dump or round-trip the full live policy.
+Start from the [NemoClaw Policy Setup](https://build.nvidia.com/playbooks/nemoclaw-applications/policy-setup) tab's working Telegram channel (channel plugin + `api.telegram.org` egress). Then **add network egress for the sources you want the agent to read** by applying a small custom preset with `nemoclaw policy-add --from-file`. The preset is additive and hot-reloads — you do **not** need to dump or round-trip the full live policy.
 
 Create `news-sources.yaml`:
 
@@ -540,7 +540,7 @@ Open the report on the host (`~/nemoclaw-projects/my-app/develop-and-review.md`)
 | **Scope limits** | Prompt — SAFETY RULES | Add file/dir denylists (e.g. *"Never touch migrations/, infra/, or any file ending in .lock."*) for parts of the repo you want strictly off-limits. |
 | **Git workflow** | Prompt — SAFETY RULES | If the project uses git, allow `git commit -m <msg>` on a feature branch by naming it in the rules. Keep `git push` blocked unless you really want remote pushes. |
 | **Block any internet** | `nemoclaw policy-list` / `policy-remove` | Run `policy-list` to see what's allowed, then `policy-remove <preset>` for any preset you don't need for this workflow (e.g. `telegram`, `github`, `pypi`). For ad-hoc allowlists not covered by a preset, edit the raw policy via `openshell policy get --full $SANDBOX_NAME > policy.yaml && $EDITOR policy.yaml && openshell policy set $SANDBOX_NAME --policy policy.yaml --wait`. More restrictive policy = lower blast radius if the model goes off-script. |
-| **Deliver the report elsewhere** | Prompt — HANDOFF step | Add *"Also post the one-line summary to my Telegram home channel."* (Requires the Telegram channel plugin and `api.telegram.org` egress from the [news-digest](https://build.nvidia.com/playbooks/nemoclaw-example-agents/news-digest) recipe.) |
+| **Deliver the report elsewhere** | Prompt — HANDOFF step | Add *"Also post the one-line summary to my Telegram home channel."* (Requires the Telegram channel plugin and `api.telegram.org` egress from the [news-digest](https://build.nvidia.com/playbooks/nemoclaw-applications/news-digest) recipe.) |
 
 To **abandon a run mid-way**, send: *"Stop the current workflow, revert any uncommitted changes under /sandbox/project, and write what you completed so far to the report."* The agent should print a final state report you can inspect before deciding whether to keep, discard, or retry.
 
@@ -557,7 +557,7 @@ The agent reads the artifact you're about to ship (PPTX, DOCX, PDF, Markdown) pl
 
 ## Step 1. Policy setup
 
-This recipe optionally layers on top of the [NemoClaw Policy Setup](https://build.nvidia.com/playbooks/nemoclaw-example-agents/policy-setup) tab's working Telegram channel (channel plugin + `api.telegram.org` egress) so the agent can DM you when a review is ready. Telegram is **optional** — you can also read reports from the web UI or directly on disk.
+This recipe optionally layers on top of the [NemoClaw Policy Setup](https://build.nvidia.com/playbooks/nemoclaw-applications/policy-setup) tab's working Telegram channel (channel plugin + `api.telegram.org` egress) so the agent can DM you when a review is ready. Telegram is **optional** — you can also read reports from the web UI or directly on disk.
 
 ### Create the red-team working directory
 
@@ -956,7 +956,7 @@ A real run on the kind of deck you'd hand to a partner typically surfaces things
 | **Background watcher mode** | Outside the sandbox | A small host-side `inotifywait` (or cron) on `queue/` can DM the agent `run on <new-file>` whenever a file lands. Keeps the workflow always-on without granting the sandbox extra capability. |
 | **Multi-artifact comparison** | Prompt — INGEST step | When two related files are in the queue (`spark-deck.pptx` + `dgx-spark-roadmap.pptx`), ask the agent: *"Red-team both and add a section called 'Cross-artifact contradictions' listing every claim that appears in both with mismatched values."* |
 | **Dismissal audit** | `~/nemoclaw-redteam/memory/dismissals.jsonl` | Open this file periodically. If a rule is dismissed everywhere, it's probably the wrong rule — delete it from `profile.yaml.custom_rules` so the agent stops generating noise. |
-| **Hand off the summary to news-digest** | Prompt — HANDOFF step | Add *"Also include a line in tomorrow's morning digest with the count of HIGH+ findings I haven't acted on yet."* (Requires the [news-digest](https://build.nvidia.com/playbooks/nemoclaw-example-agents/news-digest) recipe.) |
+| **Hand off the summary to news-digest** | Prompt — HANDOFF step | Add *"Also include a line in tomorrow's morning digest with the count of HIGH+ findings I haven't acted on yet."* (Requires the [news-digest](https://build.nvidia.com/playbooks/nemoclaw-applications/news-digest) recipe.) |
 
 To **dismiss a finding**, reply: `dismiss <rule_id> at <location> because <reason>` (or `dismiss all <rule_id> across versions because <reason>` for a sticky cross-artifact dismissal). The agent appends to `memory/dismissals.jsonl` and confirms.
 
@@ -979,13 +979,13 @@ The agent reads a snapshot of your calendar and a personal availability profile 
 
 Telegram is **optional**. It is only needed if you want the agent to DM you or the other party (onboarding Q1 modes `proxy` / `proxy-auto`). In **propose-only** mode — the recommended default, and what this guide uses — the agent just shows you drafts in the web UI / session and writes booking files to disk, so **no Telegram channel and no `api.telegram.org` egress are required.** You can run the entire workflow Telegram-free. Telegram uses long-polling — no public cloudflared tunnel is required for messaging.
 
-If you *do* want Telegram relay, layer this recipe on top of the [NemoClaw Policy Setup](https://build.nvidia.com/playbooks/nemoclaw-example-agents/policy-setup) tab's working Telegram channel first and confirm it is registered:
+If you *do* want Telegram relay, layer this recipe on top of the [NemoClaw Policy Setup](https://build.nvidia.com/playbooks/nemoclaw-applications/policy-setup) tab's working Telegram channel first and confirm it is registered:
 
 ```bash
 nemoclaw $SANDBOX_NAME status | grep -i telegram   # only needed for proxy / proxy-auto modes
 ```
 
-A line showing the Telegram channel means it is wired in. If there is no such line and you want Telegram, follow the **Optional — Set up Messaging Channel (Telegram)** section in [Run NemoClaw with a Local LLM](https://build.nvidia.com/playbooks/nemoclaw) (`nemoclaw $SANDBOX_NAME channels add telegram`), then return to [NemoClaw Policy Setup](https://build.nvidia.com/playbooks/nemoclaw-example-agents/policy-setup) for egress wiring. Otherwise, ignore this and continue in propose-only mode.
+A line showing the Telegram channel means it is wired in. If there is no such line and you want Telegram, follow the **Optional — Set up Messaging Channel (Telegram)** section in [Run NemoClaw with a Local LLM](https://build.nvidia.com/playbooks/nemoclaw) (`nemoclaw $SANDBOX_NAME channels add telegram`), then return to [NemoClaw Policy Setup](https://build.nvidia.com/playbooks/nemoclaw-applications/policy-setup) for egress wiring. Otherwise, ignore this and continue in propose-only mode.
 
 ### Create the calendar working directory
 
@@ -1069,7 +1069,7 @@ nemoclaw $SANDBOX_NAME exec -- bash -lc 'cd /sandbox/calendar && tar czf - booki
 > **`nemoclaw share mount` is the *opposite* direction and is optional.** `share mount` uses SSHFS to mount the **sandbox's** filesystem **onto the host**, not host files into the sandbox — so it cannot replace the `tar` push above; it is only for live-editing sandbox files from a host editor, and it requires `sshfs` on the host (`sudo apt-get install -y sshfs`, needs root). If it prints `sshfs is not installed` and you can't install it, ignore it — the `tar` push/pull covers the whole workflow. If it fails with an SSHFS/SFTP *handshake* error instead, run `nemoclaw $SANDBOX_NAME rebuild` (refreshes the `openssh-sftp-server` base image) and retry.
 
 > [!NOTE]
-> **Telegram relay — only if you use proxy / proxy-auto.** Telegram messaging uses long-polling and does **not** need cloudflared or a public webhook. Wire the channel via [NemoClaw Policy Setup](https://build.nvidia.com/playbooks/nemoclaw-example-agents/policy-setup) (and the companion playbook’s messaging section if the channel was never registered). In **propose-only** mode (this guide's default) the agent never sends messages itself, so skip Telegram entirely. cloudflared / `nemoclaw tunnel start` is only for remote Web UI access — see optional Step 2 in Policy Setup.
+> **Telegram relay — only if you use proxy / proxy-auto.** Telegram messaging uses long-polling and does **not** need cloudflared or a public webhook. Wire the channel via [NemoClaw Policy Setup](https://build.nvidia.com/playbooks/nemoclaw-applications/policy-setup) (and the companion playbook’s messaging section if the channel was never registered). In **propose-only** mode (this guide's default) the agent never sends messages itself, so skip Telegram entirely. cloudflared / `nemoclaw tunnel start` is only for remote Web UI access — see optional Step 2 in Policy Setup.
 
 ## Step 2. Agent prompt
 
@@ -1271,7 +1271,7 @@ Expected: the agent walks you through the six setup questions, echoes your negot
 | **Re-importing to real calendar** | Outside the sandbox | Easiest pattern: a small host-side cron that reads `bookings/log.csv`, generates `.ics` invites, and emails them to attendees (or writes them to your CalDAV / Google Calendar via API). Keeps the sandbox itself out of your live calendar. |
 | **Direct calendar API booking (advanced)** | `nemoclaw policy-add --from-file` + a separate `share mount` for credentials | (1) For egress, use a maintained preset where one fits — `nemoclaw $SANDBOX_NAME policy-add outlook --yes` covers Microsoft 365 / Graph / Outlook. For Google Calendar, author a small preset YAML allowing `googleapis.com` and `oauth2.googleapis.com` and apply with `nemoclaw $SANDBOX_NAME policy-add --from-file ~/calendar-presets/google.yaml --yes`. (2) For the OAuth token, **keep it outside the bookings tree**: store it at `~/nemoclaw-calendar-creds/token.json` on the host, `chmod a-w ~/nemoclaw-calendar-creds/token.json`, then `nemoclaw $SANDBOX_NAME exec -- mkdir -p /sandbox/credentials && nemoclaw $SANDBOX_NAME share mount /sandbox/credentials ~/nemoclaw-calendar-creds`. The agent reads `/sandbox/credentials/token.json` but the host `chmod` blocks any overwrite. Never place secrets under `bookings/` — that tree is writable by the agent. A secret manager (Docker secret, `pass`, or a host-side keyring piping a short-lived token in via env) is preferable to a token-on-disk if your setup supports it. Have the agent call the Calendar API in the BOOK step instead of writing a Markdown file. **Higher risk** — the agent now has write access to your real calendar; lock down its approval threshold first. |
 | **Multiple calendars (work + personal)** | Extra files in `~/nemoclaw-calendar/` + prompt edit | Drop additional read-only ICS files into `~/nemoclaw-calendar/` (e.g. `work.ics`, `personal.ics`) and `chmod a-w` them on the host. They appear inside the sandbox at `/sandbox/calendar/work.ics` and `/sandbox/calendar/personal.ics` via the existing `share mount`. Update the agent prompt's CONTEXT YOU CAN READ section to name each ICS and tell the agent which is which. Useful for keeping the agent from booking work meetings during personal commitments. |
-| **Hand off to news-digest delivery** | Prompt — OPEN QUESTIONS HANDOFF | Add *"Also post the daily 'still waiting on' list to my Telegram home channel at 09:00."* (Reuses the scheduler pattern from the [news-digest](https://build.nvidia.com/playbooks/nemoclaw-example-agents/news-digest) recipe.) |
+| **Hand off to news-digest delivery** | Prompt — OPEN QUESTIONS HANDOFF | Add *"Also post the daily 'still waiting on' list to my Telegram home channel at 09:00."* (Reuses the scheduler pattern from the [news-digest](https://build.nvidia.com/playbooks/nemoclaw-applications/news-digest) recipe.) |
 
 To **cancel an in-flight negotiation**, send: *"Drop the negotiation with <name> about <purpose>. Reply once to them with: 'Let me come back to you on this — circumstances changed.' and archive the working files under bookings/cancelled/."* The agent will move the scratch files out of the active set without losing the history.
 
@@ -1279,7 +1279,7 @@ To **cancel an in-flight negotiation**, send: *"Drop the negotiation with <name>
 
 ## NemoClaw Policy Setup
 
-This tab covers the **shared sandbox configuration** for Telegram messaging used by the [Daily Personal News Digest](https://build.nvidia.com/playbooks/nemoclaw-example-agents/news-digest), optionally by the [Calendar Negotiator](https://build.nvidia.com/playbooks/nemoclaw-example-agents/calendar-negotiator) (when you choose proxy / proxy-auto delivery), and optionally by the [Software Development Agent](https://build.nvidia.com/playbooks/nemoclaw-example-agents/developer-agent) and [Deck Reviewer](https://build.nvidia.com/playbooks/nemoclaw-example-agents/deck-reviewer) for "ready for review" notifications. Each application tab has its **own** policy setup section for the filesystem mounts and network egress that workflow needs — this page only covers Telegram, which is shared.
+This tab covers the **shared sandbox configuration** for Telegram messaging used by the [Daily Personal News Digest](https://build.nvidia.com/playbooks/nemoclaw-applications/news-digest), optionally by the [Calendar Negotiator](https://build.nvidia.com/playbooks/nemoclaw-applications/calendar-negotiator) (when you choose proxy / proxy-auto delivery), and optionally by the [Software Development Agent](https://build.nvidia.com/playbooks/nemoclaw-applications/developer-agent) and [Deck Reviewer](https://build.nvidia.com/playbooks/nemoclaw-applications/deck-reviewer) for "ready for review" notifications. Each application tab has its **own** policy setup section for the filesystem mounts and network egress that workflow needs — this page only covers Telegram, which is shared.
 
 Set your sandbox name once so the commands below read cleanly:
 
@@ -1356,7 +1356,7 @@ Tables below are grouped by tab so you can jump straight to the workflow you're 
 | `nemoclaw <sandbox> policy-add --from-file ...` fails with `Preset must declare preset.name (lowercase, hyphenated RFC 1123 label)` | `preset.name` in your custom preset file contains an underscore, uppercase letter, or other non-RFC-1123 character | Change the value of `preset.name` to lowercase letters, digits, and hyphens only (e.g. `news_sources` → `news-sources`). The inner `network_policies.<group>` map key and its `name` field do accept underscores — the constraint is only on the top-level `preset.name`. |
 | Web UI shows `origin not allowed` after policy changes | Accessing via `localhost` instead of `127.0.0.1` | Use `http://127.0.0.1:18789/#token=<your-token>`. The gateway origin check requires `127.0.0.1` exactly. |
 
-### [NemoClaw Policy Setup](https://build.nvidia.com/playbooks/nemoclaw-example-agents/policy-setup)
+### [NemoClaw Policy Setup](https://build.nvidia.com/playbooks/nemoclaw-applications/policy-setup)
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
@@ -1364,7 +1364,7 @@ Tables below are grouped by tab so you can jump straight to the workflow you're 
 | `nemoclaw tunnel start` prints `cloudflared not found — no public URL` | `cloudflared` is not installed (affects **optional remote Web UI** only — Telegram messaging does not need a tunnel) | If you need a public dashboard URL, install cloudflared for your host architecture (on ARM64: `curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64.deb && sudo dpkg -i cloudflared.deb`), then `nemoclaw tunnel stop && nemoclaw tunnel start`. Skip this entirely for Telegram-only workflows. |
 | Telegram bot receives messages but returns nothing for 60+ seconds | First response on a large local model is slow (cold start), or the inference server is not warm | Expected for the first reply after a restart. Verify the inference route with `nemoclaw $SANDBOX_NAME status`. If subsequent replies are also slow, pick a smaller model in the NemoClaw onboard wizard (see the companion playbook). |
 
-### [Daily Personal News Digest](https://build.nvidia.com/playbooks/nemoclaw-example-agents/news-digest)
+### [Daily Personal News Digest](https://build.nvidia.com/playbooks/nemoclaw-applications/news-digest)
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
@@ -1372,7 +1372,7 @@ Tables below are grouped by tab so you can jump straight to the workflow you're 
 | Digest fires but message says `unable to fetch <url>` | Host is not in `network_policies` | Add the host as a new entry under `network_policies.news_sources.endpoints` in `news-sources.yaml` (the preset file from Step 1) and re-run `nemoclaw $SANDBOX_NAME policy-add --from-file ./news-sources.yaml --yes`. Outbound denials show up in `nemoclaw $SANDBOX_NAME logs --follow` and `openshell term`. |
 | Agent skips the setup questions and dives straight into a generic digest | Profile from a prior run is still in memory | Send *"Forget my profile and run the one-time setup again from scratch."* and re-answer the six questions. |
 
-### [Software Development Agent](https://build.nvidia.com/playbooks/nemoclaw-example-agents/developer-agent)
+### [Software Development Agent](https://build.nvidia.com/playbooks/nemoclaw-applications/developer-agent)
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
@@ -1381,7 +1381,7 @@ Tables below are grouped by tab so you can jump straight to the workflow you're 
 | Agent runs tests and reports "tests not run" even though the project has tests | Test runner not installed in the sandbox image | The default NemoClaw sandbox may not ship `pytest`, `npm`, `cargo`, or `go test`. Install whatever the project uses once after sandbox creation: `nemoclaw $SANDBOX_NAME connect`, then `pip install --user pytest` (or equivalent), then `exit`. |
 | Agent modifies files outside the plan | Plan-approval checkpoint was disabled | In the profile, answer `yes` to "pause for approval" (Q5). The agent must then print `PLAN READY — reply 'approve'` and wait, never modifying source files until you reply `approve`. |
 
-### [Deck Reviewer](https://build.nvidia.com/playbooks/nemoclaw-example-agents/deck-reviewer)
+### [Deck Reviewer](https://build.nvidia.com/playbooks/nemoclaw-applications/deck-reviewer)
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
@@ -1390,7 +1390,7 @@ Tables below are grouped by tab so you can jump straight to the workflow you're 
 | Same finding keeps re-appearing after I dismissed it | Dismissal mode is `None`, or the rule + location pair did not match | Confirm profile Q4 is `Sticky` or `Per-version`. Check `~/nemoclaw-redteam/memory/dismissals.jsonl` to verify the dismissal was written. If the `location` field differs by a single character (e.g. "Slide 1" vs "slide 1"), the agent treats them as different sites — ask the agent to dismiss again using the exact coordinates from the latest report. |
 | CRITICAL findings disappear from the report | Auto-dismiss was attempted (should be impossible) | This is a regression — CRITICAL is hardcoded to require `yes, dismiss critical` re-confirmation per the prompt's DISMISSAL PROTOCOL. Re-paste the full prompt to restore the rule and re-run. |
 
-### [Calendar Negotiator](https://build.nvidia.com/playbooks/nemoclaw-example-agents/calendar-negotiator)
+### [Calendar Negotiator](https://build.nvidia.com/playbooks/nemoclaw-applications/calendar-negotiator)
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|

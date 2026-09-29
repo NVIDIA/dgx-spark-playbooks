@@ -16,11 +16,11 @@
 
 NVIDIA Brev is an AI development platform that makes GPU environments remotely accessible, shareable, and easy to standardize using preconfigured setups called Launchables.
 
-This walkthrough helps you connect your hardware platform to Brev so it appears as a managed GPU environment. After a one-time registration, your hardware becomes remotely accessible and shareable.
+This walkthrough helps you connect your hardware platform to Brev so it appears as a managed GPU environment. After registration and SSH setup, your hardware becomes remotely accessible and shareable.
 
 ## What you'll accomplish
 
-You'll register your hardware platform with Brev. It will appear as a healthy node in the Brev web UI and CLI, ready to share access and accept workloads.
+You'll register your hardware platform with Brev and configure SSH access. It will appear as a healthy node in the Brev web UI and CLI, ready to share access and accept workloads.
 
 ## What to know before starting
 
@@ -54,6 +54,7 @@ Use the matrix below to confirm your hardware platform. The same registration wo
 **Software requirements**
 
 - An NVIDIA Brev account — [create an account](https://login.brev.nvidia.com/signin) if you do not have one
+- Owner or Admin access to your Brev org
 - Administrative (root or sudo) access on the hardware platform to run the registration command
 - Network access from the hardware platform to Brev services
 
@@ -62,36 +63,44 @@ Use the matrix below to confirm your hardware platform. The same registration wo
 - **Estimated time:** 5–10 MIN
 - **Risk level:** Low
   - Registration configures the hardware platform for secure remote access without altering existing workloads
-- **Rollback:** Remove the Brev registration through the Brev UI or CLI (see Cleanup in the **Instructions** tab)
-- **Last Updated:** 07/31/2026
+- **Rollback:** Run `brev deregister` on the hardware platform (see Cleanup in the **Instructions** tab)
+- **Last Updated:** 09/21/2026
   - Registration workflow for connecting supported hardware platforms to NVIDIA Brev
 
 ## Instructions
 
 ## Step 1. Log in to Brev
 
-Go to the [Brev UI](https://brev.nvidia.com), log in, and confirm you are in the correct org (click the org control in the upper-right of the page). Once logged in, open [Registered Compute](https://brev.nvidia.com/org/environments?tab=registered-compute) under the **GPU** tab in the main navigation.
+Go to the [Brev UI](https://brev.nvidia.com), log in, and confirm you are in the correct org. Once logged in, open [Compute](https://brev.nvidia.com/org/environments).
 
-Click **Register Compute** and follow the instructions in the pop-up window.
+Click **Connect a local device** (or **Register Compute**) and follow the instructions in the pop-up window.
 
 ## Step 2. Complete the pop-up instructions
 
-In the Register Compute flow:
+In the Brev Connect flow:
 
-- Install the Brev CLI
-- Configure your compute
-  - Add a name for the compute
-  - To configure SSH, ensure the **Enable SSH access** toggle is on
-- Run the registration command on your hardware platform (requires administrative privileges)
+- Add a name for the compute
+- Create or enter an unexpired **Read & Write Personal API key** for your org
+- Run the generated command on your hardware platform to install the Brev CLI and register the compute (requires administrative privileges)
 
-## Step 3. Follow the registration flow
+Save your API key and click **Done** after registration. Do not share the key or command.
 
-In the CLI on your hardware platform, complete the interactive registration flow until registration finishes successfully.
+## Step 3. Enable SSH access
+
+On your hardware platform, enable SSH and grant yourself access using the same API key:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+brev enable-ssh --api-key "<your-api-key>"
+brev grant-ssh --api-key "<your-api-key>"
+```
+
+Grant your Brev user access using the same Linux user and SSH port (default: `22`) selected during SSH setup.
 
 ## Step 4. Confirm registration in the Brev UI
 
 1. Go to the [Brev UI](https://brev.nvidia.com)
-2. Open [Registered Compute](https://brev.nvidia.com/org/environments?tab=registered-compute)
+2. Open [Compute](https://brev.nvidia.com/org/environments)
 3. Confirm that your hardware platform appears as a registered node with a **Connected** status
 
 ## Step 5. Next steps
@@ -101,25 +110,29 @@ Your hardware platform is now integrated into Brev as a secure, remotely accessi
 You can share access through the Brev UI by:
 
 1. Adding the user to your [Team](https://brev.nvidia.com/org/team)
-2. Opening your instance under [Registered Compute](https://brev.nvidia.com/org/environments?tab=registered-compute)
-3. In the **SSH Access** section for the instance, search for the user and click **Modify Access** to enable access
+2. Opening your instance under [Compute](https://brev.nvidia.com/org/environments)
+3. In the **SSH Access** section for the instance, search for the user, click **Modify Access**, enable access for the Linux user selected in Step 3, and click **Save**
+
+On your local machine, [install the Brev CLI](https://docs.nvidia.com/brev/cli/getting-started), run `brev login`, select the same org with `brev org set <org>`, and connect with `brev shell <name>`.
 
 ## Step 6. Cleanup
 
-To unregister your hardware platform from Brev, use either the Brev CLI or the Brev UI.
+To unregister your hardware platform and complete local cleanup, run the following on that platform.
 
 **CLI:**
 
 ```bash
-brev deregister
+brev deregister --api-key "<your-api-key>"
 ```
 
 **UI:**
 
+UI removal revokes access. Run `brev deregister` on the hardware platform to complete local cleanup.
+
 1. Go to the [Brev UI](https://brev.nvidia.com)
-2. Open **Registered Compute** under GPU Environments
-3. Choose **Remove** for the registered compute you want to delete from Brev
-4. Confirm your selection
+2. Open [Compute](https://brev.nvidia.com/org/environments)
+3. Choose **Remove** from the compute's menu
+4. Enter the compute name and click **Remove Node**
 
 ## Troubleshooting
 
@@ -129,7 +142,8 @@ The **Hardware platform** column shows where an issue is most relevant. "All har
 
 | Symptom | Hardware platform | Cause | Fix |
 |---------|-------------------|-------|-----|
-| Registered compute appears in the wrong org | All hardware platforms | Registration was completed while signed into a different org | Run `brev set <my-org>`, then redo the registration flow |
+| Registered compute appears in the wrong org | All hardware platforms | The API key belongs to a different org | Run `brev deregister --api-key "<original-org-key>"` on the hardware platform, then register with a key for the correct org |
+| SSH access is denied | All hardware platforms | SSH is not enabled or access has not been granted | Complete Steps 3 and 5 in the **Instructions** tab |
 | Unable to run `brev shell <name>` | All hardware platforms | Local CLI state is stale | Run `brev refresh` |
 
 For product documentation, see [NVIDIA Brev documentation](https://docs.nvidia.com/brev/latest).

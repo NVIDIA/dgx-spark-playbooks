@@ -1,4 +1,4 @@
-# Connect Remotely to Your AI Compute
+# Use NVIDIA Sync to Connect Remotely to Your AI Compute
 
 > Reach your machine remotely via NVIDIA Sync
 
@@ -6,6 +6,7 @@
 
 - [Overview](#overview)
 - [Connect with NVIDIA Sync](#connect-with-nvidia-sync)
+- [Enable Tailscale](#enable-tailscale)
 - [Connect with Manual SSH](#connect-with-manual-ssh)
 - [Troubleshooting](#troubleshooting)
 
@@ -15,65 +16,50 @@
 
 ## Basic idea
 
-Your hardware platform can be used as a local desktop (keyboard, mouse, and monitor) or as a remote device over a network.
+[NVIDIA Sync](https://docs.nvidia.com/sync/latest/index.html) is a free desktop app that simplifies using a remote device over a local network or Tailscale.
+It replaces running commands in a terminal with a configured, click-through interface that lets you connect to remote devices, launch applications and services on the remote, and then access them from your laptop.
 
-This playbook shows two paths to connect to your hardware platform over SSH on a local network:
-
-* **With NVIDIA Sync:** A desktop app that configures SSH and launches remote applications through a click-through interface
-* **Manual SSH:** Terminal commands for direct SSH access and port forwarding
-
-NVIDIA Sync gives you a reusable connection you can return to later. Manual SSH uses commands that you may need to repeat each time you connect.
+This playbook shows how to install NVIDIA Sync on your laptop and use it to connect to a DGX Spark on your home network. 
+The instructions, except for the DGX Dashboard, generalize to any remote device with a Debian based Linux operating system, including a DGX Station.
 
 ## What you'll accomplish
 
-You'll establish secure SSH access to your hardware platform and then open the DGX Dashboard as an example of launching a remote web application.
+- **Use NVIDIA Sync**: Connect to your DGX Spark and launch remote applications from your laptop
+  - One time: Install NVIDIA Sync and add your Spark with its SSH credentials
+  - Optional one time: Set up the [Tailscale integration](tailscale-via-sync.md) to reach your Spark from another network
+  - Repeat use: Connect in NVIDIA Sync and launch a terminal, the [DGX Dashboard](https://docs.nvidia.com/dgx/dgx-spark/dgx-dashboard.html#spark-dgx-dashboard), or the [Resource Monitor](https://docs.nvidia.com/sync/latest/resource-monitor.html)
+
+- **Advanced path:** Use SSH commands to connect to your Spark and forward the DGX Dashboard to your laptop.
 
 ## What to know before starting
 
-**Required:**
-
-- With NVIDIA Sync: How to install a desktop application; the basics of NVIDIA Sync ([documentation](https://docs.nvidia.com/sync/latest/direct-connections.html))
-- Manual SSH: Terminal/command usage and the basics of SSH configuration, including port forwarding
+- Required: You must have your username and password to access the DGX Spark
+- Required for initial setup: Your Spark must be on the same network as your laptop ([see here for DGX Spark](https://docs.nvidia.com/dgx/dgx-spark/first-boot.html))
+- Required: You must have the Spark's IP address on the network or know its mDNS broadcast name
 
 ## Supported hardware platforms
 
-Use the matrix below to confirm your hardware platform, recommended default local settings, and whether multi-node applies.
-
-| Hardware platform | OS | Memory | Recommended default local settings | Multi-node capable hardware |
-| :---- | :---- | :---- | :---- | :---- |
-| **DGX Spark** | DGX OS (Linux) | 128 GB Unified Memory | NVIDIA Sync for remote SSH; Manual SSH as an alternative | — |
+- Local device: You can install the NVIDIA Sync desktop app on Windows 11, macOS, or Ubuntu 24.04 or later
+- Remote target device: Any Debian-based device accessible over SSH, including DGX Spark and DGX Station.
 
 ## Prerequisites
 
-**Hardware requirements**
-
-- Supported hardware platform — see Supported hardware platforms matrix above
-- Hardware platform powered on, networked, and reachable from your laptop on the same network
-- A user account on the hardware platform (username and password)
-- The hardware platform's mDNS hostname or its IP address on the network
-
-**Software requirements**
-
-- With NVIDIA Sync path: NVIDIA Sync installed on your laptop (download steps are in the **Connect with NVIDIA Sync** tab)
-- Manual SSH path: An SSH client on your laptop (`ssh -V`)
-- Web browser access to forwarded ports (for example, DGX Dashboard on port `11000`)
+- Required: Your laptop should be Windows 11, macOS or Ubuntu 24.04 or higher
+- Required for initial setup: Your laptop and Spark should be on the same network. After you enable Tailscale, they can be on different networks.
+- Required: You know the Spark's mDNS hostname or its IP address on the network
+- Suggested: You have signed up for a free [Tailscale account](https://login.tailscale.com/start) using a non-corporate email address
 
 ## Time & risk
 
-- **Estimated time:** 5–10 MIN
+- **Estimated time:** 5 MIN
 - **Risk level:** Low
-  - SSH setup configures credentials and key-based access without system-level changes to the hardware platform
-- **Rollback:** Remove SSH keys by editing `~/.ssh/authorized_keys` on the hardware platform; disconnect or remove the device in NVIDIA Sync
-- **Last Updated:** 08/03/2026
-  - Remote SSH access with NVIDIA Sync or Manual SSH, including verification and rollback guidance
+- **Rollback:** Remove SSH keys by editing `~/.ssh/authorized_keys` on the remote device; disconnect or remove the device in NVIDIA Sync
+- **Last Updated:** 09/24/2026
+  - Updating NVIDIA Sync instructions and added Tailscale instructions.
 
 ## Connect with NVIDIA Sync
 
-## Step 1. Install NVIDIA Sync on your laptop
-
-NVIDIA Sync is a desktop app that connects your laptop to remote devices over a local network.
-It replaces running manual commands in a terminal with a configured, click-through interface.
-You can use it to manage SSH access and launch development tools on your hardware platform.
+## Step 1. Install NVIDIA Sync on your laptop (one time)
 
 ::spark-download
 
@@ -102,58 +88,88 @@ You can use it to manage SSH access and launch development tools on your hardwar
 
 **Success:** A "Let's Get Started" modal opens and asks you to read and agree to the EULA.
 
-## Step 2. Complete onboarding by agreeing to the EULA and selecting applications to launch
+## Step 2. Agree to the EULA and select applications to launch (one time)
 
-Click the link to the EULA, read the EULA, and then select **Agree** in the "Let's Get Started" modal.
+1. Click the link to read the EULA, and then select **Agree** in the "Let's Get Started" modal.
+2. Then, NVIDIA Sync will show you any IDEs you have installed locally to select for launch on a remote device.
+3. Select **Next** to proceed.
 
-NVIDIA Sync will then prompt you to choose local developer applications for it to launch.
-You can always add more applications later in the Settings window.
+## Step 3. Find your DGX Spark on the network and add it to NVIDIA Sync (one time)
 
-Select **Next** to proceed.
+DGX Spark devices broadcast their hostname through mDNS, and NVIDIA Sync will open a modal while it searches the network for broadcasting devices.
 
-## Step 3. Add your hardware platform to NVIDIA Sync
-
-> [!NOTE]
-> Your hardware platform must be on the same network as your laptop, and you must know its mDNS hostname or its IP address.
-> See the documentation linked under **Resources** for first-boot and networking guidance for your hardware platform.
-
-Once onboarding completes, NVIDIA Sync shows a modal while it searches for mDNS devices.
-If your network allows mDNS broadcasting, NVIDIA Sync should detect your hardware platform (for example, `spark-abcd.local`) and prompt you to select it.
-
-Otherwise, the modal will transition to a form requesting specific fields to connect:
+- If your DGX Spark is on a home network, NVIDIA Sync should discover the device name (for example, `spark-abcd.local`) and prompt you to select it.
+- If your Spark doesn't appear, select "Add a device manually" and enter the information below to access the device.
 
 - **Name:** A descriptive name you will remember (for example, "My Home Lab")
-- **Hostname or IP:** The mDNS hostname (for example, `spark-abcd.local`) or IP address of your hardware platform
-- **Username:** Your hardware platform user account name
-- **Password:** Your hardware platform user account password
+- **Hostname or IP:** The device's mDNS hostname or IP address
+- **Username:** The user account name
+- **Password:** The associated account password
 
-Fill out the fields and select **Add**.
+Then, select **Add** to proceed.
 
-**Success:** The form will transition to a modal prompting you to get started.
+**Success:** The form will transition and prompt you to get started.
 
 > [!NOTE]
-> The password is used to configure SSH key-based authentication only when you add the device. It is not persisted or logged.
+> Your password is only temporarily used for SSH authentication and configuring key-based authentication when you add the device. It is not persisted or logged.
 
-## Step 4. Connect to your hardware platform and launch the DGX Dashboard
+## Step 4. Connect to your remote device and launch a terminal and the DGX Dashboard (repeat use)
 
-Select **Get Started** in the modal to connect to your hardware platform.
+1. Select **Get Started** in the addition confirmation modal to initiate the connection.
+2. The task bar utility will open and show that it is connecting to the device.
+3. When the connection succeeds, the utility will show apps to can launch on the remote.
+4. Select the Terminal app to launch a terminal on the remote.
+5. Select the DGX Dashboard app to launch it on the remote. It will open in your browser. 
+6. Select the Resource Monitor app to launch it. It will open in a new application window.
 
-The device window will open near the task or menu bar and then expand and populate with apps that you can launch on the hardware platform.
+**Success:** The applications start and open.
 
-The DGX Dashboard is a pre-installed web application that helps you monitor and manage the system remotely.
+## Next steps
 
-To launch it, select the DGX Dashboard icon in the device window.
+- Use NVIDIA Sync to [add Tailscale](tailscale-via-sync.md) so you can connect to your device from anywhere
+- Use NVIDIA Sync to [cluster two or more DGX Spark devices](https://build.nvidia.com/playbooks/connect-multiple-sparks/connect-devices)
+- Use NVIDIA Sync to [launch a vLLM container](https://build.nvidia.com/playbooks/vllm)
 
-When it opens, you will be prompted to log in using your username and password for the hardware platform.
+## Enable Tailscale
 
-**Success:** The DGX Dashboard web app opens in your browser and you see the main screen.
+## Step 1. Decide whether you need Tailscale
 
-## Step 5. Next steps
+Tailscale is a free service that creates secure tunnels between devices on different networks.
+It lets you connect devices that aren't exposed to the internet, for example a DGX Spark on your home network, to
+other devices that are on a different network, for example your laptop when you are working from a coffee shop.
 
-- Learn more about NVIDIA Sync:
-  - [NVIDIA Sync Tailscale integration](https://docs.nvidia.com/sync/latest/tailscale.html#nvidia-sync-tailscale)
-  - [NVIDIA Sync Cluster Assistant](https://docs.nvidia.com/sync/latest/cluster-assistant.html)
-- Try related workflows that use NVIDIA Sync, such as remote development tools or browser-based apps launched through the device window.
+NVIDIA Sync has a Tailscale integration that uses those tunnels to reach your device when a direct local connection is unavailable.
+You do not need a separate Tailscale app on your laptop.
+
+## Step 2. Create a Tailscale account
+
+Tailscale requires you to sign up through a third party auth provider like Google or GitHub.
+
+[Go here](https://login.tailscale.com/start) to create a Tailscale account.
+
+## Step 3. Enable Tailscale in NVIDIA Sync
+
+1. Open NVIDIA Sync **Settings** and select **Tailscale**.
+2. Select **Enable Tailscale**. It can take a while for Tailscale to pick up the request.
+3. In the browser window, sign in to Tailscale and select **Connect**.
+4. Wait for **Login Successful**, then return to NVIDIA Sync.
+
+## Step 4. Add your device to Tailscale
+
+1. In NVIDIA Sync **Settings → Tailscale**, select **Add a Device**.
+2. Select the device you already added to NVIDIA Sync.
+3. Use the link in the dialog to create a Tailscale authentication key with the default settings.
+4. Paste the key into NVIDIA Sync and select **Add Device**.
+5. A terminal opens on the device. Follow its prompts to install and authenticate Tailscale on the device.
+
+**Success:** The device appears in the Tailscale device list in NVIDIA Sync.
+
+## Step 5. Connect when you are away
+
+1. When your laptop is away from the local network, connect to the device in NVIDIA Sync as usual.
+2. Check the connection indicator. NVIDIA Sync selects Tailscale automatically when a direct connection is unavailable.
+
+For more help, see [Tailscale Connections in the NVIDIA Sync User Guide](https://docs.nvidia.com/sync/latest/tailscale.html#nvidia-sync-tailscale).
 
 ## Connect with Manual SSH
 
@@ -176,11 +192,10 @@ Collect the required connection details for your hardware platform:
 - **Username:** Your hardware platform user account name
 - **Password:** Your hardware platform account password
 - **Hostname:** Your device's mDNS hostname (for example, `spark-abcd.local`)
-- **IP Address:** An alternative only needed if mDNS does not work on your network as described below
+- **IP Address:** Use this if your device does not advertise an mDNS hostname, as with DGX Station, or if mDNS does not work on your network
 
 In some network configurations, such as complex corporate environments, mDNS will not work as expected
-and you will have to use your device's IP address directly to connect. You will know you are in this situation when
-you try to SSH and the command hangs indefinitely or you get an error like:
+and you will have to use your device's IP address directly to connect. A name-resolution error looks like this:
 
 ```
 ssh: Could not resolve hostname spark-abcd.local: Name or service not known
@@ -214,14 +229,14 @@ ping: cannot resolve spark-abcd.local: Unknown host
 If none of these work, you'll need to:
 
 - Log into your router's admin panel to find the IP address
-- Connect a display, keyboard, and mouse to check from the Ubuntu desktop
+- If the device has a desktop, connect a display, keyboard, and mouse to check its IP address
 
 ## Step 3. Test initial connection
 
 Connect to your hardware platform for the first time to verify basic connectivity:
 
 ```bash
-## Connect using mDNS hostname (preferred)
+## Connect using an mDNS hostname, if your device advertises one
 ssh <YOUR_USERNAME>@<DEVICE_HOSTNAME>.local
 ```
 
@@ -256,17 +271,23 @@ exit
 
 ## Step 5. Use SSH tunneling for web applications
 
-To access web applications running on your hardware platform, use SSH port
-forwarding. In this example you'll access the DGX Dashboard web application.
+To access web applications running on your remote device, use SSH port
+forwarding. This DGX OS example uses the DGX Dashboard. For another Debian-based device, use the port of an application running on that device.
 
 > [!NOTE]
-> DGX Dashboard runs on localhost, port 11000.
+> On DGX OS, DGX Dashboard runs on localhost, port 11000.
 
 Open the tunnel:
 
 ```bash
 ## local port 11000 → remote port 11000
 ssh -L 11000:localhost:11000 <YOUR_USERNAME>@<DEVICE_HOSTNAME>.local
+```
+
+If you use the device's IP address instead of its mDNS hostname, open the tunnel with:
+
+```bash
+ssh -L 11000:localhost:11000 <YOUR_USERNAME>@<DEVICE_IP_ADDRESS>
 ```
 
 After establishing the tunnel, access the forwarded web app in your browser: [http://localhost:11000](http://localhost:11000)

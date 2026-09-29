@@ -136,7 +136,7 @@ Clone the playbook assets, then launch the container. If your system has more th
 
 ```bash
 git clone https://github.com/NVIDIA/dgx-spark-playbooks
-cd client-hardware-playbooks/nvidia/playbook-nvfp4-pretraining/assets
+cd dgx-spark-playbooks/nvidia/playbook-nvfp4-pretraining/assets
 
 ## Use the latest nemo tag
 export TAG=26.04

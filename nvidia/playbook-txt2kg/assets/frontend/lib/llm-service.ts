@@ -23,6 +23,8 @@ export interface LLMOptions {
   maxTokens?: number;
   topP?: number;
   stream?: boolean;
+  responseFormat?: Record<string, unknown>;
+  extraBody?: Record<string, unknown>;
 }
 
 export interface OllamaOptions {
@@ -253,7 +255,13 @@ export class LLMService {
       throw new Error('Ollama client not configured.');
     }
     
-    const { temperature = 0.7, maxTokens = 1024, topP = 0.9, stream = false, maxRetries = 3 } = options;
+    const {
+      temperature = 0.7,
+      maxTokens = 1024,
+      topP = 0.9,
+      stream = false,
+      maxRetries = 3
+    } = options;
     
     return this.retryWithBackoff(async () => {
       const completion = await this.ollamaClient!.chat.completions.create({
@@ -337,14 +345,24 @@ export class LLMService {
     
     return this.retryWithBackoff(async () => {
       if (!stream) {
-        const completion = await this.vllmClient!.chat.completions.create({
+        const completionRequest: Record<string, unknown> = {
           model,
           messages,
           temperature,
           max_tokens: maxTokens,
           top_p: topP,
           stream: false,
-        });
+        };
+
+        if (responseFormat) {
+          completionRequest.response_format = responseFormat;
+        }
+
+        if (extraBody) {
+          completionRequest.extra_body = extraBody;
+        }
+
+        const completion = await this.vllmClient!.chat.completions.create(completionRequest as any);
         
         if (completion && completion.choices && completion.choices.length > 0) {
           return completion.choices[0]?.message?.content || '';
@@ -698,4 +716,4 @@ export class LLMService {
 }
 
 // Export a singleton instance for convenience
-export const llmService = LLMService.getInstance(); 
+export const llmService = LLMService.getInstance();

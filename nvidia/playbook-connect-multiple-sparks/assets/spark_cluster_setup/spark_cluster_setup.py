@@ -28,7 +28,6 @@ import sys
 from pathlib import Path
 import os
 import subprocess
-import re
 from ipaddress import ip_address as ip_addr_obj, ip_network
 
 logging.getLogger("paramiko").setLevel(logging.CRITICAL)
@@ -49,11 +48,6 @@ NETWORK_SETUP_SCRIPT = SCRIPT_DIR / "node_scripts" / NETWORK_SETUP_SCRIPT_NAME
 IP_PREFIX = "192.168.100."
 LAST_OCTET_START = 10
 SUBNET_SIZE = 24
-
-MIN_NCCL_TEST_BW = 21.875 # 175 Gbps
-MIN_NCCL_TEST_BW_RING = 10 # 80 Gbps
-
-NCCL_ENV = """export CUDA_HOME="/usr/local/cuda" && export MPI_HOME="/usr/lib/aarch64-linux-gnu/openmpi" && export NCCL_HOME="$HOME/nccl_spark_cluster/build/" && export LD_LIBRARY_PATH="$NCCL_HOME/lib:$CUDA_HOME/lib64/:$MPI_HOME/lib:$LD_LIBRARY_PATH" """
 
 class ExceptionThread(threading.Thread):
     def __init__(self, *args, **kwargs):
@@ -175,125 +169,6 @@ def ssh_client_active(ssh):
 def close_ssh_session(ssh):
     if ssh_client_active(ssh):
         ssh.close()
-
-def setup_nccl_deps(node):
-    """Setup NCCL dependencies on the node."""
-    ssh = None
-    try:
-        ssh = create_ssh_client(node["ip_address"], node["port"], node["user"], node["password"])
-        if not ssh.get_transport().is_active():
-            raise Exception(f"Could not establish a session to node {node["ip_address"]}. Check the credentials and try again.")
-
-        print(f"Updating apt on node {node["ip_address"]}...")
-        paramiko_run_sudo_command(ssh, node["password"], "apt update")
-
-        print(f"Installing libopenmpi-dev on node {node["ip_address"]}...")
-        exit_code, output, error = paramiko_run_sudo_command_with_output(ssh, node["password"], "apt install -y libopenmpi-dev")
-        if exit_code:
-            raise Exception(f"Failed to install libopenmpi-dev on node {node["ip_address"]}: output:{output} error:{error}")
-
-        print(f"Cloning NCCL repo on node {node["ip_address"]}...")
-
-        cmd = """rm -rf ~/nccl_spark_cluster/ && git clone -b v2.30.7-1 https://github.com/NVIDIA/nccl.git ~/nccl_spark_cluster/"""
-        exit_code, output, error = paramiko_run_command_with_output(ssh, cmd)
-        if exit_code:
-            raise Exception(f"Failed to clone NCCL repo on node {node['ip_address']}: output:{output} error:{error}")
-
-        print(f"Building NCCL on node {node["ip_address"]}...")
-        cmd = """cd ~/nccl_spark_cluster/ && make -j src.build NVCC_GENCODE="-gencode=arch=compute_121,code=sm_121" """
-        exit_code, output, error = paramiko_run_command_with_output(ssh, cmd)
-        if exit_code:
-            raise Exception(f"Failed to build NCCL on node {node['ip_address']}: output:{output} error:{error}")
-
-        print(f"Cloning NCCL tests repo on node {node["ip_address"]}...")
-        cmd = """rm -rf ~/nccl-tests_spark_cluster/ && git clone https://github.com/NVIDIA/nccl-tests.git ~/nccl-tests_spark_cluster/"""
-        exit_code, output, error = paramiko_run_command_with_output(ssh, cmd)
-        if exit_code:
-            raise Exception(f"Failed to clone NCCL tests repo on node {node['ip_address']}: output:{output} error:{error}")
-
-        print(f"Building NCCL tests on node {node["ip_address"]}...")
-        cmd = """cd ~/nccl-tests_spark_cluster/ && %s && make MPI=1 -j8 """ % NCCL_ENV
-        exit_code, output, error = paramiko_run_command_with_output(ssh, cmd)
-        if exit_code:
-            raise Exception(f"Failed to build NCCL tests on node {node['ip_address']}: {error}")
-        
-        print(f"Successfully setup NCCL dependencies on node {node['ip_address']}")
-        close_ssh_session(ssh)
-    except Exception as e:
-        close_ssh_session(ssh)
-        raise Exception(f"Failed to setup NCCL dependencies on node {node["ip_address"]}:\n{e}")
-
-def run_nccl_test(nodes_info, ring_topology):
-    """Runs the NCCL test."""
-
-    threads = []
-    for i, node in enumerate(nodes_info):
-        t = ExceptionThread(target=setup_nccl_deps, args=(node,))
-        threads.append(t)
-        t.start()
-
-    for t in threads:
-        try:
-            t.join()
-        except Exception as e:
-            print(f"An error occurred when running NCCL setup on nodes:\n{e}")
-            return False
-
-    print(f"Successfully setup NCCL dependencies on all nodes...")
-
-    print(f"Running NCCL test...")
-    
-    # Generate the mpirun command
-    host_list = ",".join(f"{node['ip_address']}:1" for node in nodes_info)
-    ring_topology_specific_env = "-x NCCL_NET_PLUGIN=none " if ring_topology else ""
-    mpirun_cmd = (
-        f"{NCCL_ENV} && mpirun -np {len(nodes_info)} -H {host_list} "
-        '--mca plm_rsh_agent "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" '
-        "-x LD_LIBRARY_PATH=$LD_LIBRARY_PATH "
-        "-x UCX_NET_DEVICES=enP7s7 "
-        "-x NCCL_SOCKET_IFNAME=enP7s7 "
-        "-x OMPI_MCA_btl_tcp_if_include=enP7s7 "
-        "-x NCCL_IB_SUBNET_AWARE_ROUTING=1 "
-        f"{ring_topology_specific_env}"
-        "$HOME/nccl-tests_spark_cluster/build/all_gather_perf -b 16G -e 16G -f 2"
-    )
-
-    # Run command on the primary node (first node in the list)
-    node0 = nodes_info[0]
-    ssh = create_ssh_client(node0["ip_address"], node0["port"], node0["user"], node0["password"])
-    if not ssh.get_transport().is_active():
-        print(f"Could not establish a session to node {node0}. Check the credentials and try again.")
-        return False
-
-    print(f"NCCL test command: {mpirun_cmd}")
-    exit_code, output, error = paramiko_run_command_with_output(ssh, mpirun_cmd)
-    if exit_code:
-        print(f"Failed to run NCCL test on node {node0["ip_address"]}: output:{output} error:{error}")
-        close_ssh_session(ssh)
-        return False
-    
-    # Extract the "Avg bus bandwidth" value from the NCCL test output
-    avg_bus_bw = None
-    # The output could potentially be multiline (as it is command output)
-    # We need to search for a line matching "# Avg bus bandwidth    : value"
-    for line in output.splitlines():
-        m = re.match(r"# Avg bus bandwidth\s*:\s*([0-9.]+)", line.strip())
-        if m:
-            avg_bus_bw = float(m.group(1))
-            print(f"Avg bus bandwidth from NCCL test: {avg_bus_bw} GB/s")
-            break
-
-    if avg_bus_bw is None:
-        print("WARNING: Failed to extract Avg bus bandwidth from NCCL test output.")
-    else:
-        # If the average bus bandwidth is less then throw a warning
-        if (ring_topology and avg_bus_bw < MIN_NCCL_TEST_BW_RING) or (not ring_topology and avg_bus_bw < MIN_NCCL_TEST_BW):
-            print("WARNING: NCCL Test bandwidth is less than expected. Stop any GPU workloads on the nodes and try NCCL test again using the NCCL test command above.")
-        else:
-            print(f"NCCL test BW is as expected")
-
-    close_ssh_session(ssh)
-    return True
 
 def ensure_ssh_dir():
     """Ensure ~/.ssh exists with mode 0700."""
@@ -649,31 +524,29 @@ def configure_ssh_keys_on_nodes(nodes_info) -> bool:
 
     return True
 
-def pre_validate_cluster(config) -> tuple[bool, bool, list[str]]:
+def pre_validate_cluster(config) -> tuple[bool, list[str]]:
     """Pre-validates the cluster."""
     try:
         nodes_info = config.get("nodes_info", None)
         if not nodes_info:
             print("ERROR: Nodes information not found.")
-            return False, False, []
+            return False, []
 
         print(f"Checking UP CX7 interfaces...")
         up_interfaces = check_and_get_up_cx7_interfaces(nodes_info)
         if not up_interfaces:
             print("ERROR: Failed to check UP CX7 interfaces. Check the QSFP cable connection and try again.")
-            return False, False, []
+            return False, []
 
         print(f"Checking CX7 interface link speed...")
         if not check_interface_link_speed(nodes_info, up_interfaces):
-            return False, False, []
-
-        ring_topology = (len(nodes_info) == 3 and len(up_interfaces) == 4)
+            return False, []
 
     except Exception as e:
         print(f"ERROR: An error occurred when pre-validating the cluster:\n{e}")
-        return False, False, []
+        return False, []
 
-    return True, ring_topology, up_interfaces
+    return True, up_interfaces
 
 def handle_cluster_setup(config, up_interfaces) -> bool:
     """Handles the cluster network setup."""
@@ -832,17 +705,16 @@ def main():
     """Main function to setup the Spark cluster."""
     parser = _HelpHintParser(
         description="Setup the Spark cluster.",
-        epilog="One of --pre-validate-only, --run-setup, or --run-nccl-test is required.",
+        epilog="One of --pre-validate-only or --run-setup is required.",
     )
     parser.add_argument("-c", "--config", type=str, required=True, help="Path to the configuration file.")
     parser.add_argument("-v", "--pre-validate-only", action="store_true", help="Only run pre-setup validations.")
-    parser.add_argument("-s", "--run-setup", action="store_true", help="Run the cluster setup and run NCCL bandwidth test.")
-    parser.add_argument("-n", "--run-nccl-test", action="store_true", help="Run the NCCL bandwidth test.")
+    parser.add_argument("-s", "--run-setup", action="store_true", help="Run the cluster setup.")
 
     args = parser.parse_args()
 
-    if not (args.pre_validate_only or args.run_setup or args.run_nccl_test):
-        parser.error("One of -v/--pre-validate-only, -s/--run-setup, or -n/--run-nccl-test is required.")
+    if not (args.pre_validate_only or args.run_setup):
+        parser.error("One of -v/--pre-validate-only or -s/--run-setup is required.")
 
     config_path = args.config
     if not os.path.exists(config_path):
@@ -868,7 +740,7 @@ def main():
             return
 
         print(f"Pre-validating cluster setup...")
-        ret, ring_topology, up_interfaces = pre_validate_cluster(config)
+        ret, up_interfaces = pre_validate_cluster(config)
         if not ret:
             return
 
@@ -882,14 +754,6 @@ def main():
                 return
 
             print("Spark cluster setup completed successfully.")
-
-        if args.run_nccl_test or args.run_setup:
-            print("Running NCCL test...")
-            if ring_topology:
-                print("Detected ring topology...")
-            if not run_nccl_test(config.get("nodes_info", []), ring_topology):
-                return
-            print("NCCL test completed.")
 
     except Exception as e:
         print(f"ERROR: An error occurred when running Spark cluster setup:\n{e}")

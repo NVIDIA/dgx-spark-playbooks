@@ -86,6 +86,10 @@ services:
     container_name: vllm-service
     ports:
       - '8001:8001'
+    runtime: nvidia
+    gpus: all
+    devices:
+      - /dev/nvidia0:/dev/nvidia0
     ipc: host
     ulimits:
       memlock: -1
@@ -101,6 +105,8 @@ services:
       - VLLM_KV_CACHE_DTYPE=auto
       - VLLM_PORT=8001
       - VLLM_HOST=0.0.0.0
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
       - CUDA_VISIBLE_DEVICES=0
       - NCCL_DEBUG=INFO
       - CUDA_MANAGED_FORCE_DEVICE_ALLOC=1

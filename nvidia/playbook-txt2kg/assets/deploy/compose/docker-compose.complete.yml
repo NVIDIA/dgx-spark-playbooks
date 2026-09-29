@@ -95,6 +95,7 @@ services:
       context: ../services/ollama
       dockerfile: Dockerfile
     image: ollama-custom:latest
+    pull_policy: build
     container_name: ollama-compose
     ports:
       - '11434:11434'
@@ -135,6 +136,10 @@ services:
     container_name: vllm-service
     ports:
       - '8001:8001'
+    runtime: nvidia
+    gpus: all
+    devices:
+      - /dev/nvidia0:/dev/nvidia0
     environment:
       - VLLM_MODEL=meta-llama/Llama-3.2-3B-Instruct
       - VLLM_TENSOR_PARALLEL_SIZE=1
@@ -144,6 +149,8 @@ services:
       - VLLM_KV_CACHE_DTYPE=fp8
       - VLLM_PORT=8001
       - VLLM_HOST=0.0.0.0
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
       - CUDA_VISIBLE_DEVICES=0
       - NCCL_DEBUG=INFO
     volumes:

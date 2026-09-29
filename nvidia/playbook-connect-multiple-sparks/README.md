@@ -1,6 +1,6 @@
 # Connect Multiple DGX Sparks for Distributed Workloads
 
-> Stacked, ring, or switch topologies for high-speed multi-node jobs
+> Use NVIDIA Sync clustering so larger models and training can span nodes.
 
 ## Table of Contents
 
@@ -19,26 +19,29 @@
 
 ## Basic idea
 
-You can connect two or more DGX Spark devices into a high-speed cluster to run workloads that won't fit on a single device. Configuring the cluster takes more than just plugging in cables. Setting up the DGX Spark ConnectX-7 network by hand has many steps and can be confusing.
+This playbook shows you how to connect two to four DGX Spark devices into a high-speed cluster for workloads.
+This will let you run models or training workloads that cannot run effectively on a single DGX Spark.
 
-This playbook shows you how to create a cluster of two to four DGX Spark devices with the NVIDIA Sync Cluster Assistant ([see demo video](https://www.youtube.com/watch?v=MehBUQtb9qM)).
-NVIDIA Sync streamlines the software and network configuration so you can get to a functioning cluster without configuring each device from a terminal.
+There are two paths:
 
-When you finish, choose a workload playbook to set up on your cluster.
+- **Recommended:** Use the [NVIDIA Sync Cluster Assistant](https://docs.nvidia.com/sync/latest/cluster-assistant.html) to set up and test the ConnectX-7 network and interdevice SSH ([see demo video](https://www.youtube.com/watch?v=MehBUQtb9qM)).
+- **Advanced:** Experienced users can use the NVIDIA provided scripts in **Configure Manually**.
 
+Both paths begin with **Connect the Devices**.
 
 ## What you'll accomplish
 
-- You will physically connect your devices directly with QSFP cables or through a switch and QSFP cables.
-- You will use [NVIDIA Sync Cluster Assistant](https://docs.nvidia.com/sync/latest/cluster-assistant.html) to set up and test the ConnectX-7 network.
+- You will physically connect your devices directly with QSFP cables (and potentially a switch).
+- You will configure the ConnectX-7 network across the devices.
+- You will set up interdevice SSH.
 
 ## What to know before starting
 
 **Required:**
 
-- How to [plug a QSFP cable into a DGX Spark or GB10 device](https://docs.nvidia.com/dgx/dgx-spark/spark-clustering.html#plugging-in-a-qsfp-cable)
-- Access to the switch settings and the switch maker's setup guide, if you use a switch
-- How to [set up a DGX Spark or GB10 device](https://docs.nvidia.com/dgx/dgx-spark/first-boot.html) on the same network as the computer that runs NVIDIA Sync
+- How to [plug a QSFP cable into a DGX Spark](https://docs.nvidia.com/dgx/dgx-spark/spark-clustering.html#plugging-in-a-qsfp-cable).
+- How to configure switch settings, if you use a switch.
+- How to [set up a DGX Spark](https://docs.nvidia.com/dgx/dgx-spark/first-boot.html) on a local network.
 
 **Suggested:**
 
@@ -56,37 +59,36 @@ Check the table below to see if this playbook is for your hardware.
 
 **Hardware requirements**
 
-- Two to four DGX Spark or GB10 devices
-- The QSFP cables listed for your layout in **Connect the Devices**
-- A switch with one 200 Gbit/s Ethernet link for each device, if you use a switch. Some 400 Gbit/s ports must be split into 200 Gbit/s ports before you set up the cluster.
+- Two to four DGX Sparks.
+- The QSFP cables listed for your layout in **Connect the Devices**.
+- A switch with one 200 Gbit/s Ethernet link for each device, if you use a switch. Some 400 Gbit/s ports must be split into 200 Gbit/s ports.
 
 **Software requirements**
 
-- Each device must be on the same local network as your laptop, and you must know its IP address or mDNS name
-- You must have a user name and password with `sudo` privileges on each device
-- Each DGX Spark or GB10 device is updated to the [April 2026 DGX OS release](https://docs.nvidia.com/dgx/dgx-spark/release-notes.html#april-2026-release)
+- Each Spark must be on the same local network, and you must know its management IP address or mDNS name.
+- You must have a user name and password with `sudo` privileges on each device.
+- Each Spark is updated to the [April 2026 DGX OS release](https://docs.nvidia.com/dgx/dgx-spark/release-notes.html#april-2026-release).
 
 ## Ancillary files
 
-These files are **only** needed if you follow the manual instructions.
+These files are only needed for the advanced path.
 You can find them in [this playbook's assets folder](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/playbook-connect-multiple-sparks/assets).
 
-- [`discover-sparks`](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/playbook-connect-multiple-sparks/assets/discover-sparks) — node discovery and SSH key setup for the manual path
-- [`spark_cluster_setup`](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/playbook-connect-multiple-sparks/assets/spark_cluster_setup) — network setup, SSH setup, and an NCCL test for the manual path
+- [`spark_cluster_setup`](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/playbook-connect-multiple-sparks/assets/spark_cluster_setup) — network and SSH setup for the advanced path
 
 ## Time & risk
 
-- **Estimated time:** 10 minutes using NVIDIA Sync
+- **Estimated time:** 10 minutes with NVIDIA Sync; longer for manual setup
 - **Risk level:** Low with NVIDIA Sync; medium with manual setup
 - **Rollback:** Delete the cluster in NVIDIA Sync. For manual setup, follow the rollback steps in **Configure Manually**.
-- **Last Updated:** 09/09/2026
-  - Made NVIDIA Sync the main path and moved cabling into its own tab.
+- **Last Updated:** 09/10/2026
+  - Clarified the recommended NVIDIA Sync path and the advanced manual path.
 
 ## Connect the Devices
 
 ## Step 1. Pick a cluster layout
 
-Pick one layout before you connect the cables.
+The procedure changes based on the number of devices and whether you use a switch.
 
 | Devices | Layout | Cables |
 | --- | --- | --- |
@@ -94,31 +96,33 @@ Pick one layout before you connect the cables.
 | Three | Direct ring | Three cables; each device links to the other two |
 | Two, three, or four | Switch | One cable and one 200 Gbit/s link from each device to the switch |
 
-Do not mix direct and switch links. Use only one cable for each link. Four devices require a switch.
+> [!NOTE]
+> If you are using a switch, do **not** connect devices directly through a cable.
+> Each device should be connected to the switch through exactly one cable.
 
-## Step 2. Check the devices and cables
+## Step 2. Set up the devices and cables
 
 1. Turn on each DGX Spark.
-2. Make sure each device is on the same local network as the computer that runs NVIDIA Sync.
+2. Make sure each device is on the same local management network ([see here](https://docs.nvidia.com/dgx/dgx-spark/first-boot.html)).
 3. Update each device to the current DGX Spark system software.
 4. Use a supported QSFP112 DAC cable in Ethernet mode. See [QSFP ports and cables](https://docs.nvidia.com/dgx/dgx-spark/spark-clustering.html#the-qsfp-ports-and-cables) for the approved cable list.
 5. Place the devices within reach of the cables.
 
 ## Step 3. Connect your layout
 
-Use these steps each time you plug in a cable:
+> [!NOTE]
+> Use these steps each time you plug in a QSFP cable:
+>
+> 1. Turn each DGX Spark so that the back faces you.
+> 2. Pick either QSFP port. The ports work the same with NVIDIA Sync.
+> 3. Hold the cable with its pull tab facing up.
+> 4. Push the cable into the port until it is fully seated.
 
-1. Turn each DGX Spark so that the back faces you.
-2. Pick either QSFP port. The ports work the same with NVIDIA Sync.
-3. Hold the cable with its pull tab facing up.
-4. Push the cable into the port until it is fully seated.
+> See [Plugging in a QSFP Cable](https://docs.nvidia.com/dgx/dgx-spark/spark-clustering.html#plugging-in-a-qsfp-cable) for an image.
 
 > [!WARNING]
 > Do not force a cable into a port. If it does not slide in, stop and check the pull tab and port alignment.
 
-See [Plugging in a QSFP Cable](https://docs.nvidia.com/dgx/dgx-spark/spark-clustering.html#plugging-in-a-qsfp-cable) for a port image and more help.
-
-Choose only one of the layouts below.
 
 ### Two-device direct link
 
@@ -136,7 +140,7 @@ Each device in the ring should have one cable in each QSFP port.
 
 ### Two-to-four-device switch
 
-Set up the switch before you run NVIDIA Sync:
+Set up the switch before you configure the cluster:
 
 1. Check that the switch, ports, and cables support 200 Gbit/s Ethernet links.
 2. Set each Spark-facing port for 200 Gbit/s. A 400 Gbit/s port may need to be split into two 200 Gbit/s ports.
@@ -161,9 +165,14 @@ For MikroTik CRS804 and CRS812 switches, see [MikroTik wired interface compatibi
 
 ## Step 4. Continue with NVIDIA Sync
 
-Follow **Configure with NVIDIA Sync**. NVIDIA Sync will check the devices and detected layout before it sets up the cluster network.
+Continue with **Configure with NVIDIA Sync**. NVIDIA Sync will check the devices and detected layout before it sets up the cluster network.
+
+Experienced users who want to configure the cluster with scripts can instead continue with **Configure Manually**.
 
 ## Configure with NVIDIA Sync
+
+> [!NOTE]
+> You can also follow the demo video [here](https://www.youtube.com/watch?v=MehBUQtb9qM).
 
 ## Step 1. Make sure the devices are properly connected
 
@@ -275,13 +284,12 @@ This removes the node-to-node SSH setup and the cluster from NVIDIA Sync.
 ## Configure Manually
 
 > [!NOTE]
-> Use this tab to configure the cluster without NVIDIA Sync. The helper changes the network and SSH settings on each device. It also installs the tools needed for an NCCL test and runs that test.
+> This advanced path is for experienced users who want to configure the cluster without NVIDIA Sync.
+> The helper script changes the network and SSH settings on each device.
 
 ## Step 1. Connect the devices
 
 Follow **Connect the Devices** for your direct, ring, or switch layout.
-
-If you use a switch, set it up before you run the helper. Put all device ports in one Layer 2 bridge and make sure each link can run at 200 Gbit/s.
 
 ## Step 2. Get the cluster setup files
 
@@ -289,12 +297,12 @@ On one DGX Spark, clone this repo and open the helper folder:
 
 ```bash
 git clone https://github.com/NVIDIA/dgx-spark-playbooks
-cd client-hardware-playbooks/nvidia/playbook-connect-multiple-sparks/assets/spark_cluster_setup
+cd dgx-spark-playbooks/nvidia/playbook-connect-multiple-sparks/assets/spark_cluster_setup
 ```
 
 ## Step 3. Add the device login details
 
-Pick the sample file that matches the number of devices:
+Pick the sample file that matches the number of devices. The helper detects how they are connected:
 
 - `config/spark_config_b2b.json` for two devices
 - `config/spark_config_ring.json` for three devices
@@ -335,9 +343,8 @@ The helper will:
 2. Set IP addresses on the ConnectX-7 network.
 3. Set up key-based SSH between the devices.
 4. Check the links between the devices.
-5. Install the tools needed for the NCCL test and run it.
 
-The setup should print `Spark cluster setup completed successfully.` The test should then print `NCCL test completed.`
+The setup should print `Spark cluster setup completed successfully.`
 
 ## Step 6. Remove the password file
 
@@ -349,7 +356,7 @@ rm config/my-cluster.json
 
 ## Next steps
 
-Open the workload playbook you want to use. The [NCCL playbook](https://build.nvidia.com/playbooks/nccl) can run a fuller network test.
+Open the workload playbook you want to use.
 
 ## Roll back the manual setup
 
@@ -359,7 +366,7 @@ If you used a switch, also undo any port, bridge, DHCP, link speed, or MTU chang
 
 ## Troubleshooting
 
-## Common issues
+## Connection and NVIDIA Sync issues
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
@@ -371,9 +378,12 @@ If you used a switch, also undo any port, bridge, DHCP, link speed, or MTU chang
 | A switch link is down or is not 200 Gbit/s | The cable is not supported, the switch port uses the wrong mode, or the two ends do not agree on link settings | Check the cable and port mode. A 400 Gbit/s port may need to be split into two 200 Gbit/s ports. If the link stays down, check auto-negotiation and FEC in the switch maker's guide. |
 | The cluster connects but data transfer is slow | A link can report 200 Gbit/s while the switch sends traffic through its CPU or the link records errors | Check hardware-offload status, switch CPU use, and port error counters. Test traffic in both directions. If the issue remains, contact the switch maker or NVIDIA support. |
 | SSH setup times out | One device took more than five minutes | Retry the SSH step in Cluster Assistant. |
-| The manual pre-check fails | A management IP, SSH login, password, or `sudo` setting is wrong | Fix the value in `config/my-cluster.json`, test SSH to each management IP, and run `--pre-validate-only` again. |
-| No ConnectX-7 interface is up | A cable or port is not active | Reseat the cables, confirm the layout, reboot the devices, and run `ibdev2netdev` again. |
-| The manual helper reports an APT error | A package source or signing key is broken | Fix the APT source or key error on that device, then run the helper again. |
-| The NCCL test cannot load `libnccl.so.2` | NCCL is not ready on every device | Follow the [NCCL playbook](https://build.nvidia.com/playbooks/nccl) on every device, then run the test again. |
 
 For more Cluster Assistant help, see the [NVIDIA Sync troubleshooting guide](https://docs.nvidia.com/sync/latest/cluster-assistant.html#troubleshooting).
+
+## Manual setup issues
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| The manual pre-check fails | A management IP, SSH login, password, or `sudo` setting is wrong | Fix the value in `config/my-cluster.json`, test SSH to each management IP, and run `--pre-validate-only` again. |
+| No ConnectX-7 interface is up | A cable or port is not active | Reseat the cables, confirm the layout, reboot the devices, and run `ibdev2netdev` again. |

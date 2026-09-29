@@ -114,7 +114,7 @@ Clone the playbook assets and open the assets directory:
 
 ```bash
 git clone https://github.com/NVIDIA/dgx-spark-playbooks
-cd client-hardware-playbooks/nvidia/playbook-jax/assets
+cd dgx-spark-playbooks/nvidia/playbook-jax/assets
 ```
 
 ## Step 3. Build the Docker image

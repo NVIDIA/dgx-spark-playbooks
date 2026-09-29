@@ -6,35 +6,16 @@
 ## Table of Contents
 
 - [Overview](#overview)
-- [Instructions](#instructions)
-  - [Hardware platform launch notes](#hardware-platform-launch-notes)
-  - [Base configuration (most models)](#base-configuration-most-models)
-  - [Agent-ready models](#agent-ready-models)
-  - [Watch startup](#watch-startup)
-- [Agent-ready Models](#agent-ready-models)
-  - [Recommendations by hardware platform](#recommendations-by-hardware-platform)
-  - [Verify your server](#verify-your-server)
-  - [Next steps](#next-steps)
+- [Choose a Recipe](#choose-a-recipe)
+- [Single device](#single-device)
+  - [Step 1. Install NVIDIA Sync locally and add the DGX Spark or DGX Station device (one time)](#step-1-install-nvidia-sync-locally-and-add-the-dgx-spark-or-dgx-station-device-one-time)
 - [Multi-node DGX Spark](#multi-node-dgx-spark)
-  - [Docker permissions](#docker-permissions)
-  - [Step 1. Confirm network connectivity](#step-1-confirm-network-connectivity)
-  - [Step 2. Download the cluster deployment script](#step-2-download-the-cluster-deployment-script)
-  - [Step 3. Pull the NGC vLLM image](#step-3-pull-the-ngc-vllm-image)
-  - [Step 4. Start the Ray head node (Node 1)](#step-4-start-the-ray-head-node-node-1)
-  - [Step 5. Start the Ray worker node (Node 2)](#step-5-start-the-ray-worker-node-node-2)
-  - [Step 6. Verify cluster status](#step-6-verify-cluster-status)
-  - [Step 7. Download Llama 3.3 70B](#step-7-download-llama-33-70b)
-  - [Step 8. Launch inference server (tensor parallel across both nodes)](#step-8-launch-inference-server-tensor-parallel-across-both-nodes)
-  - [Step 9. Test inference](#step-9-test-inference)
-  - [Step 1. Confirm network connectivity](#step-1-confirm-network-connectivity)
-  - [Step 2. Download the cluster deployment script (all nodes)](#step-2-download-the-cluster-deployment-script-all-nodes)
-  - [Step 3. Pull the NGC vLLM image (all nodes)](#step-3-pull-the-ngc-vllm-image-all-nodes)
-  - [Step 4. Start the Ray head node (Node 1)](#step-4-start-the-ray-head-node-node-1)
-  - [Step 5. Start the Ray worker nodes (all other nodes)](#step-5-start-the-ray-worker-nodes-all-other-nodes)
-  - [Step 6. Verify cluster status](#step-6-verify-cluster-status)
-  - [Step 7. Download MiniMax M2.5](#step-7-download-minimax-m25)
-  - [Step 8. Launch inference server (tensor parallel = node count)](#step-8-launch-inference-server-tensor-parallel-node-count)
-  - [Step 9. Test inference](#step-9-test-inference)
+  - [Step 1. Install NVIDIA Sync on your laptop and add the two DGX Spark devices](#step-1-install-nvidia-sync-on-your-laptop-and-add-the-two-dgx-spark-devices)
+  - [Step 2. Physically connect the two Sparks and configure the ConnectX-7 network using NVIDIA Sync](#step-2-physically-connect-the-two-sparks-and-configure-the-connectx-7-network-using-nvidia-sync)
+  - [Step 2. Check the Docker group on each device and configure if needed](#step-2-check-the-docker-group-on-each-device-and-configure-if-needed)
+  - [Step 2. Prepare the environment](#step-2-prepare-the-environment)
+  - [Step 3. Serve the model](#step-3-serve-the-model)
+  - [Step 4. Test inference](#step-4-test-inference)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -43,544 +24,392 @@
 
 ## Basic idea
 
-vLLM is an inference engine designed to run large language models efficiently. The key idea is **maximizing throughput and minimizing memory waste** when serving LLMs.
+vLLM is a highly performant inference engine for serving large language models through an OpenAI-compatible API.
+It uses efficient memory management and continuous batching to increase serving throughput.
+You can learn more about vLLM [in their blog](https://vllm.ai/blog).
 
-- **PagedAttention** handles long sequences without running out of GPU memory.
-- **Continuous batching** keeps GPUs fully utilized by adding new requests to batches already in progress.
-- An **OpenAI-compatible API** lets applications built for the OpenAI API switch to a vLLM backend with little or no modification.
+This playbook walks you through two situations for configuring a vLLM container to serve a model.
+
+- **Single remote device**: How to configure and access a model in a vLLM container on a DGX Spark or DGX Station
+- **DGX Spark cluster**: How to serve a model across vLLM containers running on two clustered DGX Sparks
+
+The playbook focuses on the recommended paths using NVIDIA Sync.
+Advanced users can take the manual path to get under the hood for details.
 
 ## What you'll accomplish
 
-Serve a **model** with vLLM on your **supported hardware platform** using a pre-built container and an OpenAI-compatible endpoint.
+Choose a model and vLLM recipe for your hardware, launch the model, and send a test request to its OpenAI-compatible API.
+
+**Recommended path:** Use [NVIDIA Sync](https://docs.nvidia.com/sync/latest/index.html)
+
+- One DGX Spark or Station: Use NVIDIA Sync to start/stop the remote container and handle port forwarding for the API
+  - One time: Download the recommended container and model
+  - One time: Save the launch script as an NVIDIA Sync custom application
+  - Repeat use: Start/stop the vLLM container from NVIDIA Sync
+
+- Two DGX Sparks: Use NVIDIA Sync to set up the cluster, then run a recipe from the head Spark to serve the model across both devices
+  - One time: Physically connect the Sparks and use the Cluster Assistant to configure and test the high-speed network and interdevice SSH
+  - One time: Prepare the recommended container and model on both Sparks
+  - Repeat use: Run the multi-node recipe from the head Spark to start vLLM
+
+**Advanced path:** Run the setup and recipe commands directly on the devices when you need to customize the deployment.
 
 ## What to know before starting
 
-**Required:**
+**Required**:
 
-- Basic Docker container usage
-- Familiarity with REST APIs
+- Familiarity with [NVIDIA Sync](https://docs.nvidia.com/sync/latest/index.html) and adding devices ([see steps here](https://docs.nvidia.com/sync/latest/direct-connections.html))
+- How to run simple terminal commands in Linux
+- Basic familiarity with [Hugging Face](https://huggingface.co/) and the [CLI](https://huggingface.co/docs/huggingface_hub/main/en/guides/cli#standalone-installer-recommended)
+- If using a DGX Spark cluster:
+  - How to physically connect the devices ([see here](https://docs.nvidia.com/dgx/dgx-spark/spark-clustering.html#the-qsfp-ports-and-cables))
+  - How to use NVIDIA Sync Cluster Assistant (see [here](https://build.nvidia.com/playbooks/connect-multiple-sparks) and the [demo video](https://www.youtube.com/watch?v=MehBUQtb9qM))
+  - How to run shell scripts
 
-**Optional:**
+**Suggested**:
 
-- Basic networking and SSH between nodes (multi-node capable hardware only)
+- How to use the NVIDIA Sync Custom App feature ([see here](https://docs.nvidia.com/sync/latest/applications.html#adding-and-editing-a-custom-script-to-a-remote-device))
+- How to download and run containers
+- How to edit and run shell scripts
 
-> [!TIP]
-> For DGX Spark multi-node serving, use [NVIDIA Sync Cluster Assistant](https://docs.nvidia.com/sync/latest/cluster-assistant.html) to configure the interconnect and inter-device SSH. A successful Cluster Assistant run satisfies that prerequisite.
 
 ## Supported hardware platforms
 
-Use the matrix below to confirm your hardware platform, OS, memory, and whether multi-node applies. The same base single-node workflow applies across supported hardware platforms. **Multi-node serving in this playbook is DGX Spark only** (see the Multi-node serving tab).
+Check the table below to confirm which path this playbook supports for your hardware.
 
-| Hardware platform | OS | Memory  | Multi-node capable hardware |
-| :---- | :---- | :---- | :---- |
-| **DGX Spark** | DGX OS (Linux) | 128 GB Unified Memory | ✅ (QSFP + Ray) |
-| **DGX Station** | DGX OS (Linux) | Large HBM + Grace DRAM | — |
-| **RTX PRO** | Ubuntu 22.04 / 24.04 (Linux) | Dedicated VRAM | — |
+| Hardware platform | OS | Memory | One device | Clustered Sparks |
+| :---- | :---- | :---- | :----: | :----: |
+| **DGX Spark** | DGX OS (Linux) | 128 GB Unified Memory | ✅ | ✅ Two devices |
+| **DGX Station** | DGX OS (Linux) | Large HBM + Grace DRAM | ✅ | — |
 
+> [!NOTE]
+> Cluster Assistant can configure two, three, or four DGX Sparks, but model sharding depends on the model and cluster configuration. For simplicity, this playbook limits cluster serving to two Sparks.
 
 ## Prerequisites
 
 **Hardware requirements**
 
-- Supported hardware platform — see Supported hardware platforms matrix above
-- Sufficient memory for your chosen model (see [vLLM Recipes](https://recipes.vllm.ai/browse) for your hardware platform)
-- Multi-node capable hardware: QSFP connectivity and passwordless SSH between nodes
+- Single device: a DGX Spark or DGX Station device — see Supported hardware platforms matrix above
+- DGX Spark cluster: Two DGX Sparks and a single QSFP cable ([see here for cabling two devices](https://docs.nvidia.com/dgx/dgx-spark/spark-clustering.html#the-qsfp-ports-and-cables))
 
 **Software requirements**
 
-- Docker installed: `docker --version`
-- NVIDIA Container Toolkit configured
-- HuggingFace account with an access token (for gated / private model downloads)
-- Network access to NGC and HuggingFace
-- NGC vLLM container image for your hardware platform — see Instructions
-
-## Find model recipes
-
-Browse tested vLLM launch settings for your hardware platform on [vLLM Recipes](https://recipes.vllm.ai/browse). Each recipe includes copyable `vllm serve` commands, container images, and tuning notes for that model on your hardware.
-
-For **more recipes**, open the filtered catalogs below:
-
-| Hardware platform | More recipes |
-| ----------------- | ------------ |
-| **DGX Spark** | [recipes.vllm.ai — DGX Spark](https://recipes.vllm.ai/browse?panel=open&hw=dgx_spark_gb10) |
-| **DGX Station** | [recipes.vllm.ai — DGX Station](https://recipes.vllm.ai/browse?panel=open&hw=dgx_station_gb300) |
-| **RTX PRO** | [recipes.vllm.ai — RTX PRO](https://recipes.vllm.ai/browse?panel=open&hw=rtx_pro_6000) |
-
-Use the **Instructions** tab for container setup and a base `docker run` workflow. For agentic workloads, see the **Agent-ready Models** tab.
-
-> [!NOTE]
-> **Memory determines what you can run.** Large models need substantially more memory and may require CPU offload. If a model is not listed for your hardware platform, check whether it fits in available memory and try the base configuration in **Instructions**.
+- NVIDIA Sync installed on your laptop ([see installation instructions here](https://docs.nvidia.com/sync/latest/getting-started.html#installation-and-onboarding))
+- Each remote device added to NVIDIA Sync ([see how to do this here](https://docs.nvidia.com/sync/latest/direct-connections.html#adding-a-device-for-a-direct-connection))
+- Each remote device has Docker installed and the user in the Docker group ([see here for how](https://docs.docker.com/engine/install/linux-postinstall/#add-your-user-to-the-docker-group))
+- The Hugging Face CLI installed and authenticated on each device
+  - [See here](https://huggingface.co/docs/huggingface_hub/main/en/guides/cli#standalone-installer-recommended) on Hugging Face for CLI installation
+  - [See here](https://huggingface.co/docs/huggingface_hub/main/en/quick-start#authentication) on Hugging Face for token authentication
 
 ## Time & risk
 
-- **Estimated time:** 30 MIN (longer on first run due to model download)
-- **Risk level:** Low
-  - Model download requires HuggingFace authentication
-  - Some containers require NGC credentials
-- **Rollback:** Stop and remove the container to restore state (non-destructive)
-- **Last Updated:** 08/12/2026
-  - Added NVIDIA Sync Cluster Assistant guidance for multi-node serving
-  - 08/03/2026: Step 5 API test uses `max_tokens: 2048` so reasoning-enabled recipes return a visible answer
-  - 07/27/2026: Multi-node serving scoped to DGX Spark only; Find model recipes links out to Spark / Station / RTX PRO filtered catalogs
+- **Estimated time:** 30 minutes for one device; longer for a cluster or the first model download
+- **Risk level:** Low for one device; medium when using a cluster
+- **Rollback:** For one device, stop the vLLM custom application in NVIDIA Sync or stop the container you launched manually. For a cluster, stop vLLM on both devices before deleting or changing the cluster.
+- **Last Updated:** 09/14/2026
+  - Reorganized the playbook around the recommended NVIDIA Sync paths for one device and DGX Spark clusters.
 
-## Instructions
+## Choose a Recipe
 
-> [!NOTE] These instructions target **Linux** (containerized vLLM). WSL and Windows Native are not applicable to the containerized vLLM workflow at this time.
+## Step 1. Identify your configuration
 
-## Step 1. Set up Docker permissions
+Choose the configuration that matches the hardware you will use:
 
-To manage containers without `sudo`, add your user to the `docker` group. Open a terminal and test Docker access:
+| Configuration | How vLLM will run |
+| --- | --- |
+| **One DGX Spark** | On the GB10 GPU in one device |
+| **One DGX Station** | On the GB300 GPU in one device |
+| **Two DGX Sparks** | Across one GB10 GPU in each device |
 
-```shell
-docker ps
+If you are unsure which NVIDIA GPU is available, connect to the device with NVIDIA Sync, open **Terminal**, and run:
+
+```bash
+nvidia-smi --query-gpu=name --format=csv,noheader
 ```
 
-If you see a permission-denied error, add your user to the docker group (skip if it already works):
+## Step 2. Use the recommended recipe
 
-```shell
-sudo usermod -aG docker $USER
-newgrp docker
+Select the row for your configuration. These recipes were chosen to provide reasoning and tool calling while making effective use of the available hardware.
+
+| Configuration | Recommended model | Why this recipe | Continue with |
+| --- | --- | --- | --- |
+| **One DGX Spark** | [Qwen3.8-27B NVFP4](https://recipes.vllm.ai/Qwen/Qwen3.8-27B?hardware=dgx_spark_gb10) | The quantized model fits one Spark and has a hardware-specific vLLM configuration. | **Single device** |
+| **One DGX Station** | [Qwen3.8-Flash-Next NVFP4](https://recipes.vllm.ai/Qwen/Qwen3.8-Flash-Next?hardware=dgx_station_gb300) | The larger mixture-of-experts model takes advantage of the Station's greater memory and uses a dedicated container. | **Single device** |
+| **Two DGX Sparks** | [Qwen3.8-27B NVFP4](https://github.com/eugr/spark-vllm-docker/blob/main/recipes/qwen3.8-27b-nvfp4-dflash2.yaml) | The predefined cluster recipe uses tensor parallelism across both Sparks and adds DFlash2 speculative decoding. | **Multi-node DGX Spark** |
+
+The launch tabs provide the complete model, container, and serving configuration for these recommended recipes. You do not need to translate the recipe commands yourself.
+
+## Step 3. Decide whether to use another recipe
+
+For the simplest path, keep the recommended recipe and continue to the tab shown in the table.
+
+If you are comfortable selecting a different model, container, and launch configuration, continue to Step 4.
+
+> [!IMPORTANT]
+> The copy-and-paste launch configurations in this playbook are tested for the recommended recipes. Another recipe may require different model-download, container, environment, memory, parser, or parallelism settings.
+
+## Step 4. Generate another recipe
+
+To use another recipe:
+
+1. Open the filtered recipe catalog for your hardware:
+   - [DGX Spark recipes](https://recipes.vllm.ai/browse?panel=open&hw=dgx_spark_gb10)
+   - [DGX Station recipes](https://recipes.vllm.ai/browse?panel=open&hw=dgx_station_gb300)
+2. Select a model that supports your hardware configuration.
+3. Select the model variant and precision.
+4. Enable the capabilities you need, such as tool calling or reasoning.
+5. Copy the model ID, container image, environment variables, and complete `vllm serve` command from the generated recipe.
+6. Keep all values from the same generated recipe. Do not combine settings from different model variants or hardware configurations.
+7. For two-Spark serving, confirm that a matching recipe exists in [`spark-vllm-docker`](https://github.com/eugr/spark-vllm-docker/tree/main/recipes). Do not assume a single-device recipe can run across two devices.
+
+> [!NOTE]
+> Model size is not the only compatibility requirement. The container architecture, vLLM version, quantization format, parsers, and parallel configuration must also match the selected model and hardware.
+
+## Step 5. Continue to the launch instructions
+
+- For a recommended one-Spark or one-Station recipe, continue with **Single device**.
+- For the recommended two-Spark recipe, continue with **Multi-node DGX Spark**.
+- For another recipe, use its generated installation and serving commands as the manual path. Substitute its settings only where the following launch instructions explicitly tell you to do so.
+
+## Single device
+
+### Step 1. Install NVIDIA Sync locally and add the DGX Spark or DGX Station device (one time)
+
+Follow the [Connect to Your Spark](https://build.nvidia.com/spark/connect-to-your-spark) playbook.
+
+## Step 2. Open a remote terminal to check Docker and the Hugging Face CLI (one time)
+
+**First, use NVIDIA Sync to open a terminal on the remote device.**
+
+1. On your computer, open NVIDIA Sync and select the device.
+3. Then select **Connect**.
+4. After the device connects, open **Terminal**.
+
+**Next, check that your user is in the Docker group.**
+
+```bash
+docker ps > /dev/null
 ```
 
-## Step 2. Set up environment variables
+If it returns a blank line, then the group is already configured.
+If it reports a permission error, add your user to the `docker` group as follows:
 
-Find your model's HuggingFace handle and launch settings on [vLLM Recipes](https://recipes.vllm.ai/browse) for your hardware platform. Set these so the vLLM container can download and serve your model:
+1. Add your user: `sudo usermod -aG docker "$USER"`
+2. Activate the group: `newgrp docker`
+3. Check status again: `docker ps > /dev/null`
 
-```shell
-## HuggingFace token (required for gated / private models)
-## Get a token from https://huggingface.co/settings/tokens
-export HF_TOKEN="your_huggingface_token"
+**Success**: It returns a blank line.
 
-## Model to serve (HuggingFace handle from vLLM Recipes for your hardware platform)
-export MODEL_HANDLE="<HF_HANDLE>"
+**Finally, check that the Hugging Face CLI is installed and authenticated.**
 
-## Tag for the vLLM image (recommended in the vLLM Recipes), then pull
-export VLLM_IMAGE=vllm/vllm-openai:latest 
-docker pull "$VLLM_IMAGE"
-
-## Maximum context length (prompt + output). Size to your workload and VRAM.
-export MAX_MODEL_LEN=131072
+```bash
+hf auth whoami
 ```
 
-## Step 3. Start the vLLM server
+If this returns `command not found` or `Not logged in`, then install ([see here](https://huggingface.co/docs/huggingface_hub/main/en/guides/cli#standalone-installer-recommended)) and/or authenticate the CLI ([see here](https://huggingface.co/docs/huggingface_hub/main/en/quick-start#authentication)).
 
-### Hardware platform launch notes
+> [!NOTE]
+> If you install the CLI, you need to refresh the terminal with the command `source "$HOME/.bashrc"`.
 
-Container flags differ slightly by hardware platform. `--gpus all` is correct on all supported hardware platforms unless noted below. Apply the note for your hardware platform to any recipe below:
+**Success**: The command `hf auth whoami` returns your username and org.
 
-| Hardware platform | Launch notes |
-| :---- | :---- |
-| **DGX Spark** | Unified memory (UMA). If you hit memory pressure even within capacity, flush the buffer cache (see Troubleshooting). For multi-node serving, use the **Multi-node serving** tab (multi-node capable hardware only). |
-| **DGX Station** | Add `--ipc host`. `--gpus all` uses the GB300; to pin the GB300 when both GPUs are present, use `--gpus '"device=N"'` where `N` is the GB300 device id from `nvidia-smi`. |
+## Step 3. Download the vLLM container and model for the recipe (one time)
 
-### Base configuration (most models)
+**First, pull the appropriate container and follow progress in the terminal.**
 
-Recommended starting point for any model that fits in memory on a single node. 
+| Device | Docker Command to Run |
+| --- | --- |
+| DGX Spark | `docker pull vllm/vllm-openai:qwen38` |
+| DGX Station | `docker pull vllm/vllm-openai:qwen38-flash-next` |
 
-```shell
-docker run -d \
-  --name vllm-server \
-  --gpus all \
-  --ipc host \
-  --ulimit memlock=-1 \
-  --ulimit stack=67108864 \
-  --entrypoint "" \
-  -p 8000:8000 \
-  -e HF_TOKEN="$HF_TOKEN" \
-  -v "$HOME/.cache/huggingface/hub:/root/.cache/huggingface/hub" \
-  "$VLLM_IMAGE" \
-  vllm serve "$MODEL_HANDLE" \
-    --max-model-len $MAX_MODEL_LEN \
-    --gpu-memory-utilization 0.8
-```
+**Success**: The Docker CLI reports that the download has succeeded.
 
-Settings used:
+**Then, download the appropriate model and follow progress in the terminal**.
 
-- `--max-model-len` — maximum context length (prompt + output) per request. Larger values reserve more GPU memory for the KV cache; size it to your workload.  
-- `--gpu-memory-utilization 0.8` — fraction of GPU memory vLLM may use for weights and KV cache. `0.8` leaves headroom; raise toward `0.95` on a dedicated GPU to fit more KV cache.
+| Device | HF CLI Command to Run |
+| --- | --- |
+| Single DGX Spark | `hf download nvidia/Qwen3.8-27B-NVFP4 --cache-dir "$HOME/.cache/huggingface/hub"` |
+| Single DGX Station | `hf download Inferact/Qwen3.8-Flash-Next-NVFP4 --cache-dir "$HOME/.cache/huggingface/hub"` |
 
-### Agent-ready models
+**Success**: The command output will stop and print a path under `$HOME/.cache/huggingface/hub`.
 
-For agentic workloads (tool calling, reasoning, long multi-turn sessions), see the **Agent-ready Models** tab for hardware-platform recommendations and launch guidance.
+## Step 4. Add the vLLM launch script as a custom app (one time)
 
-### Watch startup
+**First, open the launch script for your device.**
 
-Check the server logs for startup progress:
+| Device | Launch Script to Copy |
+| --- | --- |
+| Single DGX Spark | [open the DGX Spark Qwen3.8 27B script](https://raw.githubusercontent.com/NVIDIA/dgx-spark-playbooks/refs/heads/main/nvidia/playbook-vllm/assets/sync-vllm-single-spark.sh) |
+| Single DGX Station | [open the DGX Station Qwen3.8 Flash script](https://raw.githubusercontent.com/NVIDIA/dgx-spark-playbooks/refs/heads/main/nvidia/playbook-vllm/assets/sync-vllm-single-station.sh) |
 
-```shell
-docker logs -f vllm-server
-```
+**Next, create the custom app in NVIDIA Sync.**
 
-Expected output includes:
+1. Select **Custom > Add New** to open the form.
+2. Name the app, e.g "vLLM-Qwen3.827B" for DGX Spark or "vllm-Qwen3.8Flash" for DGX Station.
+3. Enter **8000** for the port. If it is already in use, follow [Use another API port](troubleshooting.md#use-another-api-port) before copying the script.
+4. Leave **Auto open in browser** turned off because vLLM serves an API, not a web app.
+5. Copy the appropriate script into the **Launch Script** field.
+6. Select **Add**.
 
-- Model download progress (first run only)  
-- Model loading into GPU memory  
-- `Application startup complete.`
+**Success**: The application name shows up in the **Custom** section.
 
-Or wait for the health endpoint to come up (model loading can take several minutes):
+## Step 5. Launch vLLM and watch the model load (repeat use)
 
-```shell
-timeout 900 bash -c 'until curl -sf http://localhost:8000/health > /dev/null 2>&1; do sleep 10; done' \
-  || { echo "Server failed to start within 900s"; docker logs vllm-server | tail -50; exit 1; }
-```
+1. In NVIDIA Sync, select the custom app you added in Step 4.
+2. Then open **Resource Monitor** to watch GPU activity and memory use as the model loads.
+3. Follow the container logs in an NVIDIA Sync terminal with the command for your device:
 
-## Step 4. Test the API
+| Device | Docker Command to See Logs |
+| --- | --- |
+| DGX Spark | `docker logs --tail 50 --follow vllm-qwen38` |
+| DGX Station | `docker logs --tail 50 --follow vllm-qwen38-flash` |
 
-Send a test request to verify the server:
+**Success**: The logs show `OpenAI server is ready to accept requests` or `Application startup complete`. You can close the log terminal without stopping vLLM.
 
-```shell
-curl http://localhost:8000/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "'"$MODEL_HANDLE"'",
-    "messages": [{"role": "user", "content": "Explain quantum computing in simple terms."}],
-    "max_tokens": 4096
-  }'
-```
+> [!IMPORTANT]
+> GPU activity in the Resource Monitor shows that vLLM is working but does not mean the API is ready. Wait for a readiness message before you test the endpoint.
 
-The response should contain a `choices` array with the model's answer in `message.content`.
+## Step 6. Once vLLM is ready, test the API from your laptop (one time)
 
-> Recipes that enable a reasoning parser (or models that think by default) spend part of the completion budget on a thinking pass before the answer. Use a large enough `max_tokens` (this example uses `4096`) so generation can finish with `finish_reason: stop` and a non-null `content`. If you lower the budget too far, you may see `finish_reason: length` with thinking text only (often under `reasoning` or `reasoning_content`) and `content: null`.
+> [!IMPORTANT]
+> Run these commands on the laptop where NVIDIA Sync is running, not in the remote terminal. On Windows, use PowerShell, not a WSL terminal.
+> Use the custom app port in every URL. The examples use 8000; if you assigned 8001, change every `localhost:8000` to `localhost:8001`.
 
-## Step 5. Stop the container
+**First, check the endpoint health and list the models.**
 
-Stop and remove the container when you are done testing (non-destructive — your model cache is preserved):
+| Laptop terminal | Health check command | List models command |
+| --- | --- | --- |
+| Windows (PowerShell) | `curl.exe -i http://localhost:8000/health` | `curl.exe -sS http://localhost:8000/v1/models` |
+| macOS or Linux (terminal) | `curl -i http://localhost:8000/health` | `curl -sS http://localhost:8000/v1/models` |
 
-```shell
-docker rm -f vllm-server 2>/dev/null || true
-```
+**Success**: The health check returns HTTP `200`, and the model list shows the model for your device.
 
-Optionally remove the image and cached model. The container downloads weights as root into the mounted hub cache, so the cached model files are root-owned and need `sudo` to delete:
+**Next, send a chat request using the command for your laptop terminal and DGX device.**
 
-```shell
-docker rmi "<docker image name>" 2>/dev/null || true
-sudo rm -rf $HOME/.cache/huggingface/hub/"<downloaded model name>"
-```
+| Laptop terminal | DGX Spark | DGX Station |
+| --- | --- | --- |
+| Windows (PowerShell) | `Invoke-RestMethod -Uri http://localhost:8000/v1/chat/completions -Method Post -ContentType application/json -Body '{"model":"nvidia/Qwen3.8-27B-NVFP4","messages":[{"role":"user","content":"Write a haiku about a GPU."}],"max_tokens":4096}' \| ConvertTo-Json -Depth 8` | `Invoke-RestMethod -Uri http://localhost:8000/v1/chat/completions -Method Post -ContentType application/json -Body '{"model":"Inferact/Qwen3.8-Flash-Next-NVFP4","messages":[{"role":"user","content":"Write a haiku about a GPU."}],"max_tokens":4096}' \| ConvertTo-Json -Depth 8` |
+| macOS or Linux (terminal) | `curl -sS http://localhost:8000/v1/chat/completions -H "Content-Type: application/json" -d '{"model":"nvidia/Qwen3.8-27B-NVFP4","messages":[{"role":"user","content":"Write a haiku about a GPU."}],"max_tokens":4096}'` | `curl -sS http://localhost:8000/v1/chat/completions -H "Content-Type: application/json" -d '{"model":"Inferact/Qwen3.8-Flash-Next-NVFP4","messages":[{"role":"user","content":"Write a haiku about a GPU."}],"max_tokens":4096}'` |
+
+**Success**: The response should contain a `choices` array and the model's answer.
 
 ## Next steps
 
-- **Production deployment:** configure vLLM for your specific model and workload  
-- **Performance tuning:** adjust batch sizes, `--max-model-len`, and memory settings  
-- **Monitoring:** set up logging and metrics collection  
-- **Agent-ready models:** tool-calling and reasoning workloads — see the **Agent-ready Models** tab  
-- **Scale out:** serve larger models across multiple nodes on multi-node capable hardware — see the **Multi-node serving** tab
-
-## Agent-ready Models
-
-## Agent-ready models
-
-Agent-ready models are tuned for **agentic workloads** — tool calling, reasoning traces, and long multi-turn sessions. Use this tab to pick a recommended model for your hardware platform and follow the launch guidance below.
-
-Follow the launch recipe below for your platform to set up the recommended model.
-
-### Recommendations by hardware platform
-
-| Hardware platform | Recommended agent-ready model | MODEL_HANDLE | Recipe |
-| :---- | :---- | :---- | :---- |
-| **DGX Spark** | Agent-ready Qwen3.6-35B-A3B (NVFP4) | `nvidia/Qwen3.6-35B-A3B-NVFP4` | [Launch recipe](https://recipes.vllm.ai/Qwen/Qwen3.6-35B-A3B?hardware=dgx_spark_gb10&features=tool_calling%2Creasoning) |
-| **DGX Station** | DeepSeek-V4-Flash | `deepseek-ai/DeepSeek-V4-Flash` | [Launch recipe](https://recipes.vllm.ai/deepseek-ai/DeepSeek-V4-Flash?hardware=dgx_station_gb300) |
-| **RTX PRO** | Qwen3.6 27B | `nvidia/Qwen3.6-27B-NVFP4` | [Launch recipe](https://recipes.vllm.ai/Qwen/Qwen3.6-27B?hardware=rtx_pro_6000) |
-
-### Verify your server
-
-After you launch a recipe above, confirm startup using **Watch startup** in the **Instructions** tab, then test with **Step 4. Test the API**.
-
-### Next steps
-
-- **General serving workflow:** Docker setup, health checks, and API testing — see the **Instructions** tab  
-- **Scale out:** multi-node serving on multi-node capable hardware — see the **Multi-node serving** tab
+- To serve the model across two DGX Sparks, go to [Multi-node DGX Spark](multi-node-spark.md).
+- To choose another model, return to [Choose a Recipe](choose-recipe.md).
+- If vLLM does not start or respond, see [Troubleshooting](troubleshooting.md).
 
 ## Multi-node DGX Spark
 
-## Multi-node serving
+### Step 1. Install NVIDIA Sync on your laptop and add the two DGX Spark devices
 
-Serve models larger than a single node can hold by pooling GPUs across multiple **multi-node capable hardware** systems with a Ray cluster and tensor parallelism. Two topologies are covered:
+Follow the [Connect to Your Spark](https://build.nvidia.com/spark/connect-to-your-spark) playbook.
+Estimate time is 5 minutes. 
 
-- **Two nodes (direct QSFP cable)** — connect two nodes back-to-back.  
-- **Four or more nodes through a QSFP switch** — scale out over a switch fabric.
+### Step 2. Physically connect the two Sparks and configure the ConnectX-7 network using NVIDIA Sync
 
->   
-> This tab applies to **multi-node capable hardware** only. Other supported hardware platforms serve models on a single node (see the Instructions tab).
+Follow the [Connect Multiple Sparks](https://build.nvidia.com/playbooks/connect-multiple-sparks) playbook.
 
-## Prerequisites
+It shows you how to connect the devices with a cable or switch and then walks you the NVIDIA Sync Clustering Assistant ([see demo video](https://www.youtube.com/watch?v=MehBUQtb9qM)). 
 
-### Docker permissions
+### Step 2. Check the Docker group on each device and configure if needed
 
-If `docker ps` fails with a permission error, complete [Step 1 in the Instructions tab](http://instructions.md) on every node in the cluster before continuing.
+We will be using a vLLM container on both devices.
+This simplifies things in a variety of ways, a major way being the elimination of installing and configuring NCCL on the two devices.
 
----
+Docker commands 
 
-## A. Two nodes (direct QSFP cable)
 
-### Step 1. Confirm network connectivity
-
-> [!TIP]
-> If [NVIDIA Sync Cluster Assistant](https://docs.nvidia.com/sync/latest/cluster-assistant.html) successfully configured your two-Spark cluster, this step is complete. Do not repeat the manual connection playbook; continue to Step 2.
-
-If you have not used Cluster Assistant, follow the [Connect multiple nodes for distributed workloads](https://build.nvidia.com/playbooks/connect-multiple-sparks) setting up two node cluster - physical cabling, network configuration, passwordless SSH, and connectivity verification.
+If you have not used Cluster Assistant, follow [Configure Manually](https://build.nvidia.com/playbooks/connect-multiple-sparks/manual) in the Connect Multiple Sparks playbook to set up the two-node cluster: physical cabling, network configuration, passwordless SSH, and connectivity verification.
 
 > **Manual setup only:** the connectivity script writes its SSH key to `~/.ssh/` and fails if the directory does not exist. Run `mkdir -p ~/.ssh && chmod 700 ~/.ssh` on both nodes first if you have never used SSH on them.
 
-### Step 2. Download the cluster deployment script
+### Step 2. Prepare the environment
 
-On **both nodes**, download and patch the Ray cluster script:
+On the **`head node`** (first node in your cluster), clone the DGX Spark community container repo [**spark-vllm-docker**](https://github.com/eugr/spark-vllm-docker)
 
-```shell
-wget https://raw.githubusercontent.com/vllm-project/vllm/51c1ee9b7c8acbba4899a8ebffd390685d171946/examples/ray_serving/run_cluster.sh
-
-sed -i 's|^RAY_START_CMD="ray start|RAY_START_CMD="pip install -q --root-user-action=ignore '\''ray[default]>=2.9'\'' \&\& ray start|' run_cluster.sh
-
-chmod +x run_cluster.sh
+```bash
+git clone https://github.com/eugr/spark-vllm-docker.git
+cd spark-vllm-docker
 ```
 
-### Step 3. Pull the NGC vLLM image
+Install `uv` if not present
 
-Pull the image **on both nodes**:
-
-```shell
-docker pull nvcr.io/nvidia/vllm:26.05-py3
-export VLLM_IMAGE=nvcr.io/nvidia/vllm:26.05-py3
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-### Step 4. Start the Ray head node (Node 1)
+Download the model you want to serve on all nodes in the cluster eg. **nvidia/Qwen3.8-27B-NVFP4**
 
-Run inside tmux/screen so an SSH drop doesn't tear down the cluster (`run_cluster.sh` has an EXIT trap that stops the container).
-
-Set `MN_IF_NAME` to the QSFP interface name from your completed cluster setup (validated example on multi-node capable hardware: `enp1s0f1np1`). Substitute if your interface differs.
-
-```shell
-export MN_IF_NAME=enp1s0f1np1
-export VLLM_HOST_IP=$(ip -4 addr show $MN_IF_NAME | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
-export VLLM_IMAGE=nvcr.io/nvidia/vllm:26.05-py3
-
-echo "Using interface $MN_IF_NAME with IP $VLLM_HOST_IP"
-
-bash run_cluster.sh $VLLM_IMAGE $VLLM_HOST_IP --head ~/.cache/huggingface \
-  -e VLLM_HOST_IP=$VLLM_HOST_IP \
-  -e UCX_NET_DEVICES=$MN_IF_NAME \
-  -e NCCL_SOCKET_IFNAME=$MN_IF_NAME \
-  -e OMPI_MCA_btl_tcp_if_include=$MN_IF_NAME \
-  -e GLOO_SOCKET_IFNAME=$MN_IF_NAME \
-  -e TP_SOCKET_IFNAME=$MN_IF_NAME \
-  -e RAY_memory_monitor_refresh_ms=0 \
-  -e MASTER_ADDR=$VLLM_HOST_IP
+```bash
+./hf-download.sh nvidia/Qwen3.8-27B-NVFP4 -c --copy-parallel
 ```
 
-Leave this terminal open — closing it stops the head node and tears down the cluster.
+### Step 3. Serve the model
 
-### Step 5. Start the Ray worker node (Node 2)
+To serve the model across the cluster, you can use two options
 
-Open a second terminal, SSH to Node 2, and join the cluster. Replace `<NODE_1_IP_ADDRESS>` with Node 1's QSFP IP (run `echo $VLLM_HOST_IP` on Node 1). Run inside tmux/screen on Node 2 as well. Use the same `MN_IF_NAME` guidance as Step 4.
+**Option 1**: Serve using a pre-defined recipe
 
-```shell
-export MN_IF_NAME=enp1s0f1np1
-export VLLM_HOST_IP=$(ip -4 addr show $MN_IF_NAME | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
-export HEAD_NODE_IP=<NODE_1_IP_ADDRESS>
-export VLLM_IMAGE=nvcr.io/nvidia/vllm:26.05-py3
+If a pre-defined recipe exists in the repo then you can run it directly like below. This runs the **nvidia/Qwen3.8-27B-NVFP4** model across a two node cluster.
 
-echo "Worker IP: $VLLM_HOST_IP, connecting to head node at: $HEAD_NODE_IP"
-
-bash run_cluster.sh $VLLM_IMAGE $HEAD_NODE_IP --worker ~/.cache/huggingface \
-  -e VLLM_HOST_IP=$VLLM_HOST_IP \
-  -e UCX_NET_DEVICES=$MN_IF_NAME \
-  -e NCCL_SOCKET_IFNAME=$MN_IF_NAME \
-  -e OMPI_MCA_btl_tcp_if_include=$MN_IF_NAME \
-  -e GLOO_SOCKET_IFNAME=$MN_IF_NAME \
-  -e TP_SOCKET_IFNAME=$MN_IF_NAME \
-  -e RAY_memory_monitor_refresh_ms=0 \
-  -e MASTER_ADDR=$HEAD_NODE_IP
+```bash
+./run-recipe.sh recipes/qwen3.8-27b-nvfp4-dflash2.yaml --setup
 ```
 
-### Step 6. Verify cluster status
+> !NOTE
+> See ./run-recipe.sh --help for full usage
 
-```shell
-export VLLM_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '^node-[0-9]+$')
-echo "Found container: $VLLM_CONTAINER"
-docker exec $VLLM_CONTAINER ray status
+**Option 2**: Serve with manual command
+
+If a pre-defined recipe does not exist or if you want to run with your own custom arguments, you can run it like below. 
+
+```bash
+./launch-cluster.sh -t vllm/vllm-openai:v0.28.0 \
+  --earlyoom \
+  -e VLLM_USE_V2_MODEL_RUNNER="1" \
+  -e VLLM_FLOAT32_MATMUL_PRECISION=high \
+  -e PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
+  exec \
+  vllm serve nvidia/Qwen3.8-27B-NVFP4 \
+    --host 0.0.0.0 \
+    --port 8000 \
+    --trust-remote-code \
+    --kv-cache-dtype fp8 \
+    --gpu-memory-utilization 0.8 \
+    --max-model-len 262144 \
+    --max-num-seqs 8 \
+    --max-num-batched-tokens 16384 \
+    --enable-chunked-prefill \
+    --async-scheduling \
+    --enable-prefix-caching \
+    --speculative-config '{"method":"dflash","model": "z-lab/Qwen3.8-27B-DFlash2", "num_speculative_tokens":8, "draft_tensor_parallel_size": 2}' \
+    --load-format safetensors \
+    --reasoning-parser qwen3 \
+    --tool-call-parser qwen3_xml \
+    --enable-auto-tool-choice \
+    --tensor-parallel-size 2
 ```
 
-Expected output shows 2 nodes with available GPU resources.
+> [!NOTE]
+> You can specify a different VLLM container image using the -t flag. Eg. eugr/spark-vllm-b12x:latest, vllm/vllm-openai:latest etc.
+> --earlyoom helps detect OOM early and kills the VLLM process to avoid system hang due to OOM
+> See ./launch-cluster.sh --help for full usage.
 
-### Step 7. Download Llama 3.3 70B
+### Step 4. Test inference
 
-Llama 3.3 70B is gated — accept its license at [https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct](https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct) and create an HF token with read permission. Authenticate inside the container so the cache lands at `/root/.cache/huggingface`:
+Run on **`head node`**. If you want to run from an external client, replace `localhost` with head node's reachable IP.
 
-```shell
-docker exec -it $VLLM_CONTAINER /bin/bash -c '
-  hf auth login
-  hf download meta-llama/Llama-3.3-70B-Instruct'
-```
-
-### Step 8. Launch inference server (tensor parallel across both nodes)
-
-```shell
-docker exec -it $VLLM_CONTAINER /bin/bash -c '
-  vllm serve meta-llama/Llama-3.3-70B-Instruct \
-    --tensor-parallel-size 2 --max-model-len 2048 \
-    --distributed-executor-backend ray'
-```
-
-The server is ready when you see `Application startup complete.`
-
-### Step 9. Test inference
-
-Run on Node 1; from an external client, replace `localhost` with Node 1's reachable IP.
-
-```shell
-curl http://localhost:8000/v1/completions \
+```bash
+curl -s http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "meta-llama/Llama-3.3-70B-Instruct",
-    "prompt": "Write a haiku about a GPU",
-    "max_tokens": 32,
-    "temperature": 0.7
+    "model": "nvidia/Qwen3.8-27B-NVFP4",
+    "messages": [
+      {"role": "user", "content": "Write a haiku about a GPU"}
+    ],
+    "max_tokens": 64
   }'
-```
-
----
-
-## B. Four or more nodes through a QSFP switch
-
-Same Ray + tensor-parallel workflow as Section A, scaled to more nodes over a QSFP switch. Set `--tensor-parallel-size` equal to your node count.
-
-> **Topology note:** the four-or-more-node path uses a different validated container image and `run_cluster.sh` source than the two-node path above. Follow the steps in this section exactly — do not mix image tags or script versions between topologies.
-
-### Step 1. Confirm network connectivity
-
-> [!TIP]
-> For exactly four DGX Spark systems, if [NVIDIA Sync Cluster Assistant](https://docs.nvidia.com/sync/latest/cluster-assistant.html) reports success, this step is complete. Do not repeat the manual connection playbook; continue to Step 2. For more than four systems, use the manual setup path below.
-
-If you have not used Cluster Assistant, follow the [Connect multiple nodes through a switch](https://build.nvidia.com/playbooks/connect-multiple-sparks) playbook for QSFP cabling, interface configuration, passwordless SSH, connectivity verification, and the NCCL bandwidth test.
-
-### Step 2. Download the cluster deployment script (all nodes)
-
-On **every node**, download the Ray cluster script:
-
-```shell
-wget https://raw.githubusercontent.com/vllm-project/vllm/refs/heads/main/examples/ray_serving/run_cluster.sh
-chmod +x run_cluster.sh
-```
-
-### Step 3. Pull the NGC vLLM image (all nodes)
-
-```shell
-docker pull nvcr.io/nvidia/vllm:26.02-py3
-export VLLM_IMAGE=nvcr.io/nvidia/vllm:26.02-py3
-```
-
-### Step 4. Start the Ray head node (Node 1)
-
-Run inside tmux/screen so an SSH drop doesn't tear down the cluster.
-
-Set `MN_IF_NAME` to the QSFP interface name from your completed cluster setup (validated example on multi-node capable hardware: `enp1s0f1np1`). Substitute if your interface differs.
-
-```shell
-export MN_IF_NAME=enp1s0f1np1
-export VLLM_HOST_IP=$(ip -4 addr show $MN_IF_NAME | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
-
-echo "Using interface $MN_IF_NAME with IP $VLLM_HOST_IP"
-
-bash run_cluster.sh $VLLM_IMAGE $VLLM_HOST_IP --head ~/.cache/huggingface \
-  -e VLLM_HOST_IP=$VLLM_HOST_IP \
-  -e UCX_NET_DEVICES=$MN_IF_NAME \
-  -e NCCL_SOCKET_IFNAME=$MN_IF_NAME \
-  -e OMPI_MCA_btl_tcp_if_include=$MN_IF_NAME \
-  -e GLOO_SOCKET_IFNAME=$MN_IF_NAME \
-  -e TP_SOCKET_IFNAME=$MN_IF_NAME \
-  -e RAY_memory_monitor_refresh_ms=0 \
-  -e MASTER_ADDR=$VLLM_HOST_IP
-```
-
-Leave this terminal open — closing it stops the head node and tears down the cluster.
-
-### Step 5. Start the Ray worker nodes (all other nodes)
-
-Repeat the block below on **each worker node** (Nodes 2 through N). SSH to each node in turn, run inside tmux/screen, and replace `<NODE_1_IP_ADDRESS>` with Node 1's QSFP interface IP from the switch playbook. Use the same `MN_IF_NAME` guidance as Step 4.
-
-```shell
-export MN_IF_NAME=enp1s0f1np1
-export VLLM_HOST_IP=$(ip -4 addr show $MN_IF_NAME | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
-export HEAD_NODE_IP=<NODE_1_IP_ADDRESS>
-
-echo "Worker IP: $VLLM_HOST_IP, connecting to head node at: $HEAD_NODE_IP"
-
-bash run_cluster.sh $VLLM_IMAGE $HEAD_NODE_IP --worker ~/.cache/huggingface \
-  -e VLLM_HOST_IP=$VLLM_HOST_IP \
-  -e UCX_NET_DEVICES=$MN_IF_NAME \
-  -e NCCL_SOCKET_IFNAME=$MN_IF_NAME \
-  -e OMPI_MCA_btl_tcp_if_include=$MN_IF_NAME \
-  -e GLOO_SOCKET_IFNAME=$MN_IF_NAME \
-  -e TP_SOCKET_IFNAME=$MN_IF_NAME \
-  -e RAY_memory_monitor_refresh_ms=0 \
-  -e MASTER_ADDR=$HEAD_NODE_IP
-```
-
-### Step 6. Verify cluster status
-
-```shell
-export VLLM_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '^node-[0-9]+$')
-docker exec $VLLM_CONTAINER ray status
-```
-
-Expected output shows all nodes with available GPU resources.
-
-### Step 7. Download MiniMax M2.5
-
-With four or more nodes you can run this model with tensor parallelism. Authenticate and download inside the head-node container (the cache is shared across the cluster):
-
-```shell
-docker exec -it $VLLM_CONTAINER /bin/bash -c '
-  hf auth login
-  hf download MiniMaxAI/MiniMax-M2.5'
-```
-
-### Step 8. Launch inference server (tensor parallel = node count)
-
-```shell
-export VLLM_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '^node-[0-9]+$')
-docker exec -it $VLLM_CONTAINER /bin/bash -c '
-  vllm serve MiniMaxAI/MiniMax-M2.5 \
-    --tensor-parallel-size 4 --max-model-len 129000 --max-num-seqs 4 --trust-remote-code \
-    --distributed-executor-backend ray'
-```
-
-Set `--tensor-parallel-size` to match your node count (example above uses 4).
-
-### Step 9. Test inference
-
-Run on Node 1; from an external client, replace `localhost` with Node 1's reachable IP.
-
-```shell
-curl http://localhost:8000/v1/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "MiniMaxAI/MiniMax-M2.5",
-    "prompt": "Write a haiku about a GPU",
-    "max_tokens": 32,
-    "temperature": 0.7
-  }'
-```
-
----
-
-## Validate and monitor (both topologies)
-
-```shell
-export VLLM_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '^node-[0-9]+$')
-docker exec $VLLM_CONTAINER ray status
-
-curl http://localhost:8000/health
-
-nvidia-smi
-```
-
-On hardware platforms with unified memory, `nvidia-smi --query-gpu` memory fields report `N/A` — use plain `nvidia-smi` instead.
-
-The **Ray dashboard** runs on port 8265 of the head node under host networking, so it is only directly reachable from Node 1. Tunnel it from a workstation:
-
-```shell
-ssh -L 8265:localhost:8265 nvidia@<NODE_1_IP>
-## then open http://localhost:8265
 ```
 
 ## Next steps
@@ -589,8 +418,7 @@ Consider for production:
 
 - Health checks and automatic restarts  
 - Log rotation for long-running services  
-- Persistent model caching across restarts  
-- Alternative quantization (FP8, NVFP4, INT4) to fit more models on the cluster
+- Persistent model caching across restarts
 
 ## Troubleshooting
 
@@ -604,15 +432,27 @@ The **Hardware platform** column shows where an issue is most relevant. "All har
 | Container fails to start with GPU error | All hardware platforms | NVIDIA Container Toolkit not configured | Run `nvidia-ctk runtime configure --runtime=docker` and restart Docker |
 | HuggingFace authentication failure, gated model access denied, or model download hangs/fails | All hardware platforms | Missing/invalid token, restricted model access, or network issue | Export `HF_TOKEN` before running docker; regenerate your [HuggingFace token](https://huggingface.co/docs/hub/en/security-tokens) and request access to the [gated model](https://huggingface.co/docs/hub/en/models-gated) if needed; check internet connection and verify the token is valid |
 | CUDA out of memory | All hardware platforms | Context length too large / model too big | Reduce `--max-model-len` and `--max-num-seqs`, or lower `--gpu-memory-utilization` |
-| Server not responding on port 8000 | All hardware platforms | Port already in use | Check with `lsof -i :8000`; use `-p 8001:8000` for a different port |
+| Port 8000 is in use | All hardware platforms | Another app is using the port | Follow **Use another API port** below |
+| Laptop cannot reach the API, but `/health` returns HTTP `200` on the DGX device | All hardware platforms | NVIDIA Sync is not forwarding the expected port, or the test is running in WSL on Windows | Keep the Sync custom app running and match its port to Docker's left-hand port. Use that port in the laptop URL; on Windows, test in PowerShell, not WSL |
+| PowerShell prompts for `Uri` after `curl -i` | All hardware platforms | `curl` is a PowerShell alias for `Invoke-WebRequest` | Use `curl.exe` for the Step 6 health and model checks |
+| Chat request returns `The model 'unknown' does not exist` | All hardware platforms | The request omits `model` | Use the Step 6 command for your DGX device; its model ID must match `/v1/models` |
 | NGC authentication fails | All hardware platforms | Invalid or missing credentials | Run `docker login nvcr.io` with your NGC API key |
 | `rm: cannot remove '.../.cache/huggingface/hub/models--...': Permission denied` | All hardware platforms | The container downloads weights as root into the mounted hub cache, so cached model files are root-owned | Remove with `sudo rm -rf $HOME/.cache/huggingface/hub/"<downloaded model name>"` |
 | Memory pressure within capacity | DGX Spark | UMA buffer cache not released | See UMA note below |
 | Container startup fails / missing ARM64 image | DGX Spark | Image not built for ARM64 | Use the default NGC image for your hardware platform from the Instructions tab |
 | Model runs on wrong GPU | DGX Station | Default GPU selection with two GPUs | Use `--gpus '"device=N"'` to pin the GB300 (`N` from `nvidia-smi`) |
 | EngineCore failed / FlashInfer "Buffer overflow when allocating memory for batch_prefill_tmp_v" | DGX Station | CUDA graph capture failure during batch prefill | Use the recommended container image: `nvcr.io/nvidia/vllm:26.01-py3` |
-| Node not visible in Ray cluster | multi-node capable hardware | Network connectivity issue | Verify QSFP cable connection and IP configuration; see Multi-node serving tab |
-| Chat completion returns `content: null` with `finish_reason: length` | `max_tokens` exhausted on the thinking pass before an answer | Raise `max_tokens` in the request (Step 4 uses `4096`) so reasoning-enabled recipes can finish with a visible answer |
+| Chat completion returns `content: null` with `finish_reason: length` | All hardware platforms | `max_tokens` was exhausted during reasoning | Raise `max_tokens` in the request (Step 6 uses `4096`) so the model can finish with a visible answer |
+
+## Use another API port
+
+If port 8000 is in use, you can use 8001 without changing the port inside the container:
+
+1. Set the NVIDIA Sync custom app port to **8001**.
+2. In its launch script, change the Docker mapping to `-p 8001:8000`. Leave `vllm serve --port 8000` unchanged.
+3. Restart the custom app. In every **Step 6** URL, use `http://localhost:8001` instead of `http://localhost:8000`.
+
+Docker's left-hand port is on the remote device; the right-hand port is inside the container. NVIDIA Sync forwards your laptop's port 8001 to port 8001 on the remote device.
 
 > [!NOTE]
 > **Unified memory (UMA).** On hardware platforms with unified memory, GPU and CPU share memory dynamically. Some applications have not yet been updated for UMA, so you may hit memory issues even within capacity. If that happens, manually flush the buffer cache:

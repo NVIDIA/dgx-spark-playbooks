@@ -41,17 +41,13 @@ cd ${GITLAB_REPO_NAME}/nvidia/playbook-connect-multiple-sparks/assets/spark_clus
 The script can be run with different options as mentioned below
 
 ```bash
-# To run validation, cluster setup and NCCL bandwidth test (all steps)
+# To validate the devices and set up the network and SSH
 
 bash spark_cluster_setup.sh -c <JSON config file> --run-setup
 
 # To only run pre-setup validation steps
 
 bash spark_cluster_setup.sh -c <JSON config file> --pre-validate-only
-
-# To run NCCL test and skip cluster setup (use this after cluster is already set up)
-
-bash spark_cluster_setup.sh -c <JSON config file> --run-nccl-test
 
 ```
 
@@ -61,4 +57,3 @@ bash spark_cluster_setup.sh -c <JSON config file> --run-nccl-test
 > 2. Validate the environment and cluster config
 > 3. Detect the topology and configure the IP addresses
 > 4. Configure password-less ssh between the cluster nodes
-> 5. Run NCCL BW test

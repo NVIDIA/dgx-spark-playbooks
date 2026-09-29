@@ -19,6 +19,40 @@ import { LLMService } from '@/lib/llm-service';
 
 const llmService = LLMService.getInstance();
 
+type Triple = {
+  subject: string;
+  predicate: string;
+  object: string;
+};
+
+const triplesResponseFormat = {
+  type: 'json_schema',
+  json_schema: {
+    name: 'knowledge_graph_triples',
+    strict: true,
+    schema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        triples: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              subject: { type: 'string' },
+              predicate: { type: 'string' },
+              object: { type: 'string' }
+            },
+            required: ['subject', 'predicate', 'object']
+          }
+        }
+      },
+      required: ['triples']
+    }
+  }
+};
+
 /**
  * Test vLLM connection and list available models
  * GET /api/vllm?action=test-connection
@@ -86,29 +120,36 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const { text, model = process.env.VLLM_MODEL || 'nvidia/Llama-3_3-Nemotron-Super-49B-v1_5-FP8', temperature = 0.1, maxTokens = 1024 } = await req.json();
+    const { text, model = process.env.VLLM_MODEL || 'nvidia/Llama-3_3-Nemotron-Super-49B-v1_5-FP8', temperature = 0, maxTokens = 4096 } = await req.json();
 
     if (!text || typeof text !== 'string') {
       return NextResponse.json({ error: 'Text is required' }, { status: 400 });
     }
 
+    const isNemotronReasoningModel = /nemotron/i.test(model);
+
     // Use the LLM service to generate completion with vLLM
     const messages = [
       {
         role: 'system' as const,
-        content: `You are a knowledge graph builder that extracts structured information from text.
-Extract subject-predicate-object triples from the following text.
-
-Guidelines:
-- Extract only factual triples present in the text
-- Normalize entity names to their canonical form
-- Return results in JSON format as an array of objects with "subject", "predicate", "object" fields
-- Each triple should represent a clear relationship between two entities
-- Focus on the most important relationships in the text`
+        content: isNemotronReasoningModel
+          ? 'detailed thinking off'
+          : 'You are a knowledge graph builder. Return only valid JSON matching the requested schema.'
       },
       {
         role: 'user' as const,
-        content: `Extract triples from this text:\n\n${text}`
+        content: `Extract subject-predicate-object triples from the text below.
+
+Guidelines:
+- Extract only factual triples present in the text.
+- Normalize entity names to their canonical form.
+- Each triple must represent a clear relationship between two entities.
+- Focus on the most important relationships in the text.
+- Return only a JSON object with this shape: {"triples":[{"subject":"...","predicate":"...","object":"..."}]}.
+- Do not include explanations, markdown, or reasoning text.
+
+Text:
+${text}`
       }
     ];
 
@@ -116,85 +157,101 @@ Guidelines:
     const response = await llmService.generateVllmCompletion(
       model,
       messages,
-      { temperature, maxTokens }
+      {
+        temperature,
+        maxTokens,
+        topP: 1,
+        responseFormat: triplesResponseFormat
+      }
     );
 
-    // Parse the response to extract triples
-    let triples = [];
-    try {
-      // Try to parse as JSON first
-      const jsonMatch = response.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        triples = JSON.parse(jsonMatch[0]);
-      } else {
-        // Fallback: parse line by line
-        triples = parseTriplesFallback(response);
-      }
-    } catch (parseError) {
-      console.warn('Failed to parse JSON response, using fallback parser:', parseError);
-      triples = parseTriplesFallback(response);
-    }
+    const triples = parseTriplesResponse(response);
 
     return NextResponse.json({
       triples: triples,
       model: model,
       provider: 'vllm',
-      rawResponse: response
+      rawResponse: JSON.stringify({ triples })
     });
 
   } catch (error) {
     console.error('Error in vLLM triple extraction:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
+      { status: 502 }
     );
   }
 }
 
-/**
- * Fallback parser for extracting triples from text response
- */
-function parseTriplesFallback(text: string): Array<{ subject: string; predicate: string; object: string }> {
-  const triples = [];
-  const lines = text.split('\n');
+function parseTriplesResponse(response: string): Triple[] {
+  const parsed = parseJsonPayload(response);
+  const triples = Array.isArray(parsed) ? parsed : parsed?.triples;
 
-  for (const line of lines) {
-    const trimmedLine = line.trim();
-    if (!trimmedLine || trimmedLine.startsWith('#') || trimmedLine.startsWith('//')) {
-      continue;
-    }
+  if (!Array.isArray(triples)) {
+    throw new Error('vLLM returned JSON, but it did not contain a triples array.');
+  }
 
-    // Try to parse different formats
-    if (trimmedLine.includes(' -> ')) {
-      const parts = trimmedLine.split(' -> ');
-      if (parts.length >= 3) {
-        triples.push({
-          subject: parts[0].trim(),
-          predicate: parts[1].trim(),
-          object: parts[2].trim()
-        });
-      }
-    } else if (trimmedLine.includes('|')) {
-      const parts = trimmedLine.split('|');
-      if (parts.length >= 3) {
-        triples.push({
-          subject: parts[0].trim(),
-          predicate: parts[1].trim(),
-          object: parts[2].trim()
-        });
-      }
-    } else if (trimmedLine.includes(',')) {
-      // Try comma-separated format: "subject, predicate, object"
-      const parts = trimmedLine.split(',');
-      if (parts.length >= 3) {
-        triples.push({
-          subject: parts[0].trim().replace(/['"]/g, ''),
-          predicate: parts[1].trim().replace(/['"]/g, ''),
-          object: parts[2].trim().replace(/['"]/g, '')
-        });
-      }
+  const validTriples = triples
+    .map((triple: unknown) => normalizeTriple(triple))
+    .filter((triple): triple is Triple => triple !== null);
+
+  if (validTriples.length === 0 && triples.length > 0) {
+    throw new Error('vLLM returned triples, but none had valid subject, predicate, and object fields.');
+  }
+
+  return validTriples;
+}
+
+function parseJsonPayload(response: string): any {
+  const trimmedResponse = stripMarkdownFence(response.trim());
+  const objectMatch = trimmedResponse.match(/\{[\s\S]*\}/);
+  const arrayMatch = trimmedResponse.match(/\[[\s\S]*\]/);
+  const candidates = [
+    trimmedResponse,
+    objectMatch?.[0],
+    arrayMatch?.[0]
+  ].filter((candidate): candidate is string => typeof candidate === 'string');
+
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      // Try the next candidate before failing closed.
     }
   }
 
-  return triples;
+  throw new Error('vLLM did not return valid JSON triples. Refusing to fallback-parse free-form text to avoid storing reasoning output as graph entities.');
+}
+
+function stripMarkdownFence(text: string): string {
+  return text
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
+}
+
+function normalizeTriple(triple: unknown): Triple | null {
+  if (!triple || typeof triple !== 'object') {
+    return null;
+  }
+
+  const candidate = triple as Record<string, unknown>;
+  const subject = normalizeTripleField(candidate.subject);
+  const predicate = normalizeTripleField(candidate.predicate);
+  const object = normalizeTripleField(candidate.object);
+
+  if (!subject || !predicate || !object) {
+    return null;
+  }
+
+  return { subject, predicate, object };
+}
+
+function normalizeTripleField(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }

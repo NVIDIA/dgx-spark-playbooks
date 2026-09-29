@@ -40,8 +40,7 @@ Choosing a fine-tuning method depends on how much of the original model you want
 
 VRAM required also varies by method. Unsloth translates heavy matrix workloads into efficient custom GPU kernels so fine-tuning completes more quickly with lower memory use. Unsloth publishes guides for LLM configurations, hyperparameters, notebooks, and step-by-step workflows, including:
 
-- [Fine-Tuning LLMs With NVIDIA RTX 50 Series GPUs and Unsloth](https://docs.unsloth.ai/basics/fine-tuning-llms-with-blackwell-rtx-50-series-and-unsloth)
-- [Fine-Tune Faster with Unsloth](https://build.nvidia.com/playbooks/unsloth) (install and validation path on supported hardware platforms)
+- [Fine-tuning LLMs with Blackwell, RTX 50 series & Unsloth](https://unsloth.ai/docs/blog/fine-tuning-llms-with-blackwell-rtx-50-series-and-unsloth)
 
 For a deep dive into fine-tuning and reinforcement learning on the NVIDIA Blackwell platform, read the [NVIDIA technical blog](https://developer.nvidia.com/blog/train-an-llm-on-an-nvidia-blackwell-desktop-with-unsloth-and-scale-it/). For a hands-on local walkthrough, watch [Matthew Berman](https://www.youtube.com/@matthew_berman) run reinforcement learning on an NVIDIA GeForce RTX 5090 with Unsloth in this [video](https://youtu.be/9t-BAjzBWj8).
 
@@ -60,7 +59,7 @@ Download Nemotron 3 Nano from [Hugging Face](https://huggingface.co/nvidia/NVIDI
 
 ## What you'll accomplish
 
-You'll understand how to choose among parameter-efficient fine-tuning (LoRA / QLoRA), full fine-tuning, and reinforcement learning for specialized agentic tasks on your **hardware platform**, and where to continue with Unsloth guides, Nemotron open models, and a runnable Unsloth setup playbook.
+You'll understand how to choose among parameter-efficient fine-tuning (LoRA / QLoRA), full fine-tuning, and reinforcement learning for specialized agentic tasks on your **hardware platform**, and where to continue with Unsloth guides and Nemotron open models.
 
 ## What to know before starting
 
@@ -72,7 +71,7 @@ You'll understand how to choose among parameter-efficient fine-tuning (LoRA / QL
 **Optional:**
 
 - Experience with Hugging Face Transformers, datasets, or LoRA / QLoRA
-- Comfort with the Linux command line (helpful when you move to a runnable Unsloth install playbook)
+- Comfort with the Linux command line (helpful when you follow the upstream Unsloth install steps)
 - Familiarity with reinforcement learning concepts (reward models, preference data)
 
 ## Supported hardware platforms
@@ -81,7 +80,8 @@ Use the matrix below to confirm your hardware platform, recommended default loca
 
 | Hardware platform | OS | Memory | Recommended default local settings | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- | :---- |
-| **RTX or RTX PRO** | Ubuntu 22.04 / 24.04 (Linux); Windows / WSL where your local stack supports it | Dedicated VRAM (size varies by GPU) | Unsloth fine-tuning via upstream guides; see [Fine-Tune Faster with Unsloth](https://build.nvidia.com/playbooks/unsloth) for an install path on listed platforms | — |
+| **GeForce RTX** | Ubuntu 22.04 / 24.04 (Linux); Windows / WSL where your local stack supports it | Dedicated VRAM (size varies by GPU) | Unsloth install and fine-tuning via [Fine-tuning LLMs with Blackwell, RTX 50 series & Unsloth](https://unsloth.ai/docs/blog/fine-tuning-llms-with-blackwell-rtx-50-series-and-unsloth) | — |
+| **RTX PRO** | Ubuntu 22.04 / 24.04 (Linux); Windows / WSL where your local stack supports it | Dedicated VRAM (size varies by GPU) | Unsloth install and fine-tuning via [Fine-tuning LLMs with Blackwell, RTX 50 series & Unsloth](https://unsloth.ai/docs/blog/fine-tuning-llms-with-blackwell-rtx-50-series-and-unsloth) | — |
 
 ## Prerequisites
 
@@ -120,7 +120,7 @@ nvidia-smi
 Expected output should show GPU information for your hardware platform.
 
 > [!NOTE]
-> Concrete Unsloth install, launch, and training commands are **not included in this playbook**. This page is a methods overview (LoRA / QLoRA, full fine-tuning, and reinforcement learning) plus pointers to Unsloth and Nemotron resources. For a runnable Unsloth setup and validation path on platforms listed there, use [Fine-Tune Faster with Unsloth](https://build.nvidia.com/playbooks/unsloth). For RTX 50 Series GPU guidance from Unsloth, see [Fine-Tuning LLMs With NVIDIA RTX 50 Series GPUs and Unsloth](https://docs.unsloth.ai/basics/fine-tuning-llms-with-blackwell-rtx-50-series-and-unsloth).
+> Concrete Unsloth install, launch, and training commands are **not included in this playbook**. This page is a methods overview (LoRA / QLoRA, full fine-tuning, and reinforcement learning) plus pointers to Unsloth and Nemotron resources. For Blackwell install and fine-tuning guidance from Unsloth, see [Fine-tuning LLMs with Blackwell, RTX 50 series & Unsloth](https://unsloth.ai/docs/blog/fine-tuning-llms-with-blackwell-rtx-50-series-and-unsloth).
 
 ## Step 2. Choose a fine-tuning method (intended)
 
@@ -142,12 +142,11 @@ Confirm license terms and any gated-model access before downloading.
 
 When you move from this overview to hands-on training:
 
-1. Use [Fine-Tune Faster with Unsloth](https://build.nvidia.com/playbooks/unsloth) if that playbook lists your hardware platform
-2. Or follow Unsloth’s published guides and notebooks for your GPU generation
-3. Keep other heavy GPU workloads stopped so training has enough memory
-4. Monitor utilization with `nvidia-smi` during training
+1. Follow Unsloth’s published guides and notebooks for your GPU generation
+2. Keep other heavy GPU workloads stopped so training has enough memory
+3. Monitor utilization with `nvidia-smi` during training
 
-Do not invent local package pins or container tags from this playbook — use the linked playbook or Unsloth docs for current install steps.
+Do not invent local package pins or container tags from this playbook — use the Unsloth docs for current install steps.
 
 ## Step 5. Cleanup (optional)
 
@@ -161,8 +160,7 @@ Cleanup is optional.
 
 ## Step 6. Next steps
 
-- Continue with [Fine-Tune Faster with Unsloth](https://build.nvidia.com/playbooks/unsloth) for install and validation on listed platforms
-- Review [Unsloth Documentation](https://docs.unsloth.ai/) for current configuration and hyperparameter guidance
+- Review [Unsloth Documentation](https://docs.unsloth.ai/) for current configuration, install, and hyperparameter guidance
 - Read the [NVIDIA technical blog on Unsloth and Blackwell](https://developer.nvidia.com/blog/train-an-llm-on-an-nvidia-blackwell-desktop-with-unsloth-and-scale-it/)
 - Explore [Nemotron 3 Nano on Hugging Face](https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8)
 
@@ -172,7 +170,7 @@ Cleanup is optional.
 |---------|-------|-----|
 | `nvidia-smi` not found or no GPU listed | Drivers or GPU runtime not available on this hardware platform | Install or repair NVIDIA drivers for your hardware platform, then re-run `nvidia-smi` |
 | Out-of-memory errors during fine-tuning | Model size, sequence length, batch size, or concurrent GPU workloads exceed available VRAM | Close other GPU applications, reduce batch size or sequence length, prefer LoRA / QLoRA over full fine-tuning for a first run, and monitor with `nvidia-smi` |
-| Unsloth or training package install fails | Missing dependencies, incompatible CUDA/PyTorch stack, or following steps that are not published for this playbook | Use [Fine-Tune Faster with Unsloth](https://build.nvidia.com/playbooks/unsloth) if your platform is listed there, or follow current [Unsloth Documentation](https://docs.unsloth.ai/) for your GPU generation — this playbook does not ship an install path |
+| Unsloth or training package install fails | Missing dependencies, incompatible CUDA/PyTorch stack, or following steps that are not published for this playbook | Follow the current [Unsloth Documentation](https://docs.unsloth.ai/) for your GPU generation — this playbook does not ship an install path |
 
 > [!NOTE]
 > On discrete-GPU hardware platforms, GPU memory is separate from system RAM. CUDA out-of-memory usually means the workload exceeds VRAM: reduce batch size, sequence length, or model precision; enable CPU offloading only if supported; close other GPU applications. Use `nvidia-smi` to confirm no other process is holding memory.

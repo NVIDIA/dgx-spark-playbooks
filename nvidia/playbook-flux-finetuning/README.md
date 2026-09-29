@@ -112,7 +112,7 @@ Clone the playbook assets and open the assets directory:
 
 ```bash
 git clone https://github.com/NVIDIA/dgx-spark-playbooks
-cd client-hardware-playbooks/nvidia/playbook-flux-finetuning/assets
+cd dgx-spark-playbooks/nvidia/playbook-flux-finetuning/assets
 ```
 
 ## Step 3. Model download

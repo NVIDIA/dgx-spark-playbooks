@@ -159,7 +159,7 @@ export HF_TOKEN=<your_huggingface_token>
 ```
 
 > [!NOTE]
-> Replace `<your_huggingface_token>` with your personal Hugging Face access token. A valid token is required to download any gated model.
+> Replace `<your_huggingface_token>` with your personal Hugging Face access token. A valid token is required to download any gated model. License acceptance and access approval must belong to the same Hugging Face account that issued the token; exporting the token does not request or grant gated-model access.
 >
 > - Generate a token: [Hugging Face tokens](https://huggingface.co/settings/tokens); guide available [here](https://huggingface.co/docs/hub/en/security-tokens).
 > - Request and receive access on each model's page (and accept license/terms) before attempting downloads.

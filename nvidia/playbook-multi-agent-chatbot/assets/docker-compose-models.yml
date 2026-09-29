@@ -90,7 +90,7 @@ services:
   #             capabilities: [gpu]
   #   command: 
   #     - "-m"
-  #     - "/models/gpt-oss-20b-mxfp4.gguf"
+  #     - "/models/gpt-oss-20b-MXFP4.gguf"
   #     - "--port"
   #     - "8000"
   #     - "--host"
@@ -116,7 +116,7 @@ services:
               capabilities: [gpu]
     command: 
       - "-m"
-      - "/models/gpt-oss-120b-mxfp4-00001-of-00003.gguf"
+      - "/models/gpt-oss-120b-MXFP4.gguf"
       - "--port"
       - "8000"
       - "--host"

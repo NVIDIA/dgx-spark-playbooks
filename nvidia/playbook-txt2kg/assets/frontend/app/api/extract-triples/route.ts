@@ -139,7 +139,14 @@ export async function POST(req: NextRequest) {
       });
 
       if (!vllmResponse.ok) {
-        throw new Error(`vLLM API error: ${vllmResponse.statusText}`);
+        let vllmError = vllmResponse.statusText;
+        try {
+          const errorBody = await vllmResponse.json();
+          vllmError = errorBody.error || JSON.stringify(errorBody);
+        } catch {
+          vllmError = await vllmResponse.text();
+        }
+        throw new Error(`vLLM API error: ${vllmError}`);
       }
 
       const vllmResult = await vllmResponse.json();
@@ -222,4 +229,3 @@ function parseTriplesFallback(text: string): Array<{subject: string, predicate: 
   
   return triples;
 }
-

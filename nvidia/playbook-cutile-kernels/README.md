@@ -126,14 +126,14 @@ newgrp docker
 
 ## Ancillary files
 
-TileGym sources and scripts live in the [TileGym repository](https://github.com/NVIDIA/TileGym). Companion FMHA tutorial scripts ship with this playbook [in the playbook repository](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/playbook-cutile-kernels/).
+TileGym sources and scripts live in the [TileGym repository](https://github.com/NVIDIA/TileGym). The two FMHA tutorial scripts are distributed separately from TileGym as [companion assets in this playbook](https://github.com/NVIDIA/dgx-spark-playbooks/tree/main/nvidia/cutile-kernels/assets/).
 
 - `tests/benchmark/run_all.sh` — Run all kernel benchmarks (TileGym)
 - `modeling/transformers/bench_qwen.sh` — Qwen2-7B benchmark script (TileGym)
 - `modeling/transformers/bench_deepseek.sh` — DeepSeek-V2-Lite benchmark script (TileGym)
 - `modeling/transformers/infer.py` — Main inference script with TileGym integration (TileGym)
-- `assets/fmha_optimization_tutorial.py` — FMHA step-by-step optimization tutorial
-- `assets/fmha_scaling_analysis.py` — FMHA scaling analysis across sequence lengths
+- [`assets/fmha_optimization_tutorial.py`](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/cutile-kernels/assets/fmha_optimization_tutorial.py) — FMHA step-by-step optimization tutorial (playbook companion asset)
+- [`assets/fmha_scaling_analysis.py`](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/cutile-kernels/assets/fmha_scaling_analysis.py) — FMHA scaling analysis across sequence lengths (playbook companion asset)
 
 ## Time & risk
 
@@ -788,15 +788,15 @@ def fmha_kernel(...):
 
 ### Companion scripts
 
-Clone the playbook assets, then run the companion scripts on your hardware platform:
+These scripts are distributed separately from TileGym as [companion assets in this playbook](https://github.com/NVIDIA/dgx-spark-playbooks/tree/main/nvidia/cutile-kernels/assets/). Clone the playbook repository, then run them on your hardware platform:
 
 ```bash
 git clone https://github.com/NVIDIA/dgx-spark-playbooks
-cd client-hardware-playbooks/nvidia/playbook-cutile-kernels/assets
+cd dgx-spark-playbooks/nvidia/playbook-cutile-kernels/assets
 ```
 
-- **`fmha_optimization_tutorial.py`** — Step-by-step optimization tutorial. Builds the FMHA kernel from basic to fully optimized, matching the progression in this guide.
-- **`fmha_scaling_analysis.py`** — Scaling analysis across sequence lengths. Benchmarks each optimization level and generates performance data.
+- **[`fmha_optimization_tutorial.py`](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/cutile-kernels/assets/fmha_optimization_tutorial.py)** — Step-by-step optimization tutorial. Builds the FMHA kernel from basic to fully optimized, matching the progression in this guide.
+- **[`fmha_scaling_analysis.py`](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/cutile-kernels/assets/fmha_scaling_analysis.py)** — Scaling analysis across sequence lengths. Benchmarks each optimization level and generates performance data.
 
 ```bash
 ## Run the optimization tutorial

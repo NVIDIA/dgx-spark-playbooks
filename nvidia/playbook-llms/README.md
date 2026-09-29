@@ -51,7 +51,8 @@ Use the matrix below to confirm your hardware platform, recommended default loca
 
 | Hardware platform | OS | Memory | Recommended default local settings | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- | :---- |
-| **RTX or RTX PRO** | Windows / Linux | Dedicated VRAM (size varies by GPU) | Pick a model that fits VRAM; start with LM Studio, Ollama, or llama.cpp for chat | — |
+| **GeForce RTX** | Windows / Linux | Dedicated VRAM (size varies by GPU) | Pick a model that fits VRAM; start with LM Studio, Ollama, or llama.cpp for chat | — |
+| **RTX PRO** | Windows / Linux | Dedicated VRAM (size varies by GPU) | Pick a model that fits VRAM; start with LM Studio, Ollama, or llama.cpp for chat | — |
 
 ## Choosing the right model for your GPU
 
@@ -91,7 +92,7 @@ Common LLM terminology:
   - Choosing a model larger than available VRAM can cause slow performance or out-of-memory errors
 - **Rollback:** Uninstall desktop apps you no longer need and delete downloaded model files from the app’s model library or cache
 - **Last Updated:** 08/03/2026
-  - Local LLM orientation hub for chat, agents, coding, and document Q&A on RTX or RTX PRO hardware platforms
+  - Local LLM orientation hub for chat, agents, coding, and document Q&A on GeForce RTX or RTX PRO hardware platforms
 
 ## Instructions
 

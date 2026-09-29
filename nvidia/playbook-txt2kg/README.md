@@ -67,7 +67,7 @@ Use the matrix below to confirm your hardware platform, OS, memory, and whether 
 > The 64 KB page-size issue is specific to DGX Station; DGX Spark is not affected. On affected DGX Station systems, prefer `./start.sh --neo4j`. Some upstream ArangoDB and Qdrant container images can abort at startup with `<jemalloc>: Unsupported system page size`; the Neo4j + Ollama stack preserves the fast local Ollama flow while avoiding ArangoDB.
 
 > [!NOTE]
-> Larger models generally produce higher-quality triples. Choose a model that fits the memory available on your hardware platform. See **Instructions → Step 3** for defaults and links to explore more models.
+> Larger models can improve triple quality, but reasoning models need structured-output configuration for extraction. Choose a model that fits the memory available on your hardware platform, and verify extraction output when switching models. See **Instructions → Step 3** for defaults and links to explore more models.
 
 ## Prerequisites
 
@@ -94,8 +94,8 @@ Use the matrix below to confirm your hardware platform, OS, memory, and whether 
   - GPU memory needs depend on the chosen model
   - Document processing time scales with document size and complexity
 - **Rollback:** Stop and remove containers; optionally delete downloaded models (see Instructions)
-- **Last Updated:** 08/05/2026
-  - Added explicit Neo4j + Ollama stack option; model defaults and explore links live in Instructions Step 3
+- **Last Updated:** 09/16/2026
+  - Added structured vLLM extraction handling and DGX Station vLLM GPU runtime setup fixes
 
 ## Instructions
 
@@ -180,7 +180,7 @@ To try a different Hugging Face checkpoint:
 **Explore more models:** [vLLM Recipes — DGX Spark](https://recipes.vllm.ai/browse?panel=open&hw=dgx_spark_gb10) · [vLLM Recipes — DGX Station](https://recipes.vllm.ai/browse?panel=open&hw=dgx_station_gb300) · [Hugging Face](https://huggingface.co/models)
 
 > [!NOTE]
-> Larger models generally produce higher-quality triples but need more memory and load time. If you hit memory limits, choose a smaller or quantized model.
+> Larger models can improve extraction quality, but reasoning models must be configured for structured JSON output. The default vLLM extraction path requests Nemotron's detailed thinking-off mode, requests schema-constrained triples, and stores only parsed JSON triples. If you switch models and extraction fails or returns reasoning text, use a non-reasoning model or disable thinking for that model.
 
 ## Step 4. Access the web interface
 
@@ -272,6 +272,7 @@ The **Hardware platform** column shows where an issue is most relevant. "All har
 | Port already in use | All hardware platforms | Previous instance still running | Run `./stop.sh` (with the same stack flags) or `docker compose down` |
 | Need another graph or LLM stack | All hardware platforms | Default stack is not the one you want | Use `./start.sh --neo4j` for Neo4j + Ollama or `./start.sh --vllm` for Neo4j + vLLM |
 | vLLM takes long to become ready | All hardware platforms (vLLM stack) | Model load can take 30+ minutes | The UI may show an initializing banner while the model loads. Check progress: `docker logs vllm-service -f` |
+| vLLM extraction fails with a JSON triples error, or older builds stored reasoning text as graph entities | All hardware platforms (vLLM stack) | A reasoning model returned thinking text instead of structured triples | Use the current extraction path, which requests Nemotron thinking-off mode, requests schema-constrained JSON, and refuses to fallback-parse free-form reasoning text. If you changed `VLLM_MODEL`, choose a non-reasoning model or disable thinking for that model before extracting triples. |
 
 The 64 KB page-size rows above apply to affected DGX Station systems only; DGX Spark is not affected.
 
@@ -282,4 +283,4 @@ The 64 KB page-size rows above apply to affected DGX Station systems only; DGX S
 > ```
 
 > [!NOTE]
-> **Model size vs. memory.** Larger models generally improve triple quality. If you hit memory limits, reduce context window size, use a quantized variant, or choose a smaller model for your hardware platform.
+> **Model choice.** Larger models can improve triple quality, but extraction requires structured subject-predicate-object output. If a reasoning model emits thinking text, disable thinking or choose a non-reasoning model. If you hit memory limits, reduce context window size, use a quantized variant, or choose a smaller model for your hardware platform.

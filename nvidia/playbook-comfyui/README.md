@@ -81,7 +81,7 @@ For Image Gen Quick Start, clone [ComfyUI on GitHub](https://github.com/comfyano
 
 ## Time & risk
 
-- **Estimated time:** 45 MIN (longer on first run when downloading large models)
+- **Estimated time:** 2 HOURS (longer on first run when downloading large models)
 - **Risk level:** Medium
   - Model downloads are large and may fail due to network or auth issues
   - Port 8188 must be reachable for the web UI

@@ -47,7 +47,8 @@ Use the matrix below to confirm your hardware platform, recommended default loca
 
 | Hardware platform | OS | Memory | Recommended default local settings | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- | :---- |
-| **RTX or RTX PRO** | Windows 11 | 16 GB+ dedicated VRAM; 64 GB system RAM recommended | Blender + ComfyUI; LTX-2.3 FirstFrame/LastFrame template; RTX Video Super Resolution | — |
+| **GeForce RTX** | Windows 11 | 16 GB+ dedicated VRAM; 64 GB system RAM recommended | Blender + ComfyUI; LTX-2.3 FirstFrame/LastFrame template; RTX Video Super Resolution | — |
+| **RTX PRO** | Windows 11 | 16 GB+ dedicated VRAM; 64 GB system RAM recommended | Blender + ComfyUI; LTX-2.3 FirstFrame/LastFrame template; RTX Video Super Resolution | — |
 
 ## Prerequisites
 
