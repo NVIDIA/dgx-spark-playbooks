@@ -8,7 +8,7 @@
 - [Overview](#overview)
 - [Instructions](#instructions)
   - [LM Studio](#lm-studio)
-  - [llama.cpp CLI / server](#llamacpp-cli-server)
+  - [Llama.cpp CLI / server](#llamacpp-cli-server)
   - [Verify multi-GPU utilization](#verify-multi-gpu-utilization)
 - [Troubleshooting](#troubleshooting)
 
@@ -22,14 +22,14 @@ Large local models need more memory and compute than a single GPU often provides
 
 NVIDIA has partnered with the [llama.cpp](https://github.com/ggml-org/llama.cpp) and [ComfyUI](https://www.comfy.org/) communities so consumer-friendly tools can use both GPUs effectively:
 
-- **llama.cpp tensor parallel** spreads a model across two GPUs for compute and memory — up to ~2× memory capacity and up to ~1.8× compute versus single-GPU, and substantially faster than pipeline parallel for many workloads.
+- **Llama.cpp tensor parallel** spreads a model across two GPUs for compute and memory — up to ~2× memory capacity and up to ~1.8× compute versus single-GPU, and substantially faster than pipeline parallel for many workloads.
 - **ComfyUI MultiGPU CFG Split** runs diffusion CFG work across identical GPUs (and can place pipeline stages per GPU), with measured speedups up to ~2× depending on model and workflow.
 
 This playbook covers configuring those apps on an existing dual-GPU system and, if you are still building, choosing components for a homogeneous dual-GPU PC.
 
 ## What you'll accomplish
 
-You'll **configure llama.cpp / LM Studio and ComfyUI to use two identical GPUs** on your hardware platform, and optionally follow a component guide for assembling a dual-GPU PC.
+You'll **configure Llama.cpp / LM Studio and ComfyUI to use two identical GPUs** on your hardware platform, and optionally follow a component guide for assembling a dual-GPU PC.
 
 - Enable **tensor parallel** (or pipeline parallel) for LLMs in LM Studio or llama.cpp
 - Insert the **MultiGPU CFG Split** node in ComfyUI and verify both GPUs are active
@@ -97,7 +97,7 @@ External references:
   - Tensor parallel does not yet support automatic parameter fitting in llama.cpp — OOM requires manual tuning
 - **Rollback:** Revert LM Studio split strategy / llama.cpp `-sm` flags, or remove the MultiGPU CFG Split node from ComfyUI workflows. Hardware changes (second GPU, PSU, motherboard) are physical and should be reversed carefully if needed
 - **Last Updated:** 08/03/2026
-  - Dual-GPU configuration for llama.cpp / LM Studio and ComfyUI, plus a dual-GPU PC component reference, on supported RTX / RTX PRO hardware platforms
+  - Dual-GPU configuration for Llama.cpp / LM Studio and ComfyUI, plus a dual-GPU PC component reference, on supported RTX / RTX PRO hardware platforms
 
 ## Instructions
 
@@ -117,7 +117,7 @@ On Windows, open **Task Manager → Performance** and confirm two GPU entries ap
 
 If you already have two matching GPUs installed, continue with Steps 2–3. If you are still choosing components, skip ahead to **Step 4** and return here after the system is built.
 
-## Step 2. Configure llama.cpp / LM Studio for multi-GPU LLMs
+## Step 2. Configure Llama.cpp / LM Studio for multi-GPU LLMs
 
 ![Relative llama.cpp multi-GPU performance: tensor parallel vs pipeline parallel](assets/llamacpp-tensor-vs-pipeline-performance.png)
 
@@ -126,7 +126,7 @@ If you already have two matching GPUs installed, continue with Steps 2–3. If y
 1. Under **Runtime Settings** (`Ctrl+Shift+R`), ensure a **CUDA** runtime is selected.
 2. Open **Hardware Settings** (`Ctrl+Shift+H`) and set the split strategy dropdown to **tensor parallelism**.
 
-### llama.cpp CLI / server
+### Llama.cpp CLI / server
 
 1. Download the latest build from the [llama.cpp GitHub releases page](https://github.com/ggml-org/llama.cpp/releases/).
 2. Run `llama-cli` or `llama-server` with one of the following split modes.

@@ -91,7 +91,7 @@ All required assets are in the playbook directory [in the playbook repository](h
   - LLaMA 3.1 8B model weights (~16 GB in BF16) are downloaded from Hugging Face on first run and cached locally
   - Requires a Hugging Face token with access to the LLaMA 3.1 model
 - **Rollback:** Exit the container. Your source files are preserved in the mounted `assets/` directory; everything else is discarded.
-- **Last Updated:** 09/18/2026
+- **Last Updated:** 08/03/2026
   - Profile LLaMA fine-tuning bottlenecks and ship fused Triton RMSNorm and cross-entropy kernels on supported hardware platforms
 
 ## Instructions

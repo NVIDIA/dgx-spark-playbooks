@@ -1,4 +1,4 @@
-# Run cuTile Kernels on DGX Spark
+# Run cuTile Kernels on DGX Spark and B300
 
 > Python GPU kernels you can benchmark, optimize, and reuse
 
@@ -40,7 +40,7 @@ This playbook covers three workflows:
 2. **End-to-End Inference** — Run LLM inference with cuTile-optimized kernels via monkey-patching
 3. **FMHA Implementation** — Build a Flash Multi-Head Attention kernel from pseudocode to optimized cuTile, with companion scripts to run and benchmark
 
-cuTile JIT compiles to the appropriate GPU architecture automatically.
+The same cuTile code runs across supported hardware platforms — cuTile JIT compiles to the appropriate GPU architecture automatically.
 
 ## What you'll accomplish
 
@@ -48,7 +48,7 @@ You'll set up a cuTile / TileGym environment on your **hardware platform** and:
 
 - Run the TileGym benchmark suite for attention, matrix, and activation kernels
 - Run Qwen2-7B or DeepSeek-V2-Lite inference with cuTile-optimized kernels
-- Review performance comparisons between DGX Spark and B300
+- Observe performance scaling across supported hardware platforms
 - Build an FMHA kernel step-by-step from pseudocode to an optimized cuTile implementation
 
 ## What to know before starting
@@ -70,6 +70,7 @@ Use the matrix below to confirm your hardware platform, recommended default loca
 | Hardware platform | OS | Memory | Recommended default local settings | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- | :---- |
 | **DGX Spark** | Linux (Ubuntu 24.04 / DGX OS) | 128 GB Unified Memory | CUDA NGC `nvcr.io/nvidia/cuda:13.2.0-devel-ubuntu22.04`; TileGym v1.3.0 | — |
+| **B300** | Linux (cloud instance) | 192 GB HBM3e | Same CUDA NGC image and TileGym pin; cuTile JIT targets sm_103 | — |
 
 ## Prerequisites
 
@@ -141,7 +142,7 @@ TileGym sources and scripts live in the [TileGym repository](https://github.com/
   - Large downloads may fail due to network issues
   - First run includes JIT compilation overhead
 - **Rollback:** Exit and remove the Docker container to undo environment changes
-- **Last Updated:** 09/18/2026
+- **Last Updated:** 08/03/2026
   - Set up cuTile / TileGym workflows for kernel benchmarks, end-to-end LLM inference, and FMHA implementation on supported hardware platforms
 
 ## Kernel Benchmarks
@@ -727,8 +728,6 @@ acc = ct.truediv(acc, l_i, flush_to_zero=True, rounding_mode=RMd.APPROX)
 
 The same kernel code works across hardware platforms; only configuration parameters change. Use [`ct.ByTarget`](https://docs.nvidia.com/cuda/cutile-python/performance.html) to select values per architecture, or [`ct.autotune`](https://docs.nvidia.com/cuda/cutile-python/performance.html) to search candidate values automatically.
 
-The B300 configurations below are included as comparison references; this playbook targets DGX Spark.
-
 | Hardware platform | Arch | TILE_M | TILE_N | Occupancy | Rationale |
 |---|---|---|---|---|---|
 | **DGX Spark** | sm_121 | 64 | 64 | 2 | Smaller tiles, higher occupancy for 48 SMs |
@@ -819,7 +818,7 @@ python fmha_scaling_analysis.py --iterations 100
 
 ## Hardware platform performance comparison
 
-This page compares **DGX Spark** (GB10, sm_121) with **B300** (sm_103) for kernel benchmarks and end-to-end LLM inference. B300 results are included for comparison.
+This page summarizes performance scaling between the hardware platforms listed in the Supported hardware platforms table — **DGX Spark** (GB10, sm_121) and **B300** (sm_103) — for kernel benchmarks and end-to-end LLM inference.
 
 ## Kernel benchmark scaling
 

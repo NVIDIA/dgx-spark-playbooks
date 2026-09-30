@@ -1,4 +1,4 @@
-# Run Chat Model Training with nanochat
+# Train a Chat Model with NanoChat
 
 > Build a ChatGPT-style LLM end-to-end — tokenizer, pretraining, SFT — then chat via web UI or CLI
 
@@ -84,7 +84,7 @@ Upstream reference: [nanochat on GitHub](https://github.com/karpathy/nanochat/).
   - Large dataset downloads and checkpoints need substantial disk space
   - Launch scripts exit if `WANDB_API_KEY` or `HF_TOKEN` are unset
 - **Rollback:** Stop containers, then remove caches (`~/.cache/nanochat` or local `nanochat_cache/`) and the `nanochat` Docker image (non-destructive to the host OS)
-- **Last Updated:** 09/18/2026
+- **Last Updated:** 07/31/2026
   - Removed DGX Spark support (not ready yet); playbook is Station / single-node only
 
 ## Credits
