@@ -55,7 +55,7 @@ Nemotron 3 Nano 30B-A3B is the most compute-efficient model in the lineup. It is
 
 Nemotron 3 Super targets high-accuracy reasoning for multi-agent applications; Nemotron 3 Ultra targets complex AI applications. NVIDIA also released an open collection of training datasets and reinforcement learning libraries. Nemotron 3 Nano fine-tuning is available on Unsloth.
 
-Download Nemotron 3 Nano from [Hugging Face](https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8), or experiment with it through Llama.cpp and LM Studio.
+Download Nemotron 3 Nano from [Hugging Face](https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8), or experiment with it through llama.cpp and LM Studio.
 
 ## What you'll accomplish
 
