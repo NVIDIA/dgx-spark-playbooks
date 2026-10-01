@@ -173,8 +173,8 @@ All required assets are handled by the NemoClaw installer. No manual cloning is 
 
 - **Estimated time:** 30–60 MIN for a first full pass (install, onboard, model download depending on choice and network). Large Express models can add substantial download time. Optional Brave, Telegram, and cloudflared steps add time if you do them in a second session. Multi-node model download and first start can take more than an hour.
 - **Risk level:** Medium — you are running an AI agent in a sandbox; risks are reduced by isolation but not eliminated. Use a clean environment and do not connect sensitive data or production accounts.
-- **Last Updated:** 09/17/2026
-  - Clarified Brave search verification, DGX Spark installer choices, and LKG release behavior; linked the Experimental two-Spark guide.
+- **Last Updated:** 09/30/2026
+  - Open the Web UI with the dashboard link printed during setup.
 
 ## Instructions
 
@@ -573,7 +573,7 @@ ssh -L <port>:127.0.0.1:<port> <your-user>@<your-host-ip>
 Now open the dashboard URL in your remote machine's browser.
 
 > [!IMPORTANT]
-> Use `127.0.0.1`, not `localhost` -- the gateway origin check requires an exact match.
+> Use the URL exactly as printed by `dashboard-url`.
 
 > [!NOTE]
 > If the Web UI fails to load and the port forward may be stale, get the port from `nemoclaw my-assistant dashboard-url --quiet` and reset:
@@ -1229,7 +1229,7 @@ Keep the Hugging Face caches unless reclaiming disk is intentional. Retaining th
 | Agent gives no response or is very slow | First response can be slow, especially with larger models | Response time depends on model size (30B: a few seconds; larger models may take longer). Verify inference route: `nemoclaw my-assistant status`. |
 | Port 18789 already in use | Another process is bound to the port | `lsof -i :18789` then `kill <PID>`. If needed, `kill -9 <PID>` to force-terminate. |
 | Web UI port forward dies or dashboard unreachable | Port forward not active | `openshell forward stop 18789 my-assistant` then `openshell forward start 18789 my-assistant --background`. |
-| Web UI shows `origin not allowed` | Accessing via `localhost` instead of `127.0.0.1` | Use `http://127.0.0.1:18789/#token=...` in the browser. The gateway origin check requires `127.0.0.1` exactly. |
+| Web UI shows `origin not allowed` | The browser URL does not match the URL printed by `dashboard-url` | Open the URL exactly as printed by `nemoclaw my-assistant dashboard-url --quiet`. |
 
 #### daemon.json cgroup fix
 

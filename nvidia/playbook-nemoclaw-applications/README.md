@@ -56,7 +56,7 @@ All applications run inside the **OpenShell sandbox** that NemoClaw created duri
 You'll run four practical NemoClaw workflows on your **hardware platform**:
 
 - **[Daily Personal News Digest](https://build.nvidia.com/playbooks/nemoclaw-applications/news-digest)** — a scheduled morning briefing that wakes up on a cron, sweeps the topics you care about across an allowlisted set of sources, and posts a structured digest (Top 3, headlines by topic, deep dive, skip-the-noise, on-your-radar, local) to your Telegram home channel.
-- **[Software Development Agent](https://build.nvidia.com/playbooks/nemoclaw-applications/developer-agent)** — reads a single project directory, builds an execution plan for the features you specify, implements them, reviews its own work, and writes a `develop-and-review.md` you can read before merging. No outbound network beyond the local inference endpoint.
+- **[Software Development Agent](https://build.nvidia.com/playbooks/nemoclaw-applications/developer-agent)** — reads a single project directory, builds an execution plan for the features you specify, implements them, reviews its own work, and writes a `develop-and-review.md` you can read before merging. No outbound network beyond the local inference endpoint, once your project's test runner is installed. The stock sandbox image does not ship `pytest`, `go`, or `cargo`.
 - **[Deck Reviewer](https://build.nvidia.com/playbooks/nemoclaw-applications/deck-reviewer)** — a Doc & Deck Red-Team that scans the artifact you're about to send for inconsistent numbers, unsourced claims, missing data, accessibility issues, and prior-version contradictions, then returns a severity-ranked punch list with proposed edits.
 - **[Calendar Negotiator](https://build.nvidia.com/playbooks/nemoclaw-applications/calendar-negotiator)** — a scheduling chief-of-staff that turns "when can we meet?" threads into a confirmed meeting on your calendar, respecting your focus blocks, energy patterns, and time-zone fairness with the other party.
 
@@ -95,7 +95,7 @@ Use the matrix below to confirm your hardware platform, recommended default loca
 
 **Software requirements**
 
-- Local inference serving the model you selected during NemoClaw onboard (see the companion playbook)
+- Local inference serving the model NemoClaw configured during onboard.
 
 Verify the sandbox is healthy before you start:
 
@@ -104,7 +104,7 @@ nemoclaw list
 nemoclaw my-assistant status
 ```
 
-Expected: your sandbox appears in the list and `status` reports the sandbox as **Running** with the inference provider pointing at your local model.
+Expected: your sandbox appears in the list and `status` reports it **Running**, with the inference provider pointing at your local model.
 
 ## Have ready before you begin
 
@@ -126,14 +126,20 @@ All policy snippets and example prompts in this playbook are inline in the appli
 - **Estimated time:** 30–45 MIN to walk through all four applications. Each application individually takes 5–10 minutes once the prerequisites are in place. Plan an extra 10 minutes for the one-time [Policy Setup](https://build.nvidia.com/playbooks/nemoclaw-applications/policy-setup) tab if you have not enabled Telegram yet.
 - **Risk level:** **Medium.** Every application grants the agent additional capability beyond the default sandbox — outbound network for the news digest, filesystem access for code review, deck red-team, and calendar negotiation. Risk is reduced by tight per-application policies (host-level `chmod` on read-only source data backed by `share mount`'s SSHFS permission passthrough, scoped sandbox directories so the agent only sees one mounted tree at a time, explicit egress allowlists via `nemoclaw policy-add` presets, and in-prompt safety rules that survive single-message overrides) but is not eliminated. **Do not point these recipes at sensitive data, production accounts, or personal files** without reviewing the policy first.
 - **Rollback:** Each application tab includes a rollback section that either reverts the policy (network changes are hot-reloadable) or destroys and recreates the sandbox with the original policy. The [Troubleshooting](https://build.nvidia.com/playbooks/nemoclaw-applications/troubleshooting) tab covers common stuck-state recovery. You can always run `nemoclaw uninstall` to remove everything.
-- **Last Updated:** 08/03/2026
-  - Clarified Telegram uses long-polling (no public tunnel required); companion link for messaging setup; supported hardware platforms matrix for example agent workflows
+- **Last Updated:** 09/30/2026
+  - Updated the example agent steps so sandbox setup, Telegram, scheduled digests, and troubleshooting match the current workflow.
 
 ## Daily Personal News Digest
 
 ## Daily Personal News Digest
 
 This is a cron-style workflow: the agent wakes up on a schedule, fetches updates from a small allowlist of URLs, summarizes them, and posts a digest to your Telegram home channel.
+
+Set your sandbox name once in this shell. The commands below use `$SANDBOX_NAME`:
+
+```bash
+export SANDBOX_NAME=my-assistant   # the name you chose at NemoClaw onboard
+```
 
 ## Step 1. Policy setup
 
@@ -194,7 +200,7 @@ openshell policy get $SANDBOX_NAME --full | grep -E "host:|port:"
 ```
 
 > [!TIP]
-> Prefer `nemoclaw policy-add --from-file` over `openshell policy get --full > policy.yaml` followed by `openshell policy set`. The additive `policy-add` flow never touches the live `version:` field. If `policy set` rejects a dumped file with `unknown field 'Version'`, lowercase the key in place — `sed -i 's/^Version:/version:/' policy.yaml` — and rerun `policy set`.
+> Prefer `nemoclaw policy-add --from-file` over `openshell policy get --full > policy.yaml` followed by `openshell policy set`. The additive `policy-add` flow never touches the live `version:` field. If you do round-trip a full dump, strip the metadata header that `policy get --full` prepends (`Version:`, `Hash:`, `Status:`, `Source:`, `Config rev:`, then `---`), then set the cleaned file: `awk 'f{print} /^---$/{f=1}' policy.yaml > policy-clean.yaml` followed by `openshell policy set $SANDBOX_NAME --policy policy-clean.yaml --wait`. Rewriting only the first `Version:` line leaves the rest of the header in place, and the next `policy set` fails on `Hash`.
 
 ## Step 2. Agent prompt
 
@@ -297,7 +303,13 @@ Depending on the model you choose, it can take some time to set up the agent wor
 > Test the schedule end-to-end by asking the agent to run the digest **once now** before the first scheduled trigger fires: *"Run the digest task now as a one-off, then keep the schedule for tomorrow."* This one-off runs through the **live** agent and is the most reliable end-to-end check (it produces a real briefing immediately).
 
 > [!IMPORTANT]
-> **Register the schedule from the operator side — don't rely on the agent's tool call.** When the agent runs as an embedded `openclaw agent` turn (the headless path used here), its in-turn cron tool connects to the gateway with a device token that lacks the scheduler scope, so the registration is rejected with `scope upgrade pending approval … pairing required: device is asking for more scopes than currently approved`. The agent then reports it "has no built-in scheduler" or that the scheduler is "flapping." Register the recurring job yourself instead — this is verified to work:
+> **Register the schedule from the operator side — don't rely on the agent's tool call.** When the agent runs as an embedded `openclaw agent` turn (the headless path used here), its in-turn cron tool connects to the gateway with a device token that lacks the scheduler scope, so the registration is rejected with `scope upgrade pending approval … pairing required: device is asking for more scopes than currently approved`. The agent then reports it "has no built-in scheduler" or that the scheduler is "flapping." Register the recurring job yourself. The first time you register a job from the operator side, the gateway queues a scope-upgrade request that has to be approved once. Run `nemoclaw $SANDBOX_NAME exec -- openclaw devices list` to read the pending `requestId`, then approve it:
+>
+> ```bash
+> nemoclaw $SANDBOX_NAME exec -- openclaw devices approve <requestId>
+> ```
+>
+> That command prints `Direct scope access failed; using local fallback.` before succeeding — this is normal, not an error. Then run the `openclaw cron add` command below:
 >
 > ```bash
 > nemoclaw $SANDBOX_NAME exec -- openclaw cron add \
@@ -329,10 +341,16 @@ To **cancel** the scheduled task later, send: `List my scheduled tasks, then can
 
 ## Software Development Agent
 
-The agent reads a single project directory, builds an execution plan for the features you specify, implements the features, reviews the implementation, and writes a `develop-and-review.md` back into the same directory. No outbound network beyond the local inference endpoint.
+The agent reads a single project directory, builds an execution plan for the features you specify, implements the features, reviews the implementation, and writes a `develop-and-review.md` back into the same directory. No outbound network beyond the local inference endpoint, once your project's test runner is installed. The stock sandbox image does not ship `pytest`, `go`, or `cargo` — install what your project needs once with `nemoclaw $SANDBOX_NAME connect`, then `pip install --user pytest`. That one install does need outbound access, which the Balanced tier's `pypi` preset already allows.
 
 > [!WARNING]
 > Read-write filesystem access lets the agent modify files in the mounted directory. **Point it at a project copy or a clean clone, not your only working tree.** Commit or back up before granting write access.
+
+Set your sandbox name once in this shell. The commands below use `$SANDBOX_NAME`:
+
+```bash
+export SANDBOX_NAME=my-assistant   # the name you chose at NemoClaw onboard
+```
 
 ## Step 1. Expose the project to the sandbox
 
@@ -554,6 +572,12 @@ The agent reads the artifact you're about to ship (PPTX, DOCX, PDF, Markdown) pl
 
 > [!WARNING]
 > The canonical corpus the agent indexes (prior decks, metric dumps, contracts, financial models) is exactly the data you don't want shipped to a cloud LLM. Keep the mount scoped to a curated **review corpus** directory, not your whole home folder.
+
+Set your sandbox name once in this shell. The commands below use `$SANDBOX_NAME`:
+
+```bash
+export SANDBOX_NAME=my-assistant   # the name you chose at NemoClaw onboard
+```
 
 ## Step 1. Policy setup
 
@@ -975,6 +999,12 @@ The agent reads a snapshot of your calendar and a personal availability profile 
 > [!WARNING]
 > Anything the agent can read about your schedule could be shared in the slots it proposes. **Mount only the calendar window the agent needs** (e.g. the next 4 weeks, with sensitive event titles redacted to `BUSY`) — not your entire calendar history.
 
+Set your sandbox name once in this shell. The commands below use `$SANDBOX_NAME`:
+
+```bash
+export SANDBOX_NAME=my-assistant   # the name you chose at NemoClaw onboard
+```
+
 ## Step 1. Policy setup
 
 Telegram is **optional**. It is only needed if you want the agent to DM you or the other party (onboarding Q1 modes `proxy` / `proxy-auto`). In **propose-only** mode — the recommended default, and what this guide uses — the agent just shows you drafts in the web UI / session and writes booking files to disk, so **no Telegram channel and no `api.telegram.org` egress are required.** You can run the entire workflow Telegram-free. Telegram uses long-polling — no public cloudflared tunnel is required for messaging.
@@ -982,10 +1012,10 @@ Telegram is **optional**. It is only needed if you want the agent to DM you or t
 If you *do* want Telegram relay, layer this recipe on top of the [NemoClaw Policy Setup](https://build.nvidia.com/playbooks/nemoclaw-applications/policy-setup) tab's working Telegram channel first and confirm it is registered:
 
 ```bash
-nemoclaw $SANDBOX_NAME status | grep -i telegram   # only needed for proxy / proxy-auto modes
+nemoclaw $SANDBOX_NAME exec -- openclaw channels list   # only needed for proxy / proxy-auto modes
 ```
 
-A line showing the Telegram channel means it is wired in. If there is no such line and you want Telegram, follow the **Optional — Set up Messaging Channel (Telegram)** section in [Run NemoClaw with a Local LLM](https://build.nvidia.com/playbooks/nemoclaw) (`nemoclaw $SANDBOX_NAME channels add telegram`), then return to [NemoClaw Policy Setup](https://build.nvidia.com/playbooks/nemoclaw-applications/policy-setup) for egress wiring. Otherwise, ignore this and continue in propose-only mode.
+A `telegram` entry means the channel plugin is wired in. `nemoclaw status` mentions telegram as soon as the egress preset is applied, which is not the same thing. If there is no `telegram` entry and you want Telegram, follow the **Optional — Set up Messaging Channel (Telegram)** section in [Run NemoClaw with a Local LLM](https://build.nvidia.com/playbooks/nemoclaw) (`nemoclaw $SANDBOX_NAME channels add telegram`), then return to [NemoClaw Policy Setup](https://build.nvidia.com/playbooks/nemoclaw-applications/policy-setup) for egress wiring. Otherwise, ignore this and continue in propose-only mode.
 
 ### Create the calendar working directory
 
@@ -1292,7 +1322,7 @@ export SANDBOX_NAME=my-assistant   # replace with the name you chose at NemoClaw
 > [!IMPORTANT]
 > Telegram uses **long-polling** — the sandbox pulls messages from Telegram servers. **No public URL or cloudflared tunnel is required for Telegram.** cloudflared is only for exposing the Web UI dashboard remotely (optional Step 2 below).
 
-The NemoClaw onboard wizard already wires the **Telegram channel plugin** into the sandbox when you select `telegram` at the *Messaging channels* prompt. If you skipped Telegram during onboard, follow the **Optional — Set up Messaging Channel (Telegram)** section in [Run NemoClaw with a Local LLM](https://build.nvidia.com/playbooks/nemoclaw) (`nemoclaw $SANDBOX_NAME channels add telegram`). `policy-add` alone cannot register the channel plugin.
+Express install on DGX Spark runs onboarding non-interactively and never shows a Messaging channels prompt, so it does not attach the Telegram channel plugin. That prompt only appears in the custom onboarding wizard: re-run the NemoClaw installer and answer `n` when it offers Express install, then pick `telegram`. If the sandbox already exists, register the plugin without recreating it: `nemoclaw $SANDBOX_NAME channels add telegram` (see **Optional — Set up Messaging Channel (Telegram)** in [Run NemoClaw with a Local LLM](https://build.nvidia.com/playbooks/nemoclaw)). `policy-add` alone cannot register the channel plugin.
 
 Add the Telegram **network egress preset** so the sandbox can reach `api.telegram.org`:
 
@@ -1300,7 +1330,7 @@ Add the Telegram **network egress preset** so the sandbox can reach `api.telegra
 nemoclaw $SANDBOX_NAME policy-add
 ```
 
-When prompted, type `telegram` and press **Y** to confirm. This is a hot-reload — the sandbox stays up.
+When prompted, enter the number shown next to `telegram` in the preset list, then press **Y** to confirm. The prompt takes a number, not a preset name. This is a hot-reload — the sandbox stays up.
 
 Confirm the policy now allows Telegram egress:
 
@@ -1319,7 +1349,9 @@ Open Telegram, find your bot, and send `hello`. You should get a reply from the 
 
 Skip this step unless you need a **public URL for the Web UI dashboard**. It is unrelated to Telegram messaging.
 
-Install cloudflared for your host architecture. On ARM64 hardware platforms:
+Install cloudflared (one-time, required for the tunnel). It is not always present on DGX Spark. Skip this block if `command -v cloudflared` already returns a path.
+
+On ARM64 hardware platforms:
 
 ```bash
 curl -L --output cloudflared.deb \
@@ -1343,26 +1375,32 @@ Expected: `● cloudflared` with a `*.trycloudflare.com` URL.
 
 Tables below are grouped by tab so you can jump straight to the workflow you're debugging. Start with **General sandbox & policy issues** if the failure is at the `nemoclaw` / `openshell` command layer rather than inside a specific application.
 
+Set your sandbox name once in this shell. The fixes below use `$SANDBOX_NAME`:
+
+```bash
+export SANDBOX_NAME=my-assistant   # the name you chose at NemoClaw onboard
+```
+
 ### General sandbox & policy issues
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | `nemoclaw <sandbox> policy-add` returns `unknown sandbox` | Sandbox name typo, or sandbox was deleted | Run `nemoclaw list` to see registered sandboxes; rerun the command with the exact name. If empty, follow [Run NemoClaw with a Local LLM](https://build.nvidia.com/playbooks/nemoclaw) to recreate the sandbox. |
 | `openshell policy set` fails with `validation failed` / exit code 1 | Malformed YAML or invalid policy fields | Common issues: paths must start with `/`, no `..` traversal, `run_as_user` must not be `root`, `network_policies` entries need both `host` and `port`. Fix the YAML and retry. |
-| `openshell policy set` fails with `unknown field 'Version', expected one of 'version', 'filesystem_policy', 'landlock', 'process', 'network_policies'` | Full-policy dump/set round trip emitted `Version:` (capital V) while the parser expects `version:` (lowercase) | Lowercase the key in place and retry: `sed -i 's/^Version:/version:/' policy.yaml && openshell policy set $SANDBOX_NAME --policy policy.yaml --wait`. Preferred: skip the full-policy round trip entirely and use the additive flow — write a small preset file with `preset:` + `network_policies:` blocks and apply it with `nemoclaw $SANDBOX_NAME policy-add --from-file ./my-preset.yaml --yes`. The additive flow never touches the live `version:` field. |
+| `openshell policy set` fails with `unknown field 'Version', expected one of 'version', 'filesystem_policy', 'landlock', 'process', 'network_policies'` | `policy get --full` prepends a metadata header (`Version:`, `Hash:`, `Status:`, `Source:`, `Config rev:`) and a `---` separator that are not part of the policy document | Strip that header, then set: `awk 'f{print} /^---$/{f=1}' policy.yaml > policy-clean.yaml` followed by `openshell policy set $SANDBOX_NAME --policy policy-clean.yaml --wait`. Preferred: skip the full-policy round trip entirely and use the additive `policy-add --from-file` flow, which never touches the live `version:` field. |
 | `openshell policy get` shows your new network rule but the sandbox still blocks the host | Hot-reload did not complete | Re-run with `--wait` so the CLI blocks until the update is confirmed: `openshell policy set $SANDBOX_NAME --policy policy.yaml --wait`. If still failing, restart the sandbox gateway with `nemoclaw $SANDBOX_NAME recover` (restarts the sandbox gateway and dashboard port-forward); if that doesn't clear the symptom, recreate the sandbox. |
-| Cannot recreate sandbox: `port 8080 is held by container...` | A previous OpenShell gateway or sandbox container still owns port 8080 | `openshell gateway destroy -g <old-gateway-name>` (or `docker stop <name> && docker rm <name>`), then re-run `nemoclaw onboard`. |
+| Cannot recreate sandbox: `port 8080 is held by container...` | A previous OpenShell gateway or sandbox container still owns port 8080 | `openshell gateway remove -g <old-gateway-name>` (or `docker stop <name> && docker rm <name>`), then re-run `nemoclaw onboard`. |
 | `policy-add` does not list the preset I expected | Preset name not in the interactive menu for this install | List available presets: `nemoclaw $SANDBOX_NAME policy-add --help` or run `policy-add` interactively and read the menu. Update NemoClaw if you need a maintained preset that is not listed. |
 | `nemoclaw <sandbox> policy-add --from-file ...` fails with `Preset must declare preset.name (lowercase, hyphenated RFC 1123 label)` | `preset.name` in your custom preset file contains an underscore, uppercase letter, or other non-RFC-1123 character | Change the value of `preset.name` to lowercase letters, digits, and hyphens only (e.g. `news_sources` → `news-sources`). The inner `network_policies.<group>` map key and its `name` field do accept underscores — the constraint is only on the top-level `preset.name`. |
-| Web UI shows `origin not allowed` after policy changes | Accessing via `localhost` instead of `127.0.0.1` | Use `http://127.0.0.1:18789/#token=<your-token>`. The gateway origin check requires `127.0.0.1` exactly. |
+| Web UI shows `origin not allowed` after policy changes | The browser URL does not match the URL printed by `dashboard-url` | Open the URL exactly as printed by `nemoclaw $SANDBOX_NAME dashboard-url --quiet`. |
 
 ### [NemoClaw Policy Setup](https://build.nvidia.com/playbooks/nemoclaw-applications/policy-setup)
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| Telegram bot replies `Error: Channel is unavailable: telegram` | Telegram channel plugin was not wired into the sandbox at onboard | `policy-add telegram` alone is not enough. First try the non-destructive fix: run `nemoclaw $SANDBOX_NAME channels add telegram` (you will be prompted for bot token and app token if they are not already in the environment); this wires the channel plugin into the existing sandbox without touching your config, presets, or mounts. If that command is unavailable, follow [Run NemoClaw with a Local LLM](https://build.nvidia.com/playbooks/nemoclaw) to enable Telegram (or recreate the sandbox with `telegram` at the **Messaging channels** prompt). |
+| Telegram bot replies `Error: Channel is unavailable: telegram` | Telegram channel plugin was not wired into the sandbox at onboard | `policy-add telegram` alone is not enough. First try the non-destructive fix: run `nemoclaw $SANDBOX_NAME channels add telegram` (you will be prompted for bot token and app token if they are not already in the environment); this wires the channel plugin into the existing sandbox without touching your config, presets, or mounts. If that command is unavailable, re-run the NemoClaw installer and answer `n` when it offers Express install — the Messaging channels prompt only appears in the custom onboarding wizard. Pick `telegram` there to recreate the sandbox with the channel plugin attached. |
 | `nemoclaw tunnel start` prints `cloudflared not found — no public URL` | `cloudflared` is not installed (affects **optional remote Web UI** only — Telegram messaging does not need a tunnel) | If you need a public dashboard URL, install cloudflared for your host architecture (on ARM64: `curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64.deb && sudo dpkg -i cloudflared.deb`), then `nemoclaw tunnel stop && nemoclaw tunnel start`. Skip this entirely for Telegram-only workflows. |
-| Telegram bot receives messages but returns nothing for 60+ seconds | First response on a large local model is slow (cold start), or the inference server is not warm | Expected for the first reply after a restart. Verify the inference route with `nemoclaw $SANDBOX_NAME status`. If subsequent replies are also slow, pick a smaller model in the NemoClaw onboard wizard (see the companion playbook). |
+| Telegram bot receives messages but returns nothing for 60+ seconds | First response after a restart is slow (cold start) while the model loads | Expected for the first reply after a restart. Verify the inference route with `nemoclaw $SANDBOX_NAME status`. If subsequent replies are also slow, pick a smaller model in the NemoClaw onboard wizard (see the companion playbook). |
 
 ### [Daily Personal News Digest](https://build.nvidia.com/playbooks/nemoclaw-applications/news-digest)
 
@@ -1376,7 +1414,7 @@ Tables below are grouped by tab so you can jump straight to the workflow you're 
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| Agent writes `develop-and-review.md` but the host file is missing | Looking at the wrong host path, or the `share mount` is not active | The sandbox path `/sandbox/project` maps to the host directory you passed to `nemoclaw $SANDBOX_NAME share mount` (e.g. `~/nemoclaw-projects/my-app`). Open `develop-and-review.md` under that host directory, not inside `/sandbox/project` on the host. Verify the mount is live with `ls ~/nemoclaw-projects/my-app-live/` (or whichever host path you passed to `share mount`), or pass that same path to `share status`: `nemoclaw $SANDBOX_NAME share status ~/nemoclaw-projects/my-app-live`. Without a path argument, `nemoclaw $SANDBOX_NAME share status` only tracks the default mount point `~/.nemoclaw/mounts/<name>` and will report "not mounted" for a custom host path even when the mount is fine. If the listing is empty or the status check reports not mounted, re-run the `share mount` command from Step 1. |
+| Agent writes `develop-and-review.md` but the host file is missing | The report is written inside the sandbox and has not been pulled back to the host | The report is written inside the sandbox at `/sandbox/project`. Pull it back with the Step 1 command: `nemoclaw $SANDBOX_NAME exec -- bash -lc 'cd /sandbox/project && tar czf - .' \| tar xzf - -C ~/nemoclaw-projects/my-app`, then open `develop-and-review.md` in that host directory. (If you chose the optional share mount path instead, check it with `nemoclaw $SANDBOX_NAME share status`.) |
 | Agent fails with `Permission denied` when writing `develop-and-review.md` | Host directory was locked with `chmod a-w` and the mount inherits those permissions via SSHFS | Restore write on the host: `chmod u+w ~/nemoclaw-projects/my-app` (or whichever directory you mounted) and retry. For a kernel-enforced write boundary inside the sandbox in addition to host permissions, tighten `filesystem_policy` in the sandbox policy and `nemoclaw $SANDBOX_NAME rebuild` — filesystem policy is locked at sandbox creation, so it requires a rebuild to change (workspace state is preserved automatically). |
 | Agent runs tests and reports "tests not run" even though the project has tests | Test runner not installed in the sandbox image | The default NemoClaw sandbox may not ship `pytest`, `npm`, `cargo`, or `go test`. Install whatever the project uses once after sandbox creation: `nemoclaw $SANDBOX_NAME connect`, then `pip install --user pytest` (or equivalent), then `exit`. |
 | Agent modifies files outside the plan | Plan-approval checkpoint was disabled | In the profile, answer `yes` to "pause for approval" (Q5). The agent must then print `PLAN READY — reply 'approve'` and wait, never modifying source files until you reply `approve`. |
