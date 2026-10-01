@@ -69,7 +69,7 @@ Use the matrix below to confirm your hardware platform and OS.
 
 - **Estimated time:** 30 MIN, not counting the model download
 - **Risk level:** **Medium** — the agent can run commands and edit files after you approve them
-- **Rollback:** `atomic-agent uninstall` removes the agent, its models, and all of its data
+- **Rollback:** `atomic-agent uninstall` removes the agent, its models, and all of its data after you confirm
 - **Last Updated:** 09/30/2026
   - Added Atomic Agent for DGX Spark and GeForce RTX
 
@@ -130,7 +130,7 @@ atomic-agent import hermes
 atomic-agent import openclaw
 ```
 
-The import never overwrites existing data and does not change the source.
+The import shows a preview and asks before it writes anything. It does not overwrite existing data or change the source.
 
 ## Optional — Chat from Telegram or Discord
 
@@ -164,13 +164,13 @@ atomic-agent models stop
 atomic-agent models start
 ```
 
-Remove a model you no longer use with `atomic-agent models remove <id>`.
+Remove a model you no longer use with `atomic-agent models remove <id>`. To remove the active model, run `atomic-agent models stop` first.
 
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
 |---------|--------|-----|
-| `atomic-agent: command not found` after install | The shell has not reloaded its PATH | Run `source ~/.bashrc`, or call `~/.local/bin/atomic-agent` directly |
+| `atomic-agent: command not found` after install | The shell has not reloaded its PATH | Open a new terminal or run `source ~/.bashrc`. In scripts and non-interactive SSH sessions, call `~/.local/bin/atomic-agent` directly |
 | `error while loading shared libraries: libatomic.so.1` | The `libatomic1` library is missing | Run `sudo apt install -y libatomic1` |
 | `needs glibc 2.38 or newer` | The Linux system is older than Ubuntu 24.04 or DGX OS 7 | Update the operating system |
 | Replies are very slow and `models start` shows no GPU device | The NVIDIA driver is not loaded, so the model runs on the CPU | Fix the driver until `nvidia-smi` works, then run `atomic-agent models stop` and `atomic-agent models start` |
