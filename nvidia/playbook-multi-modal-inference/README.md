@@ -41,7 +41,7 @@ Use the matrix below to confirm your hardware platform, default container image,
 
 | Hardware platform | OS | Memory | Recommended default local settings | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- | :---- |
-| **DGX Spark** | DGX OS (Linux) | 128 GB unified memory | `nvcr.io/nvidia/pytorch:25.11-py3` | — |
+| **DGX Spark** | DGX OS (Linux) | 128 GB unified memory | `nvcr.io/nvidia/pytorch:26.03-py3` | — |
 
 ## Prerequisites
 
@@ -64,7 +64,7 @@ Verify GPU and Docker GPU integration:
 
 ```bash
 nvidia-smi
-docker run --rm --gpus all nvcr.io/nvidia/pytorch:25.11-py3 nvidia-smi
+docker run --rm --gpus all nvcr.io/nvidia/pytorch:26.03-py3 nvidia-smi
 ```
 
 ## Find model recipes
@@ -125,7 +125,7 @@ Start the NVIDIA PyTorch container with GPU access and Hugging Face cache mounti
 docker run --gpus all --ipc=host --ulimit memlock=-1 \
   --ulimit stack=67108864 -it --rm \
   -v $HOME/.cache/huggingface:/root/.cache/huggingface \
-  nvcr.io/nvidia/pytorch:25.11-py3
+  nvcr.io/nvidia/pytorch:26.03-py3
 ```
 
 ## Step 3. Clone and set up the TensorRT repository
@@ -140,17 +140,23 @@ cd $TRT_OSSPATH/demo/Diffusion
 
 ## Step 4. Install required dependencies
 
-Install NVIDIA Model Optimizer and other dependencies for model quantization and optimization.
+Install the system libraries used by the image-generation demo:
 
 ```bash
-## Install OpenGL libraries
 apt update
 apt install -y libgl1 libglu1-mesa libglib2.0-0t64 libxrender1 libxext6 libx11-6 libxrandr2 libxss1 libxcomposite1 libxdamage1 libxfixes3 libxcb1
+```
 
-pip install nvidia-modelopt[torch,onnx]
-sed -i '/^nvidia-modelopt\[.*\]=.*/d' requirements.txt
-pip3 install -r requirements.txt
-pip install onnxconverter_common
+TensorRT organizes its diffusion dependencies by model family. Because this playbook uses Flux models, install the Flux dependencies:
+
+```bash
+python3 setup.py flux
+```
+
+To view the installed model-family dependencies and their status, run:
+
+```bash
+python3 -c "from demo_diffusion import deps; deps.print_status()"
 ```
 
 Set up your Hugging Face token to access gated models:

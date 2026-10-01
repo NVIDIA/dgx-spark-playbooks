@@ -211,6 +211,12 @@ If this returns `command not found` or `Not logged in`, then install ([see here]
 > [!NOTE]
 > If you install the CLI, you need to refresh the terminal with the command `source "$HOME/.bashrc"`.
 
+If `hf` is still not found after refreshing the terminal, add the local user binary directory to your current `PATH`:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
 **Success**: The command `hf auth whoami` returns your username and org.
 
 ## Step 3. Download the vLLM container and model for the recipe (one time)

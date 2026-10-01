@@ -387,9 +387,11 @@ curl http://localhost:8000/v1/chat/completions \
   -d '{
     "model": "nemotron-3-super",
     "messages": [{"role": "user", "content": "Summarize what Latent MoE changes for routing traffic."}],
-    "max_tokens": 256
+    "max_tokens": 2048
   }'
 ```
+
+Nemotron Super may use part of this budget for reasoning before writing its answer. If the response has no assistant `content` and ends with `finish_reason: "length"`, increase `max_tokens` and retry; a reasoning trace alone is not the requested answer.
 
 If you enabled API key auth in vLLM, add the matching `Authorization` header.
 

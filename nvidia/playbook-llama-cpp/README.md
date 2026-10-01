@@ -237,9 +237,11 @@ curl -X POST http://127.0.0.1:30000/v1/chat/completions \
   -d '{
     "model": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_XL",
     "messages": [{"role": "user", "content": "Solve this step by step: If a train travels 120 miles in 2 hours, what is its average speed?"}],
-    "max_tokens": 500
+    "max_tokens": 2048
   }'
 ```
+
+Qwen3.6-35B-A3B may spend part of this token budget on reasoning before it writes the answer. If the response has an empty `message.content` and `finish_reason` is `"length"`, increase `max_tokens` and try again.
 
 ## Step 7. Cleanup
 

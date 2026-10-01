@@ -40,7 +40,7 @@ Use the matrix below to confirm your hardware platform, recommended default loca
 
 | Hardware platform | OS | Memory | Recommended default local settings | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- | :---- |
-| **DGX Spark** | DGX OS (Linux) | 128 GB Unified Memory | `nvcr.io/nvidia/nemo-automodel:26.02` | — |
+| **DGX Spark** | DGX OS (Linux) | 128 GB Unified Memory | `nvcr.io/nvidia/nemo-automodel:26.08` with pinned GitHub source | — |
 
 ## Prerequisites
 
@@ -70,9 +70,9 @@ All necessary files for this playbook are in the [NeMo AutoModel GitHub reposito
   - Model downloads can be large (several GB)
   - Package or architecture compatibility issues may require troubleshooting
   - Distributed training complexity increases if you extend beyond the single-node examples in this playbook
-- **Rollback:** The container was launched with `--rm`, so exiting removes it. Optionally remove the Docker image to reclaim disk space (see Cleanup in the **Instructions** tab). No lasting host changes beyond optional Docker group membership.
-- **Last Updated:** 07/31/2026
-  - NeMo AutoModel Docker workflow for LoRA, QLoRA, and full SFT fine-tuning on supported hardware platforms
+- **Rollback:** The container was launched with `--rm`, so exiting removes it. The pinned source checkout and checkpoints remain in `$HOME/Automodel`; see Cleanup in the **Instructions** tab before removing them or the Docker image.
+- **Last Updated:** 09/04/2026
+  - NeMo AutoModel 26.08 workflow using pinned GitHub source and Spark-specific LoRA and QLoRA recipes
 
 ## Instructions
 
@@ -114,23 +114,38 @@ Open a new terminal (or continue after `newgrp`) and confirm access:
 docker ps
 ```
 
-## Step 3. Get the container image with NeMo AutoModel
+## Step 3. Get the container image and pinned NeMo AutoModel source
+
+Pull the 26.08 container for the runtime dependencies. The Spark-specific recipes and memory fixes landed after the image was built, so clone NeMo AutoModel and pin it to the merge commit for [PR 3766](https://github.com/NVIDIA-NeMo/Automodel/pull/3766).
 
 ```bash
-docker pull nvcr.io/nvidia/nemo-automodel:26.02
+docker pull nvcr.io/nvidia/nemo-automodel:26.08
+
+AUTOMODEL_COMMIT=3b5663a6fdf0fee03abbe82e431ca3a7ba6dd8e2
+git clone https://github.com/NVIDIA-NeMo/Automodel.git "$HOME/Automodel"
+git -C "$HOME/Automodel" checkout --detach "$AUTOMODEL_COMMIT"
+git -C "$HOME/Automodel" rev-parse HEAD
 ```
+
+The last command should print `3b5663a6fdf0fee03abbe82e431ca3a7ba6dd8e2`.
 
 ## Step 4. Launch Docker
 
-Launch an interactive container with GPU access. The `--rm` flag removes the container when you exit.
+Launch an interactive container with GPU access and the 64 GB limit used for the lower-memory Spark validation. Mount the pinned checkout over the source included in the image; this also keeps checkpoints on the host after the container exits. The `--rm` flag removes the container when you exit.
 
 ```bash
 docker run \
   --gpus all \
+  --ipc=host \
+  --memory=64g \
+  --memory-swap=64g \
   --ulimit memlock=-1 \
   -it --ulimit stack=67108864 \
+  -e PYTHONDONTWRITEBYTECODE=1 \
+  -v "$HOME/Automodel:/opt/Automodel" \
+  -w /opt/Automodel \
   --entrypoint /usr/bin/bash \
-  --rm nvcr.io/nvidia/nemo-automodel:26.02
+  --rm nvcr.io/nvidia/nemo-automodel:26.08
 ```
 
 ## Step 5. Explore available examples
@@ -141,16 +156,16 @@ Review the pre-configured training recipes for different model types and trainin
 ## Navigate to /opt/Automodel
 cd /opt/Automodel
 
-## List LLM fine-tuning examples
-ls examples/llm_finetune/
+## List RTX Spark fine-tuning recipes
+find examples/llm_finetune -name '*_rtx_spark.yaml' -print
 
 ## View example recipe configuration
-cat examples/llm_finetune/finetune.py | head -20
+sed -n '1,40p' examples/llm_finetune/llama3_1/llama3_1_8b_squad_peft_rtx_spark.yaml
 ```
 
 ## Step 6. Run sample fine-tuning
 
-The following commands show full fine-tuning (SFT) and parameter-efficient fine-tuning (PEFT) with LoRA and QLoRA.
+The following commands show parameter-efficient fine-tuning (PEFT) with the LoRA and QLoRA recipes validated for Spark unified memory.
 
 First, export your Hugging Face token so gated models can be downloaded.
 
@@ -165,75 +180,51 @@ export HF_TOKEN=<your_huggingface_token>
 > - Request and receive access on each model's page (and accept license/terms) before attempting downloads.
 >   - Llama-3.1-8B: [meta-llama/Llama-3.1-8B](https://huggingface.co/meta-llama/Llama-3.1-8B)
 >   - Qwen3-8B: [Qwen/Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B)
->   - Meta-Llama-3-70B: [meta-llama/Meta-Llama-3-70B](https://huggingface.co/meta-llama/Meta-Llama-3-70B)
+>   - Llama-3.3-70B-Instruct: [meta-llama/Llama-3.3-70B-Instruct](https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct)
 >
 > The same steps apply for any other gated model you use: visit its model card on Hugging Face, request access, accept the license, and wait for approval.
 
-**LoRA fine-tuning example:**
+> [!IMPORTANT]
+> Keep the batch size, packed sequence size, attention, activation checkpointing, and checkpoint-loading settings from these `_rtx_spark` recipes unless you have validated different settings on your hardware.
+
+**Llama 3.1 8B LoRA fine-tuning example:**
 
 Run a basic fine-tuning example to validate the setup. This demonstrates parameter-efficient fine-tuning with a model suitable for testing. The examples below use YAML for configuration; parameter overrides are passed as command-line arguments.
 
 ```bash
 cd /opt/Automodel
-python3 examples/llm_finetune/finetune.py \
--c examples/llm_finetune/llama3_2/llama3_2_1b_squad_peft.yaml \
---model.pretrained_model_name_or_path meta-llama/Llama-3.1-8B \
---packed_sequence.packed_sequence_size 1024 \
+automodel examples/llm_finetune/llama3_1/llama3_1_8b_squad_peft_rtx_spark.yaml \
+--nproc-per-node 1 \
 --step_scheduler.max_steps 20
 ```
 
-These overrides ensure the Llama-3.1-8B LoRA run behaves as expected:
+The recipe selects `meta-llama/Llama-3.1-8B` and the validated Spark memory settings. The command-line arguments run it on one GPU for 20 training steps.
 
-- `--model.pretrained_model_name_or_path`: selects the Llama-3.1-8B model to fine-tune from the Hugging Face model hub (weights fetched via your Hugging Face token).
-- `--packed_sequence.packed_sequence_size`: sets the packed sequence size to 1024 to enable packed sequence training.
-- `--step_scheduler.max_steps`: sets the maximum number of training steps. Set to 20 for demonstration; adjust based on your needs.
-
-> [!NOTE]
-> The recipe YAML `llama3_2_1b_squad_peft.yaml` defines training hyperparameters (LoRA rank, learning rate, and related settings) that are reusable across Llama model sizes. The `--model.pretrained_model_name_or_path` override determines which model weights are actually loaded.
-
-**QLoRA fine-tuning example:**
+**Llama 3.3 70B QLoRA fine-tuning example:**
 
 Use QLoRA to fine-tune large models in a memory-efficient manner.
 
 ```bash
 cd /opt/Automodel
-python3 examples/llm_finetune/finetune.py \
--c examples/llm_finetune/llama3_1/llama3_1_8b_squad_qlora.yaml \
---model.pretrained_model_name_or_path meta-llama/Meta-Llama-3-70B \
---loss_fn._target_ nemo_automodel.components.loss.te_parallel_ce.TEParallelCrossEntropy \
---step_scheduler.local_batch_size 1 \
---packed_sequence.packed_sequence_size 1024 \
+automodel examples/llm_finetune/llama3_3/llama_3_3_70b_instruct_squad_peft_qlora_rtx_spark.yaml \
+--nproc-per-node 1 \
 --step_scheduler.max_steps 20
 ```
 
-These overrides ensure the 70B QLoRA run behaves as expected:
+The recipe selects `meta-llama/Llama-3.3-70B-Instruct`, loads it in 4-bit mode, and uses the validated Spark memory settings. The command-line arguments run it on one GPU for 20 training steps.
 
-- `--model.pretrained_model_name_or_path`: selects the 70B base model to fine-tune (weights fetched via your Hugging Face token).
-- `--loss_fn._target_`: uses the TransformerEngine-parallel cross-entropy loss variant compatible with tensor-parallel training for large LLMs.
-- `--step_scheduler.local_batch_size`: sets the per-GPU micro-batch size to 1 to fit 70B in memory; overall effective batch size is still driven by gradient accumulation and data/tensor parallel settings from the recipe.
-- `--step_scheduler.max_steps`: sets the maximum number of training steps. Set to 20 for demonstration; adjust based on your needs.
-- `--packed_sequence.packed_sequence_size`: sets the packed sequence size to 1024 to enable packed sequence training.
+**Qwen3 8B LoRA fine-tuning example:**
 
-**Full fine-tuning example:**
-
-Run the following command to perform full (SFT) fine-tuning:
+Run the following command to fine-tune Qwen3-8B with LoRA:
 
 ```bash
 cd /opt/Automodel
-python3 examples/llm_finetune/finetune.py \
--c examples/llm_finetune/qwen/qwen3_8b_squad_spark.yaml \
---model.pretrained_model_name_or_path Qwen/Qwen3-8B \
---step_scheduler.local_batch_size 1 \
---step_scheduler.max_steps 20 \
---packed_sequence.packed_sequence_size 1024
+automodel examples/llm_finetune/qwen/qwen3_8b_squad_rtx_spark.yaml \
+--nproc-per-node 1 \
+--step_scheduler.max_steps 20
 ```
 
-These overrides ensure the Qwen3-8B SFT run behaves as expected:
-
-- `--model.pretrained_model_name_or_path`: selects the Qwen/Qwen3-8B model to fine-tune from the Hugging Face model hub (weights fetched via your Hugging Face token). Adjust this if you want to fine-tune a different model.
-- `--step_scheduler.max_steps`: sets the maximum number of training steps. Set to 20 for demonstration; adjust based on your needs.
-- `--step_scheduler.local_batch_size`: sets the per-GPU micro-batch size to 1 to fit in memory; overall effective batch size is still driven by gradient accumulation and data/tensor parallel settings from the recipe.
-- `--packed_sequence.packed_sequence_size`: sets the packed sequence size to 1024 to enable packed sequence training.
+The recipe selects `Qwen/Qwen3-8B` and the validated Spark memory settings. The command-line arguments run it on one GPU for 20 training steps.
 
 ## Step 7. Validate successful training completion
 
@@ -259,14 +250,16 @@ ls -lah checkpoints/LATEST/
 
 ## Step 8. Cleanup (Optional)
 
-The container was launched with the `--rm` flag, so it is automatically removed when you exit. To reclaim disk space used by the Docker image, run:
+The container was launched with the `--rm` flag, so it is automatically removed when you exit. The mounted source and checkpoints remain in `$HOME/Automodel`. To reclaim disk space used by the Docker image, run:
 
 > [!WARNING]
 > This will remove the NeMo AutoModel image. You will need to pull it again if you want to use it later.
 
 ```bash
-docker rmi nvcr.io/nvidia/nemo-automodel:26.02
+docker rmi nvcr.io/nvidia/nemo-automodel:26.08
 ```
+
+Remove `$HOME/Automodel` only after copying any checkpoints you want to keep.
 
 ## Step 9. Optional: Publish your fine-tuned model checkpoint on Hugging Face Hub
 
@@ -306,11 +299,11 @@ hf upload my-cool-model checkpoints/LATEST/model
 Begin using NeMo AutoModel for your specific fine-tuning tasks. Start with the provided recipes and customize them for your model and dataset.
 
 ```bash
-## Copy a recipe for customization
-cp examples/llm_finetune/finetune.py my_custom_training.py
+## Copy a Spark recipe for customization
+cp examples/llm_finetune/llama3_1/llama3_1_8b_squad_peft_rtx_spark.yaml my_custom_recipe.yaml
 
 ## Edit configuration for your specific model and data, then run:
-python3 my_custom_training.py
+automodel my_custom_recipe.yaml --nproc-per-node 1
 ```
 
 Explore the [NeMo AutoModel GitHub repository](https://github.com/NVIDIA-NeMo/Automodel) for more recipes, documentation, and community examples. Consider setting up custom datasets and experimenting with different model architectures.
@@ -322,7 +315,7 @@ Explore the [NeMo AutoModel GitHub repository](https://github.com/NVIDIA-NeMo/Au
 | `nvcc: command not found` | CUDA toolkit not in PATH | Add CUDA toolkit to PATH: `export PATH=/usr/local/cuda/bin:$PATH` |
 | `pip install uv` permission denied | System-level pip restrictions | Use `pip3 install --user uv` and update PATH |
 | GPU not detected in training | CUDA driver/runtime mismatch | Verify driver compatibility with `nvidia-smi` and reinstall CUDA if needed |
-| Out of memory during training | Model too large for available GPU memory | Reduce batch size, enable gradient checkpointing, or use model parallelism |
+| Out of memory during training | A generic recipe or custom overrides exceed unified memory | Start with the matching `_rtx_spark.yaml` recipe from the pinned source checkout and retain its batch size, packed sequence size, and activation checkpointing settings |
 | Package compatibility issues on your architecture | Package not available for the host architecture | Use source installation or build from source with architecture-appropriate flags |
 | Cannot access gated repo for URL | Certain Hugging Face models have restricted access | Regenerate your [Hugging Face token](https://huggingface.co/docs/hub/en/security-tokens); request access to the [gated model](https://huggingface.co/docs/hub/en/models-gated#customize-requested-information) in your browser |
 | Memory pressure within capacity | Unified memory buffer cache not released | See UMA note below |
