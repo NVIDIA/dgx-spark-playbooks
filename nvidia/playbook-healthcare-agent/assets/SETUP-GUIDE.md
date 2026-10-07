@@ -10,7 +10,7 @@ From-scratch setup for a DGX Station. Produces a working multi-agent clinical an
 
 - Docker + NVIDIA Container Toolkit (`docker info --format '{{.ServerVersion}}'` ≥ 23.0.1)
 - **Node.js v22+** (DGX OS 7.5.0 ships v22; if an older image reports v18 or Node is missing, download the setup script first, then run it: `curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh && sudo bash /tmp/nodesource_setup.sh && sudo apt-get install -y nodejs`)
-- OpenShell CLI ≥ 0.0.44
+- OpenShell CLI ≥ 0.0.111
 - **At least 200 GB free** on `/` (86 GB Ollama model + Docker images + working space; verify with `df -h /`)
 - A single GPU with **≥150 GB free VRAM** (target the GB300, not the RTX PRO 6000, on dual-GPU stations)
 - Network access to `r4.smarthealthit.org` (FHIR test server) and `nvcr.io` (NGC registry)
@@ -36,7 +36,7 @@ The official installer installs both the `openshell` CLI and the `openshell-gate
 ```bash
 curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh
 # Open a new shell (or `source ~/.bashrc`) so ~/.local/bin is on PATH, then:
-openshell --version   # >= 0.0.44
+openshell --version   # >= 0.0.111
 ```
 
 > [!NOTE]

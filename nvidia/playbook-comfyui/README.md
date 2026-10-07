@@ -2,7 +2,6 @@
 
 > Node-based diffusion workflows for images and videos with FLUX, Wan, HunyuanVideo, and Stable Diffusion
 
-
 ## Table of Contents
 
 - [Overview](#overview)
@@ -93,6 +92,15 @@ For Image Gen Quick Start, clone [ComfyUI on GitHub](https://github.com/comfyano
 
 > [!NOTE]
 > These instructions target **Linux**. This tab is a lightweight host Python install for Z-Image-Turbo text-to-image generation — a good first try on any supported hardware platform. For FLUX, Wan, HunyuanVideo, Cosmos, and playbook workflows, continue to the **Video Gen Workflow** tab.
+
+## Install with an agent
+
+```text
+Use https://build.nvidia.com/playbooks/comfyui.md and complete this playbook on this machine: Generate Images and Videos with ComfyUI. Fetch that .md URL directly; the non-.md page is a JavaScript shell. Cover only the Image Gen Quick Start. When finished, state clearly whether the playbook succeeded, and give the evidence: what you installed, where, and the output of a command proving it works (a version string, a container listing, or an HTTP status).
+```
+
+> [!NOTE]
+> This has been tested using OpenCode and Qwen 3.8 35B A3B NVFP4. Performance and outcome may vary based on agent and model selection.
 
 ## Quick start (optional)
 
@@ -249,6 +257,15 @@ To rollback during installation, press `Ctrl+C` to stop the server and remove th
 > | **3 — Advanced** | ~230 GB | ~120 GB (Hunyuan 1080p) |
 >
 > Match the tier to your hardware platform’s available memory. On unified-memory platforms, start with Tier 1 and reduce resolution or frame count if you hit memory pressure. For a lighter single-image start (~24 GB class), use the **Image Gen Quick Start** tab.
+
+## Install with an agent
+
+```text
+Use https://build.nvidia.com/playbooks/comfyui.md and complete this playbook on this machine: Generate Images and Videos with ComfyUI. Fetch that .md URL directly; the non-.md page is a JavaScript shell. Cover only the Video Gen Workflow (Tier 1 models). When finished, state clearly whether the playbook succeeded, and give the evidence: what you installed, where, and the output of a command proving it works (a version string, a container listing, or an HTTP status).
+```
+
+> [!NOTE]
+> This has been tested using OpenCode and Qwen 3.8 35B A3B NVFP4. Performance and outcome may vary based on agent and model selection.
 
 ## Step 1. Verify your environment
 

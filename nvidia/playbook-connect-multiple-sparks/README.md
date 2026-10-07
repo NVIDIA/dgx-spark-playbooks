@@ -19,33 +19,32 @@
 
 ## Basic idea
 
-This playbook shows you how to connect two to four DGX Spark devices into a high-speed cluster for workloads.
-This will let you run models or training workloads that cannot run effectively on a single DGX Spark.
+Some workloads need more compute and memory than a single DGX Spark can give, and it often makes sense to "cluster" two or more Sparks to scale out a workload.
+So, each Spark comes with a special network adapter card for high-speed device interconnects.
 
-There are two paths:
+The [ConnectX-7](https://resources.nvidia.com/en-us-accelerated-networking-resource-library/connectx-7-datasheet) adapter, often called a "NIC", is a software and hardware layer that enables data transfer directly between memory across devices through [RDMA](https://blogs.nvidia.com/blog/what-is-rdma/).
+Physically connecting devices with [QSFP](https://en.wikipedia.org/wiki/Small_Form-factor_Pluggable) cables allows you to then configure the ConnectX-7 network for a high-speed super computing cluster on your desktop.
 
-- **Recommended:** Use the [NVIDIA Sync Cluster Assistant](https://docs.nvidia.com/sync/latest/cluster-assistant.html) to set up and test the ConnectX-7 network and interdevice SSH ([see demo video](https://www.youtube.com/watch?v=MehBUQtb9qM)).
-- **Advanced:** Experienced users can use the NVIDIA provided scripts in **Configure Manually**.
+This playbook shows you two paths to configure the ConnectX-7 network across two to four DGX Spark devices for your own cluster.
 
-Both paths begin with **Connect the Devices**.
+- **Beginner:** Use the [NVIDIA Sync Cluster Assistant](https://docs.nvidia.com/sync/latest/cluster-assistant.html) to set up and test the ConnectX-7 network and interdevice SSH ([see demo video](https://www.youtube.com/watch?v=MehBUQtb9qM)).
+- **Advanced:** Experienced users can do things manually with the NVIDIA provided scripts in the [Configure Manually](manual.md) tab.
+
+Both paths start with [Connect the Devices](connect-devices.md) tab.
 
 ## What you'll accomplish
 
-- You will physically connect your devices directly with QSFP cables (and potentially a switch).
-- You will configure the ConnectX-7 network across the devices.
-- You will set up interdevice SSH.
+- You will physically connect your devices directly with QSFP cables, and a switch if needed. **Beginner - Advanced**
+- You will use NVIDIA Sync to configure the ConnectX-7 network across the devices. **Beginner**
+- Or, you will use commands and scripts to manually set up the ConnectX-7 network across the devices. **Advanced**
 
 ## What to know before starting
 
-**Required:**
-
-- How to [plug a QSFP cable into a DGX Spark](https://docs.nvidia.com/dgx/dgx-spark/spark-clustering.html#plugging-in-a-qsfp-cable).
-- How to configure switch settings, if you use a switch.
-- How to [set up a DGX Spark](https://docs.nvidia.com/dgx/dgx-spark/first-boot.html) on a local network.
-
-**Suggested:**
-
-- A basic grasp of [ConnectX-7 networking](https://docs.nvidia.com/dgx/dgx-spark/spark-clustering.html)
+- How to [plug a QSFP cable into a DGX Spark](https://docs.nvidia.com/dgx/dgx-spark/spark-clustering.html#plugging-in-a-qsfp-cable) and configure switch settings if required. **Beginner - Advanced**
+- How to [set up a DGX Spark](https://docs.nvidia.com/dgx/dgx-spark/first-boot.html) on a LAN. **Beginner - Advanced**
+- How to create and edit `json` files. **Advanced** 
+- How to interpret and run `bash` scripts. **Advanced**
+- A basic grasp of [ConnectX-7 networking](https://docs.nvidia.com/dgx/dgx-spark/spark-clustering.html). **Advanced**
 
 ## Supported hardware platforms
 
@@ -53,21 +52,21 @@ Check the table below to see if this playbook is for your hardware.
 
 | Hardware platform | OS | Memory | Recommended default local settings | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- | :---- |
-| **DGX Spark** | DGX OS (Linux) | 128 GB Unified Memory | Direct or switch QSFP links | ✅ (200GbE QSFP) |
+| **DGX Spark** | DGX OS (Linux) | 64 GB or 128 GB Unified Memory | Direct or switch QSFP links | ✅ (200GbE QSFP) |
 
 ## Prerequisites
 
 **Hardware requirements**
 
 - Two to four DGX Sparks.
-- The QSFP cables listed for your layout in **Connect the Devices**.
+- The QSFP cables listed for your layout in [Connect the Devices](connect-devices.md).
 - A switch with one 200 Gbit/s Ethernet link for each device, if you use a switch. Some 400 Gbit/s ports must be split into 200 Gbit/s ports.
 
 **Software requirements**
 
-- Each Spark must be on the same local network, and you must know its management IP address or mDNS name.
+- Each Spark must be on the same LAN, and you must know its management IP address or mDNS name.
 - You must have a user name and password with `sudo` privileges on each device.
-- Each Spark is updated to the [April 2026 DGX OS release](https://docs.nvidia.com/dgx/dgx-spark/release-notes.html#april-2026-release).
+- Each Spark is updated to the [April 2026 DGX OS release](https://docs.nvidia.com/dgx/dgx-spark/release-notes.html#april-2026-release) or later.
 
 ## Ancillary files
 
@@ -78,13 +77,21 @@ You can find them in [this playbook's assets folder](https://github.com/NVIDIA/d
 
 ## Time & risk
 
-- **Estimated time:** 10 minutes with NVIDIA Sync; longer for manual setup
+- **Estimated time:** 10 minutes with NVIDIA Sync; 1 hour for manual setup
 - **Risk level:** Low with NVIDIA Sync; medium with manual setup
 - **Rollback:** Delete the cluster in NVIDIA Sync. For manual setup, follow the rollback steps in **Configure Manually**.
 - **Last Updated:** 09/10/2026
   - Clarified the recommended NVIDIA Sync path and the advanced manual path.
 
 ## Connect the Devices
+
+## Creating a cluster requires physical cables 
+
+You can connect the devices directly with the QSFP cables, or you can connect each device to a single switch with a single dedicated QSFP cable.
+
+In either case, you will plug QSFP cables into the appropriate ports on the devices.
+
+If you are using a switch, **do not** connect some devices directly and others through a switch.
 
 ## Step 1. Pick a cluster layout
 
@@ -96,15 +103,11 @@ The procedure changes based on the number of devices and whether you use a switc
 | Three | Direct ring | Three cables; each device links to the other two |
 | Two, three, or four | Switch | One cable and one 200 Gbit/s link from each device to the switch |
 
-> [!NOTE]
-> If you are using a switch, do **not** connect devices directly through a cable.
-> Each device should be connected to the switch through exactly one cable.
-
 ## Step 2. Set up the devices and cables
 
 1. Turn on each DGX Spark.
-2. Make sure each device is on the same local management network ([see here](https://docs.nvidia.com/dgx/dgx-spark/first-boot.html)).
-3. Update each device to the current DGX Spark system software.
+2. Make sure each device is on the same LAN ([see here](https://docs.nvidia.com/dgx/dgx-spark/first-boot.html)).
+3. Then use the [DGX Dashboard](https://docs.nvidia.com/dgx/dgx-spark/os-and-component-update.html#using-dgx-dashboard-for-updates) to update each device to the current DGX Spark system software.
 4. Use a supported QSFP112 DAC cable in Ethernet mode. See [QSFP ports and cables](https://docs.nvidia.com/dgx/dgx-spark/spark-clustering.html#the-qsfp-ports-and-cables) for the approved cable list.
 5. Place the devices within reach of the cables.
 
@@ -123,10 +126,11 @@ The procedure changes based on the number of devices and whether you use a switc
 > [!WARNING]
 > Do not force a cable into a port. If it does not slide in, stop and check the pull tab and port alignment.
 
-
 ### Two-device direct link
 
-Connect one device to the other with one QSFP cable.
+Connect one device to the other with a **single** QSFP cable.
+
+Using two cables will **not** increase performance.
 
 ### Three-device direct ring
 
@@ -163,24 +167,29 @@ Switch settings and port names differ by maker and model. Follow the switch make
 
 For MikroTik CRS804 and CRS812 switches, see [MikroTik wired interface compatibility](https://help.mikrotik.com/docs/spaces/ROS/pages/220233794/MikroTik%2Bwired%2Binterface%2Bcompatibility) and [MikroTik bridge configuration](https://help.mikrotik.com/docs/spaces/ROS/pages/328068/Bridging%2Band%2BSwitching).
 
-## Step 4. Continue with NVIDIA Sync
+## Step 4. Move on to configure the network
 
-Continue with **Configure with NVIDIA Sync**. NVIDIA Sync will check the devices and detected layout before it sets up the cluster network.
+Continue with tab [Configure with NVIDIA Sync](sync.md) for a click-through, managed clustering process. 
 
-Experienced users who want to configure the cluster with scripts can instead continue with **Configure Manually**.
+Or, go under the hood with the [Configure Manually](manual.md) tab to use NVIDIA provided to set things up.
 
 ## Configure with NVIDIA Sync
 
-> [!NOTE]
-> You can also follow the demo video [here](https://www.youtube.com/watch?v=MehBUQtb9qM).
+## This is the recommended path for most users
+
+If you are working with up to four devices, this is the recommended path.
+
+You can see how it works in [this demo video](https://www.youtube.com/watch?v=MehBUQtb9qM).
+
+If you want to cluster more than four devices, then follow and adapt the [Configure Manually](manual.md) tab.
 
 ## Step 1. Make sure the devices are properly connected
 
-Follow the instructions in the **Connect the Devices** tab.
+**Follow the instructions in the [Connect the Devices](connect-devices.md) tab.**
 
 ## Step 2. Install NVIDIA Sync on your laptop
 
-Install NVIDIA Sync on your Windows, macOS, or Ubuntu laptop.
+**Install NVIDIA Sync on your Windows, macOS, or Ubuntu laptop.**
 
 ::spark-download
 
@@ -190,7 +199,7 @@ Install NVIDIA Sync on your Windows, macOS, or Ubuntu laptop.
 
 ## Step 3. Add each DGX Spark to NVIDIA Sync
 
-Make sure your laptop can reach each DGX Spark on the local network.
+**Make sure your laptop can reach each DGX Spark on the LAN.**
 
 For each device:
 
@@ -199,87 +208,66 @@ For each device:
 3. Enter the device name or IP address, user name, and password.
 4. Select **Add**.
 
-Each DGX Spark should now appear in NVIDIA Sync.
+**Success**: Each DGX Spark should now appear in NVIDIA Sync.
 
 ## Step 4. Start the NVIDIA Sync Cluster Assistant
 
-1. Open **Settings**.
-2. Select **Cluster Assistant**.
-3. Select **Add New Cluster**.
-4. Name the cluster.
-5. Pick the devices that you connected.
+1. Open the NVIDIA Sync **Settings** and select **Cluster Assistant**.
+2. Then select **Add New Cluster** and give it a name.
+3. Next, select the devices that you physically connected.
 
-## Step 5. NVIDIA Sync checks the devices
+## Step 5. Resolve any issues NVIDIA Sync finds in the device and link checks
 
-After you select the devices, NVIDIA Sync checks:
+After you select the devices, NVIDIA Sync will check the devices and physical connections are appropriately set up. 
 
-- SSH access
+These checks are divided into stages.
+
+- SSH access to each device
 - The hardware and system software
-- `sudo` access
+- `sudo` privileges and password requirement
+- User names and IDs across devices
+- Link configuration across devices
+- Existing compliant network plan on each device
 
-If a required check fails, fix the issue and try again.
+**If a check fails, fix the issue and retry.**
 
-If `sudo` requires a password, enter the password for that device. NVIDIA Sync uses the password for setup and does not save or log it.
+1. NVIDIA Sync should already have SSH access because you added the devices
+2. If one of the selected devices isn't a Spark, you must remove it
+3. If any device needs a DGX OS update, you must update it and retry
+4. If `sudo` requires a password on a device, you must enter it for temporary privileges
+5. (optional) If the user name, ID and group ID is different across the devices, you may want to make them the same - not necessary but can simplify downstream workloads
+6. If a cable is not properly connected, fix and retry
+7. (optional) If the negotiated speed of each physical link is too slow, fix it and retry
 
-NVIDIA Sync also compares the user name, user ID, and group ID on each device. Matching values are optional, but they can make later work easier. Choose whether to make them match, then go on.
+**Success**: All checks pass and you are asked to confirm the network plan
 
-## Step 6. NVIDIA Sync checks the physical connections and network plan
+## Step 6. NVIDIA Sync sets up inter-device SSH
 
-Once the device checks are complete, NVIDIA Sync checks:
+Once the network plan is confirmed, NVIDIA Sync will set up key-based SSH with an alias between the devices on the ConnectX-7 network for process management across devices. 
 
-- The detected ConnectX-7 interfaces and cables
-- The negotiated speed of each link
-- The current network setup and any changes it must make
+This SSH **does not** use the LAN that you use for SSH connections to the devices. 
+It goes across the physical connections.
 
-If NVIDIA Sync finds the wrong layout, check the cables in **Connect the Devices** and try again.
+This step can take a few minutes. 
+If one device times out after five minutes, try the step again.
 
-Review the network plan. If NVIDIA Sync will change the network, or if a link is not set to 200 Gbit/s, it will tell you.
+**Success**: You see the success screen with steps to move on to configuring an actual workload on the cluster.
+The ConnectX-7 network and inter-device SSH are now ready.
 
-Select **Confirm Network Configuration** to apply the plan.
+## Step 7. Save the cluster details to a text file
 
-## Step 7. NVIDIA Sync tests each link
-
-NVIDIA Sync runs a speed test on each link. A link turns green when it meets the 184 Gbit/s lower bound.
-
-If a link does not pass, fix the cable or switch setting and select **Run Test Again**. You can go on after a warning, but the cluster may run below its best speed.
-
-## Step 8. NVIDIA Sync sets up inter-device SSH
-
-Let NVIDIA Sync set up key-based SSH between the devices. It adds an SSH alias for each device.
-
-This step can take a few minutes. If one device times out after five minutes, try the step again.
-
-## Step 9. Save the cluster details to a text file
-
-When NVIDIA Sync shows the success page:
+**Save the cluster details to a text file when NVIDIA Sync shows the success page.**
 
 1. Select **Copy** to copy the network details.
 2. Save the details in a file for later use.
 3. Select **See Example Workloads**.
 
-The ConnectX-7 network and inter-device SSH are now ready.
-
 ## Next steps
 
-Set up a workload on the cluster:
-
-- [NCCL](https://build.nvidia.com/playbooks/nccl)
-- [Fine-tune with PyTorch](https://build.nvidia.com/spark/multi-sparks-distributed-finetuning)
-- [vLLM](https://build.nvidia.com/spark/vllm)
-
-Cluster Assistant sets up the network. It does not install or run the workload.
-
-## Delete the cluster with NVIDIA Sync
-
-Delete the cluster before you change its devices or cable layout:
-
-1. Open **Settings** in NVIDIA Sync.
-2. Select **Clusters**.
-3. Pick the cluster.
-4. Open the overflow menu (**...**).
-5. Select **Delete**.
-
-This removes the node-to-node SSH setup and the cluster from NVIDIA Sync.
+- [Learn how to use the NVIDIA Sync cluster assistant](https://docs.nvidia.com/sync/latest/cluster-assistant.html#nvidia-sync-cluster-assistant)
+- [Set up NCCL on the cluster](https://build.nvidia.com/playbooks/nccl)
+- [Run a fine-tuning workload with PyTorch](https://build.nvidia.com/spark/multi-sparks-distributed-finetuning)
+- [Set up vLLM on the cluster](https://build.nvidia.com/spark/vllm)
 
 ## Configure Manually
 

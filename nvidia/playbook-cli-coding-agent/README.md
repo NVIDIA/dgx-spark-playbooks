@@ -88,6 +88,15 @@ Use the **Claude Code**, **OpenCode**, or **Codex CLI** tab for the base workflo
 
 ## Claude Code
 
+## Install with an agent
+
+```text
+Use https://build.nvidia.com/playbooks/cli-coding-agent.md and complete this playbook on this machine: Set Up CLI Coding Agents with Local Inference. Fetch that .md URL directly; the non-.md page is a JavaScript shell. Cover only the claude-code.md instructions. When finished, state clearly whether the playbook succeeded, and give the evidence: what you installed, where, and the output of a command proving it works (a version string, a container listing, or an HTTP status).
+```
+
+> [!NOTE]
+> This has been tested using OpenCode and Qwen 3.8 35B A3B NVFP4. Performance and outcome may vary based on agent and model selection.
+
 ## Step 1. Confirm your environment
 
 Verify the OS version and GPU are visible before installing anything.
@@ -371,6 +380,15 @@ ollama rm qwen3.6:35b-a3b-mtp-q4_K_M
 - Browse additional models in the [Ollama library](https://ollama.com/library)
 
 ## Codex CLI
+
+## Install with an agent
+
+```text
+Use https://build.nvidia.com/playbooks/cli-coding-agent.md and complete this playbook on this machine: Set Up CLI Coding Agents with Local Inference. Fetch that .md URL directly; the non-.md page is a JavaScript shell. Cover only the codex.md instructions. When finished, state clearly whether the playbook succeeded, and give the evidence: what you installed, where, and the output of a command proving it works (a version string, a container listing, or an HTTP status).
+```
+
+> [!NOTE]
+> This has been tested using OpenCode and Qwen 3.8 35B A3B NVFP4. Performance and outcome may vary based on agent and model selection.
 
 ## Step 1. Confirm your environment
 

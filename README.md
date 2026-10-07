@@ -65,7 +65,7 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 - [Chat with LLMs Using Open WebUI and Ollama](nvidia/playbook-open-webui/)
 - [Run OpenClaw with a Local LLM](nvidia/playbook-openclaw/)
 - [Secure AI Agents with OpenShell](nvidia/playbook-openshell/)
-- [Install and Use NVIDIA PAIR](nvidia/playbook-pair/)
+- [Install and Use NVIDIA PAIR with llama.cpp](nvidia/playbook-pair/)
 - [Accelerate Portfolio Optimization with cuOpt](nvidia/playbook-portfolio-optimization/)
 - [Fine-Tune with PyTorch](nvidia/playbook-pytorch-fine-tune/)
 - [Build a RAG Application with AI Workbench](nvidia/playbook-rag-ai-workbench/)

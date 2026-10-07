@@ -78,12 +78,13 @@ services:
   # or instructions.md Step 2). NGC_API_KEY in .env alone is not enough —
   # NGC_API_KEY is the runtime credential; docker login is the pull credential.
   openfold3:
-    image: nvcr.io/nim/openfold/openfold3:latest
+    # Pin the multi-architecture 1.6.0 image tested on DGX Station GB300.
+    # Do not use `latest`: older cached manifests can reject newer GPU PCI IDs.
+    image: nvcr.io/nim/openfold/openfold3:1.6.0@sha256:f2d4a3f2755d8aa7cc4be31853a98688357e0647707aed30d24dfae943592317
     ports:
       - "${OPENFOLD_PORT:-8000}:8000"
     environment:
       NGC_API_KEY: ${NGC_API_KEY:?Set NGC_API_KEY in .env}
-      NIM_OPTIMIZED_BACKEND: torch_baseline
     shm_size: 16g
     ulimits:
       memlock: -1

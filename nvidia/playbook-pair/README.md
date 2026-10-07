@@ -1,29 +1,31 @@
-# Install and Use NVIDIA PAIR
+# Install and Use NVIDIA PAIR with llama.cpp
 
-> Run local AI requests through PAIR and route independent Ollama or LM Studio requests across compatible systems.
-
+> Route independent local AI requests across paired systems using llama.cpp, Ollama, or LM Studio
 
 ## Table of Contents
 
 - [Overview](#overview)
+  - [Why memory matters](#why-memory-matters)
+  - [Choose an engine and model](#choose-an-engine-and-model)
 - [Set Up the PAIR App](#set-up-the-pair-app)
   - [Windows](#windows)
   - [Debian or Ubuntu](#debian-or-ubuntu)
   - [macOS](#macos)
+  - [llama.cpp example](#llamacpp-example)
   - [Choose a request style](#choose-a-request-style)
-  - [OpenAI-style request](#openai-style-request)
-  - [Ollama-style request](#ollama-style-request)
+  - [Windows PowerShell: llama.cpp example](#windows-powershell-llamacpp-example)
+  - [Linux or macOS: OpenAI-style request](#linux-or-macos-openai-style-request)
+  - [Linux or macOS: Ollama-style request](#linux-or-macos-ollama-style-request)
   - [Port reference](#port-reference)
-  - [Change a port](#change-a-port)
+  - [Change ports or engine launch options](#change-ports-or-engine-launch-options)
   - [Use an engine's command line](#use-an-engines-command-line)
 - [Set Up PAIR with Terminal](#set-up-pair-with-terminal)
   - [Keep PAIR running after an SSH disconnect](#keep-pair-running-after-an-ssh-disconnect)
   - [Move around the terminal interface](#move-around-the-terminal-interface)
   - [Use the terminal interface tabs](#use-the-terminal-interface-tabs)
   - [Inspect errors and logs](#inspect-errors-and-logs)
-  - [Change settings](#change-settings)
-  - [Command locations and flags](#command-locations-and-flags)
-  - [Terminal-interface limits](#terminal-interface-limits)
+  - [Change ports and startup arguments](#change-ports-and-startup-arguments)
+  - [Command flags and current limits](#command-flags-and-current-limits)
 - [Troubleshooting](#troubleshooting)
   - [Troubleshooting](#troubleshooting)
 
@@ -33,13 +35,16 @@
 
 ## Basic idea
 
-NVIDIA Personal AI Router (PAIR) connects computers on your local network and
+NVIDIA PAIR connects computers on your local network and
 presents Ollama-compatible and OpenAI-compatible proxy endpoints to applications
 and agents. It automatically routes each independent AI inference request to an
 eligible computer according to engine availability, model availability, and
 current workload.
 Run PAIR on one computer for local inference, or run it on several computers
 to handle more requests.
+
+This playbook covers PAIR **1.0.0**, including managed **llama.cpp** support and
+the redesigned terminal interface. Ollama and LM Studio remain available.
 
 PAIR is useful for workloads such as multi-agent applications that make several
 requests at once. PAIR is designed to keep prompts and responses on your local
@@ -63,8 +68,8 @@ that have the requested model.
 **Required:**
 
 - One compatible system on which to install PAIR.
-- Ollama or LM Studio, plus a model, on at least one system that will serve
-  requests.
+- llama.cpp, Ollama, or LM Studio, plus a model, on at least one system that
+  will serve requests.
 - A trusted local network when you pair systems. The six-digit PIN is a
   short-lived setup code, not a long-term credential.
 
@@ -92,27 +97,47 @@ memory, and whether you can use it in a PAIR cluster.
 
 | Hardware platform | OS | Memory | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- |
-| **RTX Spark** | Windows 11 | Up to 64 GB Unified Memory  | ✅ (PAIR cluster) |
+| **RTX Spark** | Windows 11 on ARM | Unified memory; capacity depends on the system | ✅ (PAIR cluster) |
 | **DGX Spark** | DGX OS (Linux) | 128 GB Unified Memory | ✅ (PAIR cluster) |
 | **GeForce RTX** | Windows 11 or Linux | Depends on the GPU and model | ✅ (PAIR cluster) |
 | **RTX PRO** | Windows 11 or Linux | Depends on the GPU and model | ✅ (PAIR cluster) |
+| **Mac (Apple silicon or Intel)** | macOS 13 or later | Depends on the Mac and model | ✅ (PAIR cluster) |
 
-NVIDIA RTX Spark, DGX Spark, GeForce RTX, and RTX PRO are the hardware platforms
-covered by this playbook. GeForce RTX requires a 20 Series or newer GPU, and
-RTX PRO requires a Turing or newer GPU.
+NVIDIA RTX Spark, DGX Spark, GeForce RTX, RTX PRO, and compatible Macs are the
+hardware platforms covered by this playbook. GeForce RTX requires a 20 Series
+or newer GPU, and RTX PRO requires a Turing or newer GPU.
 PAIR can also pair compatible systems that run the supported operating systems
 below.
 
 | Support | Details |
 | :---- | :---- |
-| Operating systems | Windows 11, Linux, and macOS |
-| Architectures | x64 on Windows 11, ARM 64 on Linux, Windows and macOS. |
+| Operating systems | Windows 11, Linux, and macOS 13 or later |
+| Architectures | x64 and ARM64 packages for Windows, Linux, and macOS. RTX Spark uses Windows ARM64; DGX Spark uses Linux ARM64. |
 | Installers | Windows `.exe`, Linux `.deb`, and macOS `.dmg`. Build from source for other Linux distributions. |
 | Mixing systems | Windows, Linux, and macOS systems can pair with each other. |
-| Inference engines | Ollama and LM Studio |
+| Inference engines | llama.cpp, Ollama, and LM Studio |
 
-Check the [PAIR releases page](https://github.com/NVIDIA/Personal-AI-Router/releases)
-for a package for your operating system and architecture.
+Open the [NVIDIA PAIR download page](https://www.nvidia.com/en-us/ai-on-rtx/personal-ai-router/)
+and select your operating system and architecture. Check that the downloaded
+package is for **1.0.0**; use the
+[PAIR releases page](https://github.com/NVIDIA/Personal-AI-Router/releases) to
+check the version and release notes. The app setup tab lists the installer
+choices. These instructions use native Windows PowerShell on Windows, with no
+WSL requirement.
+
+### Why memory matters
+
+Each system serving a request needs enough memory for the model weights,
+the model's context, and the engine's runtime overhead. A model's download
+size is not its total memory requirement. On RTX Spark, DGX Spark, and Apple
+silicon Macs, the CPU and GPU share unified memory; on systems with a discrete
+GPU, GPU VRAM and system RAM are separate resources. Leave room for the
+operating system and other applications.
+
+Use your system's memory information and the model's requirements when choosing
+a model. PAIR's GPU-memory display can understate available memory on Windows
+systems with unified memory. Pairing systems does not add their memory together
+to fit one larger model.
 
 ## Prerequisites
 
@@ -124,14 +149,33 @@ for a package for your operating system and architecture.
 
 **Software requirements**
 
-- The appropriate PAIR package on each participating system.
-- Ollama, LM Studio, or both, running on each system that will serve requests.
+- The PAIR 1.0.0 package for each participating system's OS and architecture.
+- llama.cpp, Ollama, or LM Studio running on each system that will serve requests.
 - A model downloaded on at least one system that will serve requests.
+- Internet access and free disk space for installer, engine, and model downloads.
 
 PAIR can run on a supported system even when an engine cannot. Each engine has
 its own requirements for the operating system, GPU, and drivers. Each model
 also needs enough memory to load. Check the engine documentation before you
 expect a system to serve a model.
+
+### Choose an engine and model
+
+For the RTX Spark example in this playbook, select **llama.cpp** in PAIR and
+let PAIR install it. The 1.0.0 release adds llama.cpp with CUDA support for
+RTX Spark's Windows ARM64 platform. Choose Ollama or LM Studio when you need
+their model format or client workflow and they support your system.
+
+| Engine | Model selection | Request style |
+| --- | --- | --- |
+| llama.cpp | Compatible GGUF models from Hugging Face, such as `ggml-org/gemma-3-1b-it-GGUF:Q4_K_M` | OpenAI-compatible |
+| Ollama | Exact Ollama model names, such as `llama3.2` | OpenAI-compatible or Ollama-native |
+| LM Studio | A model available through LM Studio; copy its advertised ID | OpenAI-compatible |
+
+For llama.cpp, the example ID consists of a Hugging Face owner (`ggml-org`),
+repository (`gemma-3-1b-it-GGUF`), and quantization (`Q4_K_M`). Use the exact
+model ID shown by PAIR or returned by `<PAIR_BASE_URL>/v1/models` in requests;
+do not substitute a local GGUF filename or a display name.
 
 ## Ancillary files
 
@@ -144,7 +188,7 @@ No extra files are required.
   enables communication between trusted local systems.
 - **Rollback:** Remove paired systems, uninstall PAIR, and remove engines or
   models you no longer need.
-- **Last updated:** 08/17/2026.
+- **Last updated:** 10/06/2026.
 
 For a graphical setup, open **Set Up the PAIR App**. For a headless or SSH
 setup, open **Set up PAIR with Terminal**.
@@ -153,15 +197,32 @@ setup, open **Set up PAIR with Terminal**.
 
 ## Step 1. Install and open PAIR
 
-Install PAIR on each desktop system that will join the cluster. Download the
-appropriate package from the
+These instructions target **PAIR 1.0.0**, including llama.cpp support. Install
+that version on each desktop system that will join the cluster.
+
+Open the [NVIDIA PAIR download page](https://www.nvidia.com/en-us/ai-on-rtx/personal-ai-router/),
+select **Download PAIR**, then choose the operating system and architecture.
+Check that the downloaded filename contains `1.0.0`. If the download page
+provides an older version, use the matching package from the
 [PAIR releases page](https://github.com/NVIDIA/Personal-AI-Router/releases).
+
+| System | Package filename |
+| --- | --- |
+| RTX Spark or another Windows ARM64 system | `NVPAIR-Setup-1.0.0-arm64.exe` |
+| Windows on an Intel or AMD processor | `NVPAIR-Setup-1.0.0-x64.exe` |
+| DGX Spark or another Debian/Ubuntu ARM64 system | `NVPAIR-Setup-1.0.0-arm64.deb` |
+| Debian/Ubuntu on an Intel or AMD processor | `NVPAIR-Setup-1.0.0-amd64.deb` |
+| Mac with Apple silicon | `NVPAIR-Setup-1.0.0-arm64.dmg` |
+| Mac with an Intel processor | `NVPAIR-Setup-1.0.0-x64.dmg` |
 
 ### Windows
 
 1. Download the Windows installer that matches the system's architecture.
 2. Run the installer and approve the operating-system and firewall prompts.
-3. Open **NVIDIA Personal AI Router** from the Start menu.
+3. Open **NVIDIA PAIR** from the Start menu.
+
+RTX Spark uses the native Windows ARM64 installer and the PowerShell examples
+below.
 
 ### Debian or Ubuntu
 
@@ -173,23 +234,29 @@ sudo apt install "./NVPAIR-Setup-VERSION-ARCH.deb"
 ```
 
 Replace `VERSION` and `ARCH` with the values in the downloaded filename. Then
-open **NVIDIA Personal AI Router** from the desktop application menu.
+open **NVIDIA PAIR** from the desktop application menu.
 
 ### macOS
 
-1. Open the downloaded `.dmg`.
-2. Drag **NVIDIA Personal AI Router** to **Applications**.
-3. Open PAIR from **Applications**.
+Use macOS 13 or later. Choose ARM64 for Apple silicon and x64 for an Intel Mac.
 
-PAIR opens when the installation is complete.
+1. Open the downloaded `.dmg`.
+2. Drag **NVIDIA PAIR** to **Applications**.
+3. Open **NVIDIA PAIR** from **Applications**.
+
+Upgrading the macOS app preserves downloaded models.
+
+PAIR opens to its setup window or **Overview** when started.
 
 ## Step 2. Complete first-run setup
 
-When you first open PAIR, it shows the engines that it can install. Ollama is
-selected by default when it is available for the platform.
+When you first open PAIR, it shows the engines that it can install: Ollama,
+LM Studio, and llama.cpp. Available engines can already be selected.
 
 1. Review the available engines.
-2. Select the engines to install, or skip engines that you manage separately.
+2. For the RTX Spark example, select **llama.cpp** and clear the other selections
+   unless you also want those engines. On other systems, choose any supported
+   engine, or skip engines that you manage separately.
 3. Finish setup and wait for the selected engine to report that it is running.
 
 The first start can take longer while PAIR starts its background services. If
@@ -204,7 +271,7 @@ You can return to engine settings by selecting a node in **Overview**. Use
 Start PAIR on each system. Confirm that the systems are on the same trusted
 local network.
 
-1. On a system already in the cluster, select **Add node** in the top-right
+1. On the first system, select **Add node** in the top-right
    toolbar. You can also open **Settings → Cluster** and use **Available nodes
    to add**.
 2. Select a discovered system. If PAIR does not find it, add the system by IP
@@ -215,21 +282,49 @@ local network.
    **Connected nodes**. You can also check the node list in **Overview**.
 6. Repeat these steps from any cluster member to add more systems.
 
-The peer appears as a connected node when pairing is complete.
+The peer appears as a connected node when pairing is complete. With one system,
+continue to step 4 without pairing.
 
 ## Step 4. Start an engine and add a model
 
 Repeat these steps on every system that should serve the model:
 
 1. Select the system in **Overview** to open its engine settings.
-2. Install the engine if needed, then use its switch to start it.
+2. Install **llama.cpp**, **Ollama**, or **LM Studio** if needed. Installation
+   starts the engine; if it is stopped, use its switch to start it.
 3. Expand the engine and select **Add model**.
-4. Download a model and wait for the download to finish.
+4. Select a model, select **Download**, and wait for the download to finish.
 5. Load the model if the engine requires a separate load step.
 
 A system can serve a request when it is online, the engine is running, and the
 requested model is available there. To route requests across several systems,
-add the same model to each system that should serve it.
+add the same model to the same engine on each system that should serve it.
+The downloaded model appears in that engine's model list.
+
+### llama.cpp example
+
+On RTX Spark, use PAIR's managed **llama.cpp** installation. PAIR downloads the
+engine and CUDA runtime separately from the PAIR installer.
+
+1. Under **llama.cpp**, select **Add model**.
+2. Search for `ggml-org/gemma-3-1b-it-GGUF`. Typing filters the initial list;
+   press **Enter** or select the search button to search public Hugging Face
+   repositories if it is not listed.
+3. Select the `Q4_K_M` entry and select **Download**.
+4. Wait until `ggml-org/gemma-3-1b-it-GGUF:Q4_K_M` appears in the engine's model
+   list. Use **Load** to load it before testing, or allow the first request to
+   load it.
+
+This small model is an example; you can choose another compatible GGUF model
+that fits the system's memory. PAIR's llama.cpp catalog offers verified
+`Q4_K_M` entries from public repositories. Model IDs include both the repository
+and quantization: `owner/repository:quantization`. Use the exact ID when sending
+a request; an Ollama tag such as `gemma3:1b` is a different identifier.
+
+Use **Eject** to release a loaded model's memory while keeping its download.
+Managed llama.cpp models also sleep after five minutes without inference work;
+the next request wakes the model. Some GPU memory can remain allocated by the
+engine.
 
 ## Step 5. Copy the local endpoint
 
@@ -246,12 +341,13 @@ cluster, including a remote system.
 
 > [!IMPORTANT]
 > Copy the URL from **Endpoints**. PAIR puts a proxy on the engine's usual port
-> and moves the engine to the next available port.
+> and uses a separate port for the engine. llama.cpp defaults to proxy port
+> `8080` and server port `8081`.
 
 ## Step 6. Send a test request
 
-Replace `<PAIR_BASE_URL>` with the endpoint from step 5. Replace
-`<MODEL_NAME>` with the exact model name from step 4.
+Use the endpoint from step 5 and the exact downloaded model ID from step 4.
+The examples below use the OpenAI-compatible API to work with all three engines.
 
 ### Choose a request style
 
@@ -261,10 +357,53 @@ PAIR passes each request to the selected engine without rewriting it.
 | --- | --- | --- |
 | Ollama | Works | Works |
 | LM Studio | Works | Not available |
+| llama.cpp | Works | Not available |
 
-If you are unsure, use the OpenAI-style request. It works with either engine.
+If you are unsure, use the OpenAI-style request. It works with every supported
+engine.
 
-### OpenAI-style request
+### Windows PowerShell: llama.cpp example
+
+Open PowerShell on the system running PAIR. Set `$pairBaseUrl` to the endpoint
+you copied. With llama.cpp's default proxy port, list the available model IDs:
+
+```powershell
+$pairBaseUrl = "http://127.0.0.1:8080"
+(Invoke-RestMethod -Uri "$pairBaseUrl/v1/models").data | Select-Object id
+```
+
+Confirm that the output includes the model you downloaded. Set `$pairModel` to
+its exact `id`, then send the request:
+
+```powershell
+$pairModel = "ggml-org/gemma-3-1b-it-GGUF:Q4_K_M"
+$pairRequest = @{
+    model = $pairModel
+    messages = @(@{
+        role = "user"
+        content = "Tell me a short story about a dog who learns to skateboard."
+    })
+    stream = $false
+} | ConvertTo-Json -Depth 5
+$pairResponse = Invoke-RestMethod -Uri "$pairBaseUrl/v1/chat/completions" -Method Post -ContentType "application/json" -Body $pairRequest
+$pairResponse.choices[0].message.content
+```
+
+The response prints the model's answer. To use Ollama or LM Studio in
+PowerShell, use that engine's endpoint and an exact model ID returned by its
+`/v1/models` endpoint.
+
+### Linux or macOS: OpenAI-style request
+
+In a terminal, replace `<PAIR_BASE_URL>` with the endpoint from step 5 and list
+its models:
+
+```bash
+curl <PAIR_BASE_URL>/v1/models
+```
+
+Copy the exact `id` from the response. Replace `<MODEL_NAME>` with that ID and
+`<PAIR_BASE_URL>` with the same endpoint in the request below:
 
 ```bash
 curl <PAIR_BASE_URL>/v1/chat/completions \
@@ -280,7 +419,7 @@ curl <PAIR_BASE_URL>/v1/chat/completions \
   }'
 ```
 
-### Ollama-style request
+### Linux or macOS: Ollama-style request
 
 Use this request only with an Ollama endpoint. The `-N` option shows the
 response as it streams.
@@ -301,12 +440,19 @@ curl -N <PAIR_BASE_URL>/api/chat \
 
 Open **Overview**, select the **Jobs** filter, and read **Ran on** or
 **Running on** on the job card. A response and a job card show that PAIR routed
-the request.
+the request. Send several independent requests to observe routing across systems
+that have the same engine and exact model ID. One request runs on one system.
 
 ## Step 7. Connect an application
 
 Set the application's base URL to the endpoint from step 5. Select a model
 that you added in step 4.
+
+For an OpenAI-compatible SDK or application that appends the API path, include
+`/v1` in the base URL. For example, llama.cpp uses
+`http://127.0.0.1:8080/v1` with the default proxy port. A direct HTTP request uses
+the complete path, such as `http://127.0.0.1:8080/v1/chat/completions`. An
+Ollama-native client uses the host URL, such as `http://127.0.0.1:11434`.
 
 PAIR accepts requests only from the system where it is running. The proxy uses
 plaintext HTTP on loopback. A network request to an address such as
@@ -322,8 +468,8 @@ that you must manage separately.
 
 ### Port reference
 
-PAIR's proxy uses the port that an engine normally uses. PAIR moves the engine
-to the next available port.
+PAIR's proxy uses the port that an engine normally uses. Engines run behind the
+proxy on separate server ports.
 
 | Service | Default port |
 | --- | --- |
@@ -331,6 +477,8 @@ to the next available port.
 | Ollama engine behind PAIR | `11435` and upward |
 | LM Studio / OpenAI-compatible proxy | `1234` |
 | LM Studio engine behind PAIR | `1235` and upward |
+| llama.cpp / OpenAI-compatible proxy | `8080` |
+| Managed llama.cpp server behind PAIR | `8081` |
 
 If `OLLAMA_HOST` names a different local loopback address, PAIR also serves
 that address when the port is free. PAIR does not use a remote or HTTPS
@@ -353,16 +501,27 @@ restrictive, allow these ports between trusted cluster systems.
 
 ## Next steps
 
-### Change a port
+### Change ports or engine launch options
 
 1. Open **Overview** and expand **Engine settings** on the local system's card.
-2. Expand **Ports** for the engine.
-3. Edit **Proxy**, **Server**, or both, then select **Apply ports**.
+2. Expand the engine's **Settings**.
+3. Edit **Proxy port**, **Server port**, or the engine arguments, then select
+   **Apply**. Confirm the restart if PAIR requests it.
 
 PAIR applies the change as one operation and restores the new values when it
-next starts. You can change ports only on the local system. Remote system cards
-show them as read-only. If you change a proxy port, update the application's
-base URL. **Endpoints** always shows the current URL.
+next starts. Supported paired systems can also be edited from another cluster
+member. If you change a proxy port, update the application's base URL.
+**Endpoints** always shows the current URL.
+
+Keep managed llama.cpp in router mode. Do not add `-m` or `-hf` model-selection
+arguments; download and load models with PAIR's model controls instead. See
+[PAIR engine settings](https://github.com/NVIDIA/Personal-AI-Router/blob/feature/tui-llamacpp/docs/engine-settings.mdx)
+for supported argument notation and settings.
+
+For browser applications, configure only the required CORS origins on the system
+running the engine. Managed llama.cpp starts without cross-origin browser
+permission, and PAIR follows the engine's policy. Native clients such as
+PowerShell do not need a CORS setting.
 
 If another application uses a port that PAIR does not manage, choose a
 different port in PAIR or stop the other application. Then restart the service
@@ -373,7 +532,7 @@ from **Settings → Service**.
 PAIR-installed engines are normal installations, but their binaries are not in
 `PATH` and their server ports differ from the usual defaults.
 
-Ollama locations:
+PAIR-managed Ollama locations:
 
 | Platform | Path |
 | --- | --- |
@@ -381,11 +540,12 @@ Ollama locations:
 | Linux | `~/.config/Nvidia Corporation/Personal AI Router/engine-bin/ollama/bin/ollama` |
 | macOS | `~/Library/Application Support/Nvidia Corporation/Personal AI Router/engine-bin/ollama/Ollama.app/Contents/Resources/ollama` |
 
-Linux example:
+On Linux, the table shows the default location. If `XDG_CONFIG_HOME` is set,
+PAIR uses it instead of `~/.config`. The command below handles either location:
 
 ```bash
-ENGINE="$HOME/.config/Nvidia Corporation/Personal AI Router/engine-bin/ollama"
-LD_LIBRARY_PATH="$ENGINE/lib/ollama" OLLAMA_HOST=127.0.0.1:11435 "$ENGINE/bin/ollama" list
+pair_ollama_dir="${XDG_CONFIG_HOME:-$HOME/.config}/Nvidia Corporation/Personal AI Router/engine-bin/ollama"
+LD_LIBRARY_PATH="$pair_ollama_dir/lib/ollama" OLLAMA_HOST=127.0.0.1:11435 "$pair_ollama_dir/bin/ollama" list
 ```
 
 Windows PowerShell example:
@@ -414,214 +574,283 @@ shows what is on that system.
 ## Step 1. Start the terminal interface
 
 Use the PAIR terminal interface on a system without a desktop environment or
-over SSH. If the desktop application is running, quit it first. Do not run the
-desktop application and terminal interface on the same system. They start
-competing services and can conflict over ports, engines, and settings.
+over SSH. Quit the desktop application first, including its tray or menu-bar
+instance. Run one PAIR interface per system: the desktop application and
+terminal interface each start services that use the same ports, engines, and
+settings.
 
-Install PAIR with the appropriate platform package, then run:
+These instructions target **PAIR 1.0.0** and its five-tab terminal interface.
+Install the matching 1.0.0 platform package from the
+[NVIDIA PAIR download page](https://www.nvidia.com/en-us/ai-on-rtx/personal-ai-router/)
+or [PAIR releases page](https://github.com/NVIDIA/Personal-AI-Router/releases).
+The app setup tab lists installer choices by OS and architecture.
+On Windows, launching the installed desktop application creates the `nvpair`
+command wrapper. On macOS it does so when `/usr/local/bin` is writable. Quit
+the application before using that command and open a new terminal after the
+wrapper is created. On Windows, use native PowerShell. The Debian package
+creates the wrapper during installation.
 
-```bash
+```shell
+nvpair --version
 nvpair
 ```
 
-`nvpair` starts the bundled terminal interface and its PAIR service process
-tree. No other PAIR process needs to be running first.
+For a system where you will not launch the desktop application, download and
+extract the **1.0.0** services and terminal-interface archive for your platform
+and architecture instead.
+Keep all its binaries together. From the directory containing them, run:
 
-The header changes to `broker ready v<version>` when the terminal interface
-connects to the service. If it remains on `connecting to broker...`, open the
-**Logs** tab and inspect the service output.
+**Windows PowerShell:**
+
+```powershell
+.\nvpair-tui.exe --version
+.\nvpair-tui.exe
+```
+
+**Linux or macOS:**
+
+```bash
+./nvpair-tui --version
+./nvpair-tui
+```
+
+Confirm the downloaded package or archive belongs to PAIR `1.0.0`.
+The `--version` command prints the terminal-interface component version,
+which can differ from the PAIR release version.
+The terminal interface starts its PAIR service tree; no other PAIR process
+needs to be running first. The header shows `service ready` and a version when
+it connects. If it stays on `starting service...`, inspect **Logs** (tab 5).
 
 ## Step 2. Pair this system
 
-PAIR uses the same six-digit PIN exchange as the desktop application. Pair only
-systems on a trusted network. The PIN is a short-lived setup code, not a
-long-term credential.
+One system can serve local inference. To route requests across systems, start
+PAIR on each system and pair them on a trusted local network. The six-digit
+PIN is a temporary setup code. Inviting the first system forms the cluster
+automatically.
 
-To invite a discovered system:
+To pair with a discovered system:
 
-1. Open **Nodes** (tab 3).
-2. Select the system with `j` or `k`.
-3. Press `i`.
+1. Open **Nodes** (tab 1).
+2. Select the other system with `j` / `k` or the arrow keys.
+3. Press `p`.
 4. Give the displayed PIN to the person operating the other system.
 
-To invite a system by address:
+If discovery has not found the system, press `n` on **Nodes**, enter its
+hostname or IP address, and press `enter`. Use `host:port` when the system
+does not use the default pairing port.
 
-1. Open **Cluster** (tab 7).
-2. Press `i`.
-3. Enter the other system's hostname or IP address. Use `host:port` when it
-   does not use the default pairing port.
-4. Press `enter`, then give the displayed PIN to the other operator.
+On the invited system, open **Nodes**, press `a` when the pairing request
+appears, enter the PIN, and press `enter`. Press `d` to decline. When pairing
+succeeds, the peer's **CLUSTER** column reads `Member`.
 
-Use address-based pairing when network discovery is unavailable, such as when
-a network filters multicast.
-
-To accept an invitation, open **Cluster**, wait for
-`invite received from <name>`, press `a`, enter the PIN, and press `enter`.
-Press `d` to decline an invitation.
-
-The peer appears under **Members** when pairing is complete.
+Press `c` to cancel an invitation you sent. A wrong or expired PIN requires a
+new invitation. Repeat pairing to add more systems; each system can belong to
+one cluster at a time.
 
 ## Step 3. Start an engine and add a model
 
-Open **Engines** (tab 6). Select an engine with `j` or `k`, then use these
-keys:
+In **Nodes**, select your own system and press `enter` to open its hardware,
+**Engines**, and **Models**. Move between the two panes with `h` / `l` or
+`←` / `→`. Within a pane, select a row with `j` / `k` or `↓` / `↑`.
 
-| Key | Action |
-| --- | --- |
-| `i` | Install the selected engine. |
-| `s` | Start it. |
-| `x` | Stop it. |
-| `r` | Restart it. |
-| `u` | Uninstall it. |
-| `p` | Download a model. |
+For a llama.cpp example:
 
-After you press `p`, enter a model name such as `llama3.2`, then press
-`enter`. Download progress appears on the status line.
+1. In **Engines**, select **llama.cpp** and press `i` to install it.
+2. Press `s` to start it. Wait for **RUNNING** and **HEALTHY** to read `yes`.
+3. Keep llama.cpp selected and move to **Models**.
+4. Press `n`, enter `ggml-org/gemma-3-1b-it-GGUF:Q4_K_M`, and press `enter`.
+5. Wait for the download to finish and the model to appear in the model list.
+6. Select that model and press `enter` to load it. Confirm **LOADED** reads `yes`.
 
-A system can serve a request when it is online, the engine is running, and the
-requested model is available there. Add the same model to several systems when
-you want any of them to serve it.
+Select the intended running engine before downloading: the download goes to
+the highlighted running engine. llama.cpp uses a Hugging Face GGUF repository
+and quantization as its model ID. Keep the exact ID, including `:Q4_K_M`, for
+model operations and inference requests.
+
+You can browse instead of typing a name. In **Models**, press `p` to open the
+selected engine's download catalog. Select a model and press `enter` to
+download it. For llama.cpp, `/` opens a Hugging Face search; enter a query and
+press `enter`. Press `c` to return to the initial popular-model list, `o` to
+change the sort order, and `esc` to leave the catalog. Other engines use `/`
+to filter their catalog by name, family, or parameter size.
+
+| Pane | Key | Action |
+| --- | --- | --- |
+| Engines | `i` / `s` / `x` | Install, start, or stop the selected engine. |
+| Engines | `r` / `u` | Restart or uninstall a local engine. |
+| Engines | `e` / `p` / `a` | Edit engine port, proxy port, or startup arguments. |
+| Models | `p` / `n` | Browse downloads or download by exact name. |
+| Models | `enter` / `e` | Load the selected model or eject it from memory. |
+| Models | `d` | Delete the selected model after confirmation. |
+
+The same node-detail screen can install, start, and stop engines and manage
+models on paired peers. Restart and uninstall are available on the local
+system only. Destructive operations require `y` to confirm; any other key
+cancels.
+
+A system can serve a request when it is online, its compatible engine is
+running, and the requested model is available there. Prepare the same exact
+model on multiple systems when you want any of them to serve it. Press `esc`
+to return to the **Nodes** list and check each system's model inventory.
 
 ## Step 4. Check the service and endpoint
 
-Open **Overview** (tab 1). Confirm that the header shows
-`broker ready v<version>`. An `ok` worker state means no crash was reported; it
-does not prove that the worker is responding. `DOWN` means the broker reported
-a crash.
+Open **Service** (tab 3) and confirm the service is connected. Worker health
+is best-effort: `ok` means no crash was reported, `DOWN` means a worker
+reported a crash, and `?` means PAIR is still checking or the service is not
+answering. The error-reporting worker cannot report its own crash. Use
+**Errors** and **Logs** to investigate a failure.
 
-Open **Proxies** (tab 4), press `g` until the engine that you prepared is
-selected, and read its listening port. Use `http://127.0.0.1:<port>` as
-`<PAIR_BASE_URL>`. The default port is `11434` for the Ollama-compatible proxy
-and `1234` for the LM Studio / OpenAI-compatible proxy.
+Open **Jobs** (tab 2). Its top line shows each engine's current local proxy
+port. Use the port for the engine you prepared to form
+`http://127.0.0.1:<port>`. This is the client endpoint; the engine's own port
+is a separate value.
 
-Ask the endpoint what the cluster can serve:
+| Engine | Default client endpoint |
+| --- | --- |
+| Ollama | `http://127.0.0.1:11434` |
+| LM Studio | `http://127.0.0.1:1234` |
+| llama.cpp | `http://127.0.0.1:8080` |
 
-```bash
-curl <PAIR_BASE_URL>/v1/models
+Read the actual port in **Jobs**, because it can differ from the default.
+Keep the terminal interface running and open another terminal on the same
+system to check the endpoint. The examples below use llama.cpp's default;
+replace the URL if **Jobs** shows another port.
+
+**Windows PowerShell:**
+
+```powershell
+$pairBaseUrl = 'http://127.0.0.1:8080'
+Invoke-RestMethod -Uri "$pairBaseUrl/v1/models" | Select-Object -ExpandProperty data
 ```
 
-The response lists the cluster's model inventory, not only the local system's
-models. The terminal interface does not send inference requests. Configure a
-compatible client with the local PAIR endpoint to send a request.
+**Bash:**
+
+```bash
+PAIR_BASE_URL=http://127.0.0.1:8080
+curl "$PAIR_BASE_URL/v1/models"
+```
+
+The response lists the cluster's available model IDs, including the model you
+prepared. Use an exact returned ID in your client. An OpenAI-compatible
+client normally uses `<PAIR_BASE_URL>/v1` as its base URL and appends API
+paths itself. All three engines accept OpenAI-style chat requests; Ollama's
+`/api/chat` is available only on the Ollama endpoint.
+
+The proxy endpoint accepts requests from its own system only. Run PAIR on
+the system hosting your client and pair it with the systems serving models.
+That client system does not need its own engine or GPU.
 
 ## Step 5. Check routing activity
 
-Open **Workloads** (tab 5) to see live inference activity, including the
-workload ID, model, engine, state, and age. The terminal interface does not
-show which system served a workload.
+Open **Jobs** and press `t` to generate up to sixty seconds of synthetic
+inference traffic through the local endpoints. It needs a running engine
+with a text-generation model available. The progress line shows requests
+sent and time remaining. Press `t` again to stop new requests early; requests
+already sent can finish.
 
-Open **Proxies** (tab 4) to check each proxy's listening port and selected
-system. `selected=auto` means that routing is automatic. Press `g` to switch
-between engines, `enter` to pin the highlighted upstream, and `a` to restore
-automatic routing.
+Jobs appear in the table. **FROM** identifies the system where a request
+arrived; **RAN ON** identifies the system that served it. Press `a` to include
+finished jobs. Different systems in those columns demonstrate routing to a
+peer. PAIR selects a system for each request automatically; one request runs
+on one system.
 
-Leave automatic routing enabled unless you are testing one system.
+The synthetic test shows routing activity without displaying prompts or
+responses. To verify an answer, send a request from your configured client
+and confirm both its reply and the serving system in **Jobs**. To prove
+remote routing, prepare the requested model on a peer only, send from your
+local endpoint, and check that **RAN ON** names that peer.
 
 ## Next steps
 
 ### Keep PAIR running after an SSH disconnect
 
-If an SSH session closes, the terminal interface exits and the system stops
-serving requests. Use a terminal multiplexer when PAIR must stay running:
+Quitting the terminal interface stops its PAIR services. An SSH disconnect
+also ends it. On a Linux system reached over SSH, use a terminal multiplexer
+when PAIR must stay available:
 
 ```bash
 tmux new -s pair
 nvpair
 ```
 
-Detach from tmux with `Ctrl-b d`. Reattach with:
-
-```bash
-tmux attach -t pair
-```
-
-GNU Screen also works. Start it with `screen -S pair`, detach with `Ctrl-a d`,
-and reattach with `screen -r pair`. tmux and Screen are not included with PAIR.
+If you extracted a services archive, start `./nvpair-tui` from its binary
+directory inside the tmux session instead. Detach with `Ctrl-b d` and reattach
+with `tmux attach -t pair`. GNU Screen also works: start with `screen -S pair`,
+detach with `Ctrl-a d`, and reattach with `screen -r pair`. Neither tool is
+included with PAIR.
 
 ### Move around the terminal interface
 
-The second line shows the numbered tabs. The footer shows the keys for the
-current tab. If the screen shows `starting...`, enlarge the terminal window.
+Use a terminal at least 40 columns wide and 12 rows high. The tab bar and
+footer show the current controls. When a text field is open, press `enter`
+to submit or `esc` to cancel before changing tabs.
 
 | Key | Action |
 | --- | --- |
-| `tab`, `l`, or `→` | Move to the next tab. |
-| `shift+tab`, `h`, or `←` | Move to the previous tab. |
+| `1` – `5` | Go directly to a tab. |
+| `tab` / `shift+tab` | Move to the next or previous tab. |
 | `?` | Show or hide full help. |
-| `q` or `ctrl+c` | Quit. |
-| `j` / `k` or `↓` / `↑` | Move within a table. |
-| `f` / `b` | Move forward or backward by one page. |
-| `g` / `G` | Jump to the first or last row. |
-
-When you enter a PIN, address, port, or model name, all keys go to that field.
-Press `enter` to submit or `esc` to cancel.
+| `q` or `ctrl+c` | Quit and shut down the PAIR service tree. |
+| `j` / `k` or `↓` / `↑` | Move within a table or settings list. |
+| `h` / `l` or `←` / `→` | Move between node-detail panes. |
+| `home` / `end` | Jump to the first or last table row. |
 
 ### Use the terminal interface tabs
 
 | # | Tab | What it shows |
 | --- | --- | --- |
-| 1 | **Overview** | Service uptime and version, plus an `ok` / `DOWN` worker table. |
-| 2 | **Errors** | Active service errors by severity, age, system, and message. |
-| 3 | **Nodes** | Discovered systems and their connection or cluster status. |
-| 4 | **Proxies** | Compatible proxy ports, discovered upstreams, and selected systems. |
-| 5 | **Workloads** | Live inference workload ID, model, engine, state, and age. |
-| 6 | **Engines** | Local engine installation, running, health, and port state. |
-| 7 | **Cluster** | Local-system identity, cluster membership, and pairing controls. |
-| 8 | **Manual** | Systems added by address and their reachability. |
-| 9 | **Settings** | Force ports, cluster auto-sync, cluster ID, and cluster name. |
-| 10 | **Logs** | Service output and live log-level controls. |
+| 1 | **Nodes** | Systems, reachability, cluster membership, pairing, and node details with engines, models, and hardware. |
+| 2 | **Jobs** | Local endpoint ports, inference activity, originating and serving systems, and the synthetic test. |
+| 3 | **Service** | Service version, uptime, workers, settings, and data reset. |
+| 4 | **Errors** | Active errors by severity, age, system, and message. |
+| 5 | **Logs** | Service output, filtering, tailing, and save-to-file. |
 
 ### Inspect errors and logs
 
-In **Errors** (tab 2), select an error and press `c` to clear it.
+**Errors** shows its active-error count in the tab label. Select an entry to
+read its operation and suggested action. Press `c` to clear an error on the
+system that reported it; a peer's error must be cleared from that peer.
 
-In **Logs** (tab 10), scroll with `j`, `k`, and the page keys. Change the
-service log level with `d` for debug, `i` for info, `w` for warn, or `e` for
-error. Check this tab first when a service does not start.
+In **Logs**, scroll with `j` / `k`, press `/` to filter, `c` to clear the
+filter, and `t` to toggle tailing. Press `s` to save the full log buffer to a
+timestamped file in your home directory. Change the service log level from
+**Service**.
 
-### Change settings
+### Change ports and startup arguments
 
-In **Settings** (tab 9), select a row with `j` or `k` and press `enter`.
-Boolean settings change immediately. Text fields open for editing; press
-`enter` to save or `esc` to cancel.
+On **Nodes**, open a system's detail screen and select an engine in
+**Engines**. Press `e` to edit its engine port, `p` to edit its proxy port,
+or `a` to edit startup arguments and environment assignments. Clients use
+the proxy port. When changing it, update your client's base URL and check
+the resulting port in **Jobs** on that system.
 
-In **Proxies**, press `p` to change proxy ports. Engine ports are read-only in
-the terminal interface. Use the desktop application to change them.
+These settings can also be edited on paired peers when the engine supports
+configuration; changes to CORS settings must be made on the engine's own
+system. An engine PAIR found already running can report that its settings
+are not editable. Startup arguments use literal shell-style
+quoting, with environment assignments first; variables such as `$HOME` and
+`%USERPROFILE%` are not expanded. Do not include the engine executable or
+startup subcommand.
 
-### Command locations and flags
+Press `enter` to validate and save. PAIR validates syntax and its managed
+network settings; other options must be supported by the engine. If applying
+the change requires an engine restart, confirm with `y`. Read the reported
+result rather than assuming the requested port was available.
 
-The installer adds `nvpair` to `PATH`. It places the command in these
-locations:
-
-| Platform | Installed command location |
-| --- | --- |
-| Linux | `~/.local/bin/nvpair` |
-| macOS | `/usr/local/bin/nvpair` when that directory is writable |
-| Windows | A per-user `bin` directory added to `PATH` |
-
-Open a new terminal after installation if the command is not found.
+### Command flags and current limits
 
 | Flag | Effect |
 | --- | --- |
 | `--broker-path <path>` | Use a PAIR service binary that is not beside the terminal-interface binary. |
 | `--log-level <level>` | Set terminal-interface logging to `debug`, `info`, `warn`, or `error`. `NVPAIR_LOG_LEVEL` provides the same setting. |
-| `--version` | Print the version and exit. |
+| `--appearance <mode>` | Choose `auto`, `light`, or `dark`; use an explicit value if your terminal theme is hard to read. |
+| `--version` | Print the terminal-interface component version and exit. |
 
-The terminal interface writes its logs to stderr. Service logs appear on the
-**Logs** tab. Press `q` to quit. Quitting also shuts down the PAIR services
-cleanly.
-
-### Terminal-interface limits
-
-The terminal interface is an operations tool. It cannot:
-
-- List or delete models. It can download a model but does not show a model
-  inventory.
-- Change an engine's port.
-- Update an engine.
-- Control engines on other cluster systems.
-- Show which system served a workload.
-- Send an inference request. Use a compatible client with the local endpoint.
+The terminal interface can notify you of PAIR updates but does not install
+them. It cannot update an inference engine; use the desktop application for
+that operation. The **Jobs** test generates synthetic traffic, while a
+compatible external client sends your own prompts and displays the replies.
 
 ## Troubleshooting
 
@@ -629,17 +858,27 @@ The terminal interface is an operations tool. It cannot:
 
 Start with the symptom and then inspect **Settings → Service**, the desktop
 error surface, or the terminal interface's **Errors** tab for more detail.
+In the terminal interface, also check **Service** for worker state and **Logs**
+for engine installation or startup output.
 
 | Symptom | Usual meaning | What to do |
 | --- | --- | --- |
 | PAIR remains on **Loading...** | A background service did not start correctly. | Wait one or two minutes, then inspect **Settings → Service** and restart the affected service. |
+| llama.cpp is missing, or the terminal shows the old ten-tab layout | The installed PAIR version predates this playbook's 1.0.0 workflow. | Check the PAIR version and install the matching 1.0.0 package for your OS and architecture. |
+| An installer does not match the system | The architecture choice is incorrect. | Use Windows ARM64 for RTX Spark, Linux ARM64 for DGX Spark, and macOS ARM64 for Apple silicon. Intel/AMD systems use x64 packages, named `amd64` for Debian/Ubuntu. |
+| LM Studio remains after uninstalling PAIR 1.0.0 | LM Studio installations created by older PAIR versions are not removed by the newer PAIR uninstaller. | If you also want to remove LM Studio, uninstall that older installation manually from `~/.lmstudio` on Linux or macOS, or `%USERPROFILE%\.lmstudio` on Windows. |
 | A node is not discovered | mDNS is blocked or unavailable. | Confirm both nodes are on the same trusted local network, allow `5353/udp`, or add the node by IP address. |
 | Pairing stalls or fails | The invitation expired, the PIN is incorrect, or port `14321` is blocked. | Start a new invitation, enter the new PIN, and confirm cluster ports are reachable. |
 | Connection refused | Nothing is listening at that address. | Copy the current URL from **Endpoints** and confirm the PAIR service is running. |
 | `403` from another machine | PAIR endpoints accept loopback traffic only. | Run PAIR on the machine hosting the client and use its local endpoint. |
 | `502` with `no active node` | No node is eligible for the request. | Start a compatible engine and make the requested model available on at least one online node. |
-| Persistent `404` on inference | No eligible node has the requested model. | Verify the exact model name and prepare it on at least one node. |
+| A model is listed but the inference request fails | The request's model ID, API route, or engine does not match the prepared model. | Copy the exact ID from `<PAIR_BASE_URL>/v1/models`. For llama.cpp, preserve `owner/repository:quantization` and use `/v1/chat/completions`, not Ollama's `/api/chat`. |
 | `400` or `422` | The request is malformed. | Correct its JSON, route, model name, or required fields; malformed requests are not retried. |
 | A response arrives but **Jobs** is empty | Another process owns the expected proxy port. | Check **Endpoints** and **Settings → Service**, then change the PAIR port or stop the conflicting process. |
 | Requests do not use every GPU | PAIR routes each request to one eligible node. | Send independent requests and verify **Ran on** for each job. PAIR does not split one request across GPUs. |
 | Desktop and terminal behavior conflicts | Both PAIR interfaces are running on one system. | Stop one interface and use only the desktop application or terminal interface. |
+| `nvpair` is not found in native Windows PowerShell | The packaged launcher has not been created or the shell has not picked up its PATH entry. | Open the installed PAIR app once, quit it, and open a new PowerShell window before running `nvpair`. |
+| A llama.cpp model download or load fails | The GGUF selection or available resources need checking. | Confirm the selected engine is llama.cpp, choose a compatible catalog entry, and inspect **Errors** and **Logs**. Check available disk space and memory, including context overhead. |
+| llama.cpp fails after custom launch arguments | A fixed-model argument can conflict with PAIR's managed router mode. | Remove custom `-m` or `-hf` arguments and use PAIR's model download and load controls. |
+| A loaded llama.cpp model becomes idle and the next request takes longer | Managed llama.cpp puts idle models to sleep after five minutes and wakes them for a new request. | Allow the model to wake; inspect **Jobs** to confirm that the request completes. |
+| A browser client reports a CORS error | PAIR 1.0.0 follows the selected engine's origin policy. | Configure the allowed browser origin on the system running that engine. For Ollama, set `OLLAMA_ORIGINS` in the engine's **Settings** launch arguments. |

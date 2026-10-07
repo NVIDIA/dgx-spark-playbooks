@@ -173,8 +173,7 @@ You still need a working **video backend** for LIBERO (see Step 2). On aarch64, 
 >
 > # In [tool.uv.sources]:
 > flash-attn = [
->     { url = "https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.1/flash_attn-2.8.1+cu12torch2.10cxx11abiTRUE-cp312-cp312-linux_aarch64.whl",
->       marker = "sys_platform == 'linux' and platform_machine == 'aarch64' and python_version == '3.12'" },
+>     { url = "https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.1/flash_attn-2.8.1+cu12torch2.10cxx11abiTRUE-cp312-cp312-linux_aarch64.whl", marker = "sys_platform == 'linux' and platform_machine == 'aarch64' and python_version == '3.12'" },
 > ]
 > ```
 >

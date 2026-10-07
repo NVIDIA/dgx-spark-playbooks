@@ -2,7 +2,6 @@
 
 > Install a local-first AI agent and connect it to a private OpenAI-compatible model endpoint
 
-
 ## Table of Contents
 
 - [Overview](#overview)
@@ -109,6 +108,15 @@ This playbook is an **agent** workflow, not a general inference-serving guide. F
 
 > [!CAUTION]
 > **Before proceeding, review the security risks in the Overview tab.** OpenClaw is an AI agent that can access your files, execute commands, and connect to external services. Data exposure and malicious code execution are real risks. **Strongly recommended:** Run OpenClaw on an isolated system or VM, use dedicated accounts (not your main accounts), and never expose the dashboard to the public internet without authentication.
+
+## Install with an agent
+
+```text
+Use https://build.nvidia.com/playbooks/openclaw.md and complete this playbook on this machine: Run OpenClaw with a Local LLM. Fetch that .md URL directly; the non-.md page is a JavaScript shell. When finished, state clearly whether the playbook succeeded, and give the evidence: what you installed, where, and the output of a command proving it works (a version string, a container listing, or an HTTP status).
+```
+
+> [!NOTE]
+> This has been tested using OpenCode and Qwen 3.8 35B A3B NVFP4. Performance and outcome may vary based on agent and model selection.
 
 ## Step 1. Prepare your environment (Windows / WSL only)
 

@@ -1,13 +1,9 @@
 #!/usr/bin/env bash
 # Regression test for QA ticket 6376156
-# OpenFold3 NIM crash-loops with NIMProfileIDNotFound when the GPU's PCI id is
-# absent from its bundled model_manifest.yaml. GB300 board SKUs vary: some report
-# 31c2:10de (listed -> native match) while others report 31c3:10de (absent ->
-# crash); the RTX PRO 6000 2bb4:10de is absent too. (Confirmed on a real aarch64
-# GB300 whose manifest lists 31c2 but not 31c3/2bb4.)
-# Docs-only fix: troubleshooting.md must document the symptom, the PCI-ID cause,
-# and a coherent id-agnostic manifest-patch workaround, and name it an upstream
-# NIM issue. This test asserts that documentation exists and is correct.
+# Older OpenFold3 NIM images crash-loop with NIMProfileIDNotFound when their
+# PCI-gated model manifest does not recognize the GPU. The playbook must use the
+# exact OpenFold3 1.6.0 image validated on GB300 and must not recommend rewriting
+# the signed model manifest as a workaround.
 #
 # Usage: bash test_openfold3-pci-id.sh [playbook_dir]
 # Exit 0 = pass, non-zero = fail.
@@ -19,6 +15,8 @@ set -u
 PB_DIR="${1:-$(cd "$(dirname "$0")/../../.." && pwd)}"
 
 TS="$PB_DIR/troubleshooting.md"
+COMPOSE="$PB_DIR/assets/docker-compose.yml"
+EXPECTED_IMAGE='nvcr.io/nim/openfold/openfold3:1.6.0@sha256:f2d4a3f2755d8aa7cc4be31853a98688357e0647707aed30d24dfae943592317'
 
 fail() {
   echo "FAIL: $1: $2"
@@ -32,6 +30,7 @@ has() {
 }
 
 [ -f "$TS" ] || fail "troubleshooting.md" "file not found at $TS"
+[ -f "$COMPOSE" ] || fail "docker-compose.yml" "file not found at $COMPOSE"
 
 # ---------------------------------------------------------------------------
 # Group 1: symptom string documented
@@ -41,62 +40,58 @@ has "NIMProfileIDNotFound" "$TS" \
 echo "PASS: symptom 'NIMProfileIDNotFound' is documented"
 
 # ---------------------------------------------------------------------------
-# Group 2: both PCI IDs documented (31c2:10de manifest/native, 31c3:10de affected)
+# Group 2: the exact validated NIM image is immutable in Compose
 # ---------------------------------------------------------------------------
-has "31c2:10de" "$TS" \
-  || fail "troubleshooting.md" "does not mention the manifest/native PCI ID '31c2:10de'"
-has "31c3:10de" "$TS" \
-  || fail "troubleshooting.md" "does not mention the correct DGX Station GB300 PCI ID '31c3:10de'"
-has "2bb4:10de" "$TS" \
-  || fail "troubleshooting.md" "does not mention the RTX PRO 6000 PCI ID '2bb4:10de' (also absent from the manifest)"
-echo "PASS: PCI IDs documented — 31c2:10de (manifest/native), 31c3:10de (affected GB300), 2bb4:10de (RTX PRO 6000)"
+grep -Fq -- "image: $EXPECTED_IMAGE" "$COMPOSE" \
+  || fail "docker-compose.yml" "does not pin the validated OpenFold3 1.6.0 digest"
+! grep -Eq 'image:[[:space:]]+nvcr\.io/nim/openfold/openfold3:latest([[:space:]]|$)' "$COMPOSE" \
+  || fail "docker-compose.yml" "still uses the floating OpenFold3 latest tag"
+grep -Fq -- "$EXPECTED_IMAGE" "$PB_DIR/assets/scripts/molecular_viewer.py" \
+  || fail "molecular_viewer.py" "standalone example does not use the validated image digest"
+! grep -Rq --exclude='test_openfold3-pci-id.sh' 'NIM_OPTIMIZED_BACKEND\|torch_baseline' "$PB_DIR" \
+  || fail "OpenFold3 configuration" "still selects the removed PyTorch-only backend"
+
+BAD_IMAGE_REFS=$(grep -RIn --exclude='test_openfold3-pci-id.sh' \
+  'nvcr\.io/nim/openfold/openfold3:' "$PB_DIR" 2>/dev/null \
+  | grep -Fv -- "$EXPECTED_IMAGE" || true)
+[ -z "$BAD_IMAGE_REFS" ] \
+  || fail "OpenFold3 image references" "found an unpinned or mismatched image reference: $BAD_IMAGE_REFS"
+echo "PASS: OpenFold3 1.6.0 image is pinned by digest and uses its supported optimized backend"
 
 # ---------------------------------------------------------------------------
-# Group 3: manifest filename referenced
+# Group 3: recovery uses the pinned Compose image
 # ---------------------------------------------------------------------------
-has "model_manifest\.yaml" "$TS" \
-  || fail "troubleshooting.md" "does not reference the manifest file 'model_manifest.yaml'"
-echo "PASS: manifest filename 'model_manifest.yaml' is referenced"
+has "docker compose pull openfold3" "$TS" \
+  || fail "troubleshooting.md" "does not tell users to pull the pinned OpenFold3 image"
+has "force-recreate openfold3" "$TS" \
+  || fail "troubleshooting.md" "does not tell users to replace the stale container"
+echo "PASS: recovery flow pulls and recreates the pinned service"
 
 # ---------------------------------------------------------------------------
-# Group 4: id-agnostic patch flow. The doc must instruct patching ONLY when the
-# GPU's id is absent (with a guard against patching an already-listed id), NOT a
-# blind single-id remap. A concrete sed example may still be shown.
+# Group 4: unsafe manifest rewriting is explicitly prohibited
 # ---------------------------------------------------------------------------
-has "only if .*not listed|only patch if .*absent" "$TS" \
-  || fail "troubleshooting.md" "does not document the id-agnostic rule (patch ONLY if your id is absent)"
-has "sed .*:10de" "$TS" \
-  || fail "troubleshooting.md" "does not show a manifest sed remap example"
-echo "PASS: id-agnostic manifest patch flow (patch only if absent) is documented"
+has "Do not rewrite or mount over the signed image manifest" "$TS" \
+  || fail "troubleshooting.md" "does not prohibit the unvalidated manifest workaround"
+
+MANIFEST_REWRITES=$(grep -RInE --exclude='test_openfold3-pci-id.sh' \
+  'docker[[:space:]]+cp.*model_manifest|(^|[[:space:]])(sed|perl|yq)([[:space:]]|$).*model_manifest|model_manifest\.yaml:[^[:space:]]*/opt/nim/[^[:space:]]*model_manifest\.yaml' \
+  "$PB_DIR" 2>/dev/null || true)
+[ -z "$MANIFEST_REWRITES" ] \
+  || fail "OpenFold3 manifest" "found an actionable manifest monkeypatch: $MANIFEST_REWRITES"
+
+BUNDLED_MANIFEST=$(find "$PB_DIR" -type f -name 'model_manifest.yaml' -print -quit)
+[ -z "$BUNDLED_MANIFEST" ] \
+  || fail "OpenFold3 manifest" "replacement manifest is bundled at $BUNDLED_MANIFEST"
+echo "PASS: unvalidated model-manifest rewriting is prohibited"
 
 # ---------------------------------------------------------------------------
-# Group 5: names this an upstream NIM issue (durable fix is upstream)
+# Group 5: readiness and runtime-version verification are documented
 # ---------------------------------------------------------------------------
-has "upstream" "$TS" \
-  || fail "troubleshooting.md" "does not identify the durable fix as upstream"
-# The upstream mention must be tied to the NIM (image/manifest), not something else.
-has "upstream.*NIM|NIM.*upstream|manifest gap in the .{0,20}NIM" "$TS" \
-  || has "upstream.*(manifest|OpenFold3 NIM|NIM image|NIM team)" "$TS" \
-  || fail "troubleshooting.md" "'upstream' is present but not tied to the NIM manifest/image"
-echo "PASS: identifies the durable fix as an upstream NIM manifest issue"
+has "/v1/health/ready" "$TS" \
+  || fail "troubleshooting.md" "does not verify the OpenFold3 readiness endpoint"
+has "/v1/version" "$TS" \
+  || fail "troubleshooting.md" "does not verify the running NIM version"
+echo "PASS: recovery verifies readiness and the running NIM version"
 
-# ---------------------------------------------------------------------------
-# Group 6: workaround is internally coherent --
-#   docker cp of the manifest + mounting it back + real NGC key required
-# ---------------------------------------------------------------------------
-has "docker cp.*model_manifest\.yaml" "$TS" \
-  || fail "troubleshooting.md" "workaround does not docker cp the model_manifest.yaml out of the image"
-
-# Mount the patched manifest back into the container: require the actual mount
-# mapping (host manifest -> the image's /opt/nim manifest path), not a bare
-# 'volumes:' line which could match any unrelated compose snippet.
-has "model_manifest\.yaml:/opt/nim.*model_manifest\.yaml" "$TS" \
-  || fail "troubleshooting.md" "workaround does not mount the patched manifest into /opt/nim/.../model_manifest.yaml"
-
-# A real NGC key (not the .env placeholder) is required.
-has "real NGC_API_KEY|NGC_API_KEY.*(real|not the .{0,12}placeholder)|real .{0,6}NGC" "$TS" \
-  || fail "troubleshooting.md" "workaround does not state a real NGC key is required"
-echo "PASS: workaround is internally coherent (docker cp manifest, mount it back, real NGC key)"
-
-echo "PASS: ticket 6376156 OpenFold3 PCI-ID regression documentation present and correct"
+echo "PASS: ticket 6376156 uses the validated pinned NIM without manifest monkeypatching"
 exit 0

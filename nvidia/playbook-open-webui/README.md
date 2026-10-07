@@ -297,6 +297,15 @@ docker volume rm open-webui open-webui-ollama
 > [!TIP]
 > Use this tab when you are working on a local desktop session on the hardware platform, or when you want to run Docker commands directly. For remote laptop access through NVIDIA Sync, use the **Open WebUI Remotely** tab instead.
 
+## Install with an agent
+
+```text
+Use https://build.nvidia.com/playbooks/open-webui.md and complete this playbook on this machine: Chat with LLMs Using Open WebUI and Ollama. Fetch that .md URL directly; the non-.md page is a JavaScript shell. When finished, state clearly whether the playbook succeeded, and give the evidence: what you installed, where, and the output of a command proving it works (a version string, a container listing, or an HTTP status).
+```
+
+> [!NOTE]
+> This has been tested using OpenCode and Qwen 3.8 35B A3B NVFP4. Performance and outcome may vary based on agent and model selection.
+
 ## Step 1. Configure Docker permissions
 
 You should first make sure you can run Docker commands without entering your sudo password.

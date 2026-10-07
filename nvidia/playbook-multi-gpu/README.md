@@ -2,7 +2,6 @@
 
 > Homogeneous dual-GPU setups for llama.cpp tensor parallel and ComfyUI multi-GPU diffusion
 
-
 ## Table of Contents
 
 - [Overview](#overview)

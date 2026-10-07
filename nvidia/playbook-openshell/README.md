@@ -1,20 +1,12 @@
 # Secure AI Agents with OpenShell
 
-> Isolate OpenClaw with kernel-level policies and route inference to a local model
+> Isolate AI coding agents like Pi with kernel-level policies and a locally served vLLM model
 
 ## Table of Contents
 
 - [Overview](#overview)
   - [Notice & Disclaimers](#notice-disclaimers)
 - [Instructions](#instructions)
-  - [Access the dashboard](#access-the-dashboard)
-- [Agent-ready Models](#agent-ready-models)
-  - [Recommendations by hardware platform](#recommendations-by-hardware-platform)
-  - [Before you serve](#before-you-serve)
-  - [DGX Spark](#dgx-spark)
-  - [DGX Station](#dgx-station)
-  - [OpenShell-specific requirements](#openshell-specific-requirements)
-  - [Next steps](#next-steps)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -23,11 +15,13 @@
 
 ## Basic idea
 
-OpenClaw is a local-first AI agent that runs on your machine, combining memory, file access, tool use, and community skills into a persistent assistant. Running it directly on your system means the agent can access your files, credentials, and network—creating real security risks.
+AI coding and agent tools run locally with access to your files, credentials, and network — running one directly on your system means it can reach all of that, creating real security exposure.
 
-**NVIDIA OpenShell** solves this problem. It is an open-source sandbox runtime that wraps the agent in kernel-level isolation with declarative YAML policies. OpenShell controls what the agent can read on disk, which network endpoints it can reach, and what privileges it has—without disabling the capabilities that make the agent useful.
+**NVIDIA OpenShell** solves this problem. It is an open-source sandbox runtime that wraps an agent in kernel-level isolation with declarative YAML policies. OpenShell controls what the agent can read on disk, which network endpoints it can reach, and what privileges it has—without disabling the capabilities that make the agent useful.
 
-By combining OpenClaw with OpenShell on your hardware platform, you get the full power of a local AI agent backed by local model serving, while enforcing explicit controls over filesystem access, network egress, and credential handling.
+This playbook uses [Pi](https://pi.dev), a terminal coding agent, as its reference agent, backed by a model served locally with vLLM on your own hardware. You get the full power of a local AI agent with local model serving, while enforcing explicit controls over filesystem access, network egress, and credential handling.
+
+Get started with additional reference examples using [NVIDIA NemoClaw](https://github.com/NVIDIA/NemoClaw), including express installers for DGX Spark and DGX Station.
 
 ### Notice & Disclaimers
 
@@ -63,19 +57,19 @@ No system is perfect, but these practices help keep your information and systems
 1. **Isolate your environment** – Run on a clean PC or isolated virtual machine. Only provision the specific data you want the agent to access.
 2. **Never use real accounts** – Don't connect personal, confidential, or production accounts. Create dedicated test accounts with minimal permissions.
 3. **Vet your skills/plugins** – Only enable skills from trusted sources that have been vetted by the community.
-4. **Lock down access** – Ensure your OpenClaw UI or messaging channels aren't accessible over the network without proper authentication.
+4. **Lock down access** – If your agent exposes a web UI or messaging channel (via `openshell service expose` or similar), ensure it isn't accessible over the network without proper authentication.
 5. **Restrict network access** – Where feasible, limit the agent's internet connectivity.
-6. **Clean up after yourself** – When you're done, remove OpenClaw and revoke all credentials, API keys, and account access you granted.
+6. **Clean up after yourself** – When you're done, delete the sandbox and provider credentials you created, and revoke any API keys or account access you granted.
 
 ---
 
 ## What you'll accomplish
 
-You will install the OpenShell CLI (`openshell`), deploy a gateway on your hardware platform, and launch OpenClaw inside a sandboxed environment using the pre-built OpenClaw community sandbox. The sandbox enforces filesystem, network, and process isolation by default. You will also configure local inference routing so OpenClaw uses a model running on your hardware without needing external API keys.
+You will install the OpenShell CLI (`openshell`), deploy a gateway on your hardware platform, build an agent image containing Pi, and launch it inside a sandbox with a custom provider profile pointing at a model served locally with vLLM. The sandbox enforces filesystem, network, and process isolation by default — you grant the agent exactly the network endpoints and binaries it needs, nothing more, and no external API keys are required.
 
 ## Popular use cases
 
-- **Secure agent experimentation**: Test OpenClaw skills and integrations without exposing your main filesystem or credentials to the agent.
+- **Secure agent experimentation**: Test Pi's tool integrations and skills without exposing your main filesystem or credentials to the agent.
 - **Private enterprise development**: Route all inference to a local model on your hardware. No data leaves the machine unless you explicitly allow it in the policy.
 - **Auditable agent access**: Version-control the policy YAML alongside your project. Review exactly what the agent can reach before granting access.
 - **Iterative policy tuning**: Monitor denied connections in real time with `openshell term`, then hot-reload updated policies without recreating the sandbox.
@@ -85,16 +79,16 @@ You will install the OpenShell CLI (`openshell`), deploy a gateway on your hardw
 **Required:**
 
 - Comfort with the Linux terminal and SSH
-- Basic understanding of Docker (OpenShell runs a k3s cluster inside Docker)
+- Basic understanding of Docker (OpenShell runs your gateway and sandboxes as containers)
 - Familiarity with local LLM serving (this playbook uses vLLM)
 
 **Optional:**
 
-- Awareness of the security model: OpenShell reduces risk through isolation but cannot eliminate all risk. Review the [OpenShell documentation](https://docs.nvidia.com/openshell/latest/) and [OpenClaw security guidance](https://docs.openclaw.ai/gateway/security).
+- Awareness of the security model: OpenShell reduces risk through isolation but cannot eliminate all risk. Review the [OpenShell documentation](https://docs.nvidia.com/openshell/latest/).
 
 ## Supported hardware platforms
 
-Use the matrix below to confirm your hardware platform, OS, memory, and whether multi-node applies. The same OpenShell + OpenClaw workflow applies across supported hardware platforms. Model recommendations differ by platform — see the **Agent-ready Models** tab.
+Use the matrix below to confirm your hardware platform, OS, memory, and whether multi-node applies. The same OpenShell + Pi workflow applies across supported hardware platforms. Model recommendations differ by platform — see [Agent-ready Models](https://build.nvidia.com/spark/vllm/agent-ready-models).
 
 | Hardware platform | OS | Memory  | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- |
@@ -109,7 +103,7 @@ Use the matrix below to confirm your hardware platform, OS, memory, and whether 
 **Hardware requirements**
 
 - Supported hardware platform — see Supported hardware platforms matrix above
-- Sufficient memory for your chosen agent-ready model (see the **Agent-ready Models** tab)
+- Sufficient memory for your chosen agent-ready model (see [Agent-ready Models](https://build.nvidia.com/spark/vllm/agent-ready-models))
 
 **Software requirements**
 
@@ -124,18 +118,18 @@ Use the matrix below to confirm your hardware platform, OS, memory, and whether 
 
 - **Estimated time:** 30 MIN (plus model download time, which depends on model size and network speed)
 - **Risk level:** Medium
-  - OpenShell sandboxes enforce kernel-level isolation, significantly reducing the risk compared to running OpenClaw directly on the host.
+  - OpenShell sandboxes enforce kernel-level isolation, significantly reducing the risk compared to running an agent directly on the host.
   - The sandbox default policy denies all outbound traffic not explicitly allowed. Misconfigured policies may block legitimate agent traffic; use `openshell logs` to diagnose.
   - Large model downloads may fail on unstable networks.
 - **Rollback:** Delete the sandbox with `openshell sandbox delete <sandbox-name>`, stop the gateway, and remove the vLLM container if you started one. See cleanup in the **Instructions** tab.
-- **Last Updated:** 07/27/2026
-  - Gateway install path updated for the systemd user service; troubleshooting expanded for gateway connectivity and sandbox onboarding
+- **Last Updated:** 09/30/2026
+  - Rewritten for OpenShell 0.1.0: reference agent changed from OpenClaw to Pi, custom provider profiles replace managed inference routing, and the sandbox deploy flow builds a bring-your-own agent image instead of using a prebuilt community sandbox
 
 ## Instructions
 
 ## Step 1. Confirm your environment
 
-Verify the OS, GPU, Docker, and Python are available before installing anything.
+Verify the OS, GPU, Docker, and Python are available on your device.
 
 ```bash
 head -n 2 /etc/os-release
@@ -144,7 +138,10 @@ docker info --format '{{.ServerVersion}}'
 python3 --version
 ```
 
-Expected output should show Ubuntu 24.04 (or compatible DGX OS), a detected GPU, a Docker server version, and Python 3.12+. If you access the hardware remotely, ensure port `18789` is available for the OpenClaw dashboard.
+Expected output should show Ubuntu 24.04 (or compatible DGX OS), a detected GPU, a Docker server version, and Python 3.12+.
+
+> [!NOTE]
+> This playbook requires OpenShell 0.1.0 or later. If an OpenShell installation is already present on this machine, uninstall it first (see the [OpenShell uninstall docs](https://docs.nvidia.com/openshell/latest/about/installation#uninstall-openshell)) before continuing.
 
 ## Step 2. Docker configuration
 
@@ -178,33 +175,38 @@ docker run --rm --runtime=nvidia --gpus all ubuntu nvidia-smi
 
 ## Step 3. Install the OpenShell CLI
 
-Install OpenShell with the official installer, which installs the `openshell` CLI and registers the `openshell-gateway` systemd user service:
+Install OpenShell with the official installer, which installs the CLI, the policy prover, and a local gateway in one step, then starts the gateway automatically:
 
 ```bash
 curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh
 ```
 
-Open a new shell (or `source ~/.bashrc`) so `openshell` is on your `PATH`, then verify:
+> [!NOTE]
+> To pin a specific release, set `OPENSHELL_VERSION` to a release tag (`OPENSHELL_VERSION=v0.1.2 sh`) or `OPENSHELL_VERSION=pre`/`dev` for a prerelease/rolling build. See the [OpenShell installation docs](https://docs.nvidia.com/openshell/latest/about/installation) for macOS, Snap, and Kubernetes install paths. The installer is the only supported install route and is required for the gateway.
+
+The installer picks a package for your platform (a `.deb` on Ubuntu, `.rpm` on Fedora/RHEL) and registers the `openshell-gateway` systemd user service. Open a new shell (or `source ~/.bashrc`) so `openshell` is on your `PATH`, then confirm the CLI can reach the gateway:
 
 ```bash
-openshell --help
+openshell status
 ```
 
-Expected output should show the `openshell` command tree with subcommands like `gateway`, `sandbox`, `provider`, and `inference`.
-
-> [!NOTE]
-> Alternative install: `uv venv openshell-env && source openshell-env/bin/activate && uv pip install openshell`. If you use this path, activate the virtual environment in every new terminal before running `openshell` commands. The systemd unit is only provided by the official installer — see the [OpenShell gateway docs](https://docs.nvidia.com/openshell/sandboxes/manage-gateways) for gateway startup on the uv path.
+Expected: `Status: Connected`.
 
 ## Step 4. Verify the OpenShell gateway
 
-The official installer manages the gateway as a systemd user service. Confirm the service is running and the CLI can reach it:
+The installer manages the gateway as a systemd user service, listening at `https://127.0.0.1:17670` and reading `~/.config/openshell/gateway.toml`.
+
+> [!TIP]
+> To manage a gateway on remote hardware from a separate workstation, register it as a named gateway instead of connecting to `127.0.0.1`: `openshell gateway add https://<hardware-ip-or-hostname>:17670 --name <name>` (mTLS gateways need the CLI client certificate in place first). See [Manage Gateways](https://docs.nvidia.com/openshell/latest/how-it-works/gateways/overview) for the full registration and authentication flow.
+
+Confirm the service is running, and that the CLI can reach it:
 
 ```bash
 systemctl --user status --no-pager openshell-gateway
 openshell status
 ```
 
-`openshell status` should report the gateway as **Connected**. If the service is not running, start it:
+`openshell status` should report `Status: Connected` and `Authentication: Authenticated`. If the service is not running, start it:
 
 ```bash
 systemctl --user start openshell-gateway
@@ -218,22 +220,18 @@ To keep the gateway available after you log out:
 sudo loginctl enable-linger $USER
 ```
 
-Follow gateway logs in real time (press `Ctrl+C` to exit):
+Follow gateway logs in real time (press `Ctrl+C` to exit) using the following command in a new terminal window:
 
 ```bash
 journalctl --user -u openshell-gateway -f
 ```
 
-The first run may take a few minutes while Docker pulls images and the internal k3s cluster bootstraps.
-
-> [!TIP]
-> To manage a gateway on remote hardware from a separate workstation, ensure passwordless SSH works first, then use `openshell gateway start --remote <username>@<hostname>` (or register an existing gateway per the [OpenShell gateway docs](https://docs.nvidia.com/openshell/latest/sandboxes/manage-gateways.html)).
-
 ## Step 5. Serve a model with vLLM
 
-Serve an OpenAI-compatible API for local inference. Use the recommended model for your hardware platform from the **Agent-ready Models** tab.
+Serve an OpenAI-compatible API for local inference. Use the recommended model and launch recipe for your hardware platform from [Agent-ready Models](https://build.nvidia.com/spark/vllm/agent-ready-models) (covers DGX Spark, DGX Station, and RTX PRO). Keep `--host 0.0.0.0` and port `8000` so sandboxes can reach the server.
 
-Launch the matching recipe in a **separate terminal**, keeping `--host 0.0.0.0` and port `8000` so the OpenShell gateway (inside Docker) can reach the server.
+> [!IMPORTANT]
+> Do not bind the server to `localhost` only. Sandboxes reach host-local services through the `host.openshell.internal` DNS alias (Step 6), which resolves to the gateway host — not to `127.0.0.1` inside the sandbox's own network namespace.
 
 Once the server reports `Application startup complete`, verify the localhost endpoint:
 
@@ -241,42 +239,55 @@ Once the server reports `Application startup complete`, verify the localhost end
 curl -sf http://localhost:8000/v1/models
 ```
 
-Expected: a JSON `"data"` array listing your model handle. Note the exact `id` — you will reuse it in Steps 6–7 and the OpenClaw wizard.
-
-Then verify the hardware-IP endpoint. This check is required because the OpenShell gateway reaches the server from a container rather than the host network namespace:
+Expected: a JSON `"data"` array listing your model handle. Export the reported `id` as an environment variable, used throughout the remaining steps:
 
 ```bash
-export HARDWARE_IP="$(hostname -I | awk '{print $1}')"
-test -n "$HARDWARE_IP"
-curl -sf "http://${HARDWARE_IP}:8000/v1/models"
+export MODEL_HANDLE=your-model-id
 ```
 
-> [!IMPORTANT]
-> Do not bind the server to `localhost` only. The OpenShell gateway cannot reach host services via `127.0.0.1` from inside its container network.
+## Step 6. Create a provider profile for the local vLLM server
 
-## Step 6. Create an inference provider
+Providers attach directly to a sandbox. The agent inside calls the provider's endpoint directly. This playbook runs inference against a self-hosted vLLM server on your own hardware, so it needs a provider profile declaring that specific host and port — OpenShell's example profiles (like `openai`, in the [providers directory](https://github.com/NVIDIA/OpenShell/tree/main/providers)) are scoped to their public vendor endpoints (`api.openai.com`, etc.) and aren't meant to be redirected to a different host.
 
-Create an OpenShell provider that points to your local vLLM server.
-
-Set the IP address of your hardware:
+Save a profile declaring your vLLM server's host, port, and the binaries allowed to call it:
 
 ```bash
-export HARDWARE_IP="$(hostname -I | awk '{print $1}')"
-test -n "$HARDWARE_IP"
+cat > local-vllm.yaml <<'EOF'
+id: local-vllm
+display_name: Local vLLM
+description: Host-local vLLM OpenAI-compatible API
+category: inference
+inference_capable: true
+credentials: []
+endpoints:
+  - host: host.openshell.internal
+    port: 8000
+    protocol: rest
+    access: read-write
+    enforcement: enforce
+binaries:
+  - /usr/local/bin/node
+  - /usr/bin/curl
+  - /usr/local/bin/curl
+  - /usr/bin/python3
+  - /usr/local/bin/python
+  - /sandbox/.uv/python/**
+  - /sandbox/.venv/**
+EOF
 ```
 
-Create the provider with that address. vLLM does not require an API key, so any non-empty placeholder works:
+> [!NOTE]
+> `host.openshell.internal` is the DNS alias sandboxes use to reach services running on the gateway host. The network policy only grants access to binaries named in this list, matched against the kernel-resolved target of the calling process (check with `readlink -f <path>` inside the sandbox if a symlinked interpreter is denied unexpectedly). `/usr/local/bin/node` covers Pi (Step 7); add or remove entries to match the agent image you build.
+
+vLLM does not require an API key, so the profile declares no credentials (`credentials: []`), and the provider is created without any `--credential` flag.
+
+Lint and import the profile, then create a provider from it:
 
 ```bash
-openshell provider create \
-    --name local-vllm \
-    --type openai \
-    --credential OPENAI_API_KEY=not-needed \
-    --config OPENAI_BASE_URL="http://${HARDWARE_IP}:8000/v1"
+openshell profile lint -f local-vllm.yaml
+openshell profile import -f local-vllm.yaml
+openshell provider create --name local-vllm --type local-vllm
 ```
-
-> [!IMPORTANT]
-> Do **not** use `localhost` or `127.0.0.1` here. The OpenShell gateway runs inside Docker and cannot reach host services via those addresses. Use the machine's actual IP from `hostname -I`.
 
 Verify:
 
@@ -284,228 +295,253 @@ Verify:
 openshell provider list
 ```
 
-## Step 7. Configure inference routing
+## Step 7. Build the Pi agent image
 
-Point the `inference.local` endpoint (available inside every sandbox) at your model. The model name must match the handle served in Step 5:
+This playbook uses [Pi](https://pi.dev), a terminal coding agent, as its reference agent. Build an image containing Pi and pass it to `sandbox create --from`.
+
+Save the Dockerfile:
 
 ```bash
-openshell inference set \
-    --provider local-vllm \
-    --model <MODEL_HANDLE>
+cat > Dockerfile.pi <<'EOF'
+FROM node:24-bookworm-slim
+
+ARG PI_VERSION=latest
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends bash ca-certificates fd-find git ripgrep \
+    && ln -s /usr/bin/fdfind /usr/local/bin/fd \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN npm install -g --ignore-scripts "@earendil-works/pi-coding-agent@${PI_VERSION}"
+
+RUN mkdir -p /workspace && chown node:node /workspace
+USER node
+WORKDIR /workspace
+
+ENV PI_CODING_AGENT_DIR=/tmp/pi-agent
+COPY --chown=node:node models.json /tmp/pi-agent/models.json
+EOF
 ```
 
-Replace `<MODEL_HANDLE>` with the served model name from the **Agent-ready Models** tab:
-- **DGX Spark:** `nvidia/Qwen3.6-35B-A3B-NVFP4`
-- **DGX Station:** `nemotron-ultra` (the `--served-model-name` set in the launch command, not the HuggingFace handle)
+`fd`/`ripgrep` are baked in because the sandbox policy blocks Pi's fallback download of them on first use. `PI_CODING_AGENT_DIR` points at `/tmp` because that's one of the few paths the default sandbox policy lets Pi write to.
+
+Next to `Dockerfile.pi`, save `models.json`, declaring your local vLLM server as a custom OpenAI-compatible provider. This uses the `$MODEL_HANDLE` you exported in Step 5:
+
+```bash
+cat > models.json <<EOF
+{
+  "providers": {
+    "local-vllm": {
+      "baseUrl": "http://host.openshell.internal:8000/v1",
+      "api": "openai-completions",
+      "apiKey": "not-needed",
+      "models": [
+        { "id": "$MODEL_HANDLE" }
+      ]
+    }
+  }
+}
+EOF
+```
+
+Build the image:
+
+```bash
+docker build -t pi-agent:local -f Dockerfile.pi .
+```
 
 > [!NOTE]
-> If you see `failed to verify inference endpoint` or `failed to connect`, confirm the server is healthy and warm up with one chat completion request. You can add `--no-verify` to skip endpoint verification after confirming reachability from the host.
+> If your gateway uses Podman, build with `podman build -t localhost/pi-agent:local -f Dockerfile.pi .` and use `localhost/pi-agent:local` below. If the gateway runs on different hardware than this shell, push the image to a registry the gateway can pull from instead.
 
-Verify:
+## Step 8. Deploy the sandbox and start Pi
 
-```bash
-openshell inference get
-```
-
-Expected output should show `provider: local-vllm` and your chosen `model`.
-
-## Step 8. Deploy the OpenShell sandbox
-
-Create a sandbox using the pre-built OpenClaw community sandbox:
+Create the sandbox, attach the `local-vllm` provider from Step 6, and launch Pi as the sandbox's main process with the model preselected (no interactive `/model` picker needed):
 
 ```bash
 export SANDBOX_NAME=openshell-demo
 
 openshell sandbox create \
-  --keep \
-  --tty \
-  --forward 18789 \
   --name "$SANDBOX_NAME" \
-  --from openclaw \
-  -- openclaw-start
+  --from pi-agent:local \
+  --provider local-vllm \
+  -- pi --model local-vllm/"$MODEL_HANDLE"
 ```
 
-> [!NOTE]
-> Do not pass `--policy` with a local file path when using `--from openclaw`. The policy is bundled with the community sandbox; a local file path can cause "file not found."
+This uses the same `$MODEL_HANDLE` exported in Step 5 and baked into Step 7's `models.json`. OpenShell allocates a TTY automatically when both `stdin` and `stdout` are terminals; add `--tty` explicitly if you run this from a script or wrapper.
 
-The `--keep` flag keeps the sandbox running after the initial process exits. To terminate when the initial process exits, use `--no-keep` instead.
+By default OpenShell attaches to Pi's session in this terminal and retains the sandbox after Pi exits (pass `--no-keep` for an ephemeral run instead).
 
-The CLI will:
+Once connected to the sandbox, try a prompt allowed by the OpenShell policy defined in Step 6:
 
-1. Resolve `openclaw` against the community catalog
-2. Pull and build the container image
-3. Apply the bundled sandbox policy
-4. Launch OpenClaw inside the sandbox
+```text
+Explain what files are available in this workspace.
+```
+
+Then try a prompt that reaches outside the sandbox's granted network access, to confirm isolation is enforced and not just assumed:
+
+```text
+Fetch the contents of https://example.com and summarize it.
+```
+
+Expect this one to fail with an ` Error: Connection error.`. Step 6's `local-vllm.yaml` declares exactly one network endpoint — `host: host.openshell.internal`, `port: 8000` — and the sandbox denies every destination not explicitly listed in an attached profile's `endpoints`, so `example.com:443` is blocked before the connection leaves the sandbox. Confirm the exact reason with `openshell logs "$SANDBOX_NAME" --tail` (Step 9): look for a `DENIED` line citing `transparent_tcp_policy_denied`.
+
+Detach without stopping Pi: press `Ctrl-P` then `Ctrl-Q`. Later steps reconnect to this same running session.
 
 > [!IMPORTANT]
-> Once the container is ready, the OpenClaw onboarding wizard will launch automatically in this terminal. Proceed to Step 9 to complete it before continuing.
+> Don't type `/quit` yet. Quitting ends Pi as the sandbox's main process — the sandbox is retained for inspection (`sandbox get`, `policy get`, `logs`) afterward, but can no longer be reconnected to or exec'd into. `openshell sandbox delete` (Step 14) tears the sandbox down regardless of whether Pi was quit or just detached, so there's no need to quit manually before cleanup.
 
-## Step 9. Configure OpenClaw within the sandbox
+## Step 9. Inspect the sandbox
 
-> [!IMPORTANT]
-> The onboarding wizard is **fully interactive** — it requires arrow-key navigation and Enter to select options. It cannot be completed from a non-interactive session. You must run `openshell sandbox create` from a terminal with full TTY support.
->
-> If the wizard did not complete during sandbox creation, reconnect:
-> ```bash
-> openshell sandbox connect "$SANDBOX_NAME"
-> ```
+Open a second terminal to check status, effective policy, attached providers, and logs:
+
+```bash
+openshell sandbox list
+openshell policy get "$SANDBOX_NAME" --full
+openshell sandbox provider list "$SANDBOX_NAME"
+openshell logs "$SANDBOX_NAME" --tail
+```
+
+`openshell logs --tail` streams outbound connections and policy decisions (`allow`/`deny`) in real time — useful for confirming Pi's requests are reaching `host.openshell.internal:8000` and nothing else.
 
 > [!NOTE]
-> If `openshell sandbox get` shows `Phase: Unspecified`, that is expected until the interactive wizard finishes. The sandbox container can still be healthy while the phase shows `Unspecified`. Confirm with supervisor logs if needed:
-> ```bash
-> docker logs $(docker ps --filter name=openshell-"$SANDBOX_NAME" --format '{{.Names}}') --tail 20
-> ```
-> Look for `OpenShell Sandbox Supervisor success` and `Applying Landlock filesystem sandbox`.
+> A successful chat turn with Pi in Step 8 confirms inference connectivity. If Pi can't reach the model, check `openshell sandbox provider list` and the policy/logs commands above before assuming vLLM itself is unhealthy.
 
-Use the arrow keys and Enter to complete onboarding:
+## Step 10. Verify sandbox isolation
 
-- If you understand and agree, select **Yes** and press Enter.
-- Quickstart vs Manual: select **Quickstart**.
-- Model/auth Provider: select **Custom Provider**.
-- API Base URL: `https://inference.local/v1`
-- How do you want to provide this API key?: **Paste API key for now**.
-- API key: enter any non-empty placeholder (for example `vllm` or `not-needed`).
-- Endpoint compatibility: select **OpenAI-compatible**.
-- Model ID: enter the same handle you set in Step 7.
-- Endpoint ID: leave the default.
-- Alias: optional; you can reuse the model name.
-- Channel: **Skip for now**.
-- Search provider: **Skip for now**.
-- Skills: **No** for now.
-- Enable hooks: **Skip for now** / **No**, then press Enter.
-
-After 1–2 minutes you should see a URL with a token:
-
-```bash
-OpenClaw gateway starting in background.
-  Logs: /tmp/gateway.log
-  UI:   http://127.0.0.1:18789/?token=<unique-token>
-```
-
-Verify the sandbox:
-
-```bash
-openshell sandbox get "$SANDBOX_NAME"
-```
-
-### Access the dashboard
-
-**On the hardware itself:** open the UI URL from the wizard output in a local browser (right-click → Open Link when available).
-
-**From a remote workstation:** activate port forwarding:
-
-```bash
-openshell forward start --background 18789 "$SANDBOX_NAME"
-openshell forward list
-```
-
-You should see your sandbox name with port `18789`. Then open:
-
-`http://127.0.0.1:18789/#token=<your-token>`
-
-If you manage the gateway from a remote machine, register it with hostname `openshell` (not the raw LAN IP) so TLS certificate validation succeeds — see the [OpenShell gateway docs](https://docs.nvidia.com/openshell/latest/sandboxes/manage-gateways.html). Map `openshell` to the hardware IP in `/etc/hosts` on the workstation, then:
-
-```bash
-openshell gateway add https://openshell:8080 --remote <user>@<hardware-ip>
-openshell forward start --background 18789 "$SANDBOX_NAME"
-```
-
-If the dashboard URL is only reachable inside the sandbox and the host forward is not active, you can also tunnel with the OpenShell SSH proxy (replace sandbox id, token, and gateway URL from your environment):
-
-```bash
-ssh -o ProxyCommand='openshell ssh-proxy --gateway https://127.0.0.1:17670/connect/ssh --sandbox-id <sandbox-id> --token <token> --gateway-name openshell' \
-  -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR \
-  -N -L 18789:127.0.0.1:18789 sandbox
-```
-
-Then open `http://127.0.0.1:18789/?token=<your-token>` in your local browser.
-
-From the dashboard you can **Chat** with your OpenClaw agent inside the OpenShell sandbox.
-
-## Step 10. Test inference inside the sandbox
-
-Connect to the sandbox terminal:
-
-```bash
-openshell sandbox connect "$SANDBOX_NAME"
-```
-
-Test connectivity to the local model:
-
-```bash
-curl https://inference.local/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "<MODEL_HANDLE>",
-    "messages": [{"role": "user", "content": "Hello!"}]
-  }'
-```
-
-Replace `<MODEL_HANDLE>` with the same handle from Step 7.
-
-## Step 11. Verify sandbox isolation
-
-Open a second terminal and check live status and logs:
+With Pi running, open `openshell term` for a live dashboard of sandbox status and the log stream:
 
 ```bash
 openshell term
 ```
 
-The terminal dashboard shows:
-
-- **Sandbox status** — name, phase, image, providers, and port forwards
-- **Live log stream** — outbound connections, policy decisions (`allow`, `deny`, `inspect_for_inference`), and inference interceptions
-
-Verify that the agent can reach `inference.local` and that unauthorized outbound traffic is denied.
+Confirm Pi's traffic to `host.openshell.internal:8000` is allowed and that unrelated outbound traffic is denied.
 
 > [!TIP]
 > Press `f` to follow live output, `s` to filter by source, and `q` to quit.
 
-## Step 12. Reconnect and transfer files
+## Step 11 (Optional). Update the local-vllm policy
 
-Reconnect at any time:
+Grant Pi access to an additional destination — for example `raw.githubusercontent.com:443`, so Pi can fetch the OpenShell README directly from GitHub. This edits the `local-vllm` profile from Step 6, so the change applies everywhere that profile is attached, including the sandbox already running from Step 8.
+
+> [!NOTE]
+> The profile scopes access by host and port, not by URL path — granting `raw.githubusercontent.com` permits reaching any repository's raw content on that host, not only the OpenShell repo.
+
+The profile is where policy lives, so it's the only object you edit. Export it first to capture the `resource_version` that `profile update` requires:
+
+```bash
+openshell profile export local-vllm -o yaml > local-vllm.yaml
+```
+
+Add the new endpoint to the `endpoints:` list. `profile export` appends metadata fields (`resource_version`, `source`, `scope`) after `binaries:`, so appending to the end of the file would land outside `endpoints:` entirely — insert it right before the `binaries:` line instead:
+
+```bash
+sed -i '/^binaries:/i\
+  - host: raw.githubusercontent.com\
+    port: 443\
+    protocol: rest\
+    access: read-write\
+    enforcement: enforce' local-vllm.yaml
+```
+
+Lint, then update the profile:
+
+```bash
+openshell profile lint -f local-vllm.yaml
+openshell profile update local-vllm -f local-vllm.yaml
+```
+
+The provider from Step 6 references the profile by `id`, so it automatically reflects the update. New sandboxes inherit it immediately; for the sandbox already running from Step 8, confirm it has synced:
+
+```bash
+openshell sandbox provider attach "$SANDBOX_NAME" local-vllm --wait
+```
+
+Network-policy changes like this hot-reload into a running sandbox, so Pi can retry a previously denied request without restarting. Credential *value* changes need a new process instead — a running process keeps the placeholder it started with, so exit and restart the agent (or use `openshell sandbox exec`) to pick up new credentials. Reconnect and retry the same style of prompt Step 8 showed being denied, now against the newly granted host:
 
 ```bash
 openshell sandbox connect "$SANDBOX_NAME"
 ```
 
-> [!NOTE]
-> `openshell sandbox connect` is interactive-only. Use upload/download for file transfers, or `openshell sandbox ssh-config` for scripted SSH.
+```text
+Fetch the contents of https://raw.githubusercontent.com/NVIDIA/OpenShell/main/README.md and summarize it.
+```
+
+This one succeeds — `raw.githubusercontent.com:443` is now in `local-vllm`'s `endpoints`, while every other destination (`example.com` included) stays denied.
+
+To revoke `local-vllm` access from a sandbox without deleting the sandbox itself:
+
+```bash
+openshell sandbox provider detach "$SANDBOX_NAME" local-vllm --wait
+```
+
+## Step 12. Work on a local project (optional)
+
+Point Pi at your own code by uploading a project directory at sandbox-creation time. `--upload` copies the directory in before Pi starts, skipping anything `.gitignore` excludes:
+
+```bash
+openshell sandbox create \
+  --name pi-project \
+  --from pi-agent:local \
+  --provider local-vllm \
+  --upload .:/workspace \
+  -- pi --model local-vllm/"$MODEL_HANDLE"
+```
+
+Pi's changes stay inside the sandbox. Copy them back with `openshell sandbox download` from another terminal while Pi is still running (see Step 13).
+
+## Step 13. Reconnect and transfer files
+
+Reattach to Pi's running session at any time — this replays recent output and hands you back the same interactive process:
+
+```bash
+openshell sandbox connect "$SANDBOX_NAME"
+```
+
+Press `Ctrl-P` then `Ctrl-Q` to detach without stopping Pi. For a separate shell alongside Pi, or for scripted access, use:
+
+```bash
+openshell sandbox exec -n "$SANDBOX_NAME" --tty -- /bin/bash
+openshell sandbox ssh-config "$SANDBOX_NAME"
+```
+
+Transfer files without attaching:
 
 ```bash
 openshell sandbox upload "$SANDBOX_NAME" ./local-file /sandbox/destination
 openshell sandbox download "$SANDBOX_NAME" /sandbox/file ./local-destination
 ```
 
-## Step 13. Cleanup
+## Step 14. Cleanup
 
-Run gateway-dependent cleanup first, while the gateway is still reachable:
+Delete the sandbox(es) and provider while the gateway is still reachable:
 
 ```bash
 openshell sandbox delete "$SANDBOX_NAME"
 openshell provider delete local-vllm
 ```
 
-If you use the systemd user service (official installer):
+To stop the gateway without uninstalling it:
 
 ```bash
 systemctl --user stop openshell-gateway
-systemctl --user disable openshell-gateway
+```
+
+To fully remove OpenShell (Ubuntu/Debian shown; see the [uninstall docs](https://docs.nvidia.com/openshell/latest/about/installation#uninstall-openshell) for Fedora/RHEL, Homebrew, and Snap):
+
+```bash
+systemctl --user disable --now openshell-gateway
+sudo apt remove openshell
+rm -rf "${XDG_STATE_HOME:-$HOME/.local/state}/openshell"
+```
+
+If you enabled linger in Step 4, disable it:
+
+```bash
 sudo loginctl disable-linger $USER
 ```
 
-If you started the gateway with the CLI instead:
-
-```bash
-openshell gateway stop
-```
-
-> [!WARNING]
-> The following command permanently removes the gateway cluster and all its data.
-
-```bash
-openshell gateway destroy
-```
+> [!NOTE]
+> `openshell gateway stop` and `openshell gateway destroy` are not real subcommands (valid: `add`/`remove`/`login`/`logout`/`select`/`info`/`list`) — the gateway is a systemd service, not something the CLI starts or stops directly.
 
 Stop and remove the vLLM container if you started one for this playbook (replace the name/image filter to match your launch):
 
@@ -513,62 +549,13 @@ Stop and remove the vLLM container if you started one for this playbook (replace
 docker rm -f vllm-server 2>/dev/null || true
 ```
 
-## Step 14. Next steps
+## Step 15. Next steps
 
-- **Add more providers**: Attach GitHub tokens, GitLab tokens, or cloud API keys with `openshell provider create`, then pass `--provider <name>` when creating a sandbox.
-- **Try other community sandboxes**: `openshell sandbox create --from base` or `--from sdg`.
-- **Connect VS Code**: Use `openshell sandbox ssh-config <sandbox-name>` and append the output to `~/.ssh/config`.
+- **Add more providers**: Attach GitHub tokens, GitLab tokens, or cloud API keys the same way as Step 6 — import a profile, `openshell provider create`, then pass `--provider <name>` when creating a sandbox. See the [providers directory](https://github.com/NVIDIA/OpenShell/tree/main/providers) for ready-made profiles (GitHub, PyPI, hosted model APIs).
+- **Bring another agent image**: Build a Dockerfile for any agent (OpenCode, Claude Code, etc.) following the same pattern as Step 7, and write it a provider profile following Step 6.
+- **Connect VS Code**: Use `openshell sandbox create --editor vscode` or `openshell sandbox connect <name> --editor cursor` to open the sandbox workspace directly in an editor, or `openshell sandbox ssh-config <sandbox-name>` for manual SSH config.
+- **Expose a web UI**: If an agent image serves a dashboard or web UI, use `openshell service expose <sandbox> <port>`.
 - **Monitor and audit**: Use `openshell logs <sandbox-name> --tail` or `openshell term` to monitor agent activity and policy decisions.
-
-## Agent-ready Models
-
-## Agent-ready models
-
-Agent-ready models are tuned for **agentic workloads** — tool calling, reasoning traces, and long multi-turn sessions. Pick the recommended model for your hardware platform, serve it with an OpenAI-compatible API (this playbook uses vLLM), then continue with the **Instructions** tab to wire OpenShell inference routing and launch the OpenClaw sandbox.
-
-### Recommendations by hardware platform
-
-| Hardware platform | Recommended agent-ready model | HuggingFace handle |
-| ----------------- | ----------------------------- | ------------------ |
-| **DGX Spark** | Agent-ready Qwen3.6-35B-A3B (NVFP4) | `nvidia/Qwen3.6-35B-A3B-NVFP4` |
-| **DGX Station** | NVIDIA Nemotron 3 Ultra (NVFP4) | `nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4` |
-
-### Before you serve
-
-Complete Docker setup in the **Instructions** tab (Steps 1–2), then export a Hugging Face token if your model requires it:
-
-```bash
-export HF_TOKEN=your_actual_token_here
-```
-
-### DGX Spark
-
-Launch via the vLLM playbook's [Agent-ready Models](https://build.nvidia.com/playbooks/vllm/agent-ready-models) tab, keeping `--host 0.0.0.0` and port `8000`.
-
-### DGX Station
-
-Follow the [Nemotron 3 Ultra Station Deployment Guide](https://github.com/NVIDIA-NeMo/nemotron/tree/main/usage-cookbook/Nemotron-3-Ultra/StationDeploymentGuide), which covers GB300 device selection, CPU offloading, and all required vLLM flags.
-
-> [!IMPORTANT]
-> The deployment guide uses `--served-model-name nemotron-ultra`. Use `nemotron-ultra` (not the HuggingFace handle) when running `openshell inference set` in Step 7 and in the OpenClaw onboarding wizard.
-
-Once the server reports `Application startup complete`, confirm the API is up:
-
-```bash
-curl -s http://0.0.0.0:8000/v1/models
-```
-
-### OpenShell-specific requirements
-
-| Requirement | Why it matters |
-| ----------- | -------------- |
-| `--host 0.0.0.0` | The OpenShell gateway runs inside Docker and cannot reach a server bound only to `localhost`. |
-| Host IP in the provider URL | Create the OpenShell provider with `http://<Machine_IP>:8000/v1`, not `localhost` or `127.0.0.1`. |
-| Matching model id | The OpenClaw wizard Model ID must match the handle served by vLLM and configured in `openshell inference set`. |
-
-### Next steps
-
-Once the server is up and `curl http://0.0.0.0:8000/v1/models` returns your model handle, return to the **Instructions** tab at **Step 5** to create the inference provider and deploy the sandbox.
 
 ## Troubleshooting
 
@@ -577,19 +564,19 @@ Once the server is up and `curl http://0.0.0.0:8000/v1/models` returns your mode
 | `openshell status` shows "Connection refused" | The `openshell-gateway` systemd user service is not running, or Docker socket is not accessible from the user service | Start it: `systemctl --user start openshell-gateway`. Check logs: `journalctl --user -u openshell-gateway --no-pager -n 50`. If the service cannot reach Docker, fix socket access with `sudo setfacl -m u:$USER:rw /var/run/docker.sock`, then restart the service |
 | Gateway service fails to start after installation | Docker is not running | Start Docker: `sudo systemctl start docker`. Then restart the OpenShell gateway service: `systemctl --user restart openshell-gateway` |
 | `openshell status` shows gateway as unhealthy | Gateway service or container crashed / failed to initialize | Run `systemctl --user restart openshell-gateway` and inspect `journalctl --user -u openshell-gateway --no-pager -n 50`. Check Docker with `docker ps -a` and `docker logs <container-id>` |
-| `openshell sandbox create --from openclaw` fails to build | Network issue pulling the community sandbox or Dockerfile build failure | Check internet connectivity. Retry the command. If the build fails on a specific package, check if the base image is compatible with your Docker version |
-| Sandbox is in `Error` phase after creation | Policy validation failed or container startup crashed | Run `openshell logs <sandbox-name>` to see error details. Common causes: invalid policy YAML, missing provider credentials, or port conflicts |
-| Agent cannot reach `inference.local` inside the sandbox | Inference routing not configured or provider unreachable | Run `openshell inference get` to verify the provider and model are set. From the host, test the server: `curl -s http://localhost:8000/v1/models`. Ensure the provider `OPENAI_BASE_URL` uses the hardware IP address (not `localhost`), since the gateway runs inside Docker |
-| 503 verification failed or timeout when gateway/sandbox accesses vLLM on the host | Provider URL points at `localhost`, firewall blocking port 8000, model still loading, or first-request compile | Confirm the server was started with `--host 0.0.0.0`. Confirm the provider URL uses the hardware IP from `hostname -I`. Warm up with a chat completion before `openshell inference set`. Allow port 8000 through the host firewall if needed: `sudo ufw allow 8000/tcp` (then `sudo ufw reload`). Use `--no-verify` only after confirming the host API works |
-| Agent's outbound connections are all denied | Default policy does not include the required endpoints | Monitor denials with `openshell logs <sandbox-name> --tail --source sandbox`. Pull the current policy with `openshell policy get <sandbox-name>` (without `--full`), add the needed host/port under `network_policies`, and push with `openshell policy set <sandbox-name> --policy <file> --wait`. See the `unknown field 'Version'` row below if you used `--full`. |
-| `openshell policy set` fails with `unknown field 'Version'` | `openshell policy get --full` prepends a metadata header (including a `Version` field) that `policy set` does not accept | Use `openshell policy get <sandbox-name>` without `--full` to export only the policy YAML. If you already have output with the metadata header, strip every line before the first `---` (or before the first policy key) before passing it to `policy set`. |
+| `openshell sandbox create --from pi-agent:local` fails because the image isn't found | The image was built with a different container engine than the gateway's compute driver, or wasn't built at all | Confirm the build succeeded: `docker images pi-agent:local`. If the gateway uses Podman, build with `podman build -t localhost/pi-agent:local -f Dockerfile.pi .` and reference `localhost/pi-agent:local`. If the gateway runs on different hardware than this shell, push the image to a registry the gateway can pull from instead of using a local tag |
+| Sandbox is in `Error` phase after creation | Policy validation failed, a referenced provider profile is missing, or the container failed to start | Run `openshell logs <sandbox-name>` to see error details. Common causes: invalid policy or profile YAML, a provider profile that was never imported, or port conflicts |
+| Agent gets `Error: Connection error.` calling the local provider, even though the endpoint and model look right | The calling binary isn't in the attached profile's `binaries` list — a binary being allowed for one endpoint doesn't grant it access to others, and vice versa | Reproduce the request, then check `openshell logs <sandbox-name> --tail` for a line like `DENIED /path/to/binary -> host:port [reason:transparent_tcp_policy_denied]`. Add that exact binary path to the profile's `binaries` (export → edit → `profile lint` → `profile update`, per Step 11), then `openshell sandbox provider attach <sandbox-name> <provider-name> --wait` |
+| Agent gets repeated `Error: Connection error.` against the local vLLM endpoint, and `openshell logs --tail` shows `NET:FAIL` (not `DENIED`) for that destination | vLLM itself isn't responding — crashed, OOM, hung on a prior request, or was never started | From the host, confirm it's actually serving: `curl -s http://0.0.0.0:8000/v1/models`. Check the terminal/logs where vLLM is running for errors, and check `nvidia-smi` to see if the GPU is pegged or the process is gone. This is a host-side vLLM problem, not an OpenShell policy issue — a `NET:FAIL` means the connection never completed, unlike a `DENIED` line, which means policy blocked it |
+| Agent's outbound connections are all denied for a destination you expect to be allowed | The attached provider's profile doesn't declare that `host`/`port` in `endpoints`, or doesn't declare the calling binary in `binaries` | Follow the profile update workflow in Step 11: export the profile, add the missing `endpoints`/`binaries` entry, lint, then `openshell profile update <profile-id> -f <file>`. For a one-off override scoped to a single sandbox instead of the shared profile, `openshell policy get <sandbox-name>` (without `--full`) and `openshell policy set <sandbox-name> --policy <file> --wait` work directly against that sandbox — see the next row for a common mistake with this path |
+| `openshell policy set` fails with `unknown field 'Version'` | `openshell policy get --full` prepends a metadata header (including a `Version` field) that `policy set` does not accept | Use `openshell policy get <sandbox-name>` without `--full` to export only the policy YAML. If you already have output with the metadata header, strip every line before the first `---` (or before the first policy key) before passing it to `policy set` |
 | "Permission denied" or Landlock errors inside the sandbox | Agent trying to access a path not in `read_only` or `read_write` filesystem policy | Pull the current policy and add the path to `read_write` (or `read_only` if read access is sufficient). Push the updated policy. Note: filesystem policy is static and requires sandbox recreation |
 | vLLM OOM or very slow inference | Model too large for available memory or GPU contention | Free GPU memory (close other GPU workloads), choose a smaller model, or lower `--gpu-memory-utilization` / `--max-model-len`. Monitor with `nvidia-smi` |
-| `openshell sandbox connect` hangs or times out | Sandbox not in `Ready` phase | Run `openshell sandbox get <sandbox-name>` to check the phase. If stuck in `Provisioning`, wait or check logs. If in `Error`, delete and recreate the sandbox. If phase is `Unspecified` during onboarding, complete the interactive wizard with `openshell sandbox connect <sandbox-name>` |
-| Policy push returns exit code 1 (validation failed) | Malformed YAML or invalid policy fields | Check the YAML syntax. Common issues: paths not starting with `/`, `..` traversal in paths, `root` as `run_as_user`, or endpoints missing required `host`/`port` fields. Fix and re-push |
-| Gateway service starts but fails to become healthy — logs show "K8s namespace not ready" or namespace timeout | The k3s cluster inside the Docker container takes longer to bootstrap than expected | Check journal logs: `journalctl --user -u openshell-gateway --no-pager -n 50`. Check whether the container is still progressing: `docker ps --filter name=openshell`. Inspect k3s state: `docker exec <container> sh -c "KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl get ns"` and `kubectl get pods -A`. If pods are still creating, wait and retry `openshell status`. If it does not recover, stop the service with `systemctl --user stop openshell-gateway`, run `openshell gateway destroy`, then restart: `systemctl --user start openshell-gateway`. Ensure Docker has enough memory and disk |
+| `openshell sandbox connect` or `sandbox exec` refuses with "canonical main process already finished" / "sandbox is not ready (phase: Completed)" | The sandbox's main process (Pi) already exited — a `Completed` sandbox is retained for inspection (`sandbox get`, `policy get`, `logs`) but cannot accept a new attachment or exec'd process | There is no way to resume interactive work in a `Completed` sandbox — delete and recreate it (Step 8). To avoid this, detach instead of quitting next time: press `Ctrl-P` then `Ctrl-Q` rather than typing `/quit`, which keeps Pi running so `sandbox connect` has something to reattach to |
+| Policy push returns exit code 1 (validation failed) | Malformed YAML or invalid policy/profile fields | Check the YAML syntax. Common issues: paths not starting with `/`, `..` traversal in paths, `root` as `run_as_user`, endpoints missing required `host`/`port` fields, or a mapping entry landed outside its intended list because it was appended to the end of the file instead of inserted in place (see Step 11's `sed` insertion pattern) |
+| Gateway service won't become healthy, and `journalctl` shows it stuck rather than crashing outright | The gateway's internal bootstrap (compute driver, database, or container runtime) is taking longer than expected, or Docker doesn't have enough resources | Check journal logs: `journalctl --user -u openshell-gateway --no-pager -n 50`. Check whether the container is still progressing: `docker ps --filter name=openshell`. Ensure Docker has enough memory and disk. If it does not recover, `systemctl --user stop openshell-gateway`, `docker rm -f <container>`, then `systemctl --user start openshell-gateway` |
 | `openshell status` says "No gateway configured" | Gateway service never started or was disabled | Start the gateway: `systemctl --user start openshell-gateway`, then verify with `openshell status` (optionally `systemctl --user enable openshell-gateway` to auto-start on login). If the Docker container is unhealthy, run `systemctl --user stop openshell-gateway`, `docker rm -f <container>`, then `systemctl --user start openshell-gateway` |
-| TLS / certificate errors when adding a remote gateway by LAN IP | Gateway certificate is valid for `openshell`, `localhost`, and `127.0.0.1` — not the LAN IP | Map `openshell` to the hardware IP in `/etc/hosts`, then register with `openshell gateway add https://openshell:8080 --remote <user>@<hardware-ip>` |
+| TLS / certificate errors when registering a remote gateway by raw LAN IP | The gateway's certificate may not validate against a bare IP address | Map a hostname to the hardware IP in `/etc/hosts` on the workstation you're connecting from, then register by that hostname instead of the raw IP: `openshell gateway add https://<hostname>:17670 --name <name>` (see Step 4) |
 
 > [!NOTE]
 > Some hardware platforms use Unified Memory Architecture (UMA), which enables dynamic memory sharing between the GPU and CPU. With many applications still updating to take advantage of UMA, you may encounter memory issues even when within capacity. If that happens, manually flush the buffer cache with:

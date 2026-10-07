@@ -53,6 +53,65 @@ SANDBOX_NAME="${SANDBOX_NAME:-clinical-sandbox}"
 MODEL="${OLLAMA_MODEL:-nemotron-3-super:120b-a12b}"
 PORT="${GATEWAY_PORT:-18789}"
 
+# OpenShell sandbox names are DNS-1123 labels. Validate before any sandbox or
+# forward operation so an option-like or otherwise malformed value can never
+# be interpreted as CLI syntax during cleanup.
+if [ "${#SANDBOX_NAME}" -gt 63 ] \
+   || ! printf '%s\n' "$SANDBOX_NAME" | grep -Eq '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'; then
+    echo "ERROR: SANDBOX_NAME must be a DNS-1123 label (1-63 lowercase alphanumeric/hyphen characters, starting and ending alphanumeric)." >&2
+    exit 2
+fi
+
+# Serialize the complete setup. Without this lock, concurrent runs can both
+# pass the existence check and then delete/recreate each other's sandbox.
+SETUP_LOCK_DIR="${XDG_RUNTIME_DIR:-$HOME/.cache}/clinical-intelligence"
+SETUP_LOCK_FILE="$SETUP_LOCK_DIR/setup.lock"
+ORIGINAL_UMASK=$(umask)
+umask 077
+if [ -L "$SETUP_LOCK_DIR" ]; then
+    echo "ERROR: Refusing symlinked setup lock directory: $SETUP_LOCK_DIR" >&2
+    exit 1
+fi
+mkdir -p "$SETUP_LOCK_DIR"
+chmod 700 "$SETUP_LOCK_DIR"
+if [ -L "$SETUP_LOCK_FILE" ] \
+   || { [ -e "$SETUP_LOCK_FILE" ] && [ ! -f "$SETUP_LOCK_FILE" ]; }; then
+    echo "ERROR: Refusing unsafe setup lock file: $SETUP_LOCK_FILE" >&2
+    exit 1
+fi
+if ! command -v flock >/dev/null 2>&1; then
+    echo "ERROR: flock is required to serialize setup (install the util-linux package)." >&2
+    exit 1
+fi
+exec 9>>"$SETUP_LOCK_FILE"
+umask "$ORIGINAL_UMASK"
+if ! flock -n 9; then
+    echo "ERROR: Another Clinical Intelligence setup is already running." >&2
+    exit 75
+fi
+
+# `--detach` lifecycle semantics used below require OpenShell 0.0.111 or newer.
+# Check the CLI before the gateway helper, provider setup, or any other
+# OpenShell mutation. Accept the normal "openshell X.Y.Z" output only.
+OPENSHELL_VERSION_RAW=$(openshell --version 2>/dev/null || true)
+if [[ "$OPENSHELL_VERSION_RAW" =~ ^[^0-9]*([0-9]+\.[0-9]+\.[0-9]+)[[:space:]]*$ ]]; then
+    OPENSHELL_VERSION="${BASH_REMATCH[1]}"
+else
+    echo "ERROR: Invalid OpenShell version output '$OPENSHELL_VERSION_RAW' (need v0.0.111+)." >&2
+    exit 1
+fi
+if ! awk -v v="$OPENSHELL_VERSION" -v min="0.0.111" 'BEGIN {
+    split(v,a,"."); split(min,b,".")
+    for (i=1;i<=3;i++) {
+        if ((a[i]+0) > (b[i]+0)) exit 0
+        if ((a[i]+0) < (b[i]+0)) exit 1
+    }
+    exit 0
+}'; then
+    echo "ERROR: OpenShell v$OPENSHELL_VERSION found; v0.0.111+ is required." >&2
+    exit 1
+fi
+
 echo "=== Clinical Intelligence Sandbox Setup ==="
 echo "Repo:    $REPO_DIR"
 echo "Sandbox: $SANDBOX_NAME"
@@ -119,12 +178,59 @@ openshell inference set --provider ollama-local --model "$MODEL"
 echo "Inference set to ollama-local/$MODEL"
 echo ""
 
+# Read the exact validated sandbox name from `sandbox list`.
+# Return 0 when present, 1 when absent, and 2 when list itself fails.
+sandbox_exists() {
+    local output
+    if ! output=$(openshell sandbox list 2>&1); then
+        echo "ERROR: Could not list OpenShell sandboxes: $output" >&2
+        return 2
+    fi
+    printf '%s\n' "$output" \
+        | sed "s/$(printf '\033')\[[0-9;]*[a-zA-Z]//g" \
+        | awk -v n="$SANDBOX_NAME" '{ for (i=1;i<=NF;i++) if ($i==n) found=1 } END { exit !found }'
+}
+
+# Delete only SANDBOX_NAME and verify asynchronous deletion completes.
+delete_sandbox_and_wait() {
+    local exists_rc i
+    if sandbox_exists; then
+        :
+    else
+        exists_rc=$?
+        [ "$exists_rc" -eq 1 ] && return 0
+        return "$exists_rc"
+    fi
+
+    echo "Deleting sandbox: $SANDBOX_NAME"
+    if ! openshell sandbox delete "$SANDBOX_NAME"; then
+        echo "ERROR: Failed to delete sandbox '$SANDBOX_NAME'." >&2
+        return 1
+    fi
+
+    for i in $(seq 1 30); do
+        if sandbox_exists; then
+            sleep 1
+            continue
+        else
+            exists_rc=$?
+            if [ "$exists_rc" -eq 1 ]; then
+                echo "Sandbox deleted: $SANDBOX_NAME"
+                return 0
+            fi
+            return "$exists_rc"
+        fi
+    done
+
+    echo "ERROR: Sandbox '$SANDBOX_NAME' still exists after 30s." >&2
+    return 1
+}
+
 # --- Step 2: Delete old sandbox if it exists ---
 echo "--- Step 2: Clean up old sandbox ---"
-if openshell sandbox list 2>/dev/null | grep -q "$SANDBOX_NAME"; then
-    echo "Deleting existing sandbox: $SANDBOX_NAME"
-    openshell sandbox delete "$SANDBOX_NAME" 2>/dev/null || true
-    sleep 3
+if ! delete_sandbox_and_wait; then
+    echo "ERROR: Cannot safely continue while sandbox '$SANDBOX_NAME' may still exist." >&2
+    exit 1
 fi
 
 # Stop any host-level service that owns $PORT (e.g. openclaw-gateway.service
@@ -150,7 +256,7 @@ fi
 # list`, find the line that mentions :$PORT, and stop the forward for
 # whichever sandbox owns it. Falls back to a broad sweep across all
 # listed sandbox names if the line format is unfamiliar.
-if openshell forward list 2>/dev/null | grep -q "[: ]$PORT[ \t]"; then
+if openshell forward list 2>/dev/null | grep -q "[: ]${PORT}[ \t]"; then
     echo "Cleaning up stale port forwards on :$PORT ..."
     # Capture every token on lines containing the port; the sandbox name
     # is whatever non-empty, non-numeric token follows the port column.
@@ -172,44 +278,67 @@ echo ""
 
 # --- Step 3: Create sandbox ---
 echo "--- Step 3: Create sandbox ---"
-# The --no-tty SSH session can hang after sandbox creation completes
-# (the SSH proxy doesn't cleanly terminate over non-interactive pipes).
-# Wrap with timeout and verify the sandbox was actually created.
-timeout 120 openshell sandbox create \
+# A sandbox without a trailing command starts OpenShell's persistent scratch
+# login shell. Current OpenShell returns from --detach after the sandbox reaches
+# Ready; a short-lived command (for example, `echo`) would instead become the
+# canonical process and leave the sandbox in Completed/Error when it exits.
+cleanup_failed_sandbox() {
+    echo "Cleaning up incomplete sandbox: $SANDBOX_NAME" >&2
+    if ! delete_sandbox_and_wait; then
+        echo "ERROR: Rollback could not remove sandbox '$SANDBOX_NAME'." >&2
+        return 1
+    fi
+}
+
+if openshell sandbox create \
     --from openclaw \
     --name "$SANDBOX_NAME" \
     --policy "$POLICY_FILE" \
     --provider ollama-local \
     --forward "$PORT" \
-    --keep \
-    --no-tty \
-    -- echo "sandbox-ok" || true
-
-# Verify the sandbox was created regardless of timeout
-if ! openshell sandbox list 2>/dev/null | grep -q "$SANDBOX_NAME"; then
-    echo "ERROR: Sandbox '$SANDBOX_NAME' was not created." >&2
-    exit 1
+    --detach 9>&-; then
+    :
+else
+    CREATE_RC=$?
+    echo "ERROR: OpenShell failed to create sandbox '$SANDBOX_NAME' (exit $CREATE_RC)." >&2
+    if ! cleanup_failed_sandbox; then
+        echo "ERROR: Sandbox rollback failed after create exit $CREATE_RC; manual cleanup is required." >&2
+    fi
+    exit "$CREATE_RC"
 fi
 
-# Wait for the sandbox to reach phase=Ready before uploading. The
-# `sandbox create` call returns as soon as Kubernetes accepts the spec,
-# but the OpenClaw image still has to pull and the pod has to start.
-# Calling `sandbox upload` against a not-yet-Ready pod fails with
+# `--detach` returns after Ready. Defensively confirm the reported phase before
+# uploading, with a fixed bound for brief list-visibility lag. Calling
+# `sandbox upload` against a not-yet-Ready sandbox fails with
 # "× status: FailedPrecondition, message: \"sandbox is not ready\"".
 echo "Waiting for sandbox to become Ready..."
-for i in $(seq 1 60); do
+READY_MAX_POLLS=60
+READY_POLL_INTERVAL=5
+for i in $(seq 1 "$READY_MAX_POLLS"); do
     PHASE=$(openshell sandbox list 2>/dev/null \
                 | sed "s/$(printf '\033')\[[0-9;]*[a-zA-Z]//g" \
                 | awk -v n="$SANDBOX_NAME" 'NR>1 { for (i=1;i<=NF;i++) if ($i==n) { print $NF; exit } }')
-    if [ "$PHASE" = "Ready" ]; then
-        echo "Sandbox Ready (after ${i} polls)."
-        break
-    fi
-    if [ $i -eq 60 ]; then
-        echo "ERROR: Sandbox '$SANDBOX_NAME' did not reach Ready in 5 min." >&2
+    case "$PHASE" in
+        Ready)
+            echo "Sandbox Ready (after ${i} polls)."
+            break
+            ;;
+        Completed|Error)
+            echo "ERROR: Sandbox '$SANDBOX_NAME' entered terminal phase '$PHASE' before becoming Ready." >&2
+            if ! cleanup_failed_sandbox; then
+                echo "ERROR: Sandbox rollback failed; manual cleanup is required." >&2
+            fi
+            exit 1
+            ;;
+    esac
+    if [ "$i" -eq "$READY_MAX_POLLS" ]; then
+        echo "ERROR: Sandbox '$SANDBOX_NAME' did not reach Ready after $READY_MAX_POLLS polls." >&2
+        if ! cleanup_failed_sandbox; then
+            echo "ERROR: Sandbox rollback failed; manual cleanup is required." >&2
+        fi
         exit 1
     fi
-    sleep 5
+    sleep "$READY_POLL_INTERVAL"
 done
 echo ""
 
@@ -423,7 +552,9 @@ echo ""
 
 # --- Step 12: Start port forwarding ---
 echo "--- Step 12: Port forwarding ---"
-openshell forward start -d "$PORT" "$SANDBOX_NAME" 2>/dev/null || true
+# Do not let the detached forward process inherit the setup-lock descriptor;
+# this script retains fd 9 until all remaining verification completes.
+openshell forward start -d "$PORT" "$SANDBOX_NAME" 9>&- 2>/dev/null || true
 echo ""
 
 # --- Step 13: Verify ---

@@ -2,7 +2,6 @@
 
 > High-throughput serving for 30+ models, with continuous batching and an OpenAI-compatible API
 
-
 ## Table of Contents
 
 - [Overview](#overview)
@@ -172,6 +171,15 @@ To use another recipe:
 - For another recipe, use its generated installation and serving commands as the manual path. Substitute its settings only where the following launch instructions explicitly tell you to do so.
 
 ## Single device
+
+## Install with an agent
+
+```text
+Use https://build.nvidia.com/playbooks/vllm.md and complete this playbook on this machine: Serve LLMs with vLLM. Fetch that .md URL directly; the non-.md page is a JavaScript shell. When finished, state clearly whether the playbook succeeded, and give the evidence: what you installed, where, and the output of a command proving it works (a version string, a container listing, or an HTTP status).
+```
+
+> [!NOTE]
+> This has been tested using OpenCode and Qwen 3.8 35B A3B NVFP4. Performance and outcome may vary based on agent and model selection.
 
 ### Step 1. Install NVIDIA Sync locally and add the DGX Spark or DGX Station device (one time)
 

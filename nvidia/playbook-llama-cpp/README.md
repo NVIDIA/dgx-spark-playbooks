@@ -91,6 +91,15 @@ Use the **Instructions** tab for the base build-and-serve workflow. For agentic 
 
 ## Instructions
 
+## Install with an agent
+
+```text
+Use https://build.nvidia.com/playbooks/llama-cpp.md and complete this playbook on this machine: Serve Models with llama.cpp. Fetch that .md URL directly; the non-.md page is a JavaScript shell. When finished, state clearly whether the playbook succeeded, and give the evidence: what you installed, where, and the output of a command proving it works (a version string, a container listing, or an HTTP status).
+```
+
+> [!NOTE]
+> This has been tested using OpenCode and Qwen 3.8 35B A3B NVFP4. Performance and outcome may vary based on agent and model selection.
+
 ## Step 1. Install the dependencies
 
 Update the package metadata and install the required dependencies:

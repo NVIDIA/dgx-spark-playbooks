@@ -11,7 +11,7 @@ Installation, configuration, troubleshooting, and operational details for the Cl
 
 This sets up an isolated OpenShell sandbox with OpenClaw and a local Ollama inference backend. Everything the agent touches — filesystem, network, processes — is confined to the sandbox.
 
-**Requirements:** DGX Station GB300, Python 3.10+, `uv`, Docker + NVIDIA Container Toolkit, OpenShell CLI ≥ 0.0.44, Node.js 22+ LTS.
+**Requirements:** DGX Station GB300, Python 3.10+, `uv`, Docker + NVIDIA Container Toolkit, OpenShell CLI ≥ 0.0.111, Node.js 22+ LTS.
 
 ### 1. Install OpenShell
 
@@ -20,7 +20,7 @@ The official installer provides both the `openshell` CLI and the `openshell-gate
 ```bash
 curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh
 # Open a new shell (or `source ~/.bashrc`) so ~/.local/bin is on PATH, then:
-openshell --version   # >= 0.0.44
+openshell --version   # >= 0.0.111
 ```
 
 ### 2. Start Ollama (Docker, recommended)
@@ -96,10 +96,13 @@ openshell sandbox create \
   --policy sandbox-policy-local.yaml \
   --provider ollama-local \
   --forward 18789 \
-  --keep
+  --detach
 ```
 
-`--keep` prevents the sandbox from being torn down on exit so you can re-enter it later.
+Omit a trailing command so OpenShell starts its persistent scratch login shell,
+and use `--detach` to return after the sandbox is ready. A short-lived trailing
+command becomes the sandbox's canonical process; when it exits, the sandbox
+transitions to `Completed` or `Error` and cannot be used by the remaining setup.
 
 ### 7. Inside the Sandbox: Set Up OpenClaw
 
@@ -289,7 +292,7 @@ Then recreate the sandbox:
 
 ```bash
 openshell sandbox delete <sandbox-name>
-openshell sandbox create --policy sandbox-policy.yaml --provider ollama-local --forward 18789 --keep
+openshell sandbox create --policy sandbox-policy.yaml --provider ollama-local --forward 18789 --detach
 ```
 
 ### Audit

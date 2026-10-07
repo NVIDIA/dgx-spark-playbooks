@@ -2,7 +2,6 @@
 
 > Extract triples with Ollama or vLLM, store them in a graph database, and explore them in a GPU-accelerated web UI
 
-
 ## Table of Contents
 
 - [Overview](#overview)

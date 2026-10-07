@@ -2,7 +2,6 @@
 
 > Build a ChatGPT-style LLM end-to-end — tokenizer, pretraining, SFT — then chat via web UI or CLI
 
-
 ## Table of Contents
 
 - [Overview](#overview)

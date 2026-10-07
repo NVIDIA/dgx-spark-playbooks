@@ -2,7 +2,6 @@
 
 > A supervisor agent orchestrating specialists for code, retrieval, and image analysis
 
-
 ## Table of Contents
 
 - [Overview](#overview)

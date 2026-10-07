@@ -2,7 +2,6 @@
 
 > FLUX.2 image and LTX-2 video workflows you run locally with full creative control
 
-
 ## Table of Contents
 
 - [Overview](#overview)

@@ -2,7 +2,6 @@
 
 > High-throughput serving with RadixAttention, structured output, and an OpenAI-compatible API
 
-
 ## Table of Contents
 
 - [Overview](#overview)
@@ -133,6 +132,15 @@ You may also use other Hugging Face text-generation or chat checkpoints that you
 
 > [!NOTE]
 > These instructions target **Linux** (containerized SGLang). WSL and Windows Native are not applicable to the containerized SGLang workflow at this time.
+
+## Install with an agent
+
+```text
+Use https://build.nvidia.com/playbooks/sglang.md and complete this playbook on this machine: Serve LLMs with SGLang. Fetch that .md URL directly; the non-.md page is a JavaScript shell. When finished, state clearly whether the playbook succeeded, and give the evidence: what you installed, where, and the output of a command proving it works (a version string, a container listing, or an HTTP status).
+```
+
+> [!NOTE]
+> This has been tested using OpenCode and Qwen 3.8 35B A3B NVFP4. Performance and outcome may vary based on agent and model selection.
 
 ## Step 1. Set up Docker permissions
 

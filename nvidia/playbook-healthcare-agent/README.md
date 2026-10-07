@@ -109,7 +109,7 @@ Use the matrix below to confirm your hardware platform, recommended default loca
 
 - Docker with NVIDIA Container Toolkit: `docker info --format '{{.ServerVersion}}'`
 - Node.js v22+: `node --version` (if an older image reports v18 or Node is missing, see Step 1 of Instructions)
-- OpenShell CLI >= 0.0.44: `openshell --version` (binary installs to `~/.local/bin/openshell` — add to PATH; see Step 1 of Instructions)
+- OpenShell CLI >= 0.0.111: `openshell --version` (binary installs to `~/.local/bin/openshell` — add to PATH; see Step 1 of Instructions)
 - NVIDIA NGC API key from [ngc.nvidia.com](https://ngc.nvidia.com/setup/api-key) (free) **and** Docker authentication for `nvcr.io` (`docker login nvcr.io`) so the OpenFold3 NIM image pull succeeds — see Step 2 of Instructions
 - Network access to `nvcr.io` (NGC registry), `ollama.com` (model downloads), and `r4.smarthealthit.org` (FHIR data server)
 - Web browser access to `http://<HARDWARE_PLATFORM_IP>:18789`
@@ -139,8 +139,10 @@ Supporting scripts (`setup_sandbox.sh`, `check_sandbox_config.sh`, `build_viewer
   - OpenFold3 NIM takes ~3 minutes to load — the healthcheck waits automatically
   - Clinical outputs can be incomplete or incorrect and require qualified professional review
 - **Rollback:** `openshell sandbox delete clinical-sandbox`, `make down`, `make clean` (see Cleanup in Instructions).
-- **Last Updated:** 08/05/2026
-  - Deploy six healthcare agents with local Nemotron 3 Super, OpenFold3, and OpenShell sandbox isolation on supported hardware platforms
+- **Last Updated:** 09/23/2026
+  - OpenShell setup now keeps the sandbox ready and cleans up safely when creation fails; OpenShell 0.0.111 or later is required
+  - OpenFold3 now uses a pinned 1.6.0 image validated on DGX Station GB300, with no manual PCI-ID manifest editing required
+  - The customer workflow remains the same: deploy six healthcare agents with local Nemotron 3 Super, OpenFold3, and OpenShell sandbox isolation
 
 ### Notice and disclaimers
 
@@ -168,7 +170,7 @@ By participating in this demo, you acknowledge that you are solely responsible f
 ## Instructions
 
 > [!IMPORTANT]
-> This playbook requires Docker (with NVIDIA runtime), Node.js v22, and OpenShell CLI >= 0.0.44 — both the `openshell` CLI **and** the `openshell-gateway` daemon, which the official OpenShell installer provides together (Step 1). You do **not** need the NemoClaw playbook: this playbook only uses the OpenShell binaries, and running the full NemoClaw stack first leaves services (host Ollama on 11434, `nemoclaw-vllm` on 8000, `openclaw-gateway` on 18789) that collide with this playbook — Step 1 and Step 3 explain how to clear them if you already ran it. Ollama runs as a Docker container here (host Ollama is not required and will conflict with port 11434, see Step 3).
+> This playbook requires Docker (with NVIDIA runtime), Node.js v22, and OpenShell CLI >= 0.0.111 — both the `openshell` CLI **and** the `openshell-gateway` daemon, which the official OpenShell installer provides together (Step 1). You do **not** need the NemoClaw playbook: this playbook only uses the OpenShell binaries, and running the full NemoClaw stack first leaves services (host Ollama on 11434, `nemoclaw-vllm` on 8000, `openclaw-gateway` on 18789) that collide with this playbook — Step 1 and Step 3 explain how to clear them if you already ran it. Ollama runs as a Docker container here (host Ollama is not required and will conflict with port 11434, see Step 3).
 
 > [!NOTE]
 > Steps 1–3 are prerequisites. Steps 4–5 configure infrastructure and deploy the agent. Steps 6–9 are the demo. Steps 10–11 are cleanup and next steps.
@@ -191,7 +193,7 @@ openshell --version
 df -h /
 ```
 
-Expected: a large-memory Blackwell GPU on the supported hardware platform, Docker >= 23.0.1, **Node.js v22.x**, OpenShell >= 0.0.44, and **at least 200 GB free** on `/` (86 GB model + Docker images + working space).
+Expected: a large-memory Blackwell GPU on the supported hardware platform, Docker >= 23.0.1, **Node.js v22.x**, OpenShell >= 0.0.111, and **at least 200 GB free** on `/` (86 GB model + Docker images + working space).
 
 > [!WARNING]
 > If `openshell --version` says `command not found` but the binary exists at `~/.local/bin/openshell`, it just isn't on PATH. Run the `export PATH=...` line above and re-source `~/.bashrc`. Without this, every `openshell` and `make` command in later steps fails.
@@ -201,7 +203,7 @@ Expected: a large-memory Blackwell GPU on the supported hardware platform, Docke
 ```bash
 curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh
 source ~/.bashrc            # put ~/.local/bin on PATH
-openshell --version         # should show >= 0.0.44
+openshell --version         # should show >= 0.0.111
 ```
 
 > [!TIP]
@@ -562,7 +564,7 @@ make clean
 |---------|-------|-----|
 | `make up` hangs on model pull | Nemotron-3-Super is ~86 GB and takes 15–25 min on first download (longer on slow links) | Wait. Check progress with `docker compose logs -f ollama`. If interrupted, re-run — it resumes where it left off. |
 | `OpenFold3: ✗ down` in `make status` | OpenFold3 takes ~3 minutes to load model weights on startup | Wait and re-run `make status`. Check logs with `docker compose logs -f openfold3`. |
-| OpenFold3 crash-loops with `NIMProfileIDNotFound: Profile not found for this model` | The NIM matches your GPU by PCI device ID against its bundled `model_manifest.yaml`, and some Blackwell SKUs are absent — e.g. a `31c3:10de` GB300 or the RTX PRO 6000 `2bb4:10de` (note: `31c2:10de` GB300 units *are* listed and run natively). | Check your id and patch the manifest only if it's missing — see **"OpenFold3: GPU not recognized"** below the tables. |
+| OpenFold3 crash-loops with `NIMProfileIDNotFound: Profile not found for this model` | An older or cached OpenFold3 NIM image contains a PCI-gated profile manifest that does not recognize the GPU. | Pull and recreate the digest-pinned OpenFold3 1.6.0 service — see **"OpenFold3: GPU not recognized"** below. Do not patch the manifest. |
 | `failed to bind host port for 0.0.0.0:11434` on `docker compose up ollama` | Host Ollama is already listening on 11434 (common after the NemoClaw playbook) | Stop host Ollama: `sudo systemctl stop ollama && sudo systemctl disable ollama`. Or override in `.env`: `OLLAMA_PORT=11435` — `make setup` and `setup_sandbox.sh` source `.env` and configure the sandbox provider against the new port. |
 | `failed to bind host port for 0.0.0.0:8000` / "address already in use" on `docker compose up openfold3` | NemoClaw's `nemoclaw-vllm` container already holds port 8000 (common after the NemoClaw playbook) | Stop it: `docker stop nemoclaw-vllm && docker rm nemoclaw-vllm`. Or override in `.env`: `OPENFOLD_PORT=8001` — `docker-compose.yml`, `make status`, and the tests honor it. Inspect with `ss -tlnp \| grep :8000`. |
 | `unauthorized: <html><head><title>401 Authorization Required` when pulling `nvcr.io/nim/openfold/openfold3` | Docker is not authenticated against NGC; `NGC_API_KEY` in `.env` is the runtime credential, not the pull credential | Run `make ngc-login` (reads `NGC_API_KEY` from `.env`). Manual equivalent: `echo "$NGC_API_KEY" \| docker login nvcr.io -u '$oauthtoken' --password-stdin`. |
@@ -598,7 +600,7 @@ make clean
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `make setup` fails | Setup did not complete successfully | Re-run `make setup` — the script recreates the sandbox from scratch with fresh config. Ensure you're on OpenShell >= 0.0.44. |
+| `make setup` fails | Setup did not complete successfully | Re-run `make setup` — the script recreates the sandbox from scratch with fresh config. Ensure you're on OpenShell >= 0.0.111. |
 | `make check` shows stale skills | Workspace skill copies don't match the repo after an update | The check output tells you which skills are stale. Re-run `make setup` or manually copy from `/sandbox/clinical-intelligence/skills/` to `~/.openclaw/workspace/skills/` inside the sandbox. |
 | ENOENT errors for memory files in logs | OpenClaw tries to read daily memory files that don't exist | Create the memory directory: `mkdir -p ~/.openclaw/workspace/memory && touch ~/.openclaw/workspace/MEMORY.md` inside the sandbox. `make check` detects this. |
 | Agent writes code from scratch instead of using helpers | Stale IDENTITY.md or analysis-methods skill in workspace | Run `make check` to verify. If stale, the workspace IDENTITY.md doesn't have the `fhir_helpers` import instruction. |
@@ -614,55 +616,26 @@ make clean
 
 #### OpenFold3: GPU not recognized
 
-The `openfold3` NIM selects a compute profile by matching your GPU's **PCI device ID** against the `model_manifest.yaml` bundled inside the image. If your GPU's id is not in the manifest, the NIM finds no profile and crash-loops with `NIMProfileIDNotFound`.
+Older OpenFold3 NIM images selected a compute profile using the GPU's PCI device ID. A Blackwell SKU missing from that image's `model_manifest.yaml` could therefore fail during startup with `NIMProfileIDNotFound`.
 
-This affects specific Blackwell board SKUs whose ids the shipped manifest omits. **GB300 units vary**: some report `31c2:10de` (which *is* in the manifest — these run natively), while others report `31c3:10de` (absent — these crash). The RTX PRO 6000 Max-Q (`2bb4:10de`) is also absent on some dual-GPU hardware platforms. So **do not assume a fixed id — check yours first**, and only patch if it is genuinely missing.
+The playbook now pins the OpenFold3 1.6.0 multi-architecture image by digest. Its bundled manifest uses a generic OpenFold3 profile rather than a PCI-ID allowlist. On a DGX Station GB300 (`31c2:10de`), the pinned image selected that profile, initialized CUDA worker 0, reached `/v1/health/ready`, and completed the bundled `8eil` prediction. Pinning the digest also prevents an existing installation from silently resolving `latest` to a different image.
 
-This is a manifest gap in the **NIM image**, not a playbook defect — it is tracked upstream so the OpenFold3 NIM team can add the missing ids (`31c3:10de`, `2bb4:10de`) to the shipped manifest. Until that ships, patch the manifest locally:
+The public NIM/API release reported by `/v1/version` is `1.6.0`. The image's internal manifest can report a later packaging revision; that does not indicate a different OpenFold model or an image-tag mismatch.
+
+Recover an installation that still reports `NIMProfileIDNotFound`:
 
 ```bash
-## 1. Find YOUR GPU's PCI id. lspci prints it vendor:device, e.g. "[10de:31c3]"
-##    -> your device id is 31c3. (nvidia-smi --query-gpu=pci.device_id -> 0x31C3.)
-lspci -nn | grep -i nvidia
-
-## 2. Copy the manifest out of the image and list the ids it recognizes. The
-##    manifest keys profiles by "gpu_device: <device>:10de" — device-first, the
-##    REVERSE of lspci's vendor:device order.
-cid=$(docker create nvcr.io/nim/openfold/openfold3:latest)
-docker cp "$cid":/opt/nim/etc/default/model_manifest.yaml /tmp/model_manifest.yaml
-docker rm "$cid"
-grep gpu_device /tmp/model_manifest.yaml          # ids the NIM already recognizes
-
-## 3. ONLY if YOUR id is NOT listed in step 2: remap an existing same-architecture
-##    profile's gpu_device to yours (device-first order). Substitute your real ids
-##    — the example below is for a 31c3 GB300 borrowing the manifest's 31c2 profile:
-sed -i 's/31c2:10de/31c3:10de/g' /tmp/model_manifest.yaml   # <-- use YOUR ids
-
-## 4. Move the patched manifest to a persistent path (NOT /tmp, which is cleared
-##    on reboot) and mount it over the image copy so it survives recreates:
-mkdir -p ./assets/openfold3 && mv /tmp/model_manifest.yaml ./assets/openfold3/
-##    then add to the openfold3 service in docker-compose.yml:
-##      volumes:
-##        - ./assets/openfold3/model_manifest.yaml:/opt/nim/etc/default/model_manifest.yaml:ro
-
-## 5. A real NGC_API_KEY (not the .env placeholder) is required — the NIM
-##    downloads TRT engines from NGC at startup. Then recreate the container:
+## Authenticate, pull the exact compose image, and replace the old container.
+make ngc-login
+docker compose pull openfold3
 docker compose up -d --force-recreate openfold3
+
+## OpenFold3 can take roughly three minutes to compile kernels and warm up.
+docker compose logs -f openfold3
+curl -sf http://localhost:${OPENFOLD_PORT:-8000}/v1/health/ready
+curl -sf http://localhost:${OPENFOLD_PORT:-8000}/v1/version
 ```
 
-After patching, `make status` should show OpenFold3 healthy; in a full local run `make test` passed 55/55 (exact results depend on your environment).
-
-> [!WARNING]
-> Only patch if your GPU's id is genuinely absent from the manifest (step 2). On
-> a unit whose id is already listed (e.g. a `31c2` GB300), running the example
-> `sed` blindly would rename the very profile your GPU matches and *cause* the
-> `NIMProfileIDNotFound` crash it is meant to prevent.
-
-> [!NOTE]
-> Remapping a `gpu_device` id makes the NIM log a `Checksum mismatch` warning for
-> that profile. It is currently non-fatal (the NIM still loads), but the NIM warns
-> it *"will become an error in a future version"* — another reason the durable fix
-> is to have the OpenFold3 NIM team add `31c3:10de` (GB300) and `2bb4:10de`
-> (RTX PRO 6000) to the shipped manifest rather than relying on this patch.
+If the pinned image still fails, preserve `docker compose logs openfold3` and the output of `docker image inspect` for escalation. Do not rewrite or mount over the signed image manifest: mapping an unknown PCI ID to another profile is not a validated hardware fix and can select an incompatible profile.
 
 For latest known issues, see the documentation linked under **Resources** for your hardware platform.

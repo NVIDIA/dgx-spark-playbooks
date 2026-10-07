@@ -116,7 +116,7 @@ Clinical knowledge lives in plain Markdown. The LLM reads these at runtime — n
 | FHIR endpoint | Public test server (no auth) | Hospital FHIR server (OAuth2 SMART on FHIR) |
 | Patient data | Synthetic (Synthea) | Real PHI |
 | LLM model | nemotron-3-super:120b-a12b | Same or larger |
-| Protein structure | OpenFold3 (torch_baseline) | Same with TRT backend |
+| Protein structure | OpenFold3 1.6 optimized backend | Same pinned NIM with production controls |
 | Authentication | None | SSO/LDAP + RBAC |
 
 ---

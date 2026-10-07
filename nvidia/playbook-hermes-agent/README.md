@@ -2,7 +2,6 @@
 
 > Chat from the terminal against local vLLM with the self-improving Nous Research agent (Telegram optional)
 
-
 ## Table of Contents
 
 - [Overview](#overview)
@@ -108,6 +107,15 @@ You cannot eliminate all risk; proceed at your own risk. **Recommended security 
   - Telegram messaging moved to an optional section at the bottom of Instructions; core path is terminal-only
 
 ## Instructions
+
+## Install with an agent
+
+```text
+Use https://build.nvidia.com/playbooks/hermes-agent.md and complete this playbook on this machine: Run Hermes Agent with a Local LLM. Fetch that .md URL directly; the non-.md page is a JavaScript shell. When finished, state clearly whether the playbook succeeded, and give the evidence: what you installed, where, and the output of a command proving it works (a version string, a container listing, or an HTTP status).
+```
+
+> [!NOTE]
+> This has been tested using OpenCode and Qwen 3.8 35B A3B NVFP4. Performance and outcome may vary based on agent and model selection.
 
 > [!NOTE] These instructions target **Linux** on a supported hardware platform. Keep a separate terminal running vLLM while you install and use Hermes. Telegram messaging is **optional** — complete Steps 1–8 for terminal use first; only then follow the optional Telegram section at the bottom if you want a messaging gateway.
 

@@ -72,7 +72,7 @@ All required assets can be found in the Isaac Sim and Isaac Lab repositories on 
   - Build process requires significant compilation time and may encounter dependency issues
   - Build artifacts consume substantial disk space
 - **Rollback:** Remove the Isaac Sim build directory to free space. Git repositories can be deleted and re-cloned if needed.
-- **Last Updated:** 08/03/2026
+- **Last Updated:** 09/30/2026
   - Build Isaac Sim from source and set up Isaac Lab with a sample reinforcement learning training run on supported hardware platforms
 
 ## Instructions
@@ -142,12 +142,17 @@ Isaac Sim should start. Close it when you are ready to continue with Isaac Lab.
 
 Clone Isaac Lab from the NVIDIA GitHub repository. Complete Steps 1–5 first so `ISAACSIM_PATH` points at a built Isaac Sim release.
 
-> **Note:** For Isaac Lab Early Developer Release, use:
+Return to the parent directory of `IsaacSim` before cloning so `IsaacLab` is created alongside it. This layout allows Step 10 to remove both repositories.
+
+> **Note:** For Isaac Lab Early Developer Release, use this command block instead of the one below:
 > ```bash
+> cd ..
 > git clone --recursive --branch=develop https://github.com/isaac-sim/IsaacLab
+> cd IsaacLab
 > ```
 
 ```bash
+cd ..
 git clone --recursive https://github.com/isaac-sim/IsaacLab
 cd IsaacLab
 ```

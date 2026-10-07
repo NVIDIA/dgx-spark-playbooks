@@ -2,7 +2,6 @@
 
 > Cut memory ~3.5× vs FP16 while keeping accuracy close to FP8, then validate with an OpenAI-compatible endpoint
 
-
 ## Table of Contents
 
 - [Overview](#overview)

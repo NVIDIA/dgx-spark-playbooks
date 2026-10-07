@@ -1,6 +1,6 @@
 # Serve LLMs with LM Studio
 
-> Local models reachable from your own machine''s tools over an encrypted link
+> Local models reachable from your own machine's tools over an encrypted link
 
 ## Table of Contents
 

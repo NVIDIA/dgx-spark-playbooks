@@ -141,7 +141,7 @@ docker run --gpus all -it --rm --ipc=host \
 ## Step 4. Install dependencies inside the container
 
 ```bash
-pip install transformers peft datasets trl bitsandbytes "torchao>=0.16.0"
+pip install transformers==4.57.1 peft==0.18.0 datasets trl==0.25.1 bitsandbytes
 ```
 
 ## Step 5. Authenticate with Hugging Face

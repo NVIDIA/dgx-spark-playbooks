@@ -2,7 +2,6 @@
 
 > Chat, agents, and document Q&A with Ollama, LM Studio, and AnythingLLM on your hardware
 
-
 ## Table of Contents
 
 - [Overview](#overview)

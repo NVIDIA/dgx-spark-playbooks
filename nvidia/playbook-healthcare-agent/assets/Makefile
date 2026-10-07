@@ -26,8 +26,16 @@ prereq: ## Validate Docker, Node.js v22, OpenShell, disk, GPU, port 11434, NGC a
 		elif [ "$$NODE_MAJ" -lt 22 ]; then echo "  Node.js:          ✗ v$$NODE_MAJ found, need v22+. Upgrade: curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh && sudo bash /tmp/nodesource_setup.sh && sudo apt-get install -y nodejs"; exit 1; \
 		else echo "  Node.js:          ✓ $$(node --version)"; fi
 	@command -v openshell >/dev/null 2>&1 \
-		&& echo "  OpenShell:        ✓ $$(openshell --version 2>/dev/null)" \
 		|| { echo "  OpenShell:        ✗ not installed"; exit 1; }
+	@OS_RAW=$$(openshell --version 2>/dev/null || true); \
+		if [[ "$$OS_RAW" =~ ^[^0-9]*([0-9]+\.[0-9]+\.[0-9]+)[[:space:]]*$$ ]]; then \
+			OS_VER="$${BASH_REMATCH[1]}"; \
+		else \
+			echo "  OpenShell:        ✗ invalid version output '$$OS_RAW' (need v0.0.111+)"; exit 1; \
+		fi; \
+		if ! awk -v v="$$OS_VER" -v min="0.0.111" 'BEGIN { split(v,a,"."); split(min,b,"."); for(i=1;i<=3;i++){ if((a[i]+0)>(b[i]+0)) exit 0; if((a[i]+0)<(b[i]+0)) exit 1 } exit 0 }'; then \
+			echo "  OpenShell:        ✗ v$$OS_VER found, need v0.0.111+"; exit 1; \
+		else echo "  OpenShell:        ✓ $$OS_RAW"; fi
 	@FREE=$$(df -BG / | awk 'NR==2 {print $$4}' | tr -d 'G'); \
 		if [ "$$FREE" -lt 200 ]; then echo "  Disk free /:      ⚠ $${FREE}G (need 200G+ for 86G model + images + working space)"; \
 		else echo "  Disk free /:      ✓ $${FREE}G"; fi
@@ -130,7 +138,11 @@ test-docker: ## Run tests inside a container
 # ── Cleanup ─────────────────────────────────────────────────────
 
 teardown: ## Tear down sandbox and services; keep the shared OpenShell gateway running
-	openshell sandbox delete $${SANDBOX_NAME:-clinical-sandbox} 2>/dev/null || true
+	@SBOX="$${SANDBOX_NAME:-clinical-sandbox}"; \
+		if [ "$${#SBOX}" -gt 63 ] || ! printf '%s\n' "$$SBOX" | grep -Eq '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$$'; then \
+			echo "ERROR: SANDBOX_NAME must be a DNS-1123 label; refusing teardown." >&2; exit 2; \
+		fi; \
+		openshell sandbox delete "$$SBOX" 2>/dev/null || true
 	$(COMPOSE) down
 	@echo "Teardown complete. The shared package-managed OpenShell gateway remains running."
 

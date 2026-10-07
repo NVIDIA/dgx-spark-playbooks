@@ -17,6 +17,7 @@
 
 import torch
 import argparse
+import os
 from datasets import load_dataset
 from trl import SFTConfig, SFTTrainer
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -47,10 +48,11 @@ def get_alpaca_dataset(eos_token, dataset_size=512):
 def main(args):
     # Load the model and tokenizer
     print(f"Loading model: {args.model_name}")
+    device_map = None if "LOCAL_RANK" in os.environ else {"": 0}
     model = AutoModelForCausalLM.from_pretrained(
         args.model_name,
         dtype=args.dtype,
-        device_map="auto"
+        device_map=device_map
     )
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     tokenizer.pad_token = tokenizer.eos_token

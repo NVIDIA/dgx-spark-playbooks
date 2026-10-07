@@ -14,8 +14,8 @@ Requires: requests, dash, py3Dmol.
 OpenFold3 NIM must be running locally (host port defaults to 8000; set
 OPENFOLD_PORT to avoid a clash with NemoClaw's nemoclaw-vllm on 8000):
   docker run --rm -p "${OPENFOLD_PORT:-8000}":8000 --gpus all --shm-size=16g \\
-    -e NGC_API_KEY=$NGC_API_KEY -e NIM_OPTIMIZED_BACKEND=torch_baseline \\
-    nvcr.io/nim/openfold/openfold3:latest
+    -e NGC_API_KEY=$NGC_API_KEY \\
+    nvcr.io/nim/openfold/openfold3:1.6.0@sha256:f2d4a3f2755d8aa7cc4be31853a98688357e0647707aed30d24dfae943592317
 """
 
 import argparse

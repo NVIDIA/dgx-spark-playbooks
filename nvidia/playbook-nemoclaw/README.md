@@ -2,7 +2,6 @@
 
 > Build a local AI assistant in an OpenShell sandbox with vLLM inference and optional Telegram
 
-
 ## Table of Contents
 
 - [Overview](#overview)
