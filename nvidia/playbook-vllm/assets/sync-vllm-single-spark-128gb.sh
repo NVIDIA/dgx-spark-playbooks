@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-NAME="nemotron-ultra-vllm"
-IMAGE="vllm/vllm-openai:v0.22.0"
-MODEL="nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4"
+NAME="vllm-qwen36-35b-a3b"
+PORT=8000
 HF_CACHE_DIR="${HF_HOME:-$HOME/.cache/huggingface}"
 WAITER=""
 STATUS_FILE="$(mktemp)"
@@ -29,48 +28,40 @@ mkdir -p "$HOME/.cache/vllm" "$HOME/.cache/flashinfer" \
   "$HOME/.cache/triton"
 docker rm -f "${NAME}" >/dev/null 2>&1 || true
 
-GPU_INDEX="$(nvidia-smi --query-gpu=index,name --format=csv,noheader \
-  | awk -F, 'tolower($2) ~ /gb300/ { gsub(/[[:space:]]/, "", $1); print $1; exit }')"
-if [[ -z "${GPU_INDEX}" ]]; then
-  printf 'Could not find a GB300 GPU with nvidia-smi.\n' >&2
-  exit 1
-fi
-
 docker run -d \
   --name "${NAME}" \
-  --gpus "\"device=${GPU_INDEX}\"" \
-  --ipc=host \
-  --network=host \
-  --shm-size=16g \
+  --gpus all \
+  --ipc host \
   --ulimit memlock=-1 \
   --ulimit stack=67108864 \
   --entrypoint "" \
+  -p "127.0.0.1:${PORT}:8000" \
   -v "$HF_CACHE_DIR:/root/.cache/huggingface:ro" \
   -v "$HOME/.cache/vllm:/root/.cache/vllm" \
   -v "$HOME/.cache/flashinfer:/root/.cache/flashinfer" \
   -v "$HOME/.cache/triton:/root/.triton" \
   -e HF_HUB_OFFLINE=1 \
-  -e VLLM_WEIGHT_OFFLOADING_DISABLE_PIN_MEMORY=1 \
-  -e VLLM_NVFP4_GEMM_BACKEND=flashinfer-trtllm \
-  "${IMAGE}" \
-  vllm serve "${MODEL}" \
-    --served-model-name nemotron-ultra \
-    --host 127.0.0.1 \
+  -e VLLM_USE_RUST_FRONTEND=1 \
+  vllm/vllm-openai:v0.28.0 \
+  vllm serve nvidia/Qwen3.6-35B-A3B-NVFP4 \
+    --served-model-name nvidia/Qwen3.6-35B-A3B-NVFP4 \
+    --host 0.0.0.0 \
     --port 8000 \
-    --tensor-parallel-size 1 \
     --trust-remote-code \
-    --speculative-config '{"method": "nemotron_h_mtp", "num_speculative_tokens": 3}' \
     --enable-auto-tool-choice \
     --tool-call-parser qwen3_coder \
-    --reasoning-parser nemotron_v3 \
-    --enable-prefix-caching \
-    --enable-chunked-prefill \
+    --reasoning-parser qwen3 \
+    --kv-cache-dtype fp8 \
+    --attention-backend flashinfer \
+    --moe-backend marlin \
+    --gpu-memory-utilization 0.5 \
+    --max-model-len 262144 \
+    --max-num-seqs 8 \
     --max-num-batched-tokens 8192 \
-    --cpu-offload-gb 150 \
-    --cpu-offload-params experts \
-    --kernel_config '{"enable_flashinfer_autotune": false}' \
-    --max-num-seqs 256 \
-    --gpu-memory-utilization 0.9
+    --enable-chunked-prefill \
+    --async-scheduling \
+    --enable-prefix-caching \
+    --load-format fastsafetensors
 
 docker wait "${NAME}" > "${STATUS_FILE}" &
 WAITER=$!

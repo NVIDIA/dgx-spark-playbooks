@@ -1,14 +1,30 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
 NAME="vllm-qwen38"
+PORT=8000
+WAITER=""
+STATUS_FILE="$(mktemp)"
 
-stop_vllm() {
+cleanup() {
+  local status=$?
+  trap - EXIT
+  if [[ -n "${WAITER}" ]]; then
+    kill "${WAITER}" >/dev/null 2>&1 || true
+    wait "${WAITER}" >/dev/null 2>&1 || true
+  fi
   docker stop "${NAME}" >/dev/null 2>&1 || true
+  docker rm "${NAME}" >/dev/null 2>&1 || true
+  rm -f "${STATUS_FILE}"
+  exit "${status}"
 }
-trap stop_vllm EXIT INT TERM HUP
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
 
-# Remove the container from an earlier session, if one exists.
+mkdir -p "$HOME/.cache/vllm" "$HOME/.cache/flashinfer" \
+  "$HOME/.cache/triton"
 docker rm -f "${NAME}" >/dev/null 2>&1 || true
 
 docker run -d \
@@ -18,8 +34,11 @@ docker run -d \
   --ulimit memlock=-1 \
   --ulimit stack=67108864 \
   --entrypoint "" \
-  -p 8000:8000 \
+  -p "127.0.0.1:${PORT}:8000" \
   -v "$HOME/.cache/huggingface/hub:/root/.cache/huggingface/hub:ro" \
+  -v "$HOME/.cache/vllm:/root/.cache/vllm" \
+  -v "$HOME/.cache/flashinfer:/root/.cache/flashinfer" \
+  -v "$HOME/.cache/triton:/root/.triton" \
   -e HF_HUB_OFFLINE=1 \
   -e VLLM_USE_RUST_FRONTEND=1 \
   vllm/vllm-openai:qwen38 \
@@ -40,5 +59,13 @@ docker run -d \
     --enable-auto-tool-choice \
     --tool-call-parser qwen3_xml
 
-# Keep the custom application active while the container runs.
-docker wait "${NAME}" >/dev/null
+docker wait "${NAME}" > "${STATUS_FILE}" &
+WAITER=$!
+wait "${WAITER}"
+WAITER=""
+STATUS="$(<"${STATUS_FILE}")"
+if [[ ! "${STATUS}" =~ ^[0-9]+$ ]]; then
+  printf 'Could not read the container exit status.\n' >&2
+  exit 1
+fi
+exit "${STATUS}"
