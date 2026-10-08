@@ -84,6 +84,7 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 - [Generate Controlled Video with ComfyUI](nvidia/playbook-video-gen-guide/)
 - [Generate Images and Video with ComfyUI](nvidia/playbook-visual-gen-ai/)
 - [Serve LLMs with vLLM](nvidia/playbook-vllm/)
+- [Keeping vLLM Up](nvidia/playbook-vllm-as-a-service/)
 - [Fine-Tune Vision Language Models](nvidia/playbook-vlm-finetuning/)
 - [Set Up VS Code for Local and Remote Development](nvidia/playbook-vscode/)
 - [Deploy a Video Search and Summarization Agent](nvidia/playbook-vss/)
