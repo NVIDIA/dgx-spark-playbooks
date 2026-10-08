@@ -38,7 +38,7 @@ docker run -d \
     --load-format fastsafetensors \
     --reasoning-parser qwen3 \
     --enable-auto-tool-choice \
-    --tool-call-parser qwen3_xml
+    --tool-call-parser qwen3_coder
 
 # Keep the custom application active while the container runs.
 docker wait "${NAME}" >/dev/null
