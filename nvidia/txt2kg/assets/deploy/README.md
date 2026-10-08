@@ -43,14 +43,14 @@ This directory contains all deployment-related configuration for the txt2kg proj
 
 ```bash
 # Default: ArangoDB + Ollama
-docker compose -f deploy/compose/docker-compose.yml up -d
+docker compose -f deploy/compose/docker-compose.yml up -d --build
 
 # Neo4j + vLLM
-docker compose -f deploy/compose/docker-compose.vllm.yml up -d
+docker compose -f deploy/compose/docker-compose.vllm.yml up -d --build
 
 # With vector search services (add --profile vector-search)
-docker compose -f deploy/compose/docker-compose.yml --profile vector-search up -d
-docker compose -f deploy/compose/docker-compose.vllm.yml --profile vector-search up -d
+docker compose -f deploy/compose/docker-compose.yml --profile vector-search up -d --build
+docker compose -f deploy/compose/docker-compose.vllm.yml --profile vector-search up -d --build
 ```
 
 ## Services Included

@@ -1,10 +1,10 @@
 # Optimized multi-stage Dockerfile for faster builds
 # Stage 1: Dependencies
-FROM node:18-slim AS deps
+FROM node:20-slim AS deps
 WORKDIR /app
 
 # Install pnpm
-RUN npm install -g pnpm --force --yes
+RUN corepack enable && corepack prepare pnpm@10 --activate
 
 # Copy dependency files
 COPY ./frontend/package.json ./frontend/pnpm-lock.yaml* ./
@@ -19,11 +19,11 @@ RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
     fi
 
 # Stage 2: Builder
-FROM node:18-slim AS builder
+FROM node:20-slim AS builder
 WORKDIR /app
 
 # Install pnpm
-RUN npm install -g pnpm --force --yes
+RUN corepack enable && corepack prepare pnpm@10 --activate
 
 # Copy node_modules from deps stage
 COPY --from=deps /app/node_modules ./node_modules
@@ -33,23 +33,23 @@ COPY --from=deps /app/package.json ./package.json
 COPY ./frontend/ ./
 
 # Set build environment variables
-ENV NEXT_TELEMETRY_DISABLED 1
-ENV NODE_ENV production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
 
 # Build with cache mount for Next.js cache
 RUN --mount=type=cache,target=/app/.next/cache \
     pnpm build
 
 # Stage 3: Production runtime
-FROM node:18-slim AS runner
+FROM node:20-slim AS runner
 WORKDIR /app
 
-ENV NODE_ENV production
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 
 # Create non-root user for security
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+RUN groupadd --gid 1001 nodejs && \
+    useradd --uid 1001 --gid nodejs --no-create-home nextjs
 
 # Copy necessary files from builder
 COPY --from=builder /app/public ./public
@@ -63,7 +63,7 @@ USER nextjs
 
 EXPOSE 3000
 
-ENV PORT 3000
-ENV HOSTNAME "0.0.0.0"
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 
 CMD ["node", "server.js"]

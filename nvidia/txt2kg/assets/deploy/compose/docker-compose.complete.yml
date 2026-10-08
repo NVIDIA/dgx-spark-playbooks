@@ -95,6 +95,7 @@ services:
       context: ../services/ollama
       dockerfile: Dockerfile
     image: ollama-custom:latest
+    pull_policy: build
     container_name: ollama-compose
     ports:
       - '11434:11434'

@@ -49,7 +49,7 @@
     "langchain": "^0.3.19",
     "lucide-react": "^0.454.0",
     "neo4j-driver": "^5.28.1",
-    "next": "15.2.4",
+    "next": "15.2.9",
     "next-themes": "^0.4.4",
     "openai": "^4.91.0",
     "react": "^19",
@@ -60,6 +60,9 @@
     "tailwindcss-animate": "^1.0.7",
     "three": "^0.176.0",
     "zod": "^3.24.1"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["protobufjs"]
   },
   "devDependencies": {
     "@types/node": "^22",
