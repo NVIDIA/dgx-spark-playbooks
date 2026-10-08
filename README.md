@@ -61,6 +61,7 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 - [Set Up Example NemoClaw Agents](nvidia/playbook-nemoclaw-applications/)
 - [Serve Nemotron Nano and Super Models](nvidia/playbook-nemotron/)
 - [Deploy NVIDIA NIM for LLM Inference](nvidia/playbook-nim-llm/)
+- [Run ML Interatomic Potentials and GPU Molecular Dynamics on DGX Spark](nvidia/playbook-novomcp-spark/)
 - [Run NVFP4 Pretraining with Megatron Bridge](nvidia/playbook-nvfp4-pretraining/)
 - [Quantize Models to NVFP4 with NVIDIA Model Optimizer](nvidia/playbook-nvfp4-quantization/)
 - [Chat with LLMs Using Open WebUI and Ollama](nvidia/playbook-open-webui/)
