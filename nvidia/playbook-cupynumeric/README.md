@@ -53,7 +53,7 @@ Use the matrix below to confirm your hardware platform, recommended default loca
 
 - Supported hardware platform — see Supported hardware platforms matrix above
 - Two nodes of multi-node capable hardware
-- Multi-node networking and SSH configured with [NVIDIA Sync Cluster Assistant](https://docs.nvidia.com/sync/latest/cluster-assistant.html) (recommended) or [Connect two nodes for distributed workloads](https://build.nvidia.com/playbooks/connect-two-sparks)
+- Multi-node networking and SSH configured with [NVIDIA Sync Cluster Assistant](https://docs.nvidia.com/sync/latest/cluster-assistant.html) (recommended) or [Connect two nodes for distributed workloads](https://build.nvidia.com/playbooks/connect-multiple-sparks)
 - The same username on both systems (recommended; simplifies NFS and SSH configuration)
 
 **Software requirements**
@@ -86,7 +86,7 @@ This playbook does not ship local helper scripts. You install packages with cond
 Use this tab to run cuPyNumeric across two nodes of **multi-node capable hardware**.
 
 > [!TIP]
-> If [NVIDIA Sync Cluster Assistant](https://docs.nvidia.com/sync/latest/cluster-assistant.html) successfully configured your two-Spark cluster, do not repeat the manual connection playbook. Continue below using the interconnect details from your completed cluster setup. Otherwise, complete [Connect two nodes for distributed workloads](https://build.nvidia.com/playbooks/connect-two-sparks) first.
+> If [NVIDIA Sync Cluster Assistant](https://docs.nvidia.com/sync/latest/cluster-assistant.html) successfully configured your two-Spark cluster, do not repeat the manual connection playbook. Continue below using the interconnect details from your completed cluster setup. Otherwise, complete [Connect two nodes for distributed workloads](https://build.nvidia.com/playbooks/connect-multiple-sparks) first.
 
 > [!NOTE]
 > **Multi-node in this playbook applies to DGX Spark only.** Use the interconnect IPs and interface names from your completed cluster setup wherever the steps below refer to `$SERVER_IP`, `$CLIENT_IP`, `$IB_SUBNET`, or firewall interfaces.
@@ -451,7 +451,7 @@ If you encounter any issues, see the **Troubleshooting** tab for common symptoms
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `ping` fails between interconnect IPs | Interconnect interface not configured or cable down | If you used [NVIDIA Sync Cluster Assistant](https://docs.nvidia.com/sync/latest/cluster-assistant.html), verify or retry the cluster there. Otherwise, re-check physical cabling and IP assignment in [Connect two nodes for distributed workloads](https://build.nvidia.com/playbooks/connect-two-sparks). Confirm with `ip addr show` and `ibdev2netdev`. |
+| `ping` fails between interconnect IPs | Interconnect interface not configured or cable down | If you used [NVIDIA Sync Cluster Assistant](https://docs.nvidia.com/sync/latest/cluster-assistant.html), verify or retry the cluster there. Otherwise, re-check physical cabling and IP assignment in [Connect two nodes for distributed workloads](https://build.nvidia.com/playbooks/connect-multiple-sparks). Confirm with `ip addr show` and `ibdev2netdev`. |
 | `ip link show` / `ibdev2netdev` shows no active interconnect | Cable not connected or interface naming differs | Check the physical cable; note the interface marked `Up` and use that name in firewall rules |
 | `mpirun` hangs or times out | SSH not configured for interconnect IPs, firewall blocking MPI, or stacked IPs on the interconnect interface | Verify `ssh -o BatchMode=yes $SERVER_IP hostname` and `ssh -o BatchMode=yes $CLIENT_IP hostname` from both nodes (including SSH to self). Confirm firewall allows the interconnect interfaces. Run `ip addr show <INTERFACE>` and confirm only one IP is assigned |
 | Passwordless SSH falls back to password prompt | Existing `~/.ssh/config` has an `IdentityFile` directive that overrides the cluster SSH key | Inspect with `cat ~/.ssh/config` and remove or comment out conflicting entries |

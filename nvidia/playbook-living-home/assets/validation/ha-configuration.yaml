@@ -1,0 +1,74 @@
+homeassistant:
+  name: Living Home Validation Lab
+  latitude: 0
+  longitude: 0
+  elevation: 0
+  unit_system: metric
+  time_zone: America/Los_Angeles
+http:
+  server_host: 0.0.0.0
+  server_port: 8123
+api:
+frontend:
+config:
+history:
+recorder:
+  purge_keep_days: 1
+automation: !include automations.yaml
+input_boolean:
+  lab_desk_power:
+    name: Lab desk power state
+    initial: false
+  lab_lamp_power:
+    name: Lab lamp power state
+    initial: false
+  lab_motion:
+    name: Lab motion state
+    initial: false
+  lab_sensor_online:
+    name: Lab sensor availability
+    initial: true
+input_number:
+  lab_battery:
+    name: Lab battery value
+    min: 0
+    max: 100
+    initial: 18
+    unit_of_measurement: '%'
+template:
+  - switch:
+      - name: Lab desk plug
+        unique_id: livinghome_lab_desk_plug
+        state: "{{ is_state('input_boolean.lab_desk_power', 'on') }}"
+        turn_on:
+          action: input_boolean.turn_on
+          target:
+            entity_id: input_boolean.lab_desk_power
+        turn_off:
+          action: input_boolean.turn_off
+          target:
+            entity_id: input_boolean.lab_desk_power
+    light:
+      - name: Lab desk lamp
+        unique_id: livinghome_lab_desk_lamp
+        state: "{{ is_state('input_boolean.lab_lamp_power', 'on') }}"
+        turn_on:
+          action: input_boolean.turn_on
+          target:
+            entity_id: input_boolean.lab_lamp_power
+        turn_off:
+          action: input_boolean.turn_off
+          target:
+            entity_id: input_boolean.lab_lamp_power
+    binary_sensor:
+      - name: Lab hallway motion
+        unique_id: livinghome_lab_hallway_motion
+        device_class: motion
+        state: "{{ is_state('input_boolean.lab_motion', 'on') }}"
+    sensor:
+      - name: Lab sensor battery
+        unique_id: livinghome_lab_sensor_battery
+        device_class: battery
+        unit_of_measurement: '%'
+        state: "{{ states('input_number.lab_battery') }}"
+        availability: "{{ is_state('input_boolean.lab_sensor_online', 'on') }}"

@@ -17,9 +17,10 @@
 ## Basic idea
 
 [NVIDIA Sync](https://docs.nvidia.com/sync/latest/index.html) is a free desktop app that simplifies using a remote device over a local network or Tailscale.
+
 It replaces running commands in a terminal with a configured, click-through interface that lets you connect to remote devices, launch applications and services on the remote, and then access them from your laptop.
 
-This playbook shows how to install NVIDIA Sync on your laptop and use it to connect to a DGX Spark on your home network. 
+This playbook shows you how to install NVIDIA Sync on your laptop and use it to connect to a DGX Spark on your home network.
 The instructions, except for the DGX Dashboard, generalize to any remote device with a Debian based Linux operating system, including a DGX Station.
 
 ## What you'll accomplish
@@ -29,7 +30,7 @@ The instructions, except for the DGX Dashboard, generalize to any remote device 
   - Optional one time: Set up the [Tailscale integration](tailscale-via-sync.md) to reach your Spark from another network
   - Repeat use: Connect in NVIDIA Sync and launch a terminal, the [DGX Dashboard](https://docs.nvidia.com/dgx/dgx-spark/dgx-dashboard.html#spark-dgx-dashboard), or the [Resource Monitor](https://docs.nvidia.com/sync/latest/resource-monitor.html)
 
-- **Advanced path:** Use SSH commands to connect to your Spark and forward the DGX Dashboard to your laptop.
+- **Manual path:** Use SSH commands to connect to your Spark and forward the DGX Dashboard to your laptop.
 
 ## What to know before starting
 
@@ -90,44 +91,48 @@ The instructions, except for the DGX Dashboard, generalize to any remote device 
 
 ## Step 2. Agree to the EULA and select applications to launch (one time)
 
-1. Click the link to read the EULA, and then select **Agree** in the "Let's Get Started" modal.
-2. Then, NVIDIA Sync will show you any IDEs you have installed locally to select for launch on a remote device.
-3. Select **Next** to proceed.
+1. Click the link to read the EULA and select **Agree** in the "Let's Get Started" modal.
+2. Then, NVIDIA Sync will present locally installed IDEs eligible to launch on a remote device. Select those you want configured.
+3. Finally, select **Next** to proceed.
 
-## Step 3. Find your DGX Spark on the network and add it to NVIDIA Sync (one time)
-
-DGX Spark devices broadcast their hostname through mDNS, and NVIDIA Sync will open a modal while it searches the network for broadcasting devices.
-
-- If your DGX Spark is on a home network, NVIDIA Sync should discover the device name (for example, `spark-abcd.local`) and prompt you to select it.
-- If your Spark doesn't appear, select "Add a device manually" and enter the information below to access the device.
-
-- **Name:** A descriptive name you will remember (for example, "My Home Lab")
-- **Hostname or IP:** The device's mDNS hostname or IP address
-- **Username:** The user account name
-- **Password:** The associated account password
-
-Then, select **Add** to proceed.
-
-**Success:** The form will transition and prompt you to get started.
+**Success**: A modal will open searching for your DGX Spark on the network. 
 
 > [!NOTE]
-> Your password is only temporarily used for SSH authentication and configuring key-based authentication when you add the device. It is not persisted or logged.
+> DGX Spark devices broadcast over mDNS by default. 
+> If the network allows mDNS, then you should see your device with an obvious name, e.g. `spark-abcd.local`.
+> If your network blocks mDNS, then you won't see the name and must have the IP address.
 
-## Step 4. Connect to your remote device and launch a terminal and the DGX Dashboard (repeat use)
+## Step 3. Add your DGX Spark (one time)
 
-1. Select **Get Started** in the addition confirmation modal to initiate the connection.
-2. The task bar utility will open and show that it is connecting to the device.
-3. When the connection succeeds, the utility will show apps to can launch on the remote.
-4. Select the Terminal app to launch a terminal on the remote.
-5. Select the DGX Dashboard app to launch it on the remote. It will open in your browser. 
-6. Select the Resource Monitor app to launch it. It will open in a new application window.
+1. Select the device name if shown. Otherwise select **Add a device manually**.
+2. Fill in the "Name", "Hostname or IP", "Username" and "Password" fields with relevant information for the device. Your password is used temporarily for set up and is not logged or stored.
+3. Then select **Add** to proceed.
+4. (Optional) If prompted, allow NVIDIA Sync to configure the Docker group on the device.
+
+> [!NOTE]
+> Docker group configuration is **not** required to add the device, but if you use containers you will probably end up configuring it manually later because it's a major convenience that avoids entering a `sudo` password every time a `docker` command runs.  
+> However, it does allow root access for applications or scripts running `docker` commands.
+> Learn about the configuration and issues in [the Docker user guide](https://docs.docker.com/engine/install/linux-postinstall/).
+
+**Success**: A **Get Started** modal will appear.  
+
+## Step 4. Launch applications on the remote Spark through NVIDIA Sync (repeat use)
+
+1. Select **Get Started** to initiate the connection and open the task bar utility.
+2. When the connection succeeds, select the pre-configured applications and start using your Spark.
+
+**Terminal** launches an SSH shell on the remote.
+
+**DGX Dashboard** launches a device management web application it on the remote and will open in a browser. 
+
+**Resource Monitor** launches an application window that shows CPU, sRAM and GPU utilization on the device.
 
 **Success:** The applications start and open.
 
 ## Next steps
 
 - Use NVIDIA Sync to [add Tailscale](tailscale-via-sync.md) so you can connect to your device from anywhere
-- Use NVIDIA Sync to [cluster two or more DGX Spark devices](https://build.nvidia.com/playbooks/connect-multiple-sparks/connect-devices)
+- Use NVIDIA Sync to [cluster two or more DGX Spark devices](https://build.nvidia.com/playbooks/connect-multiple-sparks/cable-devices)
 - Use NVIDIA Sync to [launch a vLLM container](https://build.nvidia.com/playbooks/vllm)
 
 ## Enable Tailscale
@@ -145,7 +150,7 @@ You do not need a separate Tailscale app on your laptop.
 
 Tailscale requires you to sign up through a third party auth provider like Google or GitHub.
 
-[Go here](https://login.tailscale.com/start) to create a Tailscale account.
+[Go here](https://login.tailscale.com/start) to create a free Tailscale account.
 
 ## Step 3. Enable Tailscale in NVIDIA Sync
 

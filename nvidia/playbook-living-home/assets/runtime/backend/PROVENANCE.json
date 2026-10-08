@@ -1,0 +1,23 @@
+{
+  "source": "Owner-provided local Living Home application",
+  "sourceFiles": [
+    {
+      "path": "C:\\LivingHome\\dev\\home-assistant\\brain\\rag\\device_plans.py",
+      "sha256": "f273cc4b53f841c1421db75056007cbc98ee86b6633b0da66385a716143b3eb9"
+    },
+    {
+      "path": "C:\\LivingHome\\dev\\home-assistant\\brain\\rag\\device_plan_evidence.py",
+      "sha256": "e8fd83b1bb437eb05d95e9e6feec574f5aa0d832c6f629b882e5671551bc85de"
+    },
+    {
+      "path": "C:\\LivingHome\\dev\\home-assistant\\brain\\rag\\property_store.py",
+      "sha256": "184533f78d4b1f79e7dc23a766bfc316e07a3cb8d05b21fe497d58b93ef1ad99"
+    },
+    {
+      "path": "C:\\LivingHome\\dev\\home-assistant\\brain\\rag\\property_reports.py",
+      "sha256": "caa263851622a8bcabb6c78896e12aaeda5c913d1aa7abe07f0ca97089f55576"
+    }
+  ],
+  "adaptation": "Selected pure validation/journal methods and empty instance-scoped records only; sample seeding, global services, reset/profile switching and local registry dependencies excluded.",
+  "license": "MIT, under the root LICENSE. The owner confirmed permission to publish the adapted original code on 2026-10-05. The requested destination is an internal NVIDIA repository."
+}

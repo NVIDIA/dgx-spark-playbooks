@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "completeRuntimeInventory": false,
+  "modelBytes": 94586588224,
+  "modelArtifacts": [
+    {
+      "path": "llamacpp/flash-next/models/UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00001-of-00003.gguf",
+      "url": "https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF/resolve/38bb39ee97821de2c9009abb7e93950eec396e66/UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00001-of-00003.gguf",
+      "size": 10946624,
+      "sha256": "5ce89370720f8bf90890f439361282104c1aa1482d4013bb9a50923e758e71a4",
+      "verification": "transcribed_from_existing_manifest_not_rehashed_this_run"
+    },
+    {
+      "path": "llamacpp/flash-next/models/UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00002-of-00003.gguf",
+      "url": "https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF/resolve/38bb39ee97821de2c9009abb7e93950eec396e66/UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00002-of-00003.gguf",
+      "size": 49835229856,
+      "sha256": "577a38a2392b40ca2193cea502e1d92f60b8cd370675d308e0ec21885d9daaa7",
+      "verification": "transcribed_from_existing_manifest_not_rehashed_this_run"
+    },
+    {
+      "path": "llamacpp/flash-next/models/UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00003-of-00003.gguf",
+      "url": "https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF/resolve/38bb39ee97821de2c9009abb7e93950eec396e66/UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00003-of-00003.gguf",
+      "size": 43836407744,
+      "sha256": "d4634e6d84f0ebb0940be15c90d3790bf6464e3dea3a1cddc567dc0e83ad8833",
+      "verification": "transcribed_from_existing_manifest_not_rehashed_this_run"
+    },
+    {
+      "path": "llamacpp/flash-next/models/mmproj-F16.gguf",
+      "url": "https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF/resolve/38bb39ee97821de2c9009abb7e93950eec396e66/mmproj-F16.gguf",
+      "size": 904004000,
+      "sha256": "1f7b7f0b984cf065c604360c29c8098362ed61b290db0ff12c6f360bb1a8a980",
+      "verification": "transcribed_from_existing_manifest_not_rehashed_this_run"
+    }
+  ],
+  "llamaArchiveArtifacts": [
+    {
+      "path": "llamacpp/flash-next/downloads/llama-b10930-bin-win-cuda-13.4-arm64.zip",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b10930/llama-b10930-bin-win-cuda-13.4-arm64.zip",
+      "size": 142976141,
+      "sha256": "edd2a817dc2d1cdfbb9b22b7bcfa2ac432a74af5470fb2b94639c254e8680a76",
+      "verification": "transcribed_from_existing_manifest_not_rehashed_this_run"
+    },
+    {
+      "path": "llamacpp/flash-next/downloads/cudart-llama-bin-win-cuda-13.4-arm64.zip",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b10930/cudart-llama-bin-win-cuda-13.4-arm64.zip",
+      "size": 153262407,
+      "sha256": "642dcde8805b3e3165ca710a5443b3b4044b27d96bd3ee3132473988c9bcb774",
+      "verification": "transcribed_from_existing_manifest_not_rehashed_this_run"
+    }
+  ],
+  "localNativeComponents": [
+    {
+      "path": "runtime/node/node.exe",
+      "size": 81301320,
+      "sha256": "3958e4bb3f2d4ef37c938215dfc65a9d3c9d839b5060fec103bd2345fa78e951",
+      "architecture": "arm64",
+      "url": null,
+      "verification": "local_exact_file_rehashed_and_PE_checked"
+    },
+    {
+      "path": "runtime/node/LICENSE",
+      "size": 160552,
+      "sha256": "d9c4eeda951d6d08f4aa1316b61aafcf67e6da5f79b18f8edeb56fa6abdc038c",
+      "architecture": null,
+      "url": null,
+      "verification": "local_exact_file_rehashed_and_PE_checked"
+    },
+    {
+      "path": "runtime/python/python.exe",
+      "size": 91648,
+      "sha256": "1a967738a234a3bd90e8fa8b925e20a994326e1eb8b74913026a9449a933e6db",
+      "architecture": "x64",
+      "url": null,
+      "verification": "local_exact_file_rehashed_and_PE_checked"
+    },
+    {
+      "path": "runtime/python/python3.dll",
+      "size": 56320,
+      "sha256": "cd42200fb3a7d5bda472d617e1e7a5515798ff0a0a827b9e3aef42acc87347ed",
+      "architecture": "x64",
+      "url": null,
+      "verification": "local_exact_file_rehashed_and_PE_checked"
+    },
+    {
+      "path": "runtime/python/python312.dll",
+      "size": 6969856,
+      "sha256": "46561f1d4e29afed8db6b8bcde7be110d56d6598ae78cc0cf10b2db8360d9c5e",
+      "architecture": "x64",
+      "url": null,
+      "verification": "local_exact_file_rehashed_and_PE_checked"
+    },
+    {
+      "path": "runtime/python/vcruntime140.dll",
+      "size": 124544,
+      "sha256": "d5e4d9a3e835fa679450145d6a7d94e36573a509317111904d9b3712c30d9066",
+      "architecture": "x64",
+      "url": null,
+      "verification": "local_exact_file_rehashed_and_PE_checked"
+    },
+    {
+      "path": "runtime/python/vcruntime140_1.dll",
+      "size": 49792,
+      "sha256": "1f2d41c4aa5db0bc33ebf7b66d72943a817d7ce6cbe880502a9403823633093f",
+      "architecture": "x64",
+      "url": null,
+      "verification": "local_exact_file_rehashed_and_PE_checked"
+    },
+    {
+      "path": "runtime/python/LICENSE.txt",
+      "size": 25066,
+      "sha256": "886a0ead2d89030ee62dbff52b04e47ab91998341295bb9c56fb952b4e081c7a",
+      "architecture": null,
+      "url": null,
+      "verification": "local_exact_file_rehashed_and_PE_checked"
+    }
+  ],
+  "remaining": [
+    "Python standard library and reviewed dependencies",
+    "OpenClaw npm/plugin build dependency inventory and licenses",
+    "Container/HA runtime and own HA provisioning",
+    "Model runtime choice and measured target-Spark settings",
+    "A complete clean runtime entrypoint and release validation"
+  ],
+  "sourceManifestSha256": {
+    "models": "08cee2723c230ba6023567b8fce04a2945087dd59b1c709bb0d88edd2e8b08ee",
+    "llama": "89947cc02e73285ee058ff839437940efaf098c0bf0e671c37abebba261cc061"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "haMode": "existing",
+  "haUrl": "http://127.0.0.1:8123",
+  "entityIds": [],
+  "timeZone": "America/Los_Angeles",
+  "openclawProfile": "living-home",
+  "google": { "enabled": false }
+}

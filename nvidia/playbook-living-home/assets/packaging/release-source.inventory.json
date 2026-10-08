@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "releaseVersion": "0.1.0-preview",
+  "architecture": "arm64",
+  "entryPoint": "Setup-LivingHome.ps1",
+  "files": [],
+  "models": [],
+  "readiness": {
+    "fresh_household_initialization": false,
+    "no_seeded_property_records": false,
+    "own_ha_account_and_devices": false,
+    "own_google_scope_and_oauth": false,
+    "portable_health_collector": false,
+    "native_openclaw_configuration": false,
+    "own_maintenance_incident_ingestion": false,
+    "runtime_dependencies_pinned": false,
+    "fresh_host_validation": false
+  },
+  "blockers": [
+    "Fresh HouseholdRunStore/config writer and clean backend source exist; their complete installed runtime wiring remains unverified.",
+    "Clean own-identity property source is included in the development bundle; full installed flow must prove no sample/reset route or private source is reachable.",
+    "Own Google scope config is supported locally; fresh-account OAuth and clean Google ingestion adapter remain required.",
+    "Portable selected-entity collector and new plugin source exist; complete installed model-to-collector-to-report flow remains unverified.",
+    "Native local OpenClaw onboarding/config generation remains required. Native HA automation save/readback and actual virtual-device triggers passed in the backend and browser labs.",
+    "Clean backend authentication, evidence revisions and source/incident intake passed the virtual-device integration; the complete installed model-to-ingestion workflow remains unverified.",
+    "Clean runtime dependency inventory, ARM64 artifacts/model pins and licenses require explicit review.",
+    "A second Spark is unavailable; fresh host integration and physical action receipts are unverified."
+  ]
+}

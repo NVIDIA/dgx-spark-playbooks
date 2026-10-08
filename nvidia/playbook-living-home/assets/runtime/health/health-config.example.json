@@ -1,0 +1,7 @@
+{
+  "entity_ids": [],
+  "timezone": null,
+  "battery_warning_threshold": 20,
+  "check_integrations": false,
+  "timeout_seconds": 8
+}

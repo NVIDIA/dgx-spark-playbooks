@@ -271,7 +271,7 @@ Verify and manage a running service, then stop it when finished:
 
 `recipe stop` revalidates ownership labels and sends SIGTERM only. It never force-kills, and it only ever stops resources recorded as owned by `dgx-assist`.
 
-For additional tested vLLM launch settings beyond this smoke recipe, see [Serve LLMs with vLLM](https://build.nvidia.com/playbooks/vllm).
+For additional vLLM launch settings beyond this smoke recipe, see [Serve LLMs with vLLM on One Device](https://build.nvidia.com/playbooks/vllm).
 
 ## Step 10. Plan a MIG layout
 

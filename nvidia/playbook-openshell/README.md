@@ -443,10 +443,9 @@ sed -i '/^binaries:/i\
     enforcement: enforce' local-vllm.yaml
 ```
 
-Lint, then update the profile:
+Update the profile. `profile lint` validates a profile as new-import input and rejects an `id` that already exists, so it isn't used here — `profile update` performs its own validation against the existing profile:
 
 ```bash
-openshell profile lint -f local-vllm.yaml
 openshell profile update local-vllm -f local-vllm.yaml
 ```
 
@@ -476,15 +475,18 @@ openshell sandbox provider detach "$SANDBOX_NAME" local-vllm --wait
 
 ## Step 12. Work on a local project (optional)
 
-Point Pi at your own code by uploading a project directory at sandbox-creation time. `--upload` copies the directory in before Pi starts, skipping anything `.gitignore` excludes:
+Point Pi at your own code by uploading a project directory at sandbox-creation time. `--upload` copies the directory in before the sandbox starts, skipping anything `.gitignore` excludes. `--upload` cannot be combined with a trailing main command, so create the sandbox first and start Pi inside it as a separate step:
 
 ```bash
 openshell sandbox create \
   --name pi-project \
   --from pi-agent:local \
   --provider local-vllm \
-  --upload .:/workspace \
-  -- pi --model local-vllm/"$MODEL_HANDLE"
+  --upload .:/workspace
+```
+
+```bash
+openshell sandbox exec -n pi-project --tty -- pi --model local-vllm/"$MODEL_HANDLE"
 ```
 
 Pi's changes stay inside the sandbox. Copy them back with `openshell sandbox download` from another terminal while Pi is still running (see Step 13).

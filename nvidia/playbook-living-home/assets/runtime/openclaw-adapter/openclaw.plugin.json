@@ -1,0 +1,22 @@
+{
+  "id": "living-home",
+  "name": "Living Home",
+  "version": "0.2.0",
+  "description": "Local plans, property records, and selected Home Assistant status",
+  "categories": ["tools"],
+  "contracts": { "tools": ["living_home_fast", "living_home_property"] },
+  "activation": { "onStartup": true },
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "baseUrl": { "type": "string", "description": "Trusted HTTP(S) origin on 127.0.0.1 or [::1], with the configured backend port." },
+      "propertyBasePath": { "type": "string", "default": "/property", "description": "Trusted property API path prefix, without query parameters." },
+      "pythonExecutable": { "type": "string", "description": "Absolute local path to the selected Python executable." },
+      "collectorPath": { "type": "string", "description": "Absolute local path to the installed collect_home_status.py." },
+      "dataDirectory": { "type": "string", "description": "Absolute local data directory containing .env and health-config.json." },
+      "apiTokenFile": { "type": "string", "description": "Absolute local path to the generated backend API bearer token file." }
+    },
+    "required": ["baseUrl", "pythonExecutable", "collectorPath", "dataDirectory", "apiTokenFile"],
+    "additionalProperties": false
+  }
+}

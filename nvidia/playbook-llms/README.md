@@ -138,7 +138,7 @@ Agents typically need a local inference server, then an agent app pointed at tha
 
 1. Choose a backend:
    - [LM Studio](https://lmstudio.ai/) or [Ollama](https://ollama.com/) for an easy local server experience (llama.cpp-based apps with current GPU optimizations).
-   - For more control: [Serve LLMs with vLLM](https://build.nvidia.com/playbooks/vllm) (Linux) or [Serve Models with llama.cpp](https://build.nvidia.com/playbooks/llama-cpp).
+   - For more control: [Serve LLMs with vLLM on One Device](https://build.nvidia.com/playbooks/vllm) (Linux) or [Serve Models with llama.cpp](https://build.nvidia.com/playbooks/llama-cpp).
 2. Start the server with a large context window when possible (32k tokens or more for agentic flows).
 3. Note the URL and port, and confirm the server responds.
 4. Install your agent app (for example OpenClaw, Hermes Agent, or OpenCode).
@@ -168,7 +168,7 @@ Cleanup is optional.
 
 ## Step 7. Next steps
 
-- Follow a dedicated serving playbook when you need production-style endpoints: [Serve LLMs with vLLM](https://build.nvidia.com/playbooks/vllm), [Serve LLMs with LM Studio](https://build.nvidia.com/playbooks/lm-studio), or [Serve Models with llama.cpp](https://build.nvidia.com/playbooks/llama-cpp)
+- Follow a dedicated serving playbook when you need production-style endpoints: [Serve LLMs with vLLM on One Device](https://build.nvidia.com/playbooks/vllm), [Serve LLMs with LM Studio](https://build.nvidia.com/playbooks/lm-studio), or [Serve Models with llama.cpp](https://build.nvidia.com/playbooks/llama-cpp)
 - Build an agent workflow with [Run OpenClaw with a Local LLM](https://build.nvidia.com/playbooks/openclaw) or [Run Hermes Agent with a Local LLM](https://build.nvidia.com/playbooks/hermes-agent)
 - Browse the NVIDIA blog guide linked under **Resources** for additional product context
 

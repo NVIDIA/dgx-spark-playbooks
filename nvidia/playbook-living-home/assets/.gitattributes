@@ -1,0 +1,7 @@
+# Preserve portable scripts when contributors check out on Windows.
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Node's type stripping leaves spaces in place to preserve source positions.
+runtime/openclaw-adapter/dist/*.js whitespace=-blank-at-eol

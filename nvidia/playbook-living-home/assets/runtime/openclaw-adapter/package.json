@@ -1,0 +1,18 @@
+{
+  "name": "@living-home/openclaw-adapter",
+  "version": "0.2.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "Local Living Home plans, records, and selected Home Assistant status",
+  "engines": { "node": ">=24.16.0" },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node scripts/build.mjs && node --test test/*.test.mjs"
+  },
+  "openclaw": {
+    "extensions": ["./dist/index.js"],
+    "runtimeExtensions": ["./dist/index.js"],
+    "compat": { "minGatewayVersion": "2026.9.4", "pluginApi": ">=2026.9.4" }
+  }
+}

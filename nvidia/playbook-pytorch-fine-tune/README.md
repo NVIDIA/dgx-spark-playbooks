@@ -266,7 +266,7 @@ Use this tab to fine-tune across **multi-node capable hardware** with Docker Swa
 - A Hugging Face token with access to the selected model
 
 > [!TIP]
-> If [NVIDIA Sync Cluster Assistant](https://docs.nvidia.com/sync/latest/cluster-assistant.html) successfully configured your DGX Spark cluster, the interconnect and SSH prerequisites are complete. Do not repeat the manual connection playbook; continue to Step 1. Otherwise, follow [Connect two nodes for distributed workloads](https://build.nvidia.com/playbooks/connect-two-sparks).
+> If [NVIDIA Sync Cluster Assistant](https://docs.nvidia.com/sync/latest/cluster-assistant.html) successfully configured your DGX Spark cluster, the interconnect and SSH prerequisites are complete. Do not repeat the manual connection playbook; continue to Step 1. Otherwise, follow [Connect two nodes for distributed workloads](https://build.nvidia.com/playbooks/connect-multiple-sparks).
 
 ### Step 1. Identify the interconnect
 
