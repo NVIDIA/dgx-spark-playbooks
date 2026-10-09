@@ -176,6 +176,12 @@ Tailscale requires you to sign up through a third party auth provider like Googl
 
 For more help, see [Tailscale Connections in the NVIDIA Sync User Guide](https://docs.nvidia.com/sync/latest/tailscale.html#nvidia-sync-tailscale).
 
+## NixOS boundary
+
+NVIDIA Sync can be used as an SSH control surface after a NixOS host and its SSH access are already configured. Import existing `~/.ssh/config` aliases when key-based access is in use; mDNS discovery is optional and may find no devices even when direct SSH works. A read-only custom command such as `hostname` is a useful connection check.
+
+Sync does not replace the NixOS system configuration or install the host MPI, CUDA, or NCCL runtime. A successful Sync connection confirms SSH and port forwarding, not NCCL, MPI, or RDMA readiness. Use the relevant workload playbook for those checks.
+
 ## Connect with Manual SSH
 
 ## Step 1. Verify SSH client availability
