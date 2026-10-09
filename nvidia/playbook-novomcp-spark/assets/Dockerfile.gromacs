@@ -1,0 +1,33 @@
+# GROMACS 2026.x for DGX Spark (GB10 / sm_121), GPU + ARM SIMD.
+#
+# Key choices (all Grace-specific):
+#   - 2026.x line: the 2025.x line fails to LINK its PME-GPU kernels against
+#     CUDA 13 (undefined reference to pme_solve_kernel) — a version issue.
+#   - GMX_CUDA_TARGET_SM=121 : GB10's compute capability.
+#   - GMX_SIMD=ARM_NEON_ASIMD : AVX2_256 is x86-only.
+#   - GMX_DOUBLE=OFF : GB10 FP64 is ~34x slower than FP32 — keep MD in float32.
+#   - ubuntu22.04 (py3.10) base: the pinned scientific deps resolve to prebuilt
+#     aarch64 wheels instead of compiling from sdist.
+FROM nvidia/cuda:13.0.1-devel-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      wget build-essential git python3 python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# ubuntu22.04's cmake is too old for GROMACS 2026.x
+RUN pip3 install --no-cache-dir cmake
+
+WORKDIR /opt
+RUN wget -q https://ftp.gromacs.org/gromacs/gromacs-2026.3.tar.gz \
+    && tar xfz gromacs-2026.3.tar.gz && cd gromacs-2026.3 && mkdir build && cd build \
+    && cmake .. \
+         -DGMX_GPU=CUDA -DGMX_CUDA_TARGET_SM=121 -DGMX_SIMD=ARM_NEON_ASIMD \
+         -DGMX_DOUBLE=OFF -DGMX_BUILD_OWN_FFTW=ON \
+         -DCMAKE_INSTALL_PREFIX=/usr/local/gromacs \
+    && make -j"$(nproc)" && make install
+
+ENV PATH=/usr/local/gromacs/bin:$PATH
+
+COPY water_benchmark.sh topol_template.top /work/
+WORKDIR /work

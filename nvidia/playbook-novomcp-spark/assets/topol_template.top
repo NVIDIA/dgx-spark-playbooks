@@ -1,0 +1,7 @@
+#include "oplsaa.ff/forcefield.itp"
+#include "oplsaa.ff/spce.itp"
+
+[ system ]
+SPC/E water box
+
+[ molecules ]
