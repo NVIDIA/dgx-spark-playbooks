@@ -45,8 +45,14 @@ echo "Checking for existing models..."
 
 if ! /bin/ollama list | grep -q llama3.1:8b; then
     echo "No models found. Pulling llama3.1:8b..."
-    /bin/ollama pull llama3.1:8b
-    echo "Successfully pulled llama3.1:8b"
+    # A failed pull (no network, registry down) must not kill PID 1 — that would
+    # trap the container in a restart loop instead of leaving a usable server.
+    if /bin/ollama pull llama3.1:8b; then
+        echo "Successfully pulled llama3.1:8b"
+    else
+        echo "WARNING: pull failed. Server stays up; retry with:"
+        echo "  docker exec ollama-compose ollama pull llama3.1:8b"
+    fi
 else
     echo "Models already exist, skipping pull."
 fi
