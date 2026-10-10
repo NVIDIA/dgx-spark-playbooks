@@ -20,7 +20,6 @@ import os
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_milvus import Milvus
 from langchain_core.documents import Document
-from typing_extensions import List
 from langchain_openai import OpenAIEmbeddings
 from langchain_unstructured import UnstructuredLoader
 from dotenv import load_dotenv
