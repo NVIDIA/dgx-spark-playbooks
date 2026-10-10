@@ -1,0 +1,10 @@
+models:
+  - name: deberta-injection
+    hf_model: deepset/deberta-v3-base-injection
+    device: cuda:0
+    batch_size: 32
+  - name: protectai-injection
+    hf_model: protectai/deberta-v3-base-prompt-injection-v2
+    device: cuda:0
+    batch_size: 32
+port: 8234
