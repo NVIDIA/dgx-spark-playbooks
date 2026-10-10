@@ -10,6 +10,9 @@ or:
 """
 from __future__ import annotations
 
+import torch
+torch.cuda.init()
+
 # ── GPU accel must be installed BEFORE umap/hdbscan/pandas imports ───────────
 import cuml.accel
 cuml.accel.install()
@@ -18,6 +21,7 @@ import cudf.pandas
 cudf.pandas.install()
 
 import copy
+import io
 import pickle
 import re
 import time
@@ -203,16 +207,121 @@ c3.metric("Clustered docs",
           f"{int(topic_info.loc[topic_info['Topic'] != -1, 'Count'].sum()):,}")
 
 
-# ── Visualization tabs ───────────────────────────────────────────────────────
-tab_topics, tab_bar, tab_heat, tab_map, tab_table = st.tabs([
+# ── Datamap helpers ──────────────────────────────────────────────────────────
+@st.cache_data(show_spinner=False, max_entries=4)
+def reduce_2d(n: int, fit_key: str) -> np.ndarray:
+    """UMAP the first `n` embeddings to 2D, shared by both datamap renderers."""
+    return UMAP(n_neighbors=15, n_components=2, min_dist=0.15,
+                metric="cosine").fit_transform(embeddings[:n])
+
+
+@st.cache_data(show_spinner=False, max_entries=4)
+def build_datamap(_model: BERTopic, n: int, interactive: bool, offline: bool,
+                  label_top_n: int, fit_key: str):
+    """Render the datamap for the first `n` docs. `fit_key` keys the cache."""
+    temp_model = copy.copy(_model)
+    temp_model.topics_ = _model.topics_[:n]
+    kwds = dict(
+        reduced_embeddings=reduce_2d(n, fit_key),
+        interactive=interactive,
+    )
+    if interactive:
+        # offline_mode inlines deck.gl/d3/arrow/jquery + fonts into the page
+        # instead of pulling them from unpkg.com at view time. Costs ~3 MB of
+        # HTML but means the map still draws if the browser can't reach a CDN.
+        kwds["int_datamap_kwds"] = {"offline_mode": offline}
+    else:
+        # Static label placement costs ~0.4s per distinct label: a 250-topic
+        # sample takes ~110s, the top 25 take ~3s. Unselected topics still get
+        # plotted, just unlabelled.
+        ranked = _model.get_topic_info().sort_values("Count", ascending=False)
+        kwds["topics"] = [t for t in ranked["Topic"].tolist() if t != -1][:label_top_n]
+
+    fig = temp_model.visualize_document_datamap(texts[:n], **kwds)
+
+    if interactive:
+        # str(fig) is the standalone HTML page. Do NOT use _repr_html_() here:
+        # that wraps the page in a fixed 1200x750 iframe, which Streamlit then
+        # nests inside its own component iframe — the map ends up clipped.
+        return str(fig)
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", bbox_inches="tight", dpi=100)
+    return buf.getvalue()
+
+
+def render_datamap() -> None:
+    st.subheader("Document datamap")
+    n = max(100, int(len(texts) * datamap_pct / 100.0))
+    st.caption(f"Plotting {n:,} of {len(texts):,} documents.")
+
+    mode_col, opt_col = st.columns([2, 3])
+    with mode_col:
+        interactive = st.radio(
+            "Renderer", ["Interactive (WebGL)", "Static image"],
+            horizontal=True, label_visibility="collapsed",
+        ) == "Interactive (WebGL)"
+    with opt_col:
+        if interactive:
+            label_top_n = 0
+            offline = st.checkbox(
+                "Bundle JS + fonts into the page (offline mode)", value=True,
+                help="Interactive datamaps normally load deck.gl, d3 and Google Fonts "
+                     "from a CDN at view time. If your browser can't reach unpkg.com "
+                     "the map renders blank — keep this on to inline them instead. "
+                     "The first render downloads and caches the bundle (needs network "
+                     "on the machine running the app).",
+            )
+        else:
+            offline = False
+            label_top_n = st.slider(
+                "Label the top N topics", 5, 100, 25, step=5,
+                help="Static rendering places every label with matplotlib, which "
+                     "costs roughly 0.4s per distinct topic. Labelling all ~250 "
+                     "topics in a sample takes minutes; the rest are still plotted, "
+                     "just without a label.",
+            )
+
+    spinner = ("Rendering datamap…" if interactive else
+               f"Rendering static datamap ({label_top_n} labels, ~{label_top_n // 8 + 2}s)…")
+    try:
+        with st.spinner(spinner):
+            result = build_datamap(topic_model, n, interactive, offline,
+                                   label_top_n, str(params))
+    except Exception as exc:  # noqa: BLE001
+        st.error(f"Datamap render failed: {type(exc).__name__}: {exc}")
+        if offline:
+            st.info("If this is a network error, untick offline mode — the CDN "
+                    "bundle can't be downloaded without internet access.")
+        return
+
+    if interactive:
+        st.components.v1.html(result, height=820, scrolling=False)
+        st.download_button(
+            "Download standalone HTML",
+            result, file_name="document_datamap.html", mime="text/html",
+            help="If the map above is blank, open this file directly — the "
+                 "browser console will show why (usually WebGL or a blocked CDN).",
+        )
+    else:
+        st.image(result, width="stretch")
+
+
+# ── Visualizations ───────────────────────────────────────────────────────────
+# One view at a time, chosen server-side. st.tabs renders every tab body on
+# every run, and the datamap's deck.gl canvas draws once while its tab is still
+# hidden — it never redraws when you switch to it, so the map comes up blank
+# until some other widget forces a rerun. Rendering only the selected view
+# means the canvas is always mounted visible.
+VIEWS = [
     "Intertopic map",
     "Top words barchart",
     "Similarity heatmap",
     "Document datamap",
     "Topic table",
-])
+]
+view = st.radio("View", VIEWS, horizontal=True, label_visibility="collapsed")
 
-with tab_topics:
+if view == "Intertopic map":
     st.subheader("Intertopic distance map")
     try:
         fig = topic_model.visualize_topics()
@@ -220,33 +329,20 @@ with tab_topics:
     except Exception as exc:  # noqa: BLE001
         st.warning(f"visualize_topics failed: {exc}")
 
-with tab_bar:
+elif view == "Top words barchart":
     st.subheader(f"Top words for top {barchart_top_n} topics")
     fig = topic_model.visualize_barchart(top_n_topics=barchart_top_n)
     st.plotly_chart(fig, width="stretch")
 
-with tab_heat:
+elif view == "Similarity heatmap":
     st.subheader(f"Topic similarity heatmap (top {heatmap_top_n} topics)")
     fig = topic_model.visualize_heatmap(top_n_topics=heatmap_top_n)
     st.plotly_chart(fig, width="stretch")
 
-with tab_map:
-    st.subheader("Document datamap")
-    n = max(100, int(len(texts) * datamap_pct / 100.0))
-    st.caption(f"Plotting {n:,} of {len(texts):,} documents.")
-    temp_model = copy.copy(topic_model)
-    temp_model.topics_ = topic_model.topics_[:n]
-    with st.spinner("Rendering datamap…"):
-        interactive_fig = temp_model.visualize_document_datamap(
-            texts[:n],
-            embeddings=embeddings[:n],
-            interactive=True,
-        )
-    # datamapplot's InteractiveFigure exposes the html string.
-    html_str = getattr(interactive_fig, "html", None) or interactive_fig._repr_html_()
-    st.components.v1.html(html_str, height=820, scrolling=True)
+elif view == "Document datamap":
+    render_datamap()
 
-with tab_table:
+elif view == "Topic table":
     st.subheader("Topic info")
     st.dataframe(topic_info.to_pandas() if hasattr(topic_info, "to_pandas") else topic_info,
                  width="stretch", height=600)
