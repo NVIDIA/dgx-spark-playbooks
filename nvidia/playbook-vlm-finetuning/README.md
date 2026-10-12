@@ -89,8 +89,8 @@ All required assets can be found [in this playbook repository](https://github.co
   - Training sustains high GPU and memory use; residual cache can cause pressure after UI or notebook sessions
   - Image dataset prep may require a Kaggle login and accepting dataset terms; video datasets need correct folder layout and `metadata.jsonl`
 - **Rollback:** Stop and remove Docker containers; delete downloaded models, datasets, and checkpoints under the mounted assets directory if needed
-- **Last Updated:** 08/03/2026
-  - Fine-tune image and video VLMs with Docker-based Streamlit and notebook workflows on supported hardware platforms
+- **Last Updated:** 10/09/2026
+  - Pinned `peft` in the Dockerfile so GRPO fine-tuning no longer fails on the base image's `torchao` version, and added a troubleshooting entry
 
 ## Instructions
 
@@ -364,6 +364,7 @@ The **Hardware platform** column shows where an issue is most relevant. "All har
 | Jupyter unreachable on port 8888 | All hardware platforms | Notebook server not running or port blocked | Confirm `jupyter notebook` is running in `ui_video/train`; open `http://localhost:8888` or `http://<HARDWARE_IP>:8888` |
 | vLLM / model load spinner runs a long time | All hardware platforms | First-time model load or cold start | Wait up to about 15 minutes for image (vLLM) or about 10 minutes for video; confirm GPU is free and disk has the model weights |
 | Training OOM / memory pressure during train or infer | All hardware platforms | Other GPU jobs, residual cache, or workload exceeds available memory | Stop other GPU processes; bring down Streamlit or Jupyter before the next heavy step; flush buffer cache (see note); lower batch size, frames, or LoRA scope |
+| GRPO fine-tuning fails immediately with `ImportError: Found an incompatible version of torchao` | All hardware platforms | The container was built with a newer `peft` that needs `torchao` 0.16 or later, but the base image ships `torchao` 0.13 | Pull the latest playbook assets and rebuild the image as in Step 3 (the Dockerfile pins `peft==0.17.1`), then relaunch the container |
 | Memory pressure within capacity | DGX Spark | UMA buffer cache not released | See UMA note below |
 
 > [!NOTE]

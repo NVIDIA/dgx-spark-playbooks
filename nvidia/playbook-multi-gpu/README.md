@@ -5,175 +5,105 @@
 ## Table of Contents
 
 - [Overview](#overview)
-- [Instructions](#instructions)
-  - [LM Studio](#lm-studio)
-  - [llama.cpp CLI / server](#llamacpp-cli-server)
-  - [Verify multi-GPU utilization](#verify-multi-gpu-utilization)
-- [Troubleshooting](#troubleshooting)
+  - [Llama.cpp for LLMs](#llamacpp-for-llms)
+  - [ComfyUI for Creative AI](#comfyui-for-creative-ai)
+  - [Quick Spec Reference](#quick-spec-reference)
+  - [Choosing Your Components](#choosing-your-components)
+  - [Build Tips and Common Pitfalls](#build-tips-and-common-pitfalls)
 
 ---
 
 ## Overview
 
-## Basic idea
+## How to Build a Multi-GPU AI PC: A Practical Guide
 
-Large local models need more memory and compute than a single GPU often provides. A **multi-GPU hardware platform** — two matching discrete GPUs in one system — lets you pool VRAM and accelerate inference and diffusion by splitting work across both cards.
+Many people are interested in exploring local generative AI for privacy and to avoid token limits. The challenge is that the latest models consume a lot of memory, and a lot of compute. To tackle this, some users have started building multi-GPU setups.
 
-NVIDIA has partnered with the [llama.cpp](https://github.com/ggml-org/llama.cpp) and [ComfyUI](https://www.comfy.org/) communities so consumer-friendly tools can use both GPUs effectively:
+In this guide, we show you how to build your own multi-GPU PC, and how to configure your AI apps to take advantage of it.
 
-- **llama.cpp tensor parallel** spreads a model across two GPUs for compute and memory — up to ~2× memory capacity and up to ~1.8× compute versus single-GPU, and substantially faster than pipeline parallel for many workloads.
-- **ComfyUI MultiGPU CFG Split** runs diffusion CFG work across identical GPUs (and can place pipeline stages per GPU), with measured speedups up to ~2× depending on model and workflow.
+## Why is this now possible?
 
-This playbook covers configuring those apps on an existing dual-GPU system and, if you are still building, choosing components for a homogeneous dual-GPU PC.
+AI enthusiasts have been using multi-GPU PCs to run local AI for years, by leveraging the AI frameworks that are run on datacenters, like vLLM or SGLang, to pair up GPUs. Until recently, the consumer tools that most AI enthusiasts use - Llama.cpp for LLMs and ComfyUI for creative AI - were not optimized for multi-GPU setups.
 
-## What you'll accomplish
+NVIDIA has partnered with the llama.cpp and ComfyUI community to bring optimized performance for multi-GPU setups on NVIDIA GPUs:
 
-You'll **configure llama.cpp / LM Studio and ComfyUI to use two identical GPUs** on your hardware platform, and optionally follow a component guide for assembling a dual-GPU PC.
+* Llama.cpp has added Tensor Parallel - a technique that allows you to spread a model across 2 GPUs and use both for compute. This effectively doubles the performance compared to the previously available method, Pipeline Parallelization, which only allowed you to share VRAM but not benefit from dual compute. This tensor parallel technique fully utilizes both GPUs for up to ~2X memory capacity and up to ~1.8X compute performance.
 
-- Enable **tensor parallel** (or pipeline parallel) for LLMs in LM Studio or llama.cpp
-- Insert the **MultiGPU CFG Split** node in ComfyUI and verify both GPUs are active
-- Use a **quick spec reference** and component guidance when building or upgrading a dual-GPU system
+* ComfyUI has added CFG, a method to use both GPUs to compute the AI work during a diffusion process. Users can also choose what part of the pipeline is loaded on each GPU to benefit from the additional VRAM offered by a second GPU, avoiding having to load models in and out of memory for a further performance boost. These techniques have resulted in up to 2x compute across two GPUs.
 
-## What to know before starting
+## Configuring Your PC for Multi-GPU AI
 
-**Required:**
+If you already have a PC with 2 equivalent GPUs, you are ready to start using the new optimizations! Follow the instructions below to learn how to configure your apps to best leverage your 2 GPUs. If you haven’t made the move yet, you can skip over to the next section for tips on how to build your dual-GPU system.
 
-- Familiarity with installing and running local AI apps (LM Studio, llama.cpp, and/or ComfyUI)
-- Two **identical** NVIDIA discrete GPUs (homogeneous pair) in one system, or a plan to build that configuration
+**Supported GPUs:** Any NVIDIA RTX Ampere GPU (e.g. RTX 30 Series) or newer can be utilized, but the GPUs must be homogeneous (i.e., 2x 3090, 2x 5070 Ti, etc.); mixed GPU types are not supported. For the best experience, we recommend using 2 GPUs connected over a PCIe network.
 
-**Optional:**
+### Llama.cpp for LLMs
 
-- Experience assembling desktop PCs (motherboard PCIe lanes, PSU cabling, BIOS) if you are building from components
-- Basic understanding of VRAM sizing for LLMs and diffusion models
+* If you are using LM Studio:
+   1. Under Runtime Settings (Ctrl+Shift+R), ensure you have a CUDA runtime selected
+   2. Open the hardware settings (Ctrl+Shift+H) and from the dropdown menu, select "tensor parallelism" as the split strategy
 
-## Supported hardware platforms
+* If you are using Llama.cpp directly:
+   1. Get a CUDA-enabled build of llama.cpp. On Windows, go to the llama.cpp [GitHub release page](https://github.com/ggml-org/llama.cpp/releases/) and download the latest CUDA build. On Linux, the prebuilt releases do not include a CUDA build (they are CPU, Vulkan, ROCm, SYCL, or OpenVINO only and cannot split work across NVIDIA GPUs), so build from source with the CUDA Toolkit, CMake, and git installed:
 
-Use the matrix below to confirm your hardware platform, recommended default local settings, and whether multi-node applies.
+      ```bash
+      git clone https://github.com/ggml-org/llama.cpp
+      cd llama.cpp
+      cmake -B build -DGGML_CUDA=ON
+      cmake --build build --config Release -j
+      ```
 
-| Hardware platform | OS | Memory | Recommended default local settings | Multi-node capable hardware |
-| :---- | :---- | :---- | :---- | :---- |
-| **GeForce RTX** | Windows 11 (primary); Linux for llama.cpp CLI | Dedicated VRAM (homogeneous dual discrete GPUs) | Tensor parallel (`-sm tensor`) for LLMs; MultiGPU CFG Split for ComfyUI | — |
-| **RTX PRO** | Windows 11 (primary); Linux for llama.cpp CLI | Dedicated VRAM (homogeneous dual discrete GPUs) | Tensor parallel (`-sm tensor`) for LLMs; MultiGPU CFG Split for ComfyUI | — |
+      The binaries are written to `build/bin/`.
+   2. Run `llama-cli` or `llama-server` with the following commands.
 
-## Prerequisites
+      - **Pipeline parallel**
 
-**Hardware requirements**
+         ```bash
+         <app> -m <model_path> -sm layer -fa 1
+         ```
 
-- Supported hardware platform — see Supported hardware platforms matrix above
-- Two identical NVIDIA Ampere-or-newer discrete GPUs (for example, two matching RTX 30 / 40 / 50 Series or matching professional counterparts). Mixed GPU types are not supported
-- For best multi-GPU bandwidth: both GPUs on PCIe Gen 5 with at least **x8/x8** lane allocation (x16/x16 preferred when available)
-- Sufficient system power and cooling for two GPUs (see the build reference in **Instructions**)
+      - **Tensor parallel**
 
-**Software requirements**
+         ```bash
+         <app> -m <model_path> -sm tensor -fa 1
+         ```
 
-- Current NVIDIA GPU driver with both GPUs visible (`nvidia-smi`, or Task Manager → Performance on Windows)
-- For LLMs: [LM Studio](https://lmstudio.ai/) with a CUDA runtime, **or** a recent [llama.cpp](https://github.com/ggml-org/llama.cpp/releases/) build (`llama-cli` / `llama-server`)
-- For creative AI: [ComfyUI](https://www.comfy.org/) with the MultiGPU CFG Split node available in your install
-- Network access to download models and app updates as needed
+   3. Automatic parameter fitting is not supported with `-sm tensor` yet. If you hit OOM errors, reduce the `-np` value for `llama-server`, or reduce the `-c` or `-ngl` values.
+   4. Refer to [multi-GPU readme](https://github.com/ggml-org/llama.cpp/blob/master/docs/multi-gpu.md) in llama.cpp repo for more details.
 
-## Ancillary files
+### ComfyUI for Creative AI
 
-Playbook images live under `assets/` in this repository:
+The new **MultiGPU CFG Split Node in ComfyUI** allows diffusion processing to occur using multiple GPUs installed in the same system. Performance results are workflow dependent, but speedups of up to 1.95x have been measured in common workflows.
 
-- `assets/llamacpp-tensor-vs-pipeline-performance.png` — Relative llama.cpp throughput: single GPU vs pipeline parallel vs tensor parallel
-- `assets/comfyui-multi-gpu-performance.png` — Relative ComfyUI generation performance on one vs two GPUs
-- `assets/comfyui-multigpu-cfg-split-node.png` — MultiGPU CFG Split node (`max_gpus`)
-- `assets/comfyui-multigpu-workflow-placement.png` — Example placement between model load and sampling
-- `assets/task-manager-performance.png` — Windows Task Manager → Performance
-- `assets/task-manager-dual-gpu-utilization.png` — Example dual-GPU utilization while a workflow runs
+**Supported Models:** The following models have been tested as working, speedups will vary by model and workflow.
 
-External references:
+* LTX-2.3
+* WAN 2.2
+* FLUX.2 Klein - Base Versions
+* Z-Image
+* Stable Diffusion 3.5 Large
+* Hunyuan Video
+* Qwen-Image-Edit-2511
+* Hunyuan-3D-v2.1
+* SDXL
 
-- [llama.cpp multi-GPU documentation](https://github.com/ggml-org/llama.cpp/blob/master/docs/multi-gpu.md)
-- [llama.cpp releases](https://github.com/ggml-org/llama.cpp/releases/)
+**MultiGPU CFG Split Node:** The max_gpus field should be set to the maximum number of identical GPUs installed in the system.
 
-## Time & risk
+**Node placement:** The MultiGPU CFG Split needs to be placed between the Model Load node and Sampling node. If other nodes are connected to the model output of the model loader node, the MultiGPU CFG should be the last node in the chain before the Sampling node.
 
-- **Estimated time:** 13 MIN for app configuration on an existing dual-GPU system (longer if you are assembling a new PC)
-- **Risk level:** Medium
-  - Incorrect PCIe lane allocation or a second NVMe drive can silently drop a GPU slot to x4 and hurt multi-GPU performance
-  - Undersized or daisy-chained GPU power cables can cause instability or connector damage under load
-  - Tensor parallel does not yet support automatic parameter fitting in llama.cpp — OOM requires manual tuning
-- **Rollback:** Revert LM Studio split strategy / llama.cpp `-sm` flags, or remove the MultiGPU CFG Split node from ComfyUI workflows. Hardware changes (second GPU, PSU, motherboard) are physical and should be reversed carefully if needed
-- **Last Updated:** 08/03/2026
-  - Dual-GPU configuration for llama.cpp / LM Studio and ComfyUI, plus a dual-GPU PC component reference, on supported RTX / RTX PRO hardware platforms
+**Workflow Requirements:** The node works by splitting the diffusion workflow at the CFG level; because of this, the CFG in the workflow must be greater than CFG = 1. Distilled workflows (or similar workflows) which require a CFG = 1 will not show a performance benefit when using the MultiGPU CFG Split node to run on multiple GPUs.
 
-## Instructions
+#### Verifying Multi-GPU Utilization
 
-## Step 1. Confirm a homogeneous dual-GPU system
+When running a workflow with MultiGPU CFG Split enabled, you can look at the Windows Task Manager and select the performance category.
 
-Both GPUs must be the **same model**. Mixed GPU types are not supported for the multi-GPU paths in this playbook. Any NVIDIA Ampere GPU (for example, RTX 30 Series) or newer can be used when the pair matches. For the best experience, connect both GPUs over a high-bandwidth PCIe fabric (ideally Gen 5 with at least x8/x8).
+You should see activity on both installed GPUs while the sampler is running in the workflow.
 
-Verify both GPUs are visible:
+## How to Build Your Dual GPU PC
 
-```bash
-nvidia-smi -L
-```
+### Quick Spec Reference
 
-On Windows, open **Task Manager → Performance** and confirm two GPU entries appear.
-
-![Windows Task Manager Performance tab](assets/task-manager-performance.png)
-
-If you already have two matching GPUs installed, continue with Steps 2–3. If you are still choosing components, skip ahead to **Step 4** and return here after the system is built.
-
-## Step 2. Configure llama.cpp / LM Studio for multi-GPU LLMs
-
-![Relative llama.cpp multi-GPU performance: tensor parallel vs pipeline parallel](assets/llamacpp-tensor-vs-pipeline-performance.png)
-
-### LM Studio
-
-1. Under **Runtime Settings** (`Ctrl+Shift+R`), ensure a **CUDA** runtime is selected.
-2. Open **Hardware Settings** (`Ctrl+Shift+H`) and set the split strategy dropdown to **tensor parallelism**.
-
-### llama.cpp CLI / server
-
-1. Download the latest build from the [llama.cpp GitHub releases page](https://github.com/ggml-org/llama.cpp/releases/).
-2. Run `llama-cli` or `llama-server` with one of the following split modes.
-
-**Pipeline parallel** (shares VRAM across GPUs; less dual-compute benefit):
-
-```bash
-<app> -m <model_path> -sm layer -fa 1
-```
-
-**Tensor parallel** (preferred — uses both GPUs for compute):
-
-```bash
-<app> -m <model_path> -sm tensor -fa 1
-```
-
-Replace `<app>` with `llama-cli` or `llama-server`, and `<model_path>` with your model file path.
-
-3. Automatic parameter fitting is not supported with `-sm tensor` yet. If you hit out-of-memory errors, reduce `-np` for `llama-server`, or reduce `-c` or `-ngl`.
-4. For more detail, see the [llama.cpp multi-GPU documentation](https://github.com/ggml-org/llama.cpp/blob/master/docs/multi-gpu.md).
-
-## Step 3. Configure ComfyUI MultiGPU CFG Split
-
-![Relative ComfyUI multi-GPU creative AI performance](assets/comfyui-multi-gpu-performance.png)
-
-The **MultiGPU CFG Split** node lets diffusion processing use multiple identical GPUs in the same system. Speedups are workflow-dependent; up to about **1.95×** has been measured on common workflows.
-
-**Supported models (tested):** LTX-2.3, WAN 2.2, FLUX.2 Klein (base versions), Z-Image, Stable Diffusion 3.5 Large, Hunyuan Video, Qwen-Image-Edit-2511, Hunyuan-3D-v2.1, SDXL.
-
-1. Add the **MultiGPU CFG Split** node and set **`max_gpus`** to the number of identical GPUs installed (for example, `2`).
-
-![MultiGPU CFG Split node with max_gpus set to 2](assets/comfyui-multigpu-cfg-split-node.png)
-
-2. Place the node **between the Model Load node and the Sampling node**. If other nodes connect to the model loader output, MultiGPU CFG Split should be the **last** node in that chain before sampling.
-
-![Example MultiGPU CFG Split placement between model load and sampling](assets/comfyui-multigpu-workflow-placement.png)
-
-3. Set workflow **CFG greater than 1**. Distilled or similar workflows that require CFG = 1 will not benefit from MultiGPU CFG Split.
-
-### Verify multi-GPU utilization
-
-While the sampler runs with MultiGPU CFG Split enabled, open Windows **Task Manager → Performance**. You should see activity on both installed GPUs.
-
-![Example dual-GPU utilization in Task Manager](assets/task-manager-dual-gpu-utilization.png)
-
-## Step 4. (Optional) Dual-GPU PC quick spec reference
-
-Use this table if you are building or upgrading a dual-GPU system. Detailed reasoning is in **Step 5**.
+For readers who want to skim and go, this is the recommended setup:
 
 | Component | Good | Best |
 | :---- | :---- | :---- |
@@ -181,85 +111,89 @@ Use this table if you are building or upgrading a dual-GPU system. Detailed reas
 | **GPU 2** | NVIDIA GeForce RTX 5080 | NVIDIA GeForce RTX 5090 |
 | **Motherboard** | x8/x8 PCIe Gen 5 | x16/x16 PCIe Gen 5 |
 | **CPU** | AMD Ryzen 9 / Intel Core i9 | AMD Threadripper |
-| **RAM** | 64 GB | 128 GB |
-| **Storage** | Single PCIe Gen 5 NVMe (4 TB+) | Single PCIe Gen 5 NVMe (4 TB+) |
-| **Power supply** | 1600 W+, 80 Plus Gold | 1800 W+, 80 Plus Gold |
+| **RAM** | 64GB (32GB minimum) | 128GB |
+| **Storage** | Single PCIe Gen 5 NVMe (4TB+) | Single PCIe Gen 5 NVMe (4TB+) |
+| **Power supply** | 1200–1400W, 80 Plus Gold | 1800W+, 80 Plus Gold |
 | **Case** | Large ATX or open-frame ATX | Large ATX or open-frame ATX |
 
-## Step 5. (Optional) Choosing components
+The detailed reasoning behind each component is in the next section.
 
-Each subsection covers shared technical context, then recommendations. This is a **component reference** for choosing parts — not a full chassis assembly recipe (torque sequences, cable routing diagrams, or step-by-step physical install photos are out of scope).
+### Choosing Your Components
+
+Each subsection below covers the shared technical context first, then splits the recommendation by path.
 
 #### GPUs
 
-Large language models load weights into GPU memory and stay there while running. Assuming 4-bit quantization, a ~30B model needs at least ~24 GB VRAM; ~70B needs ~40 GB or more; ~120B needs roughly ~70 GB once context is included. Diffusion image and video models behave the same way.
+Large language models load weights into GPU memory and stay there while running. Assuming models are quantized to 4-bit, a 30-billion-parameter LLM needs at least 24GB of VRAM. A 70-billion-parameter model needs 40GB or more. A 120-billion-parameter model needs roughly 70GB once context is included, which is more than the 64GB of two NVIDIA GeForce RTX 5090 GPUs; for a model that size, use a smaller or more aggressively quantized model, or accept slower partial CPU offload. Diffusion image and video models behave the same way.
 
-NVIDIA GeForce RTX 50 Series GPUs ship with high-speed GDDR7 and add native FP4 support. FP4 quantization shrinks models by roughly 60–70% while keeping quality near the original. RTX 40 Series GPUs support FP8 quantization with similar size reductions at slightly lower compression.
+NVIDIA GeForce RTX 50 Series GPUs ship with high-speed GDDR7 memory at 28–30 Gbps and add native FP4 support. FP4 quantization shrinks models by 60–70% while keeping quality near the original. NVIDIA GeForce RTX 40 Series GPUs support FP8 quantization, which delivers similar size reductions at slightly lower compression. Both let larger models fit in less VRAM.
 
-GPUs must match. Local LLM inference runs at the speed of the slower GPU, and FP4 acceleration applies on RTX 50 Series. Two RTX 5090 GPUs deliver the most VRAM (64 GB combined) and compute. Two RTX 5080 GPUs deliver 32 GB combined at lower power draw per GPU.
+GPUs must match. Local LLM inference runs at the speed of the slower GPU, and FP4 acceleration only works on NVIDIA GeForce RTX 50 Series. Two NVIDIA GeForce RTX 5090 GPUs deliver the most VRAM (64GB combined) and the most compute. Two NVIDIA GeForce RTX 5080 GPUs deliver 32GB combined at 37% lower power draw per GPU.
 
 #### Motherboard
 
-The motherboard decides how fast the two GPUs can talk. PCIe Gen 5 roughly doubles Gen 4 bandwidth (~4 GB/s per lane) — useful headroom when moving large model weights between GPUs. Prefer at least **x8 PCIe Gen 5** per GPU; less can bottleneck some models. Many consumer boards have one true multi-GPU-capable slot layout — check the manual for which secondary slot is wired for x8 (not x1/x4). Bandwidth is often shared with M.2 NVMe drives; adding a second SSD can silently drop a GPU slot to x4.
+The motherboard decides how fast the two GPUs can talk to each other. PCIe Gen 5 doubles Gen 4 bandwidth at roughly 4GB per second per lane — useful headroom for AI workloads moving large model weights between GPUs. For the best performance, we recommend at least x8 PCIe Gen 5 lanes; anything less can create a bottleneck with some models. Most consumer motherboards have one PCIe x16 slot and several secondary slots wired for x1 or x4. Those secondary slots are not multi-GPU slots, and the location of the x8 slot varies between boards — check the manual carefully before buying. Bandwidth gets shared with M.2 NVMe drives on most consumer boards, so adding a second SSD can drop a GPU slot to x4 without warning.
 
-**x8/x8 PCIe Gen 5** is a strong target; **x16/x16 PCIe Gen 5** is best when both GPUs run heavy AI work simultaneously.
+x8/x8 PCIe Gen 5 is ideal for best performance. x16/x16 PCIe Gen 5 is the best option, since both GPUs run heavy AI work simultaneously and benefit from full bandwidth.
 
-**Example motherboards (AMD):** ASUS ROG Crosshair X870E Extreme; ASUS ROG Crosshair X870E APEX; ASUS ROG Crosshair X870E Hero; ASUS ProArt X870E-Creator WiFi; Gigabyte X870E Aorus Master X3D Ice; Gigabyte X870E Aorus Xtreme AI TOP; MSI MEG X870E Godlike.
+**Examples of good motherboards (AMD)**
 
-**Example motherboards (Intel):** ASUS ROG Maximus Z890 Extreme; ASUS ROG Maximus Z890 Apex; ASUS ProArt Z890-Creator WiFi; Gigabyte Z890 Aorus Xtreme AI TOP; Gigabyte Z890 Aorus Master AI TOP; Gigabyte Z890 Aorus Tachyon Ice; Gigabyte Z890 Aero D/G; MSI MEG Z890 Godlike; MSI MEG Z890 Ace; MSI MEG Z890 Unify X; MSI MEG Z890 Carbon WiFi.
+- ASUS ROG Crosshair X870E Extreme
+- ASUS ROG Crosshair X870E APEX
+- ASUS ROG Crosshair X870E Hero
+- ASUS ProArt X870E-Creator WiFi
+- Gigabyte X870E Aorus Master X3D Ice
+- Gigabyte X870E Aorus Xtreme AI TOP
+- MSI MEG X870E Godlike
+
+**Examples of good motherboards (Intel)**
+
+- ASUS ROG Maximus Z890 Extreme
+- ASUS ROG Maximus Z890 Apex
+- ASUS ProArt Z890-Creator WiFi
+- Gigabyte Z890 Aorus Xtreme AI TOP
+- Gigabyte Z890 Aorus Master AI TOP
+- Gigabyte Z890 Aorus Tachyon Ice
+- Gigabyte Z890 Aero D/G
+- MSI MEG Z890 Godlike
+- MSI MEG Z890 Ace
+- MSI MEG Z890 Unify X
+- MSI MEG Z890 Carbon WiFi
 
 #### CPU
 
-The CPU provides the PCIe lanes both GPUs depend on. Look for at least **20 PCIe lanes** — enough for two GPUs and one NVMe SSD with dedicated bandwidth. AMD Ryzen 9 or Intel Core i9 is a practical minimum. AMD Threadripper is the best option for full x16/x16 GPU operation plus additional NVMe drives and core count for parallel AI work.
+The CPU provides the PCIe lanes both GPUs depend on. The latest AMD Ryzen and Intel Core CPUs both support PCIe Gen 5 and run AI workloads at similar speed. Look for at least 20 PCIe lanes — enough for two GPUs and one NVMe SSD with dedicated bandwidth for each. AMD's latest CPUs support up to 28 lanes, which leaves more headroom for a second SSD.
+
+AMD Ryzen 9 or Intel Core i9 minimum. AMD Threadripper is the best option — it provides the PCIe lane count for full x16/x16 GPU operation plus additional NVMe drives, and the core count to keep up with parallel AI workloads.
 
 #### RAM
 
-System RAM stages models and activation tensors. **32 GB** is the floor for any multi-GPU build. **64 GB** minimum for typical use; **128 GB** for ~100B-parameter LLMs or fine-tuning workloads (tensor-parallel inference and FSDP2-style fine-tuning stage large tensors through system memory).
+System RAM holds models that get streamed into GPU memory and stages data between drives and GPUs. 32GB is the floor for any multi-GPU build.
+
+64GB minimum. Builds running 100B-parameter LLMs or fine-tuning workloads should run 128GB. Tensor-parallel inference and FSDP2 fine-tuning stage large activation tensors through system memory.
 
 #### Storage
 
-A single PCIe Gen 5 NVMe SSD handles most AI workloads. RAID across multiple NVMe drives does not meaningfully help AI load patterns, and extra M.2 drives can steal PCIe lanes from a GPU slot. Prefer one high-capacity drive (**4 TB+**). Quantized 70B and 120B LLMs often occupy 40–80 GB each on disk.
+Modern AI models are large and load slowly from disk. A single PCIe Gen 5 NVMe SSD handles most workloads. Combining multiple NVMe SSDs in a RAID array does not provide a meaningful performance boost for AI workloads, and adding M.2 drives can silently steal PCIe lanes from a GPU slot, so a single high-capacity drive is the better choice.
 
-#### Power supply
+Single PCIe Gen 5 NVMe SSD, 4TB or larger. Quantized 70B and 120B LLMs each occupy 40–80GB of disk; serious model collections fill 2TB drives quickly.
 
-A single RTX 5090 can draw up to ~575 W under load. Use a CEM 5.1–compliant PSU, and give **each GPU a dedicated 12V-2x6 cable** — do not splice or daisy-chain across GPUs. Size up rather than running near 100% load.
+#### Power Supply
 
-**1600 W** minimum for two RTX 5090s plus a high-end desktop CPU; **1800 W** recommended for headroom. Paired RTX 5080s typically need about **1200–1400 W**. Prefer **80 Plus Gold** or better.
+A single NVIDIA GeForce RTX 5090 draws up to 575W under load. The PSU must be CEM 5.1 compliant, and each GPU requires a dedicated 12V-2x6 cable from the power supply — splicing or daisy-chaining cables across GPUs causes connector damage and instability. Always size up: running a power supply at 95% load shortens its life.
 
-#### Case and cooling
+1600W minimum for two NVIDIA GeForce RTX 5090s plus an AMD Ryzen 9 9950X CPU. 1800W recommended for headroom. Paired RTX 5080s need 1200–1400W. 80 Plus Gold or better.
 
-Two GPUs roughly double heat output. Use a full-tower ATX or open-frame ATX chassis with clear airflow between cards. Example cases include Corsair 7000 and 9000 series, NZXT H9 Flow, Phanteks Enthoo Pro, and Thermaltake AX700 series. Air-cooled dual high-power GPUs stacked tightly can starve the lower card of intake — prioritize spacing and airflow.
+#### Case and Cooling
 
-## Step 6. (Optional) Build tips and common pitfalls
+Two GPUs generate roughly twice the heat of one and need somewhere for it to go. A full-tower ATX or open-frame ATX chassis provides the volume. Examples of good cases include the Corsair 7000 and 9000 series, NZXT H9 Flow, Phanteks Enthoo Pro, and Thermaltake AX700 series. Air-cooled NVIDIA GeForce RTX 5090s stacked next to each other run hot — the top GPU starves the bottom GPU of intake.
 
-- Seat each **12V-2x6** power cable fully into the GPU **before** installing the card in the motherboard slot. Connecting power after the card is mounted often leaves the connector partially seated.
-- Leave at least **~35 mm of slack** on each GPU power cable. Tight bends fatigue the connector and can overheat contacts.
-- **Update the motherboard BIOS** before first boot. A stale BIOS often shows up as one GPU not being detected.
-- After building, **verify PCIe lane allocation in BIOS**. Adding a second M.2 NVMe can silently drop a GPU slot from x8 to x4.
-- Route cables behind the motherboard tray so they do not block airflow between GPUs.
-- Power **both GPUs from the same PSU**. Splitting GPU power across two PSUs can create ground-loop and timing issues.
+### Build Tips and Common Pitfalls
 
-## Step 7. Cleanup (optional)
-
-No software services are installed by this playbook beyond your existing LM Studio, llama.cpp, or ComfyUI setup.
-
-- To stop using multi-GPU in LM Studio: set the hardware split strategy back to your previous single-GPU mode.
-- To stop using multi-GPU in llama.cpp: omit `-sm tensor` / `-sm layer` or return to your prior launch flags.
-- To stop using multi-GPU in ComfyUI: remove or bypass the MultiGPU CFG Split node in the workflow.
-
-## Troubleshooting
-
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| Only one GPU visible in `nvidia-smi` or Task Manager | Second GPU not seated, not powered, disabled in BIOS, or PCIe slot not enabled | Reseat the card and 12V-2x6 cable; confirm the slot is enabled; update BIOS; verify lane allocation |
-| Multi-GPU much slower than expected | GPU slot dropped to x4 (often after adding a second M.2 NVMe); mismatched GPUs; pipeline parallel instead of tensor parallel | Check BIOS PCIe status; use identical GPUs; prefer `-sm tensor` / LM Studio tensor parallelism |
-| llama.cpp OOM with `-sm tensor` | Automatic parameter fitting not supported for tensor parallel yet | Reduce `-np` (llama-server), or lower `-c` / `-ngl`; see [multi-GPU docs](https://github.com/ggml-org/llama.cpp/blob/master/docs/multi-gpu.md) |
-| ComfyUI shows little or no multi-GPU speedup | CFG = 1 (distilled / no-CFG workflows); node placed incorrectly; `max_gpus` too low | Use CFG > 1; place MultiGPU CFG Split last before sampling; set `max_gpus` to the number of identical GPUs |
-| Only one GPU active while ComfyUI samples | MultiGPU CFG Split missing or not in the model→sampler path | Insert the node between model load and sampling; confirm both GPUs show activity in Task Manager → Performance |
-| Instability, thermal events, or connector damage under load | Partially seated or daisy-chained 12V-2x6 cables; PSU undersized; tight cable bends | Use dedicated CEM 5.1 cables per GPU from one PSU; seat cables before mounting cards; leave cable slack; size PSU with headroom |
-| Second GPU not detected after build | Stale motherboard BIOS; incorrect slot used for the second GPU | Update BIOS; move the second GPU to a documented multi-GPU (x8+) slot per the board manual |
-
-> [!NOTE]
-> On discrete-GPU hardware platforms, GPU memory is separate from system RAM. CUDA out-of-memory usually means the workload exceeds combined multi-GPU VRAM or per-GPU placement: reduce context length, batch size, or model precision; close other GPU applications; use `nvidia-smi` to confirm no other process is holding memory.
-
-For latest known issues, see the documentation linked under **Resources** for your hardware platform.
+* A multi-GPU PC has more failure modes than a single-GPU build. Most of them are avoidable.
+* Seat the 12V-2x6 power cable fully into each GPU before installing the card in the motherboard slot. Plugging the power cable in with the GPU already mounted often leaves the connector partially seated, which causes thermal events under load. Connect the power outside the chassis, then install.
+* Leave at least 35mm of slack on each GPU power cable. Tight bends fatigue the connector over time. Excessive bending damages the contacts and can cause the power cable to overheat.
+* Update the motherboard BIOS before first boot. PCIe compatibility, CPU support, and memory training improvements ship in BIOS updates. A stale BIOS often manifests as one GPU not being detected.
+* Verify PCIe lane allocation in BIOS after building. Adding a second M.2 NVMe drive can silently drop a GPU slot from x8 to x4 on most consumer motherboards. The BIOS PCIe status page shows the actual lane count assigned to each slot.
+* Cable management is cooling. Loose cables block airflow between GPUs. Route cables behind the motherboard tray. Use motherboards that place fan headers and front-panel I/O on the back side of the PCB to keep the GPU corridor clear.
+* Do not mix GPU power supplies. Both GPUs must be powered by the same PSU. Splitting GPU power across two PSUs creates ground-loop and timing issues.

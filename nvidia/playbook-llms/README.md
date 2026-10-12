@@ -1,188 +1,77 @@
 # Run Local LLMs
 
-> Chat, agents, and document Q&A with Ollama, LM Studio, and AnythingLLM on your hardware
+> Chat, agents, coding, and document Q&A with Ollama, LM Studio, and AnythingLLM on your hardware
 
 ## Table of Contents
 
 - [Overview](#overview)
-- [Instructions](#instructions)
-- [Troubleshooting](#troubleshooting)
+  - [Choosing the right model for your GPU](#choosing-the-right-model-for-your-gpu)
+  - [Chat](#chat)
+  - [Agents](#agents)
+  - [Local Document Chat](#local-document-chat)
 
 ---
 
 ## Overview
 
-## Basic idea
+Local large language models (LLMs) let you run AI workflows on your own PC or workstation. That means your prompts, files, and local context can stay on your machine while you experiment with chat assistants, agents, and document-based Q&A. This also means you get unlimited access to on-device AI with no usage limits or subscription fees.
 
-Local large language models (LLMs) let you run AI workflows on your own hardware platform. Your prompts, files, and local context can stay on the machine while you experiment with chat assistants, agents, and document-based Q&A — with unlimited on-device access and no usage limits or subscription fees.
+The easiest way to get started is to choose a model that fits your GPU, then choose the app that matches what you want to do. Here are some popular use-cases:
+* Chat: Engage with a local LLM through apps like LM Studio, Ollama or AnythingLLM to edit or reword text, get answers from the web, or track notes / personal lists.
+* Agents: Connect an agent like OpenClaw or Hermes Agent with a local model to handle personal or work tasks for you, with free, private, local AI.
+* Coding: Develop applications with coding agents like OpenCode.
+* Local Document Chat: Use tools like AnythingLLM to chat with local documents, notes, and other files.
 
-The easiest way to get started is to choose a model that fits your GPU memory, then choose the app that matches what you want to do:
+### Choosing the right model for your GPU
+In general, use the most powerful model that fits comfortably in your GPU’s memory.
+Here are some recommended starting models:
+* 6-8GB RTX GPUs: Qwen 3.5 4B
+* 12-16GB RTX GPUs: Qwen 3.5 9B / Gemma 4 12B
+* 24GB+ RTX GPUs: Qwen 3.6 27B
+* DGX Spark: Qwen 3.6 35B
 
-- **Chat:** Engage with a local LLM through apps like LM Studio, Ollama, or AnythingLLM to edit or reword text, get answers from the web, or track notes and personal lists.
-- **Agents:** Connect an agent such as OpenClaw or Hermes Agent with a local model to handle personal or work tasks with private, local AI.
-- **Coding:** Develop applications with coding agents such as OpenCode.
-- **Local document chat:** Use tools like AnythingLLM to chat with local documents, notes, and other files.
+Here are some more details on common LLM terminology:
+* Parameter size: This defines the number of learnable parameters by the model. Larger number of parameters means that the model has the capacity to reason, recognize patterns and write better, but they need more GPU memory and as a consequence run slower. For best experience, pick the largest models that fits comfortably on your system.
+* Tokens (per second): This is a measure of how fast your LLM is running.
+* Quantization: Quantized models use lower-precision weights to fit in less VRAM. This can save memory, but quantizing too aggressively can deteriorate the quality of the model’s responses. NVFP4 or Q4_K_M quantizations are a good balance of throughput, accuracy and memory requirements.
+* Context window: This is how much the model can consider at once, including your prompt, chat history, tool outputs, and retrieved documents. Longer context is useful especially for agentic flows, but it also uses more memory.
+* Dense vs. MoE Models: These are 2 different types of models. Dense models use all parameters for every token. Mixture-of-experts models activate only a smaller subset per token to maximize speed. For a similar number of total parameters, a dense model typically offers higher intelligence but lower speed.
 
-## What you'll accomplish
+### Chat
 
-You'll pick a model that fits your hardware platform and follow the path that matches your goal — chat, agents, coding, or document Q&A — using desktop apps or dedicated serving playbooks.
+The fastest way to start is with a desktop chat app. 
 
-- Choose a starting model based on available GPU memory
-- Start chatting with LM Studio, Ollama, or llama.cpp
-- Point an agent at a local inference server
-- Chat with local documents using AnythingLLM
+1. Install [LM Studio](https://lmstudio.ai/), [Ollama](https://ollama.com/) desktop app, or the [llama.cpp inference server](https://github.com/ggml-org/llama.cpp#llama-server).  
+2. Search for a good model that fits your GPU and download it, then start chatting. This is the simplest path for drafting, rewriting, summarizing notes, asking questions, and testing model quality before you build anything else.
 
-## What to know before starting
+### Agents
 
-**Required:**
+For agents, you need to typically set up a local inference server, which then powers the agent application. Here is a guide for [OpenClaw](https://build.nvidia.com/rtx/openclaw).
 
-- A supported hardware platform with an NVIDIA GPU and enough free storage for model downloads
-- Comfort installing desktop apps or following a linked playbook for the path you choose
+Your typical setup might look like:
 
-**Optional:**
+1. Select and download the backend of your choice:   
+   1. [LM Studio](https://lmstudio.ai/) and [Ollama](https://ollama.com/) are optimized, easy-to-use apps that use the llama.cpp backend and benefit from our latest optimizations. You can use either for a simple experience to set up your local inference server. LM Studio also enables MTP by default on supported models, which can deliver up to \+100% faster performance.  
+   2. For more advanced users, using the inference backends directly provides maximum configurability and control. [vLLM](https://vllm.ai/) (requires Linux) and [llama.cpp](https://github.com/ggml-org/llama.cpp/blob/master/docs/install.md) are great options for RTX & DGX users.
+   3. If you are using a DGX Spark, follow the [NVIDIA Qwen 3.6 35B NVFP4 model card](https://huggingface.co/nvidia/Qwen3.6-35B-A3B-NVFP4) to get the recommended checkpoint and setup for optimized performance.   
+2. Pick a model and start your inference server \- with a large (32k or more) context window.  
+3. Note the URL and port your inference engine is configured to use, and test it.
+4. Download your agent app (e.g. OpenClaw, Hermes Agent, or OpenCode).
+5. Start onboarding in your agent, during which it will ask you to specify a model provider. Here, enter the URL for your inference server.
+6. Finish the agent installation, and test it with a simple prompt.
 
-- Familiarity with common LLM terms (parameter size, tokens per second, quantization, context window, dense vs. MoE)
-- Experience with OpenAI-compatible APIs if you plan to wire agents to a local server
+### Local Document Chat
 
-## Supported hardware platforms
+Local LLMs also enable users to analyze local documents and get private, free responses from their context.
 
-Use the matrix below to confirm your hardware platform, recommended default local settings, and whether multi-node applies.
+For example, for students, managing a flood of slides, notes, labs and past exams can be overwhelming. Local LLMs make it possible to create a personal tutor that can adapt to individual learning needs.
 
-| Hardware platform | OS | Memory | Recommended default local settings | Multi-node capable hardware |
-| :---- | :---- | :---- | :---- | :---- |
-| **GeForce RTX** | Windows / Linux | Dedicated VRAM (size varies by GPU) | Pick a model that fits VRAM; start with LM Studio, Ollama, or llama.cpp for chat | — |
-| **RTX PRO** | Windows / Linux | Dedicated VRAM (size varies by GPU) | Pick a model that fits VRAM; start with LM Studio, Ollama, or llama.cpp for chat | — |
+A simple way to do this is with AnythingLLM, an application that helps users to build custom AI chatbots and agents by connecting them to their documents and data. It supports document uploads, custom knowledge bases and conversational interfaces. This makes it a flexible tool for anyone who wants to create a customizable AI to help with research, projects or day-to-day tasks. And with RTX acceleration, users can experience even faster responses.
 
-## Choosing the right model for your GPU
+By loading syllabi, assignments and textbooks into [AnythingLLM](https://anythingllm.com/) on RTX PCs and RTX PRO workstations, students can gain an adaptive, interactive study companion. They can ask the agent, using plain text or speech, to help with tasks like:
 
-In general, use the most powerful model that fits comfortably in your GPU’s memory. Recommended starting models:
-
-- **6–8 GB VRAM:** Qwen 3.5 4B
-- **12–16 GB VRAM:** Qwen 3.5 9B / Gemma 4 12B
-- **24 GB+ VRAM:** Qwen 3.6 27B
-
-Common LLM terminology:
-
-- **Parameter size:** Number of learnable parameters. Larger models can reason and write better, but need more GPU memory and may run slower. Prefer the largest model that fits comfortably.
-- **Tokens (per second):** How fast the model generates output.
-- **Quantization:** Lower-precision weights that use less VRAM. Aggressive quantization can reduce response quality. NVFP4 or Q4_K_M are a good balance of throughput, accuracy, and memory.
-- **Context window:** How much the model can consider at once (prompt, history, tool outputs, retrieved documents). Longer context helps agentic flows but uses more memory.
-- **Dense vs. MoE:** Dense models use all parameters for every token. Mixture-of-experts models activate a smaller subset per token for speed. For a similar total parameter count, a dense model typically offers higher intelligence but lower speed.
-
-## Prerequisites
-
-**Hardware requirements**
-
-- Supported hardware platform — see Supported hardware platforms matrix above
-- Enough dedicated VRAM for your chosen model (see Choosing the right model for your GPU)
-- Enough free storage for model downloads (several GB to tens of GB depending on the model)
-
-**Software requirements**
-
-- NVIDIA GPU drivers installed so GPU tools such as `nvidia-smi` work on your hardware platform
-- Network access to download desktop apps and models
-- For agent workflows: a local inference server URL and port you can point the agent at (see **Instructions**)
-
-## Time & risk
-
-- **Estimated time:** 6 MIN to orient and pick a path; longer once you install an app or follow a linked playbook and download a model
-- **Risk level:** Low
-  - Large model downloads can fail if network connectivity is unstable
-  - Choosing a model larger than available VRAM can cause slow performance or out-of-memory errors
-- **Rollback:** Uninstall desktop apps you no longer need and delete downloaded model files from the app’s model library or cache
-- **Last Updated:** 08/03/2026
-  - Local LLM orientation hub for chat, agents, coding, and document Q&A on GeForce RTX or RTX PRO hardware platforms
-
-## Instructions
-
-> [!NOTE]
-> This playbook is an **orientation hub**. It does not ship a single install or launch CLI. Use the steps below to choose a path, then follow the linked product docs or playbooks for concrete commands.
-
-## Step 1. Verify GPU access
-
-Confirm the GPU is visible on your hardware platform before you download models.
-
-```bash
-nvidia-smi
-```
-
-Expected output should show GPU information for your hardware platform, including available memory.
-
-## Step 2. Choose a model that fits your GPU
-
-Use the VRAM guidance in the **Overview** tab:
-
-- **6–8 GB:** Qwen 3.5 4B
-- **12–16 GB:** Qwen 3.5 9B / Gemma 4 12B
-- **24 GB+:** Qwen 3.6 27B
-
-Prefer the largest model that fits comfortably. Quantized checkpoints (for example NVFP4 or Q4_K_M) reduce memory use when a full-precision model does not fit.
-
-## Step 3. Chat with a desktop app or local server (intended)
-
-The fastest path for drafting, rewriting, summarizing, and testing model quality is a desktop chat app or a lightweight local server:
-
-1. Install [LM Studio](https://lmstudio.ai/), the [Ollama](https://ollama.com/) desktop app, or the [llama.cpp inference server](https://github.com/ggml-org/llama.cpp#llama-server).
-2. Search for a model that fits your GPU, download it, and start chatting.
-
-For playbook-style setup of these backends on supported hardware platforms, see:
-
-- [Serve LLMs with LM Studio](https://build.nvidia.com/playbooks/lm-studio)
-- [Serve Models with llama.cpp](https://build.nvidia.com/playbooks/llama-cpp)
-
-## Step 4. Connect an agent to a local inference server (intended)
-
-Agents typically need a local inference server, then an agent app pointed at that server’s URL and port.
-
-**Intended loop:**
-
-1. Choose a backend:
-   - [LM Studio](https://lmstudio.ai/) or [Ollama](https://ollama.com/) for an easy local server experience (llama.cpp-based apps with current GPU optimizations).
-   - For more control: [Serve LLMs with vLLM on One Device](https://build.nvidia.com/playbooks/vllm) (Linux) or [Serve Models with llama.cpp](https://build.nvidia.com/playbooks/llama-cpp).
-2. Start the server with a large context window when possible (32k tokens or more for agentic flows).
-3. Note the URL and port, and confirm the server responds.
-4. Install your agent app (for example OpenClaw, Hermes Agent, or OpenCode).
-5. During onboarding, set the model provider to your local inference server URL.
-6. Finish setup and test with a simple prompt.
-
-Playbook guides for agent paths:
-
-- [Run OpenClaw with a Local LLM](https://build.nvidia.com/playbooks/openclaw)
-- [Run Hermes Agent with a Local LLM](https://build.nvidia.com/playbooks/hermes-agent)
-
-## Step 5. Chat with local documents (intended)
-
-Use [AnythingLLM](https://anythingllm.com/) to connect a local model to your documents, notes, and files. Typical uses include generating flashcards from slides, asking questions grounded in your materials, creating practice quizzes, and walking through problems step by step.
-
-Install AnythingLLM from the product site, add your documents, and select a local model or local server endpoint that fits your GPU. This playbook does not ship AnythingLLM install commands.
-
-## Step 6. Cleanup (optional)
-
-If you installed apps or downloaded models only for evaluation:
-
-1. Quit the chat app, agent, or inference server
-2. Remove models from the app’s library or delete cached model files you no longer need
-3. Uninstall desktop apps you do not plan to keep
-
-Cleanup is optional.
-
-## Step 7. Next steps
-
-- Follow a dedicated serving playbook when you need production-style endpoints: [Serve LLMs with vLLM on One Device](https://build.nvidia.com/playbooks/vllm), [Serve LLMs with LM Studio](https://build.nvidia.com/playbooks/lm-studio), or [Serve Models with llama.cpp](https://build.nvidia.com/playbooks/llama-cpp)
-- Build an agent workflow with [Run OpenClaw with a Local LLM](https://build.nvidia.com/playbooks/openclaw) or [Run Hermes Agent with a Local LLM](https://build.nvidia.com/playbooks/hermes-agent)
-- Browse the NVIDIA blog guide linked under **Resources** for additional product context
-
-## Troubleshooting
-
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| `nvidia-smi` not found or no GPU listed | Drivers or GPU runtime not available on this hardware platform | Install or repair NVIDIA drivers for your hardware platform, then re-run `nvidia-smi` |
-| Chat app or server is very slow, or generation fails with out-of-memory errors | Model size, context length, or concurrent GPU workloads exceed dedicated VRAM | Close other GPU apps, pick a smaller or more aggressively quantized model, shorten the context window, and confirm free memory with `nvidia-smi` |
-| Agent cannot reach the local model | Inference server not running, wrong URL/port, or bound only to another interface | Confirm the server is running, use the URL/port shown by the backend, and keep the endpoint on localhost or an authenticated remote path |
-| Document chat answers ignore uploaded files | Documents not indexed, or the app is not using the local knowledge base | Re-index or re-upload documents in AnythingLLM (or your chosen app) and confirm the active workspace uses that knowledge base |
-| Desktop app install or model download fails | Network interruption or insufficient disk space | Check connectivity and free storage, then retry the download from the app or model library |
-
-> [!NOTE]
-> On discrete-GPU hardware platforms, GPU memory is separate from system RAM. CUDA out-of-memory usually means the workload exceeds VRAM: reduce model size, sequence length, or precision; enable CPU offloading only if your backend supports it; close other GPU applications. Use `nvidia-smi` to confirm no other process is holding memory.
-
-For latest known issues, see the documentation linked under **Resources** for your hardware platform.
+Generating flashcards from lecture slides: *“Create flashcards from the Sound chapter lecture slides. Put key terms on one side and definitions on the other.”*  
+Asking contextual questions tied to their materials: *“Explain conservation of momentum using my Physics 8 notes.”*  
+Creating and grading quizzes for exam prep: *“Create a 10-question multiple-choice quiz based on chapters 5-6 of my chemistry textbook and grade my answers.”*  
+Walking through tough problems step by step: *“Show me how to solve problem 4 from my coding homework, step by step.”*  
+Beyond the classroom, hobbyists and professionals can use AnythingLLM to prepare for certifications in new fields of study or for other similar purposes. And running locally on RTX GPUs ensures fast, private responses with no subscription costs or usage limits.

@@ -7,13 +7,12 @@
 - [Overview](#overview)
 - [Instructions](#instructions)
   - [Option A — vLLM (recommended on large-memory Linux hardware platforms)](#option-a-vllm-recommended-on-large-memory-linux-hardware-platforms)
-  - [Option B — LM Studio (simple path on discrete-GPU hardware platforms)](#option-b-lm-studio-simple-path-on-discrete-gpu-hardware-platforms)
-  - [Option C — Ollama](#option-c-ollama)
+  - [Option B — Ollama](#option-b-ollama)
 - [Agent-ready Models](#agent-ready-models)
   - [Recommendations by hardware platform](#recommendations-by-hardware-platform)
   - [Context window guidance](#context-window-guidance)
   - [Large-memory Linux hardware platforms — vLLM agent-ready path](#large-memory-linux-hardware-platforms-vllm-agent-ready-path)
-  - [Discrete-GPU hardware platforms — LM Studio / Ollama / vLLM](#discrete-gpu-hardware-platforms-lm-studio-ollama-vllm)
+  - [Discrete-GPU hardware platforms — Ollama / vLLM](#discrete-gpu-hardware-platforms-ollama-vllm)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -46,7 +45,7 @@ You will install OpenClaw on your hardware platform, connect it to a local OpenA
 
 **Optional:**
 
-- Familiarity with a local inference backend (vLLM, Ollama, or LM Studio) if you plan to use a local model
+- Familiarity with a local inference backend (vLLM or Ollama) if you plan to use a local model
 
 ## Important: security and risks
 
@@ -94,7 +93,7 @@ Use the matrix below to confirm your hardware platform, OS, memory, and whether 
 
 ## Find model guidance
 
-This playbook is an **agent** workflow, not a general inference-serving guide. For recommended local models by hardware platform, use the **Agent-ready Models** tab. For full vLLM container recipes and launch settings, see [Serve LLMs with vLLM](https://build.nvidia.com/playbooks/vllm). For Ollama or LM Studio setup, see those playbooks in **Resources**.
+This playbook is an **agent** workflow, not a general inference-serving guide. For recommended local models by hardware platform, use the **Agent-ready Models** tab. For full vLLM container recipes and launch settings, see [Serve LLMs with vLLM](https://build.nvidia.com/playbooks/vllm). For Ollama setup, see **Instructions**, Option B.
 
 ## Time & risk
 
@@ -156,33 +155,21 @@ curl -fsSL https://openclaw.ai/install.sh | bash
 
 On native Windows, follow the install options documented at [openclaw.ai](https://openclaw.ai) if the curl install path does not apply.
 
-After dependencies are downloaded, OpenClaw will show a **security warning**. Read the risks; if you accept them, use the arrow keys to select **Yes** and press Enter.
+After dependencies are downloaded, read the **security disclaimer** and accept any confirmation if you agree to proceed.
 
 ## Step 3. Complete the OpenClaw onboarding
 
 Work through the prompts as follows.
 
-1. **Quickstart vs Manual**: Choose **Quickstart**.
+1. **How would you like to start?** Choose **Quick start (recommended)**.
 
-2. **Model provider**:
+2. **What would you like to create?** Choose **One agent**.
+
+3. **Model/auth provider**:
    - **Recommended for a local model:** If your backend is not listed yet (or you will configure it after the server is up), go to the bottom of the list and select **Skip for now**—you’ll configure the model in a later step.
-   - If your inference backend appears in the list (for example Ollama, LM Studio, or vLLM), you can select it now and fill in API key (leave blank or use a dummy value), Base URL (default is usually fine), and Model ID (must match the exact handle served by the backend).
+   - If your inference backend appears in the list (for example Ollama or vLLM), you can select it now and fill in API key (leave blank or use a dummy value), Base URL (default is usually fine), and Model ID (must match the exact handle served by the backend).
 
-3. **Filtering models by provider**: If prompted, select **All Providers**. On the next prompt for the default model, choose **Keep Current** unless you already selected a provider.
-
-4. **Communication channel**: You can connect a channel (for example messaging) to use the bot when away from the machine, or select **Skip for Now** and configure it later.
-
-5. **Skills**: We recommend selecting **No** for now. You can add skills later from the web UI or Clawhub after you’ve tested the basics.
-
-6. **Homebrew**: If you are prompted to install Homebrew, select **No**—Homebrew is for macOS only and is not needed on Linux or Windows for this playbook.
-
-7. **Hooks**: We recommend selecting all three for a better experience. Note that this may log data locally; enable only if you’re comfortable with that.
-
-8. **Dashboard URL**: The terminal will print a URL for the OpenClaw dashboard. **Save this URL** (and any access token shown)—you’ll need it to open the web UI.
-
-9. **Finish**: Select **Yes** on the final prompt to complete installation.
-
-You can now open the OpenClaw dashboard in a browser using the URL and token from the installer.
+After selecting **Skip for now**, onboarding returns to the shell. Continue with **Step 4** to start the model server and **Step 5** to configure OpenClaw and start the Gateway. You can add channels, skills, and hooks later.
 
 ## Step 4. Serve a local model
 
@@ -201,20 +188,7 @@ curl http://localhost:8000/v1/models
 
 You should see your model handle in the returned list. The default OpenClaw `baseUrl` for this path is `http://localhost:8000/v1`.
 
-### Option B — LM Studio (simple path on discrete-GPU hardware platforms)
-
-Install LM Studio, download a model that fits your VRAM (see the **Agent-ready Models** table — the 27B example below is for 24GB+ only), and serve it with a large context window (32K minimum; 64K+ recommended when VRAM allows):
-
-```bash
-curl -fsSL https://lmstudio.ai/install.sh | bash
-lms get qwen/qwen3.6-27b
-lms load qwen/qwen3.6-27b --context-length 65536
-lms server start
-```
-
-Use the Model ID that matches what LM Studio serves. Prefer this path when you want a GUI-oriented, llama.cpp-backed workflow.
-
-### Option C — Ollama
+### Option B — Ollama
 
 ```bash
 curl -fsSL https://ollama.com/install.sh | sh
@@ -296,7 +270,7 @@ You can also ask OpenClaw which model it’s using. In the gateway chat UI you c
 - **Skills** add capabilities but also risk; only enable skills you trust (for example, community-vetted ones). To add a skill:
   - Ask OpenClaw to configure a skill, or
   - Use the sidebar in the web UI to enable skills, or
-  - Browse [Clawhub](https://docs.openclaw.ai/tools/clawhub) for community skills.
+  - Browse [Clawhub](https://docs.openclaw.ai/clawhub) for community skills.
 
 - For more usage and configuration details, see the [OpenClaw documentation](https://docs.openclaw.ai).
 
@@ -311,9 +285,9 @@ Agent-ready models are tuned for **agentic workloads** — tool calling, reasoni
 | Hardware platform | Recommended model | Example handle / tag | Inference path |
 | ----------------- | ----------------- | -------------------- | -------------- |
 | **DGX Spark** | Agent-ready Qwen3.6-35B-A3B (NVFP4) | `nvidia/Qwen3.6-35B-A3B-NVFP4` | vLLM — see [Serve LLMs with vLLM → Agent-ready Models](https://build.nvidia.com/playbooks/vllm/agent-ready-models) |
-| **GeForce RTX** (24GB+ VRAM) | Qwen3.6 27B | `qwen/qwen3.6-27b` (LM Studio) or `qwen3.6:27b` (Ollama) | LM Studio, Ollama, or vLLM |
-| **GeForce RTX** (12–16GB VRAM) | Qwen 3.5 9B / Gemma 4 12B | backend-specific tags | LM Studio or Ollama |
-| **GeForce RTX** (6–8GB VRAM) | Qwen 3.5 4B | backend-specific tags | LM Studio or Ollama |
+| **GeForce RTX** (24GB+ VRAM) | Qwen3.6 27B | `qwen3.6:27b` (Ollama) | Ollama or vLLM |
+| **GeForce RTX** (12–16GB VRAM) | Qwen 3.5 9B / Gemma 4 12B | backend-specific tags | Ollama |
+| **GeForce RTX** (6–8GB VRAM) | Qwen 3.5 4B | backend-specific tags | Ollama |
 
 Only platforms listed in the Supported hardware platforms table (Overview) are listed above.
 
@@ -334,21 +308,12 @@ curl http://localhost:8000/v1/models
 
 3. In OpenClaw, set provider `baseUrl` to `http://localhost:8000/v1` and set `id` / `name` to `nvidia/Qwen3.6-35B-A3B-NVFP4`. Match `contextWindow` to the server `--max-model-len` (the agent-ready recipe uses a large context suitable for multi-turn agent sessions).
 
-### Discrete-GPU hardware platforms — LM Studio / Ollama / vLLM
+### Discrete-GPU hardware platforms — Ollama / vLLM
 
 On discrete-GPU hardware platforms, choose a model that fits available VRAM (table above), then serve it with your preferred backend:
 
-- **LM Studio** — easy GUI path; MTP may be enabled by default on supported models.
 - **Ollama** — simple CLI path.
 - **vLLM** — maximum configurability on Linux; use when you want OpenAI-compatible HTTP serving and custom flags.
-
-Example LM Studio download + serve (24GB+ recommendation):
-
-```bash
-lms get qwen/qwen3.6-27b
-lms load qwen/qwen3.6-27b --context-length 65536
-lms server start
-```
 
 Example Ollama pull + context setting:
 
@@ -365,7 +330,7 @@ Use the **exact** model handle or tag as the OpenClaw Model ID.
 | Symptom | Cause | Fix |
 |---------|--------|-----|
 | OpenClaw dashboard URL not loading | Gateway not running or wrong host/port | **Restart the OpenClaw gateway** so it reloads `~/.openclaw/openclaw.json`. **Verify:** Check that the gateway process is running with `pgrep -f openclaw` or `ps aux \| grep openclaw`. **Find URL/token:** Check the original installer output (scroll up in your terminal) or look in gateway logs (typically `~/.openclaw/logs/`) for the dashboard URL and access token |
-| "Connection refused" to model (for example localhost:8000) | Local inference server not running, still loading, or wrong port | Confirm the backend is up (`curl http://localhost:8000/v1/models` for vLLM, or your LM Studio / Ollama status checks) and that `baseUrl` in `openclaw.json` matches the server |
+| "Connection refused" to model (for example localhost:8000) | Local inference server not running, still loading, or wrong port | Confirm the backend is up (`curl http://localhost:8000/v1/models` for vLLM, or your Ollama status checks) and that `baseUrl` in `openclaw.json` matches the server |
 | OpenClaw says no model available | Provider not configured or model handle mismatch | Add the provider to `~/.openclaw/openclaw.json` and ensure `id`/`name` exactly match the served handle |
 | Out-of-memory or very slow inference | Model too large for available GPU memory or other GPU workloads | Use a smaller model from **Agent-ready Models**, lower context length / GPU memory utilization for vLLM, free GPU memory (close other apps), or check usage with `nvidia-smi` |
 | WSL cannot reach model server on Windows host | `localhost` inside WSL is not the Windows host | Replace `127.0.0.1` / `localhost` in OpenClaw `baseUrl` with the Windows host IP as seen from WSL |

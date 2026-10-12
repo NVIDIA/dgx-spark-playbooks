@@ -165,7 +165,8 @@ RUN git clone https://github.com/facebookresearch/xformers && \
     python setup.py install && \
     cd ..
 # install unsloth without depedencies so we can build them from source
-RUN pip install unsloth==2025.9.11 unsloth_zoo==2025.9.14 bitsandbytes==0.48.0
+# peft is pinned because peft>=0.19 requires torchao>=0.16, but the base image ships torchao 0.13
+RUN pip install unsloth==2025.9.11 unsloth_zoo==2025.9.14 bitsandbytes==0.48.0 peft==0.17.1
 
 CMD ["/bin/bash"]
 
