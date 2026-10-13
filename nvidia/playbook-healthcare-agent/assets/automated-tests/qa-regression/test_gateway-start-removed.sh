@@ -140,7 +140,8 @@ fi
 CONFIG="$PB_DIR/assets/openshell-gateway.toml"
 GROUP7=0
 for required in \
-    'compute_drivers = \["docker"\]' \
+    'version = 2' \
+    'compute_driver = "docker"' \
     'disable_tls = false' \
     'allow_unauthenticated_users = false' \
     'enabled = true' \

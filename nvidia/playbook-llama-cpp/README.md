@@ -62,7 +62,7 @@ Use the matrix below to confirm your hardware platform, recommended default loca
 **Software requirements**
 
 - Git: `git --version`
-- CMake (3.14+): `cmake --version`
+- CMake (3.18+): `cmake --version`
 - CUDA Toolkit: `nvcc --version`
 - Network access to GitHub and Hugging Face
 
@@ -81,13 +81,13 @@ Use the **Instructions** tab for the base build-and-serve workflow. For agentic 
 
 ## Time & risk
 
-- **Estimated time:** 30 MIN (longer on first run due to the example GGUF download — ~35 GB order of magnitude for the default quant)
+- **Estimated time:** 30 MIN (longer on first run due to the example GGUF download — about 21 GB for the default quant)
 - **Risk level:** Low
-  - Build is local to your clone; no system-wide installs required for the steps below
+  - The build is local to your clone; Step 1 installs a few system packages with `apt`
   - Large GGUF downloads may fail or stall due to network issues
 - **Rollback:** Remove the `llama.cpp` clone and the model directory under `~/.cache/huggingface/hub/` to reclaim disk space
-- **Last Updated:** 07/31/2026
-  - Build-and-serve walkthrough for llama.cpp with Qwen3.6-35B-A3B (GGUF) and an OpenAI-compatible API
+- **Last Updated:** 10/09/2026
+  - Fixed the `llama-server` launch path, raised the CMake minimum to 3.18, corrected the model download size, and updated the sample API response for the Qwen3.6 thinking model
 
 ## Instructions
 
@@ -133,14 +133,14 @@ The build usually takes on the order of 5–10 minutes. When it finishes, `llama
 
 llama.cpp loads models in **GGUF** format. This playbook uses the **Q4_K_XL** checkpoint from `unsloth/Qwen3.6-35B-A3B-MTP-GGUF`, which provides a good balance between quality and speed on the supported hardware platforms.
 
-From your `llama.cpp/build` directory, launch the OpenAI-compatible server with GPU offload. It loads the model from Hugging Face first if it has not been downloaded before or if there are updates.
+From the `~/llama.cpp` directory you cloned in Step 2, launch the OpenAI-compatible server with GPU offload. It loads the model from Hugging Face first if it has not been downloaded before or if there are updates.
 
 All models are saved in the default Hugging Face cache directory under `~/.cache/huggingface/hub`. For example, this model is saved into `~/.cache/huggingface/hub/models--unsloth--Qwen3.6-35B-A3B-MTP-GGUF`.
 
 It also automatically loads an mmproj file to enable vision capabilities if supported by the model. By default, `llama-server` tries to fit the full model context with the ability to serve 4 concurrent requests, and adjusts parameters automatically if needed.
 
 ```bash
-./bin/llama-server \
+./build/bin/llama-server \
   -hf unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_XL \
   --host 0.0.0.0 \
   --port 30000
@@ -149,7 +149,7 @@ It also automatically loads an mmproj file to enable vision capabilities if supp
 To run with MTP speculative decoding, provide additional parameters as shown below. MTP requires a compatible model, like `unsloth/Qwen3.6-35B-A3B-MTP-GGUF` used in this example. The following example also sets the `preserve_thinking` flag so Qwen models can use interleaved thinking by preserving prior thinking blocks in the history — useful for agentic workflows. For a dedicated agentic launch path, see the **Agent-ready Models** tab.
 
 ```bash
-./bin/llama-server \
+./build/bin/llama-server \
   -hf unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_XL \
   --host 0.0.0.0 \
   --port 30000 \
@@ -161,6 +161,7 @@ To run with MTP speculative decoding, provide additional parameters as shown bel
 **Parameters (short):**
 
 - `--host` / `--port`: bind address and port for the HTTP API
+- `--n-gpu-layers`: number of model layers to offload to the GPU; llama.cpp normally chooses this for you, so set it explicitly (for example `--n-gpu-layers 99`) only if `nvidia-smi` shows the model is not running on the GPU
 - `--chat-template-kwargs`: additional params for the JSON template parser; must be a valid JSON object string
 - `--spec-type`: comma-separated list of speculative decoding types (default: none; most MTP-compatible models use `draft-mtp` — check the model card)
 - `--spec-draft-n-max`: number of tokens to draft for speculative decoding (default: 3)
@@ -203,11 +204,13 @@ curl -X POST http://127.0.0.1:30000/v1/chat/completions \
   }'
 ```
 
+Qwen3.6-35B-A3B is a thinking model, so with a small `max_tokens` budget the reply can finish while it is still reasoning. In that case `message.content` is empty and the generated text appears in `message.reasoning_content`. Increase `max_tokens` (Step 6 uses 2048) to get the final answer in `content`.
+
 If you see `curl: (7) Failed to connect`, the server is still loading, the process exited (check the server log for OOM or path errors), or you are not curling the host that runs `llama-server`.
 
 From another device, use `http://<HARDWARE_IP>:30000/v1` where `<HARDWARE_IP>` is your hardware platform’s reachable address.
 
-Example shape of the response (fields vary by llama.cpp version; `message` may include extra keys):
+Example shape of the response for the request above (fields vary by llama.cpp version; `message` may include extra keys). The 100-token budget is spent on reasoning, so `content` is empty and `finish_reason` is `length`:
 
 ```json
 {
@@ -217,7 +220,8 @@ Example shape of the response (fields vary by llama.cpp version; `message` may i
       "index": 0,
       "message": {
         "role": "assistant",
-        "content": "New York is a great city because it's a living, breathing collage of cultures, ideas, and possibilities—all stacked into one vibrant, never‑sleeping metropolis. Here are just a few reasons that many people ("
+        "content": "",
+        "reasoning_content": "Here's a thinking process:\n\n1.  **Analyze User Input:** ..."
       }
     }
   ],
@@ -226,8 +230,8 @@ Example shape of the response (fields vary by llama.cpp version; `message` may i
   "object": "chat.completion",
   "usage": {
     "completion_tokens": 100,
-    "prompt_tokens": 25,
-    "total_tokens": 125
+    "prompt_tokens": 18,
+    "total_tokens": 118
   },
   "id": "chatcmpl-...",
   "timings": {
@@ -280,22 +284,22 @@ The server implements the usual OpenAI-style chat features your llama.cpp build 
 
 Agent-ready models are tuned for **agentic workloads** — tool calling, reasoning traces, and long multi-turn sessions. Use this tab to pick a recommended model for your hardware platform and follow the launch guidance below.
 
-Complete **Steps 1–3** in the **Instructions** tab first (dependencies, clone, and CUDA build). Then launch from your `~/llama.cpp/build` directory with the recipe below.
+Complete **Steps 1–3** in the **Instructions** tab first (dependencies, clone, and CUDA build). Then launch from your `~/llama.cpp` directory with the recipe below.
 
 ### Recommendations by hardware platform
 
 | Hardware platform | Recommended agent-ready model | HuggingFace handle | Recipe |
 | ----------------- | ----------------------------- | ------------------ | ------ |
-| **DGX Spark** | Agent-ready Qwen3.6-35B-A3B (GGUF, MTP) | `unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_XL` | [Launch recipe](#dgx-spark-agent-ready-qwen36-35b-a3b-gguf-mtp) |
+| **DGX Spark** | Agent-ready Qwen3.6-35B-A3B (GGUF, MTP) | `unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_XL` | [Agent-ready Models](https://build.nvidia.com/playbooks/llama-cpp/agent-ready-models) |
 
 ### DGX Spark: Agent-ready Qwen3.6-35B-A3B (GGUF, MTP)
 
 Agentic serving for the recommended model on unified-memory hardware. MTP speculative decoding and `preserve_thinking` keep interleaved thinking blocks in history for multi-turn agent sessions.
 
-From `~/llama.cpp/build`:
+From `~/llama.cpp`:
 
 ```bash
-./bin/llama-server \
+./build/bin/llama-server \
   -hf unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_XL \
   --host 0.0.0.0 \
   --port 30000 \
@@ -326,9 +330,9 @@ After you launch the recipe above, confirm startup using **Step 5. Test the API*
 |---------|-------------------|-------|-----|
 | `cmake` fails with "CUDA not found" | All hardware platforms | CUDA toolkit not in PATH | Run `export PATH=/usr/local/cuda/bin:$PATH` and re-run CMake from a clean build directory |
 | Build errors mentioning wrong GPU arch | All hardware platforms | CMake `CMAKE_CUDA_ARCHITECTURES` does not match the GPU | Use `-DCMAKE_CUDA_ARCHITECTURES=121a-real` as in the Instructions tab |
-| GGUF download fails or stalls | All hardware platforms | Network or Hugging Face availability | Re-run the `-hf` launch (or `hf download`); it resumes partial files |
+| GGUF download fails or stalls | All hardware platforms | Network or Hugging Face availability | Re-run the `-hf` launch from Step 4; it resumes partial files |
 | "CUDA out of memory" when starting `llama-server` | All hardware platforms | Model too large for current context or available memory | Lower `--ctx-size` (e.g. 4096) or use a smaller quantization from the same repo |
-| Server runs but latency is high | All hardware platforms | Layers not on GPU | Confirm `--n-gpu-layers` is high enough for your model; check `nvidia-smi` during a request |
+| Server runs but latency is high | All hardware platforms | Layers not on GPU | Check `nvidia-smi` during a request to confirm the model is on the GPU; if not, set `--n-gpu-layers` explicitly as described in Step 4 |
 | `curl: (7) Failed to connect` on port 30000 | All hardware platforms | No listener yet, wrong host, or crash | Wait for `server is listening`; run `curl` on the same host as `llama-server` (or use `<HARDWARE_IP>`); run `ss -tln` and confirm `:30000`; read server stderr for OOM or a bad `--model` path |
 | Chat API errors or empty replies | All hardware platforms | Wrong `--model` path or incompatible GGUF | Verify the path to the `.gguf` file; update llama.cpp if the GGUF requires a newer format |
 | Memory pressure within capacity | DGX Spark | UMA buffer cache not released | See UMA note below |

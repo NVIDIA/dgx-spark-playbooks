@@ -172,7 +172,12 @@ echo ""
 echo "Starting services..."
 echo "Running: $CMD $PROFILES up -d --build"
 cd $(dirname "$0")
-eval "$CMD $PROFILES up -d --build"
+if ! eval "$CMD $PROFILES up -d --build"; then
+  echo "" >&2
+  echo "ERROR: txt2kg services failed to start (image build or compose error above)." >&2
+  echo "       No services are running. Fix the error and re-run ./start.sh." >&2
+  exit 1
+fi
 
 echo ""
 echo "=========================================="

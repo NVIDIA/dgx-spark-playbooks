@@ -2,11 +2,11 @@
 # Native OpenShell configuration for the package-managed local gateway.
 
 [openshell]
-version = 1
+version = 2
 
 [openshell.gateway]
 bind_address = "127.0.0.1:17670"
-compute_drivers = ["docker"]
+compute_driver = "docker"
 disable_tls = false
 
 [openshell.gateway.auth]

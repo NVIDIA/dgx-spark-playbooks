@@ -83,7 +83,8 @@ All required assets can be found [in the playbook repository](https://github.com
   - Large dataset download (~14 GB) may take time depending on network speed
   - Embedding generation requires significant GPU memory
 - **Rollback:** Delete the downloaded dataset and any generated embedding files; optionally remove the conda environment
-- **Last Updated:** 09/13/2026
+- **Last Updated:** 10/13/2026
+  - Step 9 now explains the JupyterLab "Running as root" exit on WSL2 and how to resolve it
   - Added missing BERTopic diagram PNG so the notebook intro cell renders correctly
   - Replaced st.tabs with radio selector to fix deck.gl map initialization and redraw
   - Switched to str(fig) to prevent the map from being clipped inside Streamlit's layout
@@ -217,6 +218,9 @@ Start JupyterLab from the assets directory:
 jupyter lab
 ```
 
+> [!NOTE]
+> JupyterLab refuses to start as the root user and exits immediately with `Running as root is not recommended. Use --allow-root to bypass.` This happens, for example, when you enter WSL2 with `wsl -d Ubuntu-24.04 -u root`. Run the playbook as a regular (non-root) user, which is recommended. If you must stay as root, start JupyterLab with `jupyter lab --allow-root`.
+
 Open a browser to the URL JupyterLab prints (typically `http://localhost:8888`). From another device, use `http://<HARDWARE_IP>:8888` where `<HARDWARE_IP>` is your hardware platform's reachable address.
 
 If you access the hardware platform over SSH, forward the Jupyter port to your local browser:
@@ -312,6 +316,7 @@ The **Hardware platform** column shows where an issue is most relevant. "All har
 | Symptom | Hardware platform | Cause | Fix |
 |---------|-------------------|-------|-----|
 | `Permission denied` when downloading Hugging Face models | All hardware platforms | Hugging Face cache not writable | Re-run the cache ownership commands in Instructions Step 1 for your user |
+| `Running as root is not recommended. Use --allow-root to bypass.` and JupyterLab exits; port 8888 never opens | Windows with WSL2 (or any shell running as root) | The shell is running as root (for example `wsl -d Ubuntu-24.04 -u root`) | Run the playbook as a non-root user, or start JupyterLab with `jupyter lab --allow-root` |
 | Conda create fails resolving packages | All hardware platforms | Channel or version pin mismatch | Retry with the exact `conda create` command from Instructions; ensure network access to `rapidsai` and `conda-forge` |
 | Pip reports dask/distributed or RAPIDS dependency conflicts | All hardware platforms | `datamapplot` upgrades dask beyond RAPIDS-compatible pins | Re-pin with `python -m pip install "dask==2025.9.1" "distributed==2025.9.1"`; BERTopic can still run with the reported conflicts |
 | `PackagesNotFoundError` for `jupyterlab-widgets` | All hardware platforms | Package unavailable on the conda channel | Install with `python -m pip install jupyterlab-widgets` |

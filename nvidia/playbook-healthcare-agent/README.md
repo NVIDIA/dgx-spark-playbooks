@@ -139,7 +139,8 @@ Supporting scripts (`setup_sandbox.sh`, `check_sandbox_config.sh`, `build_viewer
   - OpenFold3 NIM takes ~3 minutes to load — the healthcheck waits automatically
   - Clinical outputs can be incomplete or incorrect and require qualified professional review
 - **Rollback:** `openshell sandbox delete clinical-sandbox`, `make down`, `make clean` (see Cleanup in Instructions).
-- **Last Updated:** 09/23/2026
+- **Last Updated:** 10/12/2026
+  - The bundled OpenShell gateway config now uses schema version 2, so `ensure_openshell_gateway.sh` works with current OpenShell releases
   - OpenShell setup now keeps the sandbox ready and cleans up safely when creation fails; OpenShell 0.0.111 or later is required
   - OpenFold3 now uses a pinned 1.6.0 image validated on DGX Station GB300, with no manual PCI-ID manifest editing required
   - The customer workflow remains the same: deploy six healthcare agents with local Nemotron 3 Super, OpenFold3, and OpenShell sandbox isolation

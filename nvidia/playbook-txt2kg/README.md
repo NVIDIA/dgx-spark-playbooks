@@ -93,7 +93,8 @@ Use the matrix below to confirm your hardware platform, OS, memory, and whether 
   - GPU memory needs depend on the chosen model
   - Document processing time scales with document size and complexity
 - **Rollback:** Stop and remove containers; optionally delete downloaded models (see Instructions)
-- **Last Updated:** 09/16/2026
+- **Last Updated:** 10/13/2026
+  - start.sh now exits non-zero and prints an error when the image build or compose startup fails, instead of reporting success
   - Added structured vLLM extraction handling and DGX Station vLLM GPU runtime setup fixes
 
 ## Instructions

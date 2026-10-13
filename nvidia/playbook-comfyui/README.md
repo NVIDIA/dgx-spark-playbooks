@@ -85,7 +85,8 @@ For Image Gen Quick Start, clone [ComfyUI on GitHub](https://github.com/comfyano
   - Model downloads are large and may fail due to network or auth issues
   - Port 8188 must be reachable for the web UI
 - **Rollback:** Remove the virtual environment and clone (Image Gen Quick Start), or stop/remove the container and optionally delete `models/` (Video Gen Workflow) — non-destructive to the host OS
-- **Last Updated:** 09/10/2026
+- **Last Updated:** 10/13/2026
+  - Video Gen Workflow documents the `--disable-dynamic-vram` workaround for the HiDream-I1 VBAR allocation error on DGX Station WSL2
   - Image Gen Quick Start now uses the Z-Image-Turbo template
 
 ## Image Gen Quick Start
@@ -366,6 +367,13 @@ docker run -d \
   comfyui
 ```
 
+> [!NOTE]
+> **DGX Station on Windows with WSL2:** the Tier 2 HiDream-I1 workflow can fail with `aimdo: ... Could not reseve Virtual Address space for VBAR` / `VBAR allocation failed`. On WSL2, start ComfyUI with dynamic VRAM disabled. Use the same options and mounts as above, but replace the final line with the full command, because adding only the flag after the image name replaces the image's default command and the container exits:
+>
+> ```bash
+>   comfyui python main.py --listen 0.0.0.0 --port 8188 --disable-dynamic-vram
+> ```
+
 Follow logs until the UI is ready:
 
 ```bash
@@ -469,6 +477,7 @@ To avoid root-owned files on future runs, add `--user "$(id -u):$(id -g)"` to `d
 | Memory pressure on unified-memory hardware even within capacity | Buffer cache not released to the GPU | Flush the buffer cache (see note below) |
 | Container exits with `ModuleNotFoundError: torchaudio` or torchaudio ABI / undefined-symbol errors (Video Gen Workflow) | Image missing the playbook torchaudio stub, or a real torchaudio wheel was layered on NGC PyTorch | Rebuild from the shipped `assets/Dockerfile`. Do **not** `pip install torchaudio` inside the container |
 | Custom-node build or DWPose warns about `onnxruntime` / no GPU providers on ARM64 (Video Gen Workflow) | `onnxruntime-gpu` has no aarch64 wheel on PyPI | The shipped Dockerfile substitutes CPU `onnxruntime`. Preprocessors run on CPU; treat as informational unless nodes fail to load |
+| `aimdo: ... Could not reseve Virtual Address space for VBAR` and `VBAR allocation failed` when running a large workflow such as HiDream-I1 (Video Gen Workflow, DGX Station on WSL2) | WSL2 cannot reserve the virtual address space that ComfyUI's dynamic VRAM management needs | Run the container with dynamic VRAM disabled: replace the final `comfyui` line of `docker run` with `comfyui python main.py --listen 0.0.0.0 --port 8188 --disable-dynamic-vram`. Passing only `--disable-dynamic-vram` after the image name fails with `exec: --: invalid option` |
 | Startup shows `aimdo` hook failures or `urllib3` / `charset_normalizer` version warnings (Video Gen Workflow) | NGC base-image diagnostics / dependency skew | Benign if the ready line `To see the GUI go to: ...` appears; ComfyUI still works |
 
 > [!NOTE]
