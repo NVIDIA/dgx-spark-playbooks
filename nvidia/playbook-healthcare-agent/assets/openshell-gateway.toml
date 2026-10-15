@@ -12,8 +12,8 @@ disable_tls = false
 [openshell.gateway.auth]
 allow_unauthenticated_users = false
 
-[openshell.gateway.mtls_auth]
-enabled = true
+# The package-managed service generates the local TLS bundle. OpenShell
+# enables mTLS from that bundle without an explicit certificate-path block.
 
 [openshell.drivers.docker]
 socket_path = "/var/run/docker.sock"

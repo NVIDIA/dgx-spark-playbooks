@@ -30,10 +30,10 @@ If you physically cable two or more Sparks with [QSFP](https://en.wikipedia.org/
 
 This playbook shows you two paths to configure the ConnectX-7 network across two to four DGX Spark devices.
 
-- **Beginner:** Follow the [Configure with NVIDIA Sync](beginner.md) tab to set up and test the ConnectX-7 network ([see demo video](https://www.youtube.com/watch?v=MehBUQtb9qM)).
-- **Advanced:** Experienced users can do things manually with the NVIDIA provided scripts in the [Configure Manually](advanced.md) tab.
+- **Beginner:** Follow the Configure with NVIDIA Sync tab to set up and test the ConnectX-7 network ([see demo video](https://www.youtube.com/watch?v=MehBUQtb9qM)).
+- **Advanced:** Experienced users can do things manually with the NVIDIA provided scripts in the Configure Manually tab.
 
-Both paths start with following the [Cable the Devices](cable-devices.md) tab to make sure the devices are appropriately connected.
+Both paths start with following the Cable the Devices tab to make sure the devices are appropriately connected.
 
 ## What you'll accomplish
 
@@ -63,7 +63,7 @@ Check the table below to see if this playbook is for your hardware.
 **Hardware requirements**
 
 - Two to four DGX Sparks.
-- The number of QSFP cables for your layout in [Cable the Devices](cable-devices.md).
+- The number of QSFP cables for your layout in Cable the Devices.
 - (if using a switch) A switch with one 200 Gbit/s Ethernet link for each device. 
 
 **Software requirements**
@@ -138,7 +138,7 @@ Viewed from the back of a Spark, **port 0** is closest to the ordinary Ethernet 
 Connect one device to the other with a **single** QSFP cable.
 Using two cables will **not** increase performance.
 
-Choose **one** of the port correspondence options below to meet the NVIDIA provided helper's interface requirements used in the [Configure Manually](advanced.md) tab.
+Choose **one** of the port correspondence options below to meet the NVIDIA provided helper's interface requirements used in the Configure Manually tab.
 
 | Port Correspondence | Spark 1 | Spark 2 |
 | --- | --- | --- |
@@ -150,7 +150,7 @@ Choose **one** of the port correspondence options below to meet the NVIDIA provi
 Use three QSFP cables to make a ring. 
 Each Spark will have **two** QSFP cables plugged into it.
 
-Use the following cabling pattern to meet the NVIDIA provided helper's interface requirements used in the [Configure Manually](advanced.md) tab.
+Use the following cabling pattern to meet the NVIDIA provided helper's interface requirements used in the Configure Manually tab.
 
 | Cable | From | To |
 | --- | --- | --- |
@@ -197,9 +197,9 @@ For MikroTik CRS804 and CRS812 switches, see [MikroTik wired interface compatibi
 
 ## Step 4. Move on to configure the network
 
-Continue with tab [Configure with NVIDIA Sync](beginner.md) for a click-through, managed clustering process. 
+Continue with tab Configure with NVIDIA Sync for a click-through, managed clustering process. 
 
-Or, go under the hood with the [Configure Manually](advanced.md) tab to use NVIDIA provided helper scripts to set things up.
+Or, go under the hood with the Configure Manually tab to use NVIDIA provided helper scripts to set things up.
 
 ## Configure with NVIDIA Sync
 
@@ -209,11 +209,11 @@ If you are working with up to four devices, this is the recommended path.
 
 You can see how it works in [this demo video](https://www.youtube.com/watch?v=MehBUQtb9qM).
 
-If you want to cluster more than four devices, then follow and adapt the [Configure Manually](manual.md) tab.
+If you want to cluster more than four devices, then follow and adapt the Configure Manually tab.
 
 ## Step 1. Make sure the devices are properly connected
 
-**Follow the instructions in the [Connect the Devices](connect-devices.md) tab.**
+**Follow the instructions in the Cable the Devices tab.**
 
 ## Step 2. Install NVIDIA Sync on your laptop
 
@@ -286,9 +286,9 @@ The ConnectX-7 network and inter-device SSH are now ready.
 
 **Save the cluster details to a text file when NVIDIA Sync shows the success page.**
 
-1. Select **Copy** to copy the network details.
+1. Copy the network details shown on the success page. If your version of NVIDIA Sync shows a **Copy** button, select it.
 2. Save the details in a file for later use.
-3. Select **See Example Workloads**.
+3. To continue, use the example workloads in **Next steps** below. If your version of NVIDIA Sync shows **See Example Workloads**, you can select it instead.
 
 ## Next steps
 
@@ -303,7 +303,7 @@ The ConnectX-7 network and inter-device SSH are now ready.
 
 You will use the NVIDIA provided cluster helper scripts to configure the ConnectX-7 network and SSH access between DGX Sparks.
 
-You will follow thethe basic procedure and the choices that depend on your layout, so you can generalize the process to a larger cluster.
+You will follow the basic procedure and the choices that depend on your layout, so you can generalize the process to a larger cluster.
 
 The helper supports two to four devices. For more than four devices through a switch, use the same procedure with manual configuration or your own automation.
 
@@ -312,7 +312,7 @@ The helper supports two to four devices. For more than four devices through a sw
 
 ## Step 1. Physically connect the devices
 
-**Follow the port wiring table for your layout in [Cable the Devices](cable-devices.md).**
+**Follow the port wiring table for your layout in Cable the Devices.**
 
 The cables (and switch) establish the physical links. 
 In the following steps, you will use the helper scripts to configure the network so the devices are reachable by other software and workloads over those links.
@@ -327,11 +327,9 @@ You **must** run it from one of the devices (or "nodes") that you connected abov
 
 **First, choose one Spark from which to set up the cluster and open a terminal on it.**
 
-The helper script will do it's work no matter which node you pick, and it will get all of the nodes into the correct network configuration per the   
+The helper script does its work no matter which node you pick. It sets up all of the devices (or "nodes") in the cluster from that one node, so that each node has the correct network configuration relative to the other nodes.
 
-is built to work from one of the devices in the cluster nodes in the cluster to set things up. get all of the devices (or "nodes") into the same shape relative to the other nodes. 
-
-No matter which node you pick, the helper script will also configure it to be part of the cluster, and at the end of the process all of the nodes will be
+The node you pick is configured as part of the cluster too, so at the end of the process all of the nodes are ready to use.
 
 **Then clone the NVIDIA playbook repository to that device, open the helper folder and inspect the files.**
 
@@ -351,7 +349,7 @@ If you inspect the individual files, you can piece together the overall process 
 
 ## Step 3. Edit the appropriate JSON file to enable inter-device SSH 
 
-The helper script inspects all devices to verify the cabled layout and coordinate the intterfaces, IP address and network plans for implementation on each device. 
+The helper script inspects all devices to verify the cabled layout and coordinate the interfaces, IP address and network plans for implementation on each device. 
 In addition, inter-device communications need to be set up with key based SSH access to avoid requiring a password.
 Finally, implementing a network configuration requires `sudo` permissions on each device. 
 
@@ -359,7 +357,7 @@ So, you need to give the script the IP addresses, usernames and related password
 
 **First, copy the appropriate JSON template for your device count.**
 
-1. Selet the appropriate JSON template from the table below, `<cluster-count.json>`
+1. Select the appropriate JSON template from the table below, `<cluster-count.json>`
 2. Copy the template to a new file, `config/my-cluster.json`
 3. Change the permissions on the file so it's visible only to the user on the head node: chmod 600 config/my-cluster.json
 

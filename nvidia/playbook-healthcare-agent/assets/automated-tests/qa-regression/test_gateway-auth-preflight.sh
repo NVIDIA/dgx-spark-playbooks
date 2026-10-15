@@ -9,6 +9,7 @@ CHECK="$PB_DIR/assets/scripts/ensure_openshell_gateway.sh"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 mkdir -p "$TMP_DIR/bin" "$TMP_DIR/home" "$TMP_DIR/proc-self/456"
+export MOCK_PREFLIGHT_LOG="$TMP_DIR/preflight.log"
 
 cat >"$TMP_DIR/bin/docker" <<'MOCK'
 #!/usr/bin/env bash
@@ -17,7 +18,15 @@ MOCK
 
 cat >"$TMP_DIR/bin/openshell-gateway" <<'MOCK'
 #!/usr/bin/env bash
-exit 0
+if [[ "$#" -eq 4 && "$1" == "config" && "$2" == "preflight" && "$3" == "--path" ]]; then
+    printf '%s\n' "$*" >>"$MOCK_PREFLIGHT_LOG"
+    if [[ "${MOCK_PREFLIGHT_RC:-0}" != "0" ]]; then
+        echo 'gateway config preflight failed: category=malformed detected_version=2' >&2
+    fi
+    exit "${MOCK_PREFLIGHT_RC:-0}"
+fi
+echo "unexpected openshell-gateway invocation: $*" >&2
+exit 64
 MOCK
 
 cat >"$TMP_DIR/bin/systemd-run" <<'MOCK'
@@ -201,6 +210,15 @@ if ! run_check; then
     exit 1
 fi
 echo "PASS: authenticated healthy Docker gateway was accepted"
+if ! MOCK_PREFLIGHT_RC=1 run_check; then
+    echo "FAIL: check-only mode validated the unused candidate instead of the live gateway"
+    exit 1
+fi
+if [[ -s "$MOCK_PREFLIGHT_LOG" ]]; then
+    echo "FAIL: check-only mode invoked candidate config preflight"
+    exit 1
+fi
+echo "PASS: check-only mode validates the live gateway without candidate preflight"
 for timed_probe in \
     'systemd-run --user --quiet --wait --pipe --collect' \
     'openshell -g openshell status --output json' \
@@ -211,6 +229,73 @@ for timed_probe in \
     fi
 done
 echo "PASS: Docker, status, and protected info probes are timeout-bounded"
+
+# Rejected or timed-out candidates must preserve both absent and present
+# configurations, including file modes, without a service/registration write.
+for preimage in absent present; do
+    for failure in rejected timed-out; do
+        CANDIDATE_HOME="$TMP_DIR/home-candidate-$preimage-$failure"
+        CANDIDATE_CONFIG_DIR="$CANDIDATE_HOME/.config/openshell"
+        CANDIDATE_TARGET="$CANDIDATE_CONFIG_DIR/gateway.toml"
+        mkdir -p "$CANDIDATE_CONFIG_DIR/gateways/openshell"
+        printf 'registration-preimage\n' >"$CANDIDATE_CONFIG_DIR/gateways/openshell/metadata.json"
+        printf 'other-gateway\n' >"$CANDIDATE_CONFIG_DIR/active_gateway"
+        if [[ "$preimage" == present ]]; then
+            printf '# Managed by playbook-healthcare-agent.\n# existing preimage\n' >"$CANDIDATE_TARGET"
+            chmod 0640 "$CANDIDATE_TARGET"
+            cp -p "$CANDIDATE_TARGET" "$TMP_DIR/config-preimage"
+        fi
+        : >"$TMP_DIR/calls.log"
+        : >"$TMP_DIR/timeout.log"
+        : >"$MOCK_PREFLIGHT_LOG"
+        preflight_rc=1
+        timeout_match=""
+        if [[ "$failure" == timed-out ]]; then
+            preflight_rc=0
+            timeout_match="openshell-gateway config preflight"
+        fi
+        if env \
+            HOME="$CANDIDATE_HOME" \
+            PATH="$TMP_DIR/bin:/usr/bin:/bin" \
+            MOCK_SYSTEMD_RUN_RC=0 \
+            MOCK_PREFLIGHT_RC="$preflight_rc" \
+            MOCK_TIMEOUT_FAIL_MATCH="$timeout_match" \
+            MOCK_TIMEOUT_LOG="$TMP_DIR/timeout.log" \
+            MOCK_CALL_LOG="$TMP_DIR/calls.log" \
+            OPENSHELL_GATEWAY_CONFIG_SOURCE="$PB_DIR/assets/openshell-gateway.toml" \
+            OPENSHELL_GATEWAY_CONFIG_TARGET="$CANDIDATE_TARGET" \
+            bash "$CHECK" >"$TMP_DIR/candidate-output" 2>&1; then
+            echo "FAIL: $failure candidate was accepted with $preimage config"
+            exit 1
+        fi
+        if [[ "$preimage" == present ]]; then
+            if ! cmp -s "$TMP_DIR/config-preimage" "$CANDIDATE_TARGET" || \
+               ! python3 -c 'import os, sys; raise SystemExit(0 if os.stat(sys.argv[1]).st_mode == os.stat(sys.argv[2]).st_mode else 1)' \
+                    "$TMP_DIR/config-preimage" "$CANDIDATE_TARGET"; then
+                echo "FAIL: $failure candidate changed config bytes or mode"
+                exit 1
+            fi
+        elif [[ -e "$CANDIDATE_TARGET" ]]; then
+            echo "FAIL: $failure candidate created the absent config"
+            exit 1
+        fi
+        if [[ -s "$TMP_DIR/calls.log" ]] || \
+           ! grep -qx 'registration-preimage' "$CANDIDATE_CONFIG_DIR/gateways/openshell/metadata.json" || \
+           ! grep -qx 'other-gateway' "$CANDIDATE_CONFIG_DIR/active_gateway"; then
+            echo "FAIL: $failure candidate changed service or registration state"
+            exit 1
+        fi
+        grep -Fq '20s openshell-gateway config preflight --path' "$TMP_DIR/timeout.log" || {
+            echo "FAIL: candidate preflight was not timeout-bounded"
+            exit 1
+        }
+        grep -Fq 'failed preflight or timed out' "$TMP_DIR/candidate-output" || {
+            echo "FAIL: $failure candidate did not explain the preflight failure"
+            exit 1
+        }
+        echo "PASS: $failure candidate preserved $preimage config and service/registration state"
+    done
+done
 
 # Registration inspection is also a fail-fast probe and must abort before any
 # gateway config, service, or registration mutation.
@@ -271,6 +356,11 @@ grep -Fq 'openshell gateway list --output json' "$TMP_DIR/timeout.log" || {
     exit 1
 }
 echo "PASS: gateway registration inspection is timeout-bounded"
+grep -qx "config preflight --path $PB_DIR/assets/openshell-gateway.toml" "$MOCK_PREFLIGHT_LOG" || {
+    echo "FAIL: setup did not preflight the bundled candidate with the gateway parser"
+    exit 1
+}
+echo "PASS: setup preflighted the bundled candidate before gateway mutations"
 
 # Configurations written from the former repository remain playbook-owned and
 # are upgraded in place to the consolidated repository marker.
@@ -507,6 +597,49 @@ grep -qx 'other-gateway' "$ROLLBACK_ACTIVE_FILE" || {
     exit 1
 }
 echo "PASS: failed registration restored config, exact registration metadata, and active gateway"
+
+# The same rollback must restore an existing configuration's exact bytes and
+# mode when registration fails after its replacement.
+printf '# Managed by playbook-healthcare-agent.\n# rollback preimage\n' \
+    >"$ROLLBACK_HOME/.config/openshell/gateway.toml"
+chmod 0640 "$ROLLBACK_HOME/.config/openshell/gateway.toml"
+cp -p "$ROLLBACK_HOME/.config/openshell/gateway.toml" "$TMP_DIR/rollback-config-preimage"
+: >"$TMP_DIR/calls.log"
+if env \
+    HOME="$ROLLBACK_HOME" \
+    PATH="$TMP_DIR/bin:/usr/bin:/bin" \
+    MOCK_SYSTEMD_RUN_RC=0 \
+    MOCK_STATUS_JSON="$GOOD_STATUS" \
+    MOCK_INFO_OUTPUT="$GOOD_INFO" \
+    MOCK_GATEWAY_LIST_JSON="$MOCK_GATEWAY_LIST_JSON" \
+    MOCK_CALL_LOG="$TMP_DIR/calls.log" \
+    MOCK_ADD_RC=1 \
+    MOCK_SERVICE_ACTIVE_RC=1 \
+    MOCK_SERVICE_ACTIVE_STATE=active \
+    MOCK_SERVICE_UNIT_STATE=enabled \
+    MOCK_REGISTRATION_DIR="$ROLLBACK_REGISTRATION_DIR" \
+    MOCK_ACTIVE_GATEWAY_FILE="$ROLLBACK_ACTIVE_FILE" \
+    OPENSHELL_GATEWAY_CONFIG_SOURCE="$PB_DIR/assets/openshell-gateway.toml" \
+    OPENSHELL_GATEWAY_CONFIG_TARGET="$ROLLBACK_HOME/.config/openshell/gateway.toml" \
+    bash "$CHECK" >/dev/null 2>&1; then
+    echo "FAIL: failed registration with existing config returned success"
+    exit 1
+fi
+if ! cmp -s "$TMP_DIR/rollback-config-preimage" "$ROLLBACK_HOME/.config/openshell/gateway.toml" || \
+   ! python3 -c 'import os, sys; raise SystemExit(0 if os.stat(sys.argv[1]).st_mode == os.stat(sys.argv[2]).st_mode else 1)' \
+        "$TMP_DIR/rollback-config-preimage" "$ROLLBACK_HOME/.config/openshell/gateway.toml"; then
+    echo "FAIL: failed migration did not restore existing config bytes and mode"
+    exit 1
+fi
+if ! grep -qx 'legacy-preimage' "$ROLLBACK_REGISTRATION_DIR/metadata.json" || \
+   ! grep -qx 'other-gateway' "$ROLLBACK_ACTIVE_FILE" || \
+   ! grep -qx -- '--user stop openshell-gateway.service' "$TMP_DIR/calls.log" || \
+   ! grep -qx -- '--user enable openshell-gateway.service' "$TMP_DIR/calls.log" || \
+   ! grep -qx -- '--user start openshell-gateway.service' "$TMP_DIR/calls.log"; then
+    echo "FAIL: existing config rollback did not restore registration, active gateway, and service state"
+    exit 1
+fi
+echo "PASS: failed registration restored existing config bytes/mode, registration, active gateway, and service state"
 
 # A timed-out registration mutation must still enter rollback, and rollback
 # must remove persistent enablement before restoring an enabled-runtime unit.

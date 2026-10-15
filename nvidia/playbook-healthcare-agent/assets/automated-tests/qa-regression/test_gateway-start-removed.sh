@@ -144,15 +144,18 @@ for required in \
     'compute_driver = "docker"' \
     'disable_tls = false' \
     'allow_unauthenticated_users = false' \
-    'enabled = true' \
     'socket_path = "/var/run/docker.sock"'; do
     if ! grep -qE "$required" "$CONFIG" 2>/dev/null; then
         fail "$CONFIG: missing required setting: $required"
         GROUP7=1
     fi
 done
+if grep -qE '^\[openshell\.gateway\.mtls_auth\]' "$CONFIG"; then
+    fail "$CONFIG: explicit mTLS block bypasses package-generated certificate defaults"
+    GROUP7=1
+fi
 if [ "$GROUP7" -eq 0 ]; then
-    echo "PASS: native OpenShell config pins Docker, TLS, and mTLS auth"
+    echo "PASS: native OpenShell config pins Docker and TLS with package-generated mTLS"
 fi
 
 # --- Result -------------------------------------------------------------------

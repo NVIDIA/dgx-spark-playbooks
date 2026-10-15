@@ -244,6 +244,11 @@ for required in openshell openshell-gateway python3 install cmp systemctl readli
     command -v "$required" >/dev/null 2>&1 || die "$required is required."
 done
 
+# Validate the candidate with the installed parser before replacing the live
+# configuration or touching the service and gateway registration.
+run_timed openshell-gateway config preflight --path "$CONFIG_SOURCE" || \
+    die "Bundled gateway config $CONFIG_SOURCE failed preflight or timed out; config, service, and registration were left unchanged. Check the installed openshell-gateway version and the diagnostics above."
+
 # Never overwrite an unrelated operator-owned OpenShell configuration.
 if [[ -e "$CONFIG_TARGET" ]] && \
    ! grep -Eq '^# Managed by (station-healthcare-agent|playbook-healthcare-agent)\.$' "$CONFIG_TARGET"; then

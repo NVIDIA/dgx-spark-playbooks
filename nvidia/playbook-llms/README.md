@@ -8,6 +8,7 @@
   - [Choosing the right model for your GPU](#choosing-the-right-model-for-your-gpu)
   - [Chat](#chat)
   - [Agents](#agents)
+  - [Coding](#coding)
   - [Local Document Chat](#local-document-chat)
 
 ---
@@ -29,6 +30,8 @@ Here are some recommended starting models:
 * 12-16GB RTX GPUs: Qwen 3.5 9B / Gemma 4 12B
 * 24GB+ RTX GPUs: Qwen 3.6 27B
 * DGX Spark: Qwen 3.6 35B
+
+If your GPU falls between these ranges (for example 9-11GB or 17-23GB), pick the model for the next lower range, or try a lower-bit quantization of the next larger model.
 
 Here are some more details on common LLM terminology:
 * Parameter size: This defines the number of learnable parameters by the model. Larger number of parameters means that the model has the capacity to reason, recognize patterns and write better, but they need more GPU memory and as a consequence run slower. For best experience, pick the largest models that fits comfortably on your system.
@@ -59,6 +62,10 @@ Your typical setup might look like:
 4. Download your agent app (e.g. OpenClaw, Hermes Agent, or OpenCode).
 5. Start onboarding in your agent, during which it will ask you to specify a model provider. Here, enter the URL for your inference server.
 6. Finish the agent installation, and test it with a simple prompt.
+
+### Coding
+
+To develop applications with a coding agent like OpenCode, follow the same local inference server setup described in the Agents section above, then choose OpenCode as your agent app in step 4. When OpenCode asks for a model provider, enter the URL of your local inference server. Use a large (32k or more) context window, since coding tasks pass files and tool outputs to the model.
 
 ### Local Document Chat
 
