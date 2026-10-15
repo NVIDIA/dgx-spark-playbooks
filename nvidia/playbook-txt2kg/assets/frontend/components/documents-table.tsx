@@ -249,7 +249,7 @@ export function DocumentsTable({ onTabChange }: DocumentsTableProps) {
                 </td>
                  <td className="py-4">
                   <div className="flex items-center gap-3">
-                    <FileText className="h-4 w-4 text-nvidia-green flex-shrink-0" />
+                    <FileText className="h-4 w-4 text-nvidia-green shrink-0" />
                     <span className="text-sm font-medium text-foreground truncate max-w-[200px]" title={doc.name}>{doc.name}</span>
                   </div>
                 </td>

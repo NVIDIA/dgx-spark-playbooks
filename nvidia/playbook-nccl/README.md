@@ -40,7 +40,7 @@ Use the matrix below to confirm your hardware platform, recommended defaults, an
 
 | Hardware platform | OS | Memory | Recommended default local settings | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- | :---- |
-| **DGX Spark** | DGX OS (Linux) | 128 GB Unified Memory | Build NCCL from source (`v2.30.7-1`, Blackwell `sm_121`) | ✅ (high-speed interconnect) |
+| **DGX Spark** | DGX OS (Linux) | 128 GB Unified Memory | Build NCCL from source (`v2.31.2-1`, Blackwell `sm_121`) | ✅ (high-speed interconnect) |
 
 ## Prerequisites
 
@@ -72,7 +72,9 @@ All required assets can be found [in this playbook's assets folder](https://gith
 - **Risk level:** Medium
   - Involves network configuration changes on multi-node capable hardware
 - **Rollback:** Remove the NCCL and NCCL Tests repositories from each node (`~/nccl/`, `~/nccl-tests/`)
-- **Last Updated:** 08/12/2026
+- **Last Updated:** 10/14/2026
+  - Updated the NCCL build to v2.31.2-1 and removed the redundant `-f 2` flag from the `all_gather_perf` command, since `-b` and `-e` are both 16G
+  - The NCCL test suite build is pinned to nccl-tests v2.19.7 so `make MPI=1` links against the system OpenMPI
   - Added NVIDIA Sync Cluster Assistant as the recommended network setup path and clarified that successful Cluster Assistant users should skip the manual connection playbooks
 
 ## Two nodes (direct)
@@ -102,7 +104,7 @@ If you just want a working setup fast, use the helper scripts. They automate Ste
 curl -fsSL "https://raw.githubusercontent.com/NVIDIA/dgx-spark-playbooks/refs/heads/main/nvidia/playbook-nccl/assets/setup.sh" -o setup.sh
 curl -fsSL "https://raw.githubusercontent.com/NVIDIA/dgx-spark-playbooks/refs/heads/main/nvidia/playbook-nccl/assets/launch.sh" -o launch.sh
 
-## 2. Build NCCL v2.30.7-1 and the test suite on both nodes.
+## 2. Build NCCL v2.31.2-1 and the test suite on both nodes.
 bash setup.sh <NODE_2_IP>
 
 ## 3. Run the all_gather test across both nodes.
@@ -122,7 +124,7 @@ Execute these commands on both nodes to build NCCL from source with Blackwell ar
 ```bash
 ## Install dependencies and build NCCL
 sudo apt-get update && sudo apt-get install -y libopenmpi-dev
-git clone -b v2.30.7-1 https://github.com/NVIDIA/nccl.git ~/nccl/
+git clone -b v2.31.2-1 https://github.com/NVIDIA/nccl.git ~/nccl/
 cd ~/nccl/
 make -j src.build NVCC_GENCODE="-gencode=arch=compute_121,code=sm_121"
 
@@ -138,8 +140,8 @@ export LD_LIBRARY_PATH="$NCCL_HOME/lib:$CUDA_HOME/lib64/:$MPI_HOME/lib:$LD_LIBRA
 Compile the NCCL test suite on **both nodes**:
 
 ```bash
-## Clone and build NCCL tests
-git clone https://github.com/NVIDIA/nccl-tests.git ~/nccl-tests/
+## Clone and build NCCL tests (pinned: v2.20.0 and later add GIN tests that fail to link with the system OpenMPI)
+git clone -b v2.19.7 https://github.com/NVIDIA/nccl-tests.git ~/nccl-tests/
 cd ~/nccl-tests/
 make MPI=1
 ```
@@ -200,7 +202,7 @@ mpirun -np 2 -H <management IP for Node 1>:1,<management IP for Node 2>:1 \
   -x UCX_NET_DEVICES=enP7s7 \
   -x NCCL_SOCKET_IFNAME=enP7s7 \
   -x OMPI_MCA_btl_tcp_if_include=enP7s7 \
-  $HOME/nccl-tests/build/all_gather_perf -b 16G -e 16G -f 2
+  $HOME/nccl-tests/build/all_gather_perf -b 16G -e 16G
 ```
 
 > [!NOTE]
@@ -245,7 +247,7 @@ If you just want a working setup fast, use the helper scripts. They automate Ste
 curl -fsSL "https://raw.githubusercontent.com/NVIDIA/dgx-spark-playbooks/refs/heads/main/nvidia/playbook-nccl/assets/setup.sh" -o setup.sh
 curl -fsSL "https://raw.githubusercontent.com/NVIDIA/dgx-spark-playbooks/refs/heads/main/nvidia/playbook-nccl/assets/launch.sh" -o launch.sh
 
-## 2. Build NCCL v2.30.7-1 and the test suite on all three nodes.
+## 2. Build NCCL v2.31.2-1 and the test suite on all three nodes.
 bash setup.sh <NODE_2_IP> <NODE_3_IP>
 
 ## 3. Run the all_gather test across all three nodes.
@@ -265,7 +267,7 @@ Execute these commands on all three nodes to build NCCL from source with Blackwe
 ```bash
 ## Install dependencies and build NCCL
 sudo apt-get update && sudo apt-get install -y libopenmpi-dev
-git clone -b v2.30.7-1 https://github.com/NVIDIA/nccl.git ~/nccl/
+git clone -b v2.31.2-1 https://github.com/NVIDIA/nccl.git ~/nccl/
 cd ~/nccl/
 make -j src.build NVCC_GENCODE="-gencode=arch=compute_121,code=sm_121"
 
@@ -281,8 +283,8 @@ export LD_LIBRARY_PATH="$NCCL_HOME/lib:$CUDA_HOME/lib64/:$MPI_HOME/lib:$LD_LIBRA
 Compile the NCCL test suite on **all three nodes**:
 
 ```bash
-## Clone and build NCCL tests
-git clone https://github.com/NVIDIA/nccl-tests.git ~/nccl-tests/
+## Clone and build NCCL tests (pinned: v2.20.0 and later add GIN tests that fail to link with the system OpenMPI)
+git clone -b v2.19.7 https://github.com/NVIDIA/nccl-tests.git ~/nccl-tests/
 cd ~/nccl-tests/
 make MPI=1
 ```
@@ -347,7 +349,7 @@ mpirun -np 3 -H <management IP for Node 1>:1,<management IP for Node 2>:1,<manag
   -x OMPI_MCA_btl_tcp_if_include=enP7s7 \
   -x NCCL_IB_SUBNET_AWARE_ROUTING=1 \
   -x NCCL_NET_PLUGIN=none \
-  $HOME/nccl-tests/build/all_gather_perf -b 16G -e 16G -f 2
+  $HOME/nccl-tests/build/all_gather_perf -b 16G -e 16G
 ```
 
 > [!NOTE]
@@ -392,7 +394,7 @@ If you just want a working setup fast, use the helper scripts. They automate Ste
 curl -fsSL "https://raw.githubusercontent.com/NVIDIA/dgx-spark-playbooks/refs/heads/main/nvidia/playbook-nccl/assets/setup.sh" -o setup.sh
 curl -fsSL "https://raw.githubusercontent.com/NVIDIA/dgx-spark-playbooks/refs/heads/main/nvidia/playbook-nccl/assets/launch.sh" -o launch.sh
 
-## 2. Build NCCL v2.30.7-1 and the test suite on all four nodes.
+## 2. Build NCCL v2.31.2-1 and the test suite on all four nodes.
 bash setup.sh <NODE_2_IP> <NODE_3_IP> <NODE_4_IP>
 
 ## 3. Run the all_gather test across all four nodes.
@@ -412,7 +414,7 @@ Execute these commands on all four nodes to build NCCL from source with Blackwel
 ```bash
 ## Install dependencies and build NCCL
 sudo apt-get update && sudo apt-get install -y libopenmpi-dev
-git clone -b v2.30.7-1 https://github.com/NVIDIA/nccl.git ~/nccl/
+git clone -b v2.31.2-1 https://github.com/NVIDIA/nccl.git ~/nccl/
 cd ~/nccl/
 make -j src.build NVCC_GENCODE="-gencode=arch=compute_121,code=sm_121"
 
@@ -428,8 +430,8 @@ export LD_LIBRARY_PATH="$NCCL_HOME/lib:$CUDA_HOME/lib64/:$MPI_HOME/lib:$LD_LIBRA
 Compile the NCCL test suite on **all four nodes**:
 
 ```bash
-## Clone and build NCCL tests
-git clone https://github.com/NVIDIA/nccl-tests.git ~/nccl-tests/
+## Clone and build NCCL tests (pinned: v2.20.0 and later add GIN tests that fail to link with the system OpenMPI)
+git clone -b v2.19.7 https://github.com/NVIDIA/nccl-tests.git ~/nccl-tests/
 cd ~/nccl-tests/
 make MPI=1
 ```
@@ -490,7 +492,7 @@ mpirun -np 4 -H <management IP for Node 1>:1,<management IP for Node 2>:1,<manag
   -x UCX_NET_DEVICES=enP7s7 \
   -x NCCL_SOCKET_IFNAME=enP7s7 \
   -x OMPI_MCA_btl_tcp_if_include=enP7s7 \
-  $HOME/nccl-tests/build/all_gather_perf -b 16G -e 16G -f 2
+  $HOME/nccl-tests/build/all_gather_perf -b 16G -e 16G
 ```
 
 > [!NOTE]

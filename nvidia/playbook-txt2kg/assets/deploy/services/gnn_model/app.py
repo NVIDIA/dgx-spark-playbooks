@@ -17,10 +17,12 @@
 #
 
 import os
+from threading import Lock
 import torch
 from flask import Flask, request, jsonify
 import torch_geometric
-from torch_geometric.nn import GAT, LLM, GRetriever
+from torch_geometric.nn import GAT
+from torch_geometric.llm.models import GRetriever, LLM
 
 app = Flask(__name__)
 
@@ -63,11 +65,13 @@ def load_model():
 
 # Initialize model
 model = None
+model_lock = Lock()
 
-@app.before_first_request
 def initialize():
     global model
-    model = load_model()
+    with model_lock:
+        if model is None:
+            model = load_model()
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -96,6 +100,7 @@ def predict():
     # Note: In a real implementation, you'd need to convert text to graph structure
     # Here we're assuming a simplified interface for demonstration
     try:
+        initialize()
         # Create a PyTorch Geometric Data object
         # This is simplified and would need to be adapted to your actual graph structure
         graph_data = create_graph_from_text(context)
@@ -127,4 +132,4 @@ def create_graph_from_text(text):
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port) 
+    app.run(host='0.0.0.0', port=port)

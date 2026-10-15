@@ -30,7 +30,7 @@ export default function DocumentDataPage() {
           <DocumentProcessor className="sticky top-8" />
         </div>
         <div className="xl:col-span-2">
-          <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden">
+          <div className="bg-card rounded-lg border border-border shadow-xs overflow-hidden">
             <div className="p-5 border-b border-border">
               <h2 className="text-xl font-semibold">Documents</h2>
               <p className="text-sm text-muted-foreground mt-1">

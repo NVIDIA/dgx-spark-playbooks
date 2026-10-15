@@ -88,7 +88,7 @@ You will install the OpenShell CLI (`openshell`), deploy a gateway on your hardw
 
 ## Supported hardware platforms
 
-Use the matrix below to confirm your hardware platform, OS, memory, and whether multi-node applies. The same OpenShell + Pi workflow applies across supported hardware platforms. Model recommendations differ by platform — see [Agent-ready Models](https://build.nvidia.com/spark/vllm/agent-ready-models).
+Use the matrix below to confirm your hardware platform, OS, memory, and whether multi-node applies. The same OpenShell + Pi workflow applies across supported hardware platforms. Model recommendations differ by platform — see [vLLM Inference](https://build.nvidia.com/spark/vllm/intermediate).
 
 | Hardware platform | OS | Memory  | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- |
@@ -103,7 +103,7 @@ Use the matrix below to confirm your hardware platform, OS, memory, and whether 
 **Hardware requirements**
 
 - Supported hardware platform — see Supported hardware platforms matrix above
-- Sufficient memory for your chosen agent-ready model (see [Agent-ready Models](https://build.nvidia.com/spark/vllm/agent-ready-models))
+- Sufficient memory for your chosen model (see [vLLM Inference](https://build.nvidia.com/spark/vllm/intermediate))
 
 **Software requirements**
 
@@ -122,7 +122,8 @@ Use the matrix below to confirm your hardware platform, OS, memory, and whether 
   - The sandbox default policy denies all outbound traffic not explicitly allowed. Misconfigured policies may block legitimate agent traffic; use `openshell logs` to diagnose.
   - Large model downloads may fail on unstable networks.
 - **Rollback:** Delete the sandbox with `openshell sandbox delete <sandbox-name>`, stop the gateway, and remove the vLLM container if you started one. See cleanup in the **Instructions** tab.
-- **Last Updated:** 09/30/2026
+- **Last Updated:** 10/14/2026
+  - Model and launch recipe links now point to the vLLM Inference page (Intermediate tab) because the vLLM playbook no longer has an Agent-ready Models tab
   - Rewritten for OpenShell 0.1.0: reference agent changed from OpenClaw to Pi, custom provider profiles replace managed inference routing, and the sandbox deploy flow builds a bring-your-own agent image instead of using a prebuilt community sandbox
 
 ## Instructions
@@ -228,7 +229,7 @@ journalctl --user -u openshell-gateway -f
 
 ## Step 5. Serve a model with vLLM
 
-Serve an OpenAI-compatible API for local inference. Use the recommended model and launch recipe for your hardware platform from [Agent-ready Models](https://build.nvidia.com/spark/vllm/agent-ready-models) (covers DGX Spark, DGX Station, and RTX PRO). Keep `--host 0.0.0.0` and port `8000` so sandboxes can reach the server.
+Serve an OpenAI-compatible API for local inference. Use the recommended model and launch recipe for your hardware platform from [vLLM Inference](https://build.nvidia.com/spark/vllm/intermediate) (covers DGX Spark and DGX Station). Keep `--host 0.0.0.0` and port `8000` so sandboxes can reach the server.
 
 > [!IMPORTANT]
 > Do not bind the server to `localhost` only. Sandboxes reach host-local services through the `host.openshell.internal` DNS alias (Step 6), which resolves to the gateway host — not to `127.0.0.1` inside the sandbox's own network namespace.

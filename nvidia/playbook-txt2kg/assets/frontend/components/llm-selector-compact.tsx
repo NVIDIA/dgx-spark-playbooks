@@ -274,7 +274,7 @@ export function LLMSelectorCompact() {
                         )}
                       </div>
                       {selectedModel.id === model.id && (
-                        <div className="w-2 h-2 rounded-full bg-nvidia-green flex-shrink-0 mt-1.5" />
+                        <div className="w-2 h-2 rounded-full bg-nvidia-green shrink-0 mt-1.5" />
                       )}
                     </button>
                   ))}

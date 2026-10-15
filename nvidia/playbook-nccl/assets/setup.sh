@@ -10,7 +10,9 @@
 # as the launcher (Node 1).
 set -e
 
-NCCL_VERSION="${NCCL_VERSION:-v2.30.7-1}"
+NCCL_VERSION="${NCCL_VERSION:-v2.31.2-1}"
+# nccl-tests v2.20.0+ adds GIN tests that fail to link against the system OpenMPI (missing MPI C++ library); v2.19.7 builds cleanly.
+NCCL_TESTS_VERSION="${NCCL_TESTS_VERSION:-v2.19.7}"
 case "$NCCL_VERSION" in
     *[!A-Za-z0-9._-]*)
         echo "Invalid NCCL_VERSION '$NCCL_VERSION' (allowed: letters, digits, . _ -)." >&2
@@ -31,7 +33,7 @@ sudo -S -p '' sh -c 'apt-get update && apt-get install -y libopenmpi-dev' && \
 git clone -b ${NCCL_VERSION} https://github.com/NVIDIA/nccl.git \$HOME/nccl/ && \
 cd \$HOME/nccl/ && \
 make -j\$(nproc) src.build NVCC_GENCODE='-gencode=arch=compute_121,code=sm_121' && \
-git clone https://github.com/NVIDIA/nccl-tests.git \$HOME/nccl-tests/ && \
+git clone -b ${NCCL_TESTS_VERSION} https://github.com/NVIDIA/nccl-tests.git \$HOME/nccl-tests/ && \
 cd \$HOME/nccl-tests/ && \
 export CUDA_HOME='/usr/local/cuda' && \
 export MPI_HOME='/usr/lib/aarch64-linux-gnu/openmpi' && \

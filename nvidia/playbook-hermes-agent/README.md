@@ -103,7 +103,8 @@ You cannot eliminate all risk; proceed at your own risk. **Recommended security 
 - **Estimated time:** 30 MIN for install and first-time terminal setup; model download time depends on size and network speed. Optional Telegram setup adds time.  
 - **Risk level:** **Medium** — the agent can execute commands and persist skills. Risk increases if you enable an optional messaging gateway without restricting allowed user IDs, or expose the local model endpoint beyond `localhost`. Always follow the security measures above.  
 - **Rollback:** Run `hermes uninstall` (with `sudo` if you installed a gateway as a system service) to remove Hermes, any gateway service, and the shell-profile entry. The data directory `~/.hermes` may still be present afterward; remove it manually if you want a full reset (see Cleanup in Instructions and the Troubleshooting tab). Stop the vLLM container separately (`docker rm` / `docker rmi`) if desired.  
-- **Last Updated:** 07/27/2026  
+- **Last Updated:** 10/14/2026  
+  - Model-serving links now point to the vLLM Inference page (Intermediate tab) because the vLLM playbook no longer has an Agent-ready Models tab
   - Telegram messaging moved to an optional section at the bottom of Instructions; core path is terminal-only
 
 ## Instructions
@@ -135,7 +136,7 @@ git --version
 
 Hermes will be configured against a local, OpenAI-compatible endpoint, so a model server must be running before you launch the Hermes installer. This playbook uses **vLLM** with the agent-ready recipe for your hardware platform — see the **Agent-ready Models** tab.
 
-Follow the [Serve LLMs with vLLM](https://build.nvidia.com/playbooks/vllm/agent-ready-models) playbook’s Agent-ready Models guidance to launch the server in a **separate terminal** so it can run alongside Hermes. It serves an OpenAI-compatible API at `http://localhost:8000/v1`.
+Follow the [Serve LLMs with vLLM](https://build.nvidia.com/spark/vllm/intermediate) playbook’s Intermediate tab to launch the server in a **separate terminal** so it can run alongside Hermes. It serves an OpenAI-compatible API at `http://localhost:8000/v1`.
 
 Once the server reports `Application startup complete`, verify the API on **8000** in another terminal. A healthy server returns **JSON** with a top-level **`"data"`** array listing the served model:
 
@@ -217,7 +218,7 @@ You now have a working Hermes install for terminal use. Steps 4–8 below are op
 
 You configured an initial model during the Hermes install. To switch to a different one later, restart vLLM serving the new model handle, then re-point Hermes at the same local endpoint.
 
-1. Stop the current vLLM server, then use the appropriate canonical recipe in the [Serve LLMs with vLLM](https://build.nvidia.com/playbooks/vllm/agent-ready-models) playbook for the new model. Do not reuse Qwen3.6-specific settings for a different model unless that recipe documents them.
+1. Stop the current vLLM server, then use the appropriate canonical recipe in the [Serve LLMs with vLLM](https://build.nvidia.com/spark/vllm/intermediate) playbook for the new model. Do not reuse Qwen3.6-specific settings for a different model unless that recipe documents them.
      
 2. Launch the Hermes model picker:
 
@@ -278,7 +279,7 @@ The command pulls the latest Hermes version, applies any required dependency cha
 
 > [!WARNING] This removes the Hermes installation and any gateway service you configured. By default, `~/.hermes/` (configuration, conversation history, and skills) is preserved unless you opt into a full uninstall at the on-screen prompt.
 
-If you started vLLM in Step 2, stop it using the cleanup instructions in the [Serve LLMs with vLLM](https://build.nvidia.com/playbooks/vllm/agent-ready-models) playbook.
+If you started vLLM in Step 2, stop the server. If you launched it as an NVIDIA Sync custom app from the [Serve LLMs with vLLM](https://build.nvidia.com/spark/vllm/intermediate) playbook, stop it from NVIDIA Sync.
 
 Run cleanup from an **interactive terminal**. The uninstaller may refuse non-interactive subprocesses and still asks you to choose whether to keep data or perform a full uninstall. For a full wipe, choose **Full uninstall** and type **`yes`** at the confirmation prompt.
 
@@ -387,13 +388,13 @@ sudo journalctl -u <hermes-gateway-unit> -e --no-pager -n 50
 
 Hermes expects an **OpenAI-compatible** local endpoint. This playbook uses **vLLM** and the agent-ready model recipe validated for the supported hardware platform below.
 
-Serve the model with the [Serve LLMs with vLLM](https://build.nvidia.com/playbooks/vllm/agent-ready-models) playbook (Agent-ready Models tab), then return here to install and configure Hermes.
+Serve the model with the [Serve LLMs with vLLM](https://build.nvidia.com/spark/vllm/intermediate) playbook (Intermediate tab), then return here to install and configure Hermes.
 
 ### Recommended models by hardware platform
 
 | Hardware platform | Recommended agent-ready model | Serve with |
 | :---- | :---- | :---- |
-| **DGX Spark** | Agent-ready Qwen3.6-35B-A3B (NVFP4) — `nvidia/Qwen3.6-35B-A3B-NVFP4` | [vLLM playbook — Agent-ready Models](https://build.nvidia.com/playbooks/vllm) |
+| **DGX Spark** | Agent-ready Qwen3.6-35B-A3B (NVFP4) — `nvidia/Qwen3.6-35B-A3B-NVFP4` | [vLLM playbook — Intermediate](https://build.nvidia.com/spark/vllm/intermediate) |
 
 Only platforms listed in the Supported hardware platforms table (Overview) are listed above.
 

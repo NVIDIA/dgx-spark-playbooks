@@ -58,6 +58,7 @@ Use the matrix below to confirm your hardware platform, recommended default loca
 - CUDA 12.9 or newer: `nvcc --version`
 - Git: `git --version`
 - Python 3 with venv and pip: `python3 --version && pip3 --version`
+- Python development headers (`python3-dev`): `sudo apt install -y python3-dev`
 - Internet connection for downloading models from Hugging Face Hub
 
 ## Ancillary files
@@ -76,7 +77,8 @@ All required assets are in the [LLaMA Factory repository](https://github.com/hiy
   - Model downloads require significant bandwidth and storage
   - Training may consume substantial GPU memory and need batch-size or accumulation tuning
 - **Rollback:** Deactivate the virtual environment and remove the `factoryEnv` and `LLaMA-Factory` directories. Delete local training checkpoints to reclaim storage.
-- **Last Updated:** 07/31/2026
+- **Last Updated:** 10/14/2026
+  - Added the `python3-dev` prerequisite so training no longer fails with `Python.h: No such file or directory` on a fresh system
   - Set up LLaMA Factory with a venv-based PyTorch CUDA 13 workflow for Qwen3 LoRA fine-tuning, chat validation, and export
 
 ## Instructions
@@ -96,6 +98,12 @@ git --version
 ```
 
 Expected output should show a supported CUDA toolkit, GPU summary from `nvidia-smi`, Python 3, and Git.
+
+Install the Python development headers. PyTorch's Triton compiler builds a small native helper the first time training runs and needs `Python.h`. Without it, training fails at step 0 with `fatal error: Python.h: No such file or directory`.
+
+```bash
+sudo apt install -y python3-dev
+```
 
 ## Step 2. Create and activate a Python virtual environment
 
@@ -222,6 +230,7 @@ The **Hardware platform** column shows where an issue is most relevant. "All har
 | Model download fails or is slow | All hardware platforms | Network connectivity or Hugging Face Hub issues | Check internet connection; try `HF_HUB_OFFLINE=1` for cached models |
 | Training loss not decreasing | All hardware platforms | Learning rate too high/low or insufficient data | Adjust `learning_rate` or check dataset quality |
 | Memory pressure within capacity | DGX Spark | UMA buffer cache not released | See UMA note below |
+| Training fails at step 0 with `fatal error: Python.h: No such file or directory` (Triton JIT compile error) | All hardware platforms | `python3-dev` (the Python headers) is not installed; a warm Triton cache can hide this on machines that ran training before | Run `sudo apt install -y python3-dev`, then re-run training |
 
 > [!NOTE]
 > **Unified memory (UMA).** On hardware platforms with unified memory, GPU and CPU share memory dynamically. Some applications have not yet been updated for UMA, so you may hit memory issues even within capacity. If that happens, manually flush the buffer cache:

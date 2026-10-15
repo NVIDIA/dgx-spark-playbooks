@@ -79,7 +79,7 @@ export function UploadDocuments() {
     <div className="space-y-6">
       {error && (
         <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
+          <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
           <p className="text-sm text-destructive">{error}</p>
         </div>
       )}

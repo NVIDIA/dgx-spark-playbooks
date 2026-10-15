@@ -260,7 +260,7 @@ export default function GraphPage() {
         <main className="container mx-auto px-4 py-8">
           <div className="glass-card rounded-xl p-6 mb-8 border border-destructive/30">
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-full bg-destructive/20 flex items-center justify-center flex-shrink-0">
+              <div className="w-12 h-12 rounded-full bg-destructive/20 flex items-center justify-center shrink-0">
                 <AlertCircle className="h-6 w-6 text-destructive" />
               </div>
               <div>

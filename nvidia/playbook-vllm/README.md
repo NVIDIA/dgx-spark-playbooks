@@ -39,28 +39,25 @@
 
 ## Basic idea
 
-[vLLM](https://vllm.ai/) is a high-performance inference engine for serving text and multimodal language models at datacenter scale.
-It offers considerable performance and flexibility, but configuring it for a particular model and use case takes skill and experience, especially on a local system.
+[vLLM](https://vllm.ai/) is a high-performance inference engine for serving LLMs at datacenter scale.
+However, getting the desired performance requires significant background knowledge and configuration experience, especially when setting up on a local system.
 
-This playbook provides three paths of increasing complexity to set up vLLM to run a text model on a DGX Spark or DGX Station ([for a cluster, go here](https://build.nvidia.com/playbooks/vllm-cluster)). 
+This playbook shows you three paths to set up vLLM and configure the endpoint on a remote DGX Spark or DGX Station ([for a Spark cluster, go here](https://build.nvidia.com/playbooks/vllm-cluster)). 
 
-The paths go from a fully software-assisted model launch to manually configuring a recipe yourself.
-
-At the end you will be able to use the remote endpoint securely at `localhost` on your laptop, or you will have a harness running on the remote consuming the endpoint directly on that device. 
 
 ## What you'll accomplish
 
 - **[Beginner](beginner.md):** Use NVIDIA Sync's model launch feature to run a model on a remote Spark or Station.
 - **[Intermediate](intermediate.md):** Manually prepare a recommended model on the remote device, add its launch script as a Sync Custom App, and then verify the API from your laptop.
-- **Advanced ([Qwen on 128GB Spark](advanced-qwen-on-spark.md) or [DeepSeek V4.1 Flash on DGX Station](advanced-deepseek-on-station.md)):** Do the entire process manually to set up the server, primarily aimed at [OpenShell](https://build.nvidia.com/playbooks/openshell) or [Hermes](https://build.nvidia.com/playbooks/hermes-agent) playbook support.
+- **Advanced ([Qwen on 128GB Spark](advanced-qwen-on-spark.md) or [DeepSeek V4.1 Flash on DGX Station](advanced-deepseek-on-station.md)):** Do the entire process manually in preparation for the [OpenShell](https://build.nvidia.com/playbooks/openshell) or [Hermes](https://build.nvidia.com/playbooks/hermes-agent) playbooks.
 
 ## What to know before starting
 
-- Using [NVIDIA Sync](https://docs.nvidia.com/sync/latest/index.html) for device connection and launching an application. **Beginner · Intermediate** (optional for Advanced)
-- Reading Docker and Hugging Face CLI commands. **Intermediate · Advanced**
-- Choosing a model recipe and understanding model size and precision. **Advanced**
-- Reading or editing a Bash launch script. **Advanced**
-- Configuring `docker run` and `vllm serve` arguments. **Advanced**
+- How to use [NVIDIA Sync](https://docs.nvidia.com/sync/latest/index.html). **Beginner · Intermediate** (optional for Advanced)
+- How to read Docker and Hugging Face CLI commands. **Intermediate · Advanced**
+- How to choose a model recipe and understanding model size and precision. **Advanced**
+- How to read and edit a Bash launch script. **Advanced**
+- How to configure `docker run` and `vllm serve` arguments. **Advanced**
 
 ## Supported hardware platforms
 
@@ -76,11 +73,10 @@ Check the table below to confirm which path this playbook supports for your hard
 **Hardware requirements**
 
 - One DGX Spark or DGX Station. 
-- For Beginner and Intermediate using NVIDIA Sync, the device must be reachable from your laptop.
 
 **Software and access requirements**
 
-- [NVIDIA Sync installed](https://docs.nvidia.com/sync/latest/getting-started.html#installation-and-onboarding) on your laptop, with the device [added and connected](https://docs.nvidia.com/sync/latest/direct-connections.html#adding-a-device-for-a-direct-connection). **Beginner · Intermediate** (optional for Advanced)
+- [NVIDIA Sync installed](https://docs.nvidia.com/sync/latest/getting-started.html#installation-and-onboarding) on your laptop, with the DGX device [connected](https://docs.nvidia.com/sync/latest/direct-connections.html#adding-a-device-for-a-direct-connection). **Beginner · Intermediate** 
 - Docker installed on the DGX device and [available to your user](https://docs.docker.com/engine/install/linux-postinstall/#add-your-user-to-the-docker-group). **Beginner · Intermediate · Advanced**
 - A Hugging Face token if the selected model or launcher asks for one. **Beginner**
 - A Hugging Face account and an [installed](https://huggingface.co/docs/huggingface_hub/main/en/guides/cli#standalone-installer-recommended), [authenticated](https://huggingface.co/docs/huggingface_hub/main/en/quick-start#authentication) Hugging Face CLI on the device. **Intermediate · Advanced**
@@ -88,7 +84,7 @@ Check the table below to confirm which path this playbook supports for your hard
 
 ## Time & risk
 
-- **Estimated time:** Beginner and Intermediate times vary between 10 and 25 minutes depending on your network speed. Advanced takes about 30 minutes more to account for manual steps.
+- **Estimated time:** Beginner and Intermediate vary between 10 and 25 minutes depending on network speed. Advanced takes about 30 minutes more to account for manual steps.
 - **Risk level:** Low
 - **Stop or rollback:** You can stop configuration flows at any time, and you can remove the container or model from the device manually.
 - **Last Updated:** 10/07/2026
@@ -97,11 +93,9 @@ Check the table below to confirm which path this playbook supports for your hard
 
 ## Use the NVIDIA Sync application to set everything up for you
 
-You will use NVIDIA Sync to access the DGX device in appliance mode.
+You will use NVIDIA Sync to connect to the DGX device, and then use the [model launcher](https://docs.nvidia.com/sync/latest/models.html) feature to configure and the model.
 
-Then you will use the [model launcher](https://docs.nvidia.com/sync/latest/index.html) feature to run the model.
-
-Finally, you will start OpenCode on the remote to query the model.
+From there, you can use the model endpoint at `localhost` on your laptop, or launch OpenCode on the remote DGX device to use the endpoint there. 
 
 ## Step 1. Install NVIDIA Sync on your laptop and add a DGX Spark or Station (one time)
 
@@ -117,48 +111,53 @@ Finally, you will start OpenCode on the remote to query the model.
 
 **Then, add your DGX Spark or Station device to NVIDIA Sync.**
 
-NVIDIA Sync scans for mDNS broadcasting devices and checks your local SSH config file, but if your remote device doesn't appear then select **Add a device manually**, enter the information below, then select **Add** to proceed.
+You can add a remote Linux device to NVIDIA Sync in one of three ways:
 
-1. `Name`: a display name  
-2. `Hostname or IP`: the IP address
-3. `Username`: your username for the device (should have `sudo` privileges)
-4. `Password`: password for that username 
+1. Sync detects an mDNS broadcasting device, you select it, and then enter its information
+2. You select **Add a device manually** and then enter its information
+3. Sync scans your local SSH config and suggests aliases, you select it
+
+For options `1` and `2 above, the information you enter is:
+
+- `Name`: a display name  
+- `Hostname or IP`: mDNS name or the IP address
+- `Username`: your username for the device (should have `sudo` privileges)
+- `Password`: password for that username 
 
 **Success**: A **Get started** modal will appear. 
 
 ## Step 2. Configure the model (one time)
 
-**First, go to Settings and configure the container, model and OpenCode.**
+**First, go to the Models tab in NVIDIA SYnc Settings to confirm the model.**
 
-1. Go to **Settings > Models tab** in NVIDIA Sync
+1. Go to **Settings > Models tab**
 2. Select the device from the drop down and read the configuration guidance
 3. Select **Configure** and follow the container and model download  
 4. When the downloads complete, follow the OpenCode install on the remote
 
 > [!NOTE]
 > Downloading the container and model can take a long time.
-> The DGX Spark container and model are roughly 50 GBs in size.
+> The DGX Spark container and model are roughly 30 GBs in size.
 > The DGX Station container and model are roughly 300 GB in size.
 
-**Leave the endpoint access mode at "Private".**
+**Sucess**: The tab will show a success screeen and a green "Configure" button.
+
+**Next, leave the endpoint access mode at `Localhost`.**
 
 The default mode securely tunnels the endpoint to `localhost:18765/v1` on your laptop. 
-
-> [!NOTE]
-> The **Shared** mode opens the endpoint at the device's IP address on your network and adds a password to it.
-> This will break the OpenCode launch, so leave it at **Private** until you are comfortable with how things work ([see NVIDIA Sync docs](https://docs.nvidia.com/sync/latest/index.html)). 
+You can change this to `LAN` later if you want. 
  
 **Success**: The model card shows details for the device.
 
-## Step 3. Launch the container and follow the vLLM server until it's ready (repeat use)
+## Step 3. Launch the model and follow the vLLM server until it's ready (repeat use)
 
-**First, launch the model from the model card in the Models tab in Settings.**
+> [!NOTE]
+> It can take up to 10 minutes or more for the server to load the model and be ready for inference.
+
+**First, launch the model from the Models tab.**
 
 Select "Start model" from the option dots on the right hand side of the card.
 This runs the container on the remote with the proper recipe. 
-
-> [!NOTE]
-> It can take up to 10 minutes for the server to load the model and be ready for inference.
 
 **Then, open the resource monitor to watch for the model loading on the GPU.**
 
@@ -168,11 +167,11 @@ This runs the container on the remote with the proper recipe.
 
 Both `GPU UTILIZATION` and `UNIFIED MEMORY` go up as the server loads the model. 
 
-**Finally, watch the Docker logs to monitor the server status for ready state.**
+**Finally, monitor the server status in a terminal to look for ready state.**
 
-1. Open a terminal from the task bar utility
+1. Open a terminal on the remote task bar utility
 2. Run `docker ps` to see the container name, `<container-name>`
-3. Then run `watch docker logs <container-name>` to see the server status
+3. Then run `docker logs --follow --tail 20 <container-name>` to see the server status
 
 **Success**: The model section in NVIDIA Sync transitions to `Running`. The Docker logs show `Application startup complete`.
 
@@ -186,6 +185,9 @@ Both `GPU UTILIZATION` and `UNIFIED MEMORY` go up as the server loads the model.
 
 **Success**: OpenCode returns a response from the model.
 
+> [!NOTE]
+> Depending on your browser, OpenCode may need to be refreshed after the initial query in order to see further responses.
+
 ## Step 5. Next Steps
 
 1. Learn about **Shared** mode in the [NVIDIA Sync documentation](https://docs.nvidia.com/sync/latest/index.html).
@@ -196,11 +198,9 @@ Both `GPU UTILIZATION` and `UNIFIED MEMORY` go up as the server loads the model.
 
 ## Set up and serve a recommended vLLM recipe as an NVIDIA Sync custom application
 
-You will set up the remote system to run a device recommended model in a container.
-It's a one time setup.
+This path gets you closer to doing everything yourself manually by walking you through the initial container and model setup, which is a one time step.
 
-Then you will add a container launch script to Sync to create a custom app.
-It's also a one time setup.
+From there, you use add a preconfigured container launch script to NVIDIA Sync to create a custom app that you can start and stop at will in the future.
 
 After that, you can launch the containerized model directly from NVIDIA Sync.
 
@@ -386,7 +386,7 @@ These instructions are meant to provide guidance that you can generalize to othe
 3. Copy the Hugging Face repository name from the table to the same file
 
 > [!NOTE]
-> The [vLLM recipe](https://recipes.vllm.ai/) site is essentially a user-friendly configuration engine that lets select options to narrow down to a model checkpoint and vLLM server/Docker command to serve the model on your device. Each model checkpoint page has further options you can select to modify the commands. 
+> The [vLLM recipe](https://recipes.vllm.ai/) site is a user-friendly configuration engine to narrow down to a model checkpoint and vLLM server/Docker command to serve the model on your device. Each model checkpoint page has further options you can select to modify the commands. 
 
 ### Step 2. Get the container and model on the device
 

@@ -89,7 +89,8 @@ Use the **Open WebUI Remotely** or **Open WebUI on Desktop** tab for the base wo
   - Docker permission issues may require user group changes and a session restart
   - Large model downloads may take significant time depending on network speed
 - **Rollback:** Stop and remove the container, image, and volumes (see Cleanup in each instructions tab). Cleanup is optional and destructive to chat history and downloaded models.
-- **Last Updated:** 07/31/2026
+- **Last Updated:** 10/14/2026
+  - Model download steps now name the button as it appears in Open WebUI: Download "<model>"
   - Run Open WebUI with integrated Ollama on your hardware platform, chat from a browser, and pull models locally
 
 ## Open WebUI Remotely
@@ -229,7 +230,7 @@ Do the following in the Open WebUI application:
 
 - Click **Select a model** in the top left corner of the Open WebUI interface.
 - Type `gpt-oss:20b` in the search field.
-- Click the **Pull "gpt-oss:20b" from Ollama.com** button that appears.
+- Click the **Download "gpt-oss:20b"** button that appears (it has an **Ollama** tag on the right).
 - Wait for the model to fully download. You can monitor progress in the interface.
 
 Alternatively, you can enter `qwen3.6:latest` instead of `gpt-oss:20b`.
@@ -372,7 +373,7 @@ You'll then download a language model through Ollama and configure it for use in
 
 - Click on the **Select a model** dropdown in the top left corner of the Open WebUI interface.
 - Type `gpt-oss:20b` in the search field.
-- Click the **Pull 'gpt-oss:20b' from Ollama.com** button that appears.
+- Click the **Download "gpt-oss:20b"** button that appears (it has an **Ollama** tag on the right).
 - Wait for the model download to complete. You can monitor progress in the interface.
 - Once complete, select **gpt-oss:20b** from the model dropdown.
 
@@ -443,7 +444,7 @@ Then pull and select the recommended model in the Open WebUI interface:
 
 1. Click **Select a model** in the top left corner.
 2. Type `qwen3.6:35b-a3b` in the search field.
-3. Click the **Pull "qwen3.6:35b-a3b" from Ollama.com** button that appears.
+3. Click the **Download "qwen3.6:35b-a3b"** button that appears (it has an **Ollama** tag on the right).
 4. Wait for the download to finish, then select **qwen3.6:35b-a3b** from the model dropdown.
 
 #### Verify in chat

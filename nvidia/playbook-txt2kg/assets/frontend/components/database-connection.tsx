@@ -323,7 +323,7 @@ export function DatabaseConnection({ className }: DatabaseConnectionProps) {
   }
 
   return (
-    <div className={`rounded-xl overflow-hidden border border-border/50 bg-card/30 backdrop-blur-sm ${className}`}>
+    <div className={`rounded-xl overflow-hidden border border-border/50 bg-card/30 backdrop-blur-xs ${className}`}>
       {/* Graph DB Section */}
       <Collapsible open={expandedSection === "graph"} onOpenChange={() => toggleSection("graph")}>
         <div className="p-3 border-b border-border/50 cursor-pointer flex justify-between items-center" onClick={() => toggleSection("graph")}>
@@ -391,7 +391,7 @@ export function DatabaseConnection({ className }: DatabaseConnectionProps) {
             
             {graphError && (
               <div className="text-xs md:text-sm text-red-600 bg-red-50 dark:bg-red-950/20 dark:text-red-400 p-2 rounded">
-                <p className="whitespace-normal break-words">Error: {graphError}</p>
+                <p className="whitespace-normal wrap-break-word">Error: {graphError}</p>
               </div>
             )}
             
@@ -585,7 +585,7 @@ export function DatabaseConnection({ className }: DatabaseConnectionProps) {
             
             {vectorError && (
               <div className="text-xs md:text-sm text-red-600 bg-red-50 dark:bg-red-950/20 dark:text-red-400 p-2 rounded">
-                <p className="whitespace-normal break-words">Error: {vectorError}</p>
+                <p className="whitespace-normal wrap-break-word">Error: {vectorError}</p>
               </div>
             )}
             

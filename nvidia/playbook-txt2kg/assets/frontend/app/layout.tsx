@@ -53,7 +53,7 @@ export default function RootLayout({
           <DocumentProvider>
             <ClientInitializer />
             {/* Modern Gradient Header */}
-            <header className="border-b border-border/50 backdrop-blur-md dark:bg-background/95 bg-background sticky top-0 z-50 shadow-sm">
+            <header className="border-b border-border/50 backdrop-blur-md dark:bg-background/95 bg-background sticky top-0 z-50 shadow-xs">
               <div className="container mx-auto px-4 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <NvidiaIcon className="h-8 w-8" />
@@ -64,7 +64,7 @@ export default function RootLayout({
                 <div className="flex items-center gap-4">
                   <Link
                     href="/rag"
-                    className="flex items-center gap-2 text-sm font-medium rounded-lg px-3 py-2 transition-colors border border-[#76b900]/40 text-[#76b900] bg-[#76b900]/10 hover:bg-[#76b900]/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#76b900]/50 dark:bg-[#76b900]/20 dark:hover:bg-[#76b900]/30 dark:border-[#76b900]/50"
+                    className="flex items-center gap-2 text-sm font-medium rounded-lg px-3 py-2 transition-colors border border-nvidia-green/40 text-nvidia-green bg-nvidia-green/10 hover:bg-nvidia-green/20 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-nvidia-green/50 dark:bg-nvidia-green/20 dark:hover:bg-nvidia-green/30 dark:border-nvidia-green/50"
                   >
                     <SearchIcon className="h-4 w-4 text-current" />
                     <span>RAG Search</span>

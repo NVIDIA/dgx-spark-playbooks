@@ -1,55 +1,220 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
 
 /* Import NVIDIA Build typography patterns with Inter font */
-@import url('../styles/nvidia-build-typography.css');
+@import url('../styles/nvidia-build-typography.css') layer(utilities);
 
-:root {
-  --foreground-rgb: 255, 255, 255;
-  --background-rgb: 0, 0, 0;
+@plugin 'tailwindcss-animate';
+@plugin '@tailwindcss/forms';
+
+@source '../*.{js,ts,jsx,tsx,mdx}';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --font-sans:
+    Inter, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto,
+    sans-serif;
+  --font-mono:
+    JetBrains Mono, Fira Code, Consolas, Monaco, Courier New, monospace;
+
+  --tracking-tighter: -0.02em;
+  --tracking-tight: -0.01em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.01em;
+  --tracking-wider: 0.02em;
+  --tracking-widest: 0.05em;
+
+  --color-nvidia-green: #76b900;
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --color-chart-1: hsl(var(--chart-1));
+  --color-chart-2: hsl(var(--chart-2));
+  --color-chart-3: hsl(var(--chart-3));
+  --color-chart-4: hsl(var(--chart-4));
+  --color-chart-5: hsl(var(--chart-5));
+
+  --color-sidebar: hsl(var(--sidebar-background));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-ring: hsl(var(--sidebar-ring));
+
+  --color-text-dark: #333333;
+  --color-text-light: #e6e6e6;
+
+  --text-lg: 1rem;
+  --text-lg--line-height: 1.5rem;
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
 }
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background: rgb(var(--background-rgb));
-  scroll-behavior: smooth;
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
 }
 
-/* Base page container styles */
-.container {
-  max-width: 90rem;
-  width: 100%;
-  margin-left: auto;
-  margin-right: auto;
+@utility text-balance {
+  text-wrap: balance;
 }
 
-@media (min-width: 1024px) {
-  .container {
-    padding-left: 2rem;
-    padding-right: 2rem;
+@utility animate-fadeIn {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@utility text-nvidia-green {
+  /* NVIDIA green utility text color */
+  color: hsl(var(--nvidia-green));
+}
+
+@utility selection-accent {
+  /* Accent color for native form controls (checkbox/radio) */
+  accent-color: hsl(var(--nvidia-green));
+}
+
+@utility startup-tabs {
+  /* Venture-backed startup modern tab styles */
+  @apply relative max-w-4xl mx-auto p-1.5 bg-black/5 dark:bg-white/5
+           backdrop-blur-lg border border-white/10 dark:border-white/5 
+           rounded-full shadow-xl overflow-hidden;
+}
+
+@utility startup-tab-indicator {
+  @apply absolute h-full bg-primary/5 dark:bg-primary/10 rounded-full
+           transition-all duration-300 ease-out;
+  margin: 4px;
+  height: calc(100% - 8px);
+}
+
+@utility startup-tab {
+  @apply flex-1 flex items-center justify-center gap-3 py-3 font-medium
+           z-10 text-sm transition-all duration-200 hover:text-primary/90;
+  letter-spacing: 0.01em;
+}
+
+@utility startup-tab-active {
+  @apply text-primary font-semibold;
+  position: relative;
+
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 25%;
+    width: 50%;
+    height: 2px;
+    @apply bg-primary rounded-full;
+  }
+
+  & .startup-tab-icon {
+    @apply from-primary/30 to-primary/15;
+    transform: scale(1.05);
+  }
+}
+
+@utility startup-tab-icon {
+  @apply flex items-center justify-center w-8 h-8 rounded-full
+           bg-linear-to-br from-primary/20 to-primary/5 text-primary;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+
+  .startup-tab-active & {
+    @apply from-primary/30 to-primary/15;
+    transform: scale(1.05);
   }
 }
 
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-rgb: 0, 0, 0;
   }
 
-  .animate-fadeIn {
-    animation: fadeIn 0.3s ease-in-out;
+  body {
+    color: rgb(var(--foreground-rgb));
+    background: rgb(var(--background-rgb));
+    scroll-behavior: smooth;
   }
 
-  /* NVIDIA green utility text color */
-  .text-nvidia-green {
-    color: hsl(var(--nvidia-green));
+  /* Base page container styles */
+  .container {
+    max-width: 90rem;
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
   }
 
-  /* Accent color for native form controls (checkbox/radio) */
-  .selection-accent {
-    accent-color: hsl(var(--nvidia-green));
+  @media (min-width: 1024px) {
+    .container {
+      padding-left: 2rem;
+      padding-right: 2rem;
+    }
   }
+}
 
+@layer utilities {
   @keyframes fadeIn {
     from {
       opacity: 0;
@@ -59,52 +224,6 @@ body {
       opacity: 1;
       transform: translateY(0);
     }
-  }
-  
-  /* Venture-backed startup modern tab styles */
-  .startup-tabs {
-    @apply relative max-w-4xl mx-auto p-1.5 bg-black/5 dark:bg-white/5 
-           backdrop-blur-lg border border-white/10 dark:border-white/5 
-           rounded-full shadow-xl overflow-hidden;
-  }
-  
-  .startup-tab-indicator {
-    @apply absolute h-full bg-primary/5 dark:bg-primary/10 rounded-full 
-           transition-all duration-300 ease-out;
-    margin: 4px;
-    height: calc(100% - 8px);
-  }
-  
-  .startup-tab {
-    @apply flex-1 flex items-center justify-center gap-3 py-3 font-medium 
-           z-10 text-sm transition-all duration-200 hover:text-primary/90;
-    letter-spacing: 0.01em;
-  }
-  
-  .startup-tab-active {
-    @apply text-primary font-semibold;
-    position: relative;
-  }
-  
-  .startup-tab-active::after {
-    content: "";
-    position: absolute;
-    bottom: -2px;
-    left: 25%;
-    width: 50%;
-    height: 2px;
-    @apply bg-primary rounded-full;
-  }
-  
-  .startup-tab-icon {
-    @apply flex items-center justify-center w-8 h-8 rounded-full 
-           bg-gradient-to-br from-primary/20 to-primary/5 text-primary;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
-  }
-  
-  .startup-tab-active .startup-tab-icon {
-    @apply from-primary/30 to-primary/15;
-    transform: scale(1.05);
   }
 }
 

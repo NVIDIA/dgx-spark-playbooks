@@ -116,7 +116,7 @@ export function S3Upload() {
     <div className="space-y-4">
       {error && (
         <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 flex items-start gap-3">
-          <AlertCircle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
+          <AlertCircle className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
           <p className="text-sm text-destructive">{error}</p>
         </div>
       )}

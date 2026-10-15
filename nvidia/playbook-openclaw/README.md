@@ -100,7 +100,8 @@ This playbook is an **agent** workflow, not a general inference-serving guide. F
 - **Estimated time:** 30 MIN for install and first-time model setup; model download time depends on size and network
 - **Risk level:** **Medium to High**—the agent has access to whatever files, tools, and channels you configure. Risk increases significantly if you enable terminal/command execution skills or connect external accounts. Without proper isolation, this setup could expose sensitive data or allow code execution. **Always follow the security measures above.**
 - **Rollback:** Stop the OpenClaw gateway and uninstall via the same install script or by removing its directory; stop the local inference server separately if desired
-- **Last Updated:** 07/27/2026
+- **Last Updated:** 10/14/2026
+  - Model-serving links now point to the vLLM Inference page (Intermediate tab) because the vLLM playbook no longer has an Agent-ready Models tab
   - Added supported hardware matrix and Agent-ready Models tab for DGX Spark and RTX
 
 ## Instructions
@@ -284,7 +285,7 @@ Agent-ready models are tuned for **agentic workloads** — tool calling, reasoni
 
 | Hardware platform | Recommended model | Example handle / tag | Inference path |
 | ----------------- | ----------------- | -------------------- | -------------- |
-| **DGX Spark** | Agent-ready Qwen3.6-35B-A3B (NVFP4) | `nvidia/Qwen3.6-35B-A3B-NVFP4` | vLLM — see [Serve LLMs with vLLM → Agent-ready Models](https://build.nvidia.com/playbooks/vllm/agent-ready-models) |
+| **DGX Spark** | Agent-ready Qwen3.6-35B-A3B (NVFP4) | `nvidia/Qwen3.6-35B-A3B-NVFP4` | vLLM — see [Serve LLMs with vLLM → Intermediate](https://build.nvidia.com/spark/vllm/intermediate) |
 | **GeForce RTX** (24GB+ VRAM) | Qwen3.6 27B | `qwen3.6:27b` (Ollama) | Ollama or vLLM |
 | **GeForce RTX** (12–16GB VRAM) | Qwen 3.5 9B / Gemma 4 12B | backend-specific tags | Ollama |
 | **GeForce RTX** (6–8GB VRAM) | Qwen 3.5 4B | backend-specific tags | Ollama |
@@ -297,9 +298,9 @@ For OpenClaw, set the local server context window to **at least 32K tokens**. If
 
 ### Large-memory Linux hardware platforms — vLLM agent-ready path
 
-On large-memory Linux hardware platforms, use the agent-ready `nvidia/Qwen3.6-35B-A3B-NVFP4` recipe from the Serve LLMs with vLLM playbook’s [Agent-ready Models](https://build.nvidia.com/playbooks/vllm/agent-ready-models) tab. That path serves an OpenAI-compatible API (typically at `http://localhost:8000/v1`) suitable for OpenClaw.
+On large-memory Linux hardware platforms, use the agent-ready `nvidia/Qwen3.6-35B-A3B-NVFP4` recipe from the Serve LLMs with vLLM playbook’s [Intermediate](https://build.nvidia.com/spark/vllm/intermediate) tab. That path serves an OpenAI-compatible API (typically at `http://localhost:8000/v1`) suitable for OpenClaw.
 
-1. Follow the Serve LLMs with vLLM playbook’s [Agent-ready Models](https://build.nvidia.com/playbooks/vllm/agent-ready-models) tab for the launch command for your hardware platform.
+1. Follow the Serve LLMs with vLLM playbook’s [Intermediate](https://build.nvidia.com/spark/vllm/intermediate) tab for the launch command for your hardware platform.
 2. Verify:
 
 ```bash

@@ -41,7 +41,7 @@ Use the matrix below to confirm your hardware platform, recommended default loca
 
 | Hardware platform | OS | Memory | Recommended default local settings | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- | :---- |
-| **DGX Spark** | DGX OS (Linux) | 128 GB Unified Memory | Isaac Sim build from source (`linux-aarch64`); Isaac Lab RL sample (`Isaac-Velocity-Rough-H1-v0`) | — |
+| **DGX Spark** | DGX OS (Linux) | 128 GB Unified Memory | Isaac Sim build from source (`linux-aarch64`); Isaac Lab RL sample (`Isaac-Velocity-Rough-H1`) | — |
 
 ## Prerequisites
 
@@ -56,6 +56,7 @@ Use the matrix below to confirm your hardware platform, recommended default loca
 - GCC/G++ 11 compiler: `gcc --version` shows version 11.x
 - Git and Git LFS installed: `git --version` and `git lfs version` succeed
 - Network access to clone repositories from GitHub and download dependencies
+- Pinned versions: Isaac Sim `v6.2.0` and Isaac Lab 3.0 at commit `4b081ff69eee56bb65137b762f2d265eb92ec36e` from `release/3.0.0`, as shown in the Instructions. Use this Lab revision, which targets Sim 6.2; the earlier `v3.0.0-EA` tag targets Sim 6.1. Do not substitute the default `develop` branches
 
 ## Ancillary files
 
@@ -72,7 +73,8 @@ All required assets can be found in the Isaac Sim and Isaac Lab repositories on 
   - Build process requires significant compilation time and may encounter dependency issues
   - Build artifacts consume substantial disk space
 - **Rollback:** Remove the Isaac Sim build directory to free space. Git repositories can be deleted and re-cloned if needed.
-- **Last Updated:** 09/30/2026
+- **Last Updated:** 10/14/2026
+  - Pinned Isaac Sim to v6.2.0 and Isaac Lab to a fixed 3.0 revision, and updated the training commands for the Isaac Lab 3.0 CLI
   - Build Isaac Sim from source and set up Isaac Lab with a sample reinforcement learning training run on supported hardware platforms
 
 ## Instructions
@@ -96,13 +98,10 @@ Expected output should show GCC/G++ version 11.x.
 
 Clone Isaac Sim from the NVIDIA GitHub repository and set up Git LFS to pull large files.
 
-> **Note:** For Isaac Sim 6.0.0 Early Developer Release, use:
-> ```bash
-> git clone --depth=1 --recursive --branch=develop https://github.com/isaac-sim/IsaacSim
-> ```
+This playbook pins **Isaac Sim v6.2.0** and **Isaac Lab 3.0**. Step 6 pins a specific revision of Isaac Lab's `release/3.0.0` branch that targets Isaac Sim 6.2. Use these refs instead of the default `develop` branches so the installation and training commands below match the checked-out code.
 
 ```bash
-git clone --depth=1 --recursive https://github.com/isaac-sim/IsaacSim
+git clone --depth=1 --recursive --branch=v6.2.0 https://github.com/isaac-sim/IsaacSim
 cd IsaacSim
 git lfs install
 git lfs pull
@@ -144,17 +143,14 @@ Clone Isaac Lab from the NVIDIA GitHub repository. Complete Steps 1–5 first so
 
 Return to the parent directory of `IsaacSim` before cloning so `IsaacLab` is created alongside it. This layout allows Step 10 to remove both repositories.
 
-> **Note:** For Isaac Lab Early Developer Release, use this command block instead of the one below:
-> ```bash
-> cd ..
-> git clone --recursive --branch=develop https://github.com/isaac-sim/IsaacLab
-> cd IsaacLab
-> ```
+Isaac Lab 3.0 does not yet have a final `v3.0.0` tag. Pin commit `4b081ff69eee56bb65137b762f2d265eb92ec36e` from `release/3.0.0`, which targets Isaac Sim 6.2. The earlier `v3.0.0-EA` tag targets Isaac Sim 6.1. This pinned revision supports the `./isaaclab.sh` launcher for source-built Isaac Sim and the `train` subcommand used in Step 9.
 
 ```bash
 cd ..
-git clone --recursive https://github.com/isaac-sim/IsaacLab
+git clone --branch=release/3.0.0 https://github.com/isaac-sim/IsaacLab
 cd IsaacLab
+git checkout --detach 4b081ff69eee56bb65137b762f2d265eb92ec36e
+git submodule update --init --recursive
 ```
 
 ## Step 7. Create a symbolic link to the Isaac Sim installation
@@ -171,17 +167,17 @@ Expected output should show a valid symlink to `python.sh` under `_isaac_sim`.
 
 ## Step 8. Install Isaac Lab
 
-Install X11 development libraries required to build `imgui_bundle` from source for Newton, then install Isaac Lab:
+Install the build tools, Python 3.12 headers, and X11 development libraries required by Isaac Lab on aarch64, then install Isaac Lab:
 
 ```bash
 sudo apt update
-sudo apt install -y libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libgl1-mesa-dev
+sudo apt install -y cmake build-essential python3.12-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libgl1-mesa-dev
 ./isaaclab.sh --install
 ```
 
 ## Step 9. Run Isaac Lab and validate humanoid reinforcement learning training
 
-Launch Isaac Lab using the provided Python executable. You can run the training in one of the following modes:
+Launch training with Isaac Lab 3.0's `train` subcommand and select `isaacsim_physx` to use the Isaac Sim build from Step 3. The task name is `Isaac-Velocity-Rough-H1` (without the older `-v0` suffix). You can run the training in one of the following modes:
 
 **Option 1: Headless mode (recommended for faster training)**
 
@@ -189,7 +185,7 @@ Runs without visualization and outputs logs directly to the terminal.
 
 ```bash
 export LD_PRELOAD="$LD_PRELOAD:/lib/aarch64-linux-gnu/libgomp.so.1"
-./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Velocity-Rough-H1-v0 --headless
+./isaaclab.sh train --rl_library rsl_rl --task Isaac-Velocity-Rough-H1 physics=isaacsim_physx --viz none
 ```
 
 **Option 2: Visualization enabled**
@@ -198,10 +194,10 @@ Runs with real-time visualization in Isaac Sim, allowing you to monitor the trai
 
 ```bash
 export LD_PRELOAD="$LD_PRELOAD:/lib/aarch64-linux-gnu/libgomp.so.1"
-./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Velocity-Rough-H1-v0
+./isaaclab.sh train --rl_library rsl_rl --task Isaac-Velocity-Rough-H1 physics=isaacsim_physx --viz kit
 ```
 
-Training should start and print progress logs for the `Isaac-Velocity-Rough-H1-v0` task.
+Training should start and print progress logs for the `Isaac-Velocity-Rough-H1` task.
 
 ## Step 10. Cleanup
 
@@ -223,6 +219,9 @@ rm -rf IsaacSim IsaacLab
 | Isaac Sim does not start | Missing or unresolved `libgomp.so.1` | `export LD_PRELOAD="$LD_PRELOAD:/lib/aarch64-linux-gnu/libgomp.so.1"` before launching |
 | Build fails after a previous attempt | Stale build cache from an older installation | Remove the `.cache` folder under the Isaac Sim repository and rebuild |
 | Isaac Lab does not start | Missing or unresolved `libgomp.so.1` | `export LD_PRELOAD="$LD_PRELOAD:/lib/aarch64-linux-gnu/libgomp.so.1"` before launching |
+| `./isaaclab.sh: No such file or directory` | Isaac Lab was cloned from a branch that no longer provides the launcher | Check out the pinned Isaac Lab 3.0 revision and initialize its submodules using Instructions Step 6 |
+| `scripts/reinforcement_learning/rsl_rl/train.py` is missing, or the old H1 task name is not found | Isaac Lab 3.0 uses the `train` subcommand and the task name `Isaac-Velocity-Rough-H1` | Use the Step 9 commands with `./isaaclab.sh train --rl_library rsl_rl --task Isaac-Velocity-Rough-H1 physics=isaacsim_physx` and the desired `--viz` mode |
+| `ModuleNotFoundError: No module named 'omni.physics.tensors.impl'` during training | Isaac Lab and Isaac Sim versions may not match, or the Isaac Sim environment is not loaded | Confirm Isaac Sim `v6.2.0` (Step 2), the pinned Isaac Lab 3.0 revision (Step 6), and the `_isaac_sim` link (Step 7), then reinstall and run through `./isaaclab.sh` |
 | Symlink to Isaac Sim is broken | `ISAACSIM_PATH` unset or points at the wrong release directory | Re-export `ISAACSIM_PATH` to `${PWD}/_build/linux-aarch64/release` from the Isaac Sim tree, then recreate `_isaac_sim` (Instructions Steps 4 and 7) |
 
 For latest known issues, see the documentation linked under **Resources** for your hardware platform.

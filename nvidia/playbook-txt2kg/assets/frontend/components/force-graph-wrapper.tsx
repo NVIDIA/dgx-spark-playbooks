@@ -2803,7 +2803,7 @@ export function ForceGraphWrapper({
         {isClusteringAvailable && (
           <button
             onClick={toggleClustering}
-            className={`px-3 py-1.5 rounded text-white text-xs shadow ${isClusteringEnabled ? 'bg-blue-600 hover:bg-blue-500' : 'bg-gray-700/80 hover:bg-gray-600/90'}`}
+            className={`px-3 py-1.5 rounded text-white text-xs shadow-sm ${isClusteringEnabled ? 'bg-blue-600 hover:bg-blue-500' : 'bg-gray-700/80 hover:bg-gray-600/90'}`}
           >
             {isClusteringEnabled ? 'Disable GPU Clustering' : 'Enable GPU Clustering'}
           </button>
@@ -2815,7 +2815,7 @@ export function ForceGraphWrapper({
               setIsClusteringAvailable(true);
               setIsClusteringEnabled(true);
             }}
-            className="px-3 py-1.5 rounded text-white text-xs shadow bg-yellow-600 hover:bg-yellow-500"
+            className="px-3 py-1.5 rounded text-white text-xs shadow-sm bg-yellow-600 hover:bg-yellow-500"
           >
             Force Enable Clustering
           </button>
@@ -2823,19 +2823,19 @@ export function ForceGraphWrapper({
         {isClusteringEnabled && (
             <button 
               onClick={() => setDebugInfo(prev => prev.includes('cluster-viz') ? '' : 'cluster-viz')}
-              className={`px-3 py-1.5 rounded text-white text-xs shadow ${debugInfo.includes('cluster-viz') ? 'bg-purple-600 hover:bg-purple-500' : 'bg-gray-700/80 hover:bg-gray-600/90'}`}
+              className={`px-3 py-1.5 rounded text-white text-xs shadow-sm ${debugInfo.includes('cluster-viz') ? 'bg-purple-600 hover:bg-purple-500' : 'bg-gray-700/80 hover:bg-gray-600/90'}`}
             >
               Toggle Cluster Viz
             </button>
         )}
         {/* Add 2D View Toggle if needed */}
-        {/* <button className="px-3 py-1.5 bg-gray-700/80 hover:bg-gray-600/90 rounded text-white text-xs shadow flex items-center">
+        {/* <button className="px-3 py-1.5 bg-gray-700/80 hover:bg-gray-600/90 rounded text-white text-xs shadow-sm flex items-center">
           <LayoutGrid size={14} className="mr-1" /> 2D View
         </button> */}
       </div>
 
       {/* Top-Right Info Panel */}
-      <div className="absolute top-4 right-24 z-10 bg-gray-800/80 p-3 rounded text-xs text-gray-300 shadow w-48">
+      <div className="absolute top-4 right-24 z-10 bg-gray-800/80 p-3 rounded text-xs text-gray-300 shadow-sm w-48">
         <p><span className="font-semibold text-white">Mode:</span> {interactionMode}</p>
         <ul className="list-disc list-inside mt-1 space-y-0.5">
           <li>Drag to rotate view</li>

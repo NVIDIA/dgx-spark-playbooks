@@ -43,7 +43,7 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 - [Accelerate JAX Performance](nvidia/playbook-jax/)
 - [Speed Up Fine-Tuning with Triton Kernels](nvidia/playbook-kernel-dev-ft/)
 - [Stream Real-Time Video to a Vision Language Model](nvidia/playbook-live-vlm-webui/)
-- [Connect Your Home with Living Home](nvidia/playbook-living-home/)
+- [Set up an AI Home Assistant](nvidia/playbook-living-home/)
 - [Serve Models with llama.cpp](nvidia/playbook-llama-cpp/)
 - [Fine-Tune LLMs with LLaMA Factory](nvidia/playbook-llama-factory/)
 - [Run Local LLMs](nvidia/playbook-llms/)

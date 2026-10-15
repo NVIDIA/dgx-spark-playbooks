@@ -1,7 +1,7 @@
 # Remote WebGPU Clustering Service Dockerfile
 # Based on NVIDIA PyTorch Geometric container which includes cuGraph/RAPIDS for GPU acceleration
 
-FROM nvcr.io/nvidia/pyg:25.05-py3
+FROM nvcr.io/nvidia/pyg:26.09-py3
 
 # Set working directory
 WORKDIR /app
@@ -16,18 +16,13 @@ RUN apt-get update && apt-get install -y \
 
 # Install Python dependencies for remote WebGPU service
 COPY requirements-remote-webgpu.txt .
-RUN pip install --no-cache-dir -r requirements-remote-webgpu.txt
-
-# Install additional dependencies for WebRTC streaming
-RUN pip install --no-cache-dir \
-    opencv-python-headless \
-    plotly \
-    kaleido \
-    Pillow \
-    redis
+# RelBench is unused by this service and pins an older scikit-learn.
+RUN pip uninstall -y relbench && \
+    pip install --no-cache-dir -r requirements-remote-webgpu.txt
 
 # Copy service files
 COPY remote_webgpu_clustering_service.py .
+COPY semantic_clustering_service.py .
 COPY unified_gpu_service.py .
 COPY local_gpu_viz_service.py .
 COPY simple_webgpu_test.py .

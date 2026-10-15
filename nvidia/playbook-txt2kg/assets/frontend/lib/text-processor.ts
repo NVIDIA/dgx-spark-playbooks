@@ -14,20 +14,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
-import { StructuredOutputParser } from "langchain/output_parsers";
+import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
+import { StructuredOutputParser } from "@langchain/classic/output_parsers";
 import { PromptTemplate } from "@langchain/core/prompts";
 import { z } from "zod";
 import { Triple } from "@/types/graph";
 import axios from "axios";
 
 import { ChatOpenAI } from "@langchain/openai";
-import { Document } from "langchain/document";
+import { Document } from "@langchain/core/documents";
 import { LLMGraphTransformer } from "@langchain/community/experimental/graph_transformers/llm";
 import { BaseLanguageModel } from "@langchain/core/language_models/base";
 import { SystemMessage, HumanMessage } from "@langchain/core/messages";
 import { langChainService } from "./langchain-service";
 import { getShouldStopProcessing, resetStopProcessing } from "@/app/api/stop-processing/route";
+
+const tripleExtractionSchema = z.array(
+  z.object({
+    subject: z.string().describe("The subject entity of the triple"),
+    predicate: z.string().describe("The relation/predicate connecting subject and object"),
+    object: z.string().describe("The object entity of the triple"),
+    confidence: z.number().min(0).max(1).describe("Confidence score between 0 and 1"),
+    metadata: z.object({
+      entityTypes: z.array(z.string()).describe("Entity types for subject and object"),
+      source: z.string().describe("The source text this triple was extracted from"),
+      context: z.string().describe("Surrounding context for the triple")
+    }).describe("Additional metadata about the triple")
+  })
+).describe("Array of knowledge graph triples extracted from the text");
 
 // Define a type for sentence with embedding
 export interface SentenceEmbedding {
@@ -85,7 +99,7 @@ export class TextProcessor {
   private sentenceTransformerUrl: string;
   private modelName: string;
   private llm: ChatOpenAI | null = null;
-  private tripleParser: StructuredOutputParser<any> | null = null;
+  private tripleParser: StructuredOutputParser<typeof tripleExtractionSchema> | null = null;
   private extractionTemplate: PromptTemplate | null = null;
   private selectedLLMProvider: 'ollama' | 'nvidia' | 'vllm' = 'ollama';
   private ollamaModel: string = 'llama3.1:8b';
@@ -179,21 +193,7 @@ export class TextProcessor {
     }
 
     // Initialize Triple Parser
-    this.tripleParser = StructuredOutputParser.fromZodSchema(
-      z.array(
-        z.object({
-          subject: z.string().describe("The subject entity of the triple"),
-          predicate: z.string().describe("The relation/predicate connecting subject and object"),
-          object: z.string().describe("The object entity of the triple"),
-          confidence: z.number().min(0).max(1).describe("Confidence score between 0 and 1"),
-          metadata: z.object({
-            entityTypes: z.array(z.string()).describe("Entity types for subject and object"),
-            source: z.string().describe("The source text this triple was extracted from"),
-            context: z.string().describe("Surrounding context for the triple")
-          }).describe("Additional metadata about the triple")
-        })
-      ).describe("Array of knowledge graph triples extracted from the text")
-    );
+    this.tripleParser = StructuredOutputParser.fromZodSchema(tripleExtractionSchema);
 
     // Initialize Extraction Template
     const templateString = `
@@ -949,4 +949,4 @@ export async function processSentenceEmbeddings(
   
   // Generate embeddings for the sentences
   return await processor.generateSentenceEmbeddings(sentences, documentId);
-} 
+}

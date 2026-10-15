@@ -140,7 +140,7 @@
 
 /* Enhanced Tab Navigation Styles */
 .nvidia-build-tabs {
-  @apply inline-flex items-center justify-center rounded-xl bg-muted/20 border border-border/15 p-2 shadow-sm backdrop-blur-sm;
+  @apply inline-flex items-center justify-center rounded-xl bg-muted/20 border border-border/15 p-2 shadow-xs backdrop-blur-xs;
   width: fit-content;
   margin: 0 auto;
 }
@@ -150,7 +150,7 @@
 }
 
 .nvidia-build-tab-active {
-  @apply bg-background text-foreground shadow-sm border border-border/20;
+  @apply bg-background text-foreground shadow-xs border border-border/20;
   background: linear-gradient(135deg, hsl(var(--background)) 0%, hsl(var(--background) / 0.95) 100%);
 }
 

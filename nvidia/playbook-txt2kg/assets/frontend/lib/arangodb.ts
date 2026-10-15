@@ -23,6 +23,7 @@ import { createHash } from 'crypto';
  */
 export class ArangoDBService {
   private db: Database | null = null;
+  private connectionUrl: string | null = null;
   private static instance: ArangoDBService;
   private collectionName: string = 'entities';
   private edgeCollectionName: string = 'relationships';
@@ -91,13 +92,13 @@ export class ArangoDBService {
         databaseName: dbName,
         auth: { username: user, password: pass },
       });
+      this.connectionUrl = connectionUrl;
 
       // Check if database exists, create if it doesn't
       const dbExists = await this.db.exists();
       if (!dbExists) {
         console.log(`Database ${dbName} does not exist, creating it...`);
         await this.db.createDatabase(dbName);
-        this.db.useDatabase(dbName);
       }
 
       // Check if collections exist, create if they don't
@@ -705,7 +706,7 @@ export class ArangoDBService {
 
     return {
       status: 'connected',
-      url: this.db.url,
+      url: this.connectionUrl,
       database: this.db.name
     };
   }

@@ -150,7 +150,7 @@ export function RagQuery({
             disabled={!vectorEnabled}
             className={`relative flex flex-col items-center p-3 border rounded-lg transition-all duration-200 hover:shadow-md ${
               queryMode === 'pure-rag' 
-                ? 'border-nvidia-green bg-nvidia-green/10 text-nvidia-green shadow-sm' 
+                ? 'border-nvidia-green bg-nvidia-green/10 text-nvidia-green shadow-xs'
                 : vectorEnabled 
                   ? 'border-border/40 hover:border-border/60 hover:bg-muted/20' 
                   : 'border-border/30 opacity-50 cursor-not-allowed'
@@ -178,7 +178,7 @@ export function RagQuery({
             onClick={() => handleQueryModeChange('traditional')}
             className={`relative flex flex-col items-center p-3 border rounded-lg transition-all duration-200 hover:shadow-md ${
               queryMode === 'traditional' 
-                ? 'border-nvidia-green bg-nvidia-green/10 text-nvidia-green shadow-sm' 
+                ? 'border-nvidia-green bg-nvidia-green/10 text-nvidia-green shadow-xs'
                 : 'border-border/40 hover:border-border/60 hover:bg-muted/20'
             }`}
           >
@@ -246,7 +246,7 @@ export function RagQuery({
           <button 
             type="submit" 
             disabled={isLoading || !query.trim()} 
-            className="px-6 py-3 bg-nvidia-green text-white hover:bg-nvidia-green/90 rounded-xl font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none shadow-sm"
+            className="px-6 py-3 bg-nvidia-green text-white hover:bg-nvidia-green/90 rounded-xl font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none shadow-xs"
           >
             {isLoading ? "Searching..." : "Search"}
           </button>
@@ -263,7 +263,7 @@ export function RagQuery({
         {error && (
           <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-xl text-destructive text-sm">
             <div className="flex items-start gap-2">
-              <div className="w-4 h-4 rounded-full bg-destructive/20 flex items-center justify-center mt-0.5 flex-shrink-0">
+              <div className="w-4 h-4 rounded-full bg-destructive/20 flex items-center justify-center mt-0.5 shrink-0">
                 <span className="text-xs">!</span>
               </div>
               <div>

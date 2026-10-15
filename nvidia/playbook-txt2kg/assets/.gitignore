@@ -32,7 +32,6 @@ frontend/node_modules
 frontend/.next
 frontend/.env
 frontend/.env.local
-frontend/pnpm-lock.yaml
 frontend/pnpm-workspace.yaml/volumes/etcd/
 /frontend/node_modules/
 /frontend/.next/

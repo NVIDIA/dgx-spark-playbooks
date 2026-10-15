@@ -61,25 +61,25 @@ export function InfoModal() {
             </div>
             <div className="space-y-4">
               <div className="flex items-start gap-3">
-                <div className="w-2 h-2 rounded-full bg-nvidia-green mt-2 flex-shrink-0"></div>
+                <div className="w-2 h-2 rounded-full bg-nvidia-green mt-2 shrink-0"></div>
                 <p className="text-sm text-foreground leading-relaxed">
                   <span className="font-semibold">Knowledge Triple Extraction:</span> Automatically identify subject-predicate-object relationships from your text documents
                 </p>
               </div>
               <div className="flex items-start gap-3">
-                <div className="w-2 h-2 rounded-full bg-nvidia-green mt-2 flex-shrink-0"></div>
+                <div className="w-2 h-2 rounded-full bg-nvidia-green mt-2 shrink-0"></div>
                 <p className="text-sm text-foreground leading-relaxed">
                   <span className="font-semibold">Interactive Visualization:</span> Explore relationships through dynamic, interactive knowledge graphs
                 </p>
               </div>
               <div className="flex items-start gap-3">
-                <div className="w-2 h-2 rounded-full bg-nvidia-green mt-2 flex-shrink-0"></div>
+                <div className="w-2 h-2 rounded-full bg-nvidia-green mt-2 shrink-0"></div>
                 <p className="text-sm text-foreground leading-relaxed">
                   <span className="font-semibold">Multi-Format Export:</span> Export your knowledge graphs in JSON, CSV, and PNG formats
                 </p>
               </div>
               <div className="flex items-start gap-3">
-                <div className="w-2 h-2 rounded-full bg-nvidia-green mt-2 flex-shrink-0"></div>
+                <div className="w-2 h-2 rounded-full bg-nvidia-green mt-2 shrink-0"></div>
                 <p className="text-sm text-foreground leading-relaxed">
                   <span className="font-semibold">AI-Powered:</span> Leverage cutting-edge language models including NVIDIA, OpenAI, and Ollama
                 </p>
@@ -97,7 +97,7 @@ export function InfoModal() {
             </div>
             <div className="space-y-4">
               <div className="flex items-start gap-4">
-                <div className="w-6 h-6 rounded-full bg-nvidia-green/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <div className="w-6 h-6 rounded-full bg-nvidia-green/15 flex items-center justify-center shrink-0 mt-0.5">
                   <Upload className="h-3 w-3 text-nvidia-green" />
                 </div>
                 <div>
@@ -106,7 +106,7 @@ export function InfoModal() {
                 </div>
               </div>
               <div className="flex items-start gap-4">
-                <div className="w-6 h-6 rounded-full bg-nvidia-green/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <div className="w-6 h-6 rounded-full bg-nvidia-green/15 flex items-center justify-center shrink-0 mt-0.5">
                   <Sparkles className="h-3 w-3 text-nvidia-green" />
                 </div>
                 <div>
@@ -115,7 +115,7 @@ export function InfoModal() {
                 </div>
               </div>
               <div className="flex items-start gap-4">
-                <div className="w-6 h-6 rounded-full bg-nvidia-green/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <div className="w-6 h-6 rounded-full bg-nvidia-green/15 flex items-center justify-center shrink-0 mt-0.5">
                   <Zap className="h-3 w-3 text-nvidia-green" />
                 </div>
                 <div>
@@ -124,7 +124,7 @@ export function InfoModal() {
                 </div>
               </div>
               <div className="flex items-start gap-4">
-                <div className="w-6 h-6 rounded-full bg-nvidia-green/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <div className="w-6 h-6 rounded-full bg-nvidia-green/15 flex items-center justify-center shrink-0 mt-0.5">
                   <Eye className="h-3 w-3 text-nvidia-green" />
                 </div>
                 <div>

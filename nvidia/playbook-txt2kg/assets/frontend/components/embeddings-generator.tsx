@@ -542,7 +542,7 @@ function EmbeddingsContent({
 
       {error && (
         <div className="bg-destructive/10 border border-destructive rounded-md p-3 flex items-start gap-2">
-          <AlertCircle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
+          <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
           <p className="text-sm text-destructive">{error}</p>
         </div>
       )}
@@ -1012,7 +1012,7 @@ function TriplesContent({
                   value={chunkSize}
                   onChange={(e) => setChunkSize(Number(e.target.value))}
                   disabled={isProcessing}
-                  className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
               </div>
               <p className="text-xs text-muted-foreground mt-1">
@@ -1034,7 +1034,7 @@ function TriplesContent({
                   value={overlapSize}
                   onChange={(e) => setOverlapSize(Number(e.target.value))}
                   disabled={isProcessing}
-                  className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
               </div>
               <p className="text-xs text-muted-foreground mt-1">
@@ -1087,7 +1087,7 @@ function TriplesContent({
       
       {error && (
         <div className="bg-destructive/10 border border-destructive rounded-md p-3 flex items-start gap-2 mt-4">
-          <AlertCircle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
+          <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
           <p className="text-sm text-destructive">{error}</p>
         </div>
       )}

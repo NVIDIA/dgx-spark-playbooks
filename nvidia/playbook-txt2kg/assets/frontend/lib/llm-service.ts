@@ -341,8 +341,16 @@ export class LLMService {
       throw new Error('vLLM client not configured.');
     }
     
-    const { temperature = 0.7, maxTokens = 1024, topP = 0.9, stream = false, maxRetries = 3 } = options;
-    
+    const {
+      temperature = 0.7,
+      maxTokens = 1024,
+      topP = 0.9,
+      stream = false,
+      maxRetries = 3,
+      responseFormat,
+      extraBody
+    } = options;
+
     return this.retryWithBackoff(async () => {
       if (!stream) {
         const completionRequest: Record<string, unknown> = {

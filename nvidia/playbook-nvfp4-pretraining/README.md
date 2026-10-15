@@ -114,7 +114,8 @@ All required assets can be found [in the playbook repository](https://github.com
   - Mock data is used by default (`eval_iters=0`); real data requires a preprocessed Megatron-format dataset
   - Large container pulls and checkpoint directories need adequate storage and network bandwidth
 - **Rollback:** Stop the `torchrun` process and remove any checkpoint directories (see Cleanup in Instructions). The container is launched with `--rm`, so exiting removes it.
-- **Last Updated:** 08/03/2026
+- **Last Updated:** 10/13/2026
+  - Step 1 now pins the GB300 by UUID so the container starts on hosts where the host and container GPU numbering differ; Step 3 documents the known NVFP4 checkpoint-save failure
   - Megatron-Bridge NVFP4 mixed-precision pretraining workflow for Llama 3.1 8B on supported hardware platforms
 
 ## Pretrain with NVFP4
@@ -141,11 +142,12 @@ cd dgx-spark-playbooks/nvidia/playbook-nvfp4-pretraining/assets
 ## Use the latest nemo tag
 export TAG=26.04
 
-## Pin the GB300 when multiple GPUs are present
-GB300_DEVICE=$(nvidia-smi --query-gpu=index,name --format=csv,noheader | awk -F', ' '/GB300/ {print $1; exit}')
+## Pin the GB300 by UUID when multiple GPUs are present
+GB300_UUID=$(nvidia-smi --query-gpu=uuid,name --format=csv,noheader | awk -F', ' '/GB300/ {print $1; exit}')
+echo "GB300_UUID=${GB300_UUID}"   # expect GPU-xxxxxxxx-...; if empty, no GB300 was found
 
 docker run --rm -it \
-  --gpus device=${GB300_DEVICE} \
+  --gpus "device=${GB300_UUID}" \
   --ipc host \
   --ulimit memlock=-1 \
   --ulimit stack=67108864 \
@@ -157,7 +159,7 @@ docker run --rm -it \
   nvcr.io/nvidia/nemo:${TAG}
 ```
 
-On a single-GPU system (GB300 only), `GB300_DEVICE` resolves to `0`.
+The GPU is selected by UUID rather than by the index that `nvidia-smi` prints on the host. Docker's `--gpus device=N` uses the container runtime's own numbering, which can differ from the host's when other GPUs (for example an RTX PRO 6000) are installed. A UUID resolves to the same GPU in both. On a single-GPU system (GB300 only), the same command works unchanged.
 
 All subsequent `torchrun` / `python` commands in this playbook are meant to be executed **from the shell inside this container**.
 
@@ -198,9 +200,12 @@ Expected output (see `nvfp4.log`):
 - Model initialization logs and a `Theoretical memory footprints: weight and optimizer=...` line
 - Iteration progress printed every step (`log_interval=1`), e.g. `iteration 10/50 | ... elapsed time per iteration (ms): ... | lm loss: ...`
 - A `[Rank 0] ... memory (GB) | mem-max-reserved-gigabytes: ...` line — this is your peak VRAM
-- A checkpoint saved to `/workdir/nemo_experiments/default/checkpoints`
+- The final iteration line (`iteration 50/50`) with a finite `lm loss`
 
-If the run finishes with `EXIT=0` (or no traceback), your NVFP4 pretraining setup is working.
+If all 50 iterations complete with finite loss values, your NVFP4 pretraining setup is working.
+
+> [!NOTE]
+> **Known issue: NVFP4 checkpoint save.** In the default 50-iteration run, the end-of-run checkpoint save can fail with `ValueError: Failed to validate global plan`, and the process exits with code 1 after training has finished. `nemo_experiments/default/checkpoints/iter_0000050/` then contains only `common.pt` and no weight shards. The BF16 baseline in Step 4 (`--disable-fp4`) saves a complete checkpoint. This is under investigation (NVBug 6262235); the training throughput and memory numbers in this playbook are not affected.
 
 ## Step 4. Compare with BF16 baseline
 
@@ -296,9 +301,11 @@ The **Hardware platform** column shows where an issue is most relevant. "All har
 | `torchrun` hangs or times out | All hardware platforms | NCCL communication failure between GPUs | Run with `NCCL_DEBUG=INFO torchrun ...`; verify the intended GPUs are visible |
 | Training loss is NaN | All hardware platforms | Precision instability | Increase `num_layers_at_end_in_bf16` (e.g., from 4 to 8) or reduce learning rate |
 | `--disable-fp4` works but NVFP4 crashes | All hardware platforms | Transformer Engine / container mismatch | Use the playbook container tag (`nvcr.io/nvidia/nemo:26.04`); do not mix host TE packages |
+| `docker: ... nvidia-container-cli: device error: 1: unknown device` on Step 1 | All hardware platforms | `--gpus device=<index>` uses the container runtime's GPU numbering, which can differ from the host `nvidia-smi` index | Pin the GPU by UUID instead of by index, as in Instructions Step 1: `--gpus "device=${GB300_UUID}"` |
+| `ValueError: Failed to validate global plan` after `iteration 50/50` (NVFP4 run exits with code 1; `iter_0000050/` holds only `common.pt`) | All hardware platforms | Known issue saving the NVFP4 sharded checkpoint (NVBug 6262235); training itself completed | Treat the 50 completed iterations as a successful run. Use the iteration lines for throughput and memory. The BF16 baseline (`--disable-fp4`) saves a complete checkpoint |
 | Slow training throughput | All hardware platforms | Tensor Cores underutilized | Ensure batch dimensions are multiples of 8; confirm high GPU utilization in `nvidia-smi` |
 | Permission denied on Docker | All hardware platforms | User not in docker group | Run `sudo usermod -aG docker $USER && newgrp docker` |
-| Training runs on the wrong GPU | All hardware platforms | Multi-GPU default selection | Set `GB300_DEVICE` from `nvidia-smi` and pass `--gpus device=${GB300_DEVICE}` |
+| Training runs on the wrong GPU | All hardware platforms | Multi-GPU default selection | Pin the GB300 by UUID: set `GB300_UUID` as shown in Instructions Step 1 and pass `--gpus "device=${GB300_UUID}"` |
 | `AssertionError: world size (1) is not divisible by total_model_size` | All hardware platforms | Recipe parallel sizes exceed launch GPU count | Override `tensor_model_parallel_size` / `context_parallel_size` for single-GPU, or launch with matching `--nproc_per_node` |
 
 For latest known issues, see the documentation linked under **Resources**.

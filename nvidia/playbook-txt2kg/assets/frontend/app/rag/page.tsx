@@ -517,22 +517,22 @@ export default function RagPage() {
                               Using general knowledge (no documents found)
                             </div>
                           )}
-                          <p className="font-medium break-words">{triple.object}</p>
+                          <p className="font-medium wrap-break-word">{triple.object}</p>
                         </div>
                       ) : (
                         // Standard triple display for other modes
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                           <div className="bg-background/60 border border-border/30 p-3 rounded-lg">
                             <p className="text-xs font-medium text-nvidia-green uppercase tracking-wider mb-1">Subject</p>
-                            <p className="font-medium break-words text-foreground">{triple.subject}</p>
+                            <p className="font-medium wrap-break-word text-foreground">{triple.subject}</p>
                           </div>
                           <div className="bg-background/60 border border-border/30 p-3 rounded-lg">
                             <p className="text-xs font-medium text-nvidia-green uppercase tracking-wider mb-1">Predicate</p>
-                            <p className="font-medium break-words text-foreground">{triple.predicate}</p>
+                            <p className="font-medium wrap-break-word text-foreground">{triple.predicate}</p>
                           </div>
                           <div className="bg-background/60 border border-border/30 p-3 rounded-lg">
                             <p className="text-xs font-medium text-nvidia-green uppercase tracking-wider mb-1">Object</p>
-                            <p className="font-medium break-words text-foreground">{triple.object}</p>
+                            <p className="font-medium wrap-break-word text-foreground">{triple.object}</p>
                           </div>
                         </div>
                       )}

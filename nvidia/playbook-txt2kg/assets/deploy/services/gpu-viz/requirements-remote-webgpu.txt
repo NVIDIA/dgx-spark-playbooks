@@ -2,10 +2,10 @@
 # For GPU-accelerated graph clustering and WebRTC streaming
 
 # Core FastAPI and web service dependencies
-fastapi==0.104.1
+fastapi==0.142.4
 uvicorn==0.24.0
 websockets==12.0
-python-multipart==0.0.6
+python-multipart==0.0.32
 
 # RAPIDS dependencies (GPU-accelerated data processing)
 # These are included in the NVIDIA PyTorch container
@@ -15,12 +15,17 @@ python-multipart==0.0.6
 numpy>=1.24.0
 pandas>=2.0.0
 networkx>=3.0
+scikit-learn>=1.9.1
+requests>=2.34.2
+sentence-transformers==6.1.0
+transformers==5.19.0
+urllib3==2.8.0
 
 # WebRTC streaming and visualization dependencies
-opencv-python-headless==4.8.1.78
+opencv-python-headless==4.14.0.94
 plotly>=5.17.0
 kaleido>=0.2.1
-Pillow>=10.0.0
+Pillow==12.3.0
 
 # Redis for session management (optional)
 redis>=5.0.0

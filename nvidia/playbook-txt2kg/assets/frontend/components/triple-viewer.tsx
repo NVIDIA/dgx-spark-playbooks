@@ -494,7 +494,7 @@ export function TripleViewer() {
           <button
             onClick={storeAllTriplesInGraphDb}
             disabled={isStoringToDb || documents.filter(doc => doc.triples && doc.triples.length > 0).length === 0}
-            className={`inline-flex items-center gap-2 px-6 py-3 text-sm font-medium rounded-lg transition-all shadow-sm ${
+            className={`inline-flex items-center gap-2 px-6 py-3 text-sm font-medium rounded-lg transition-all shadow-xs ${
               storeStatus === 'success' 
                 ? 'bg-green-50 border border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400' 
                 : storeStatus === 'error' 
@@ -534,12 +534,12 @@ export function TripleViewer() {
 
           {/* Tab Navigation */}
           <div className="mb-6">
-            <div className="inline-flex items-center justify-center rounded-xl bg-muted/20 border border-border/15 p-2 shadow-sm backdrop-blur-sm w-fit">
+            <div className="inline-flex items-center justify-center rounded-xl bg-muted/20 border border-border/15 p-2 shadow-xs backdrop-blur-xs w-fit">
               <button 
                 onClick={() => setViewMode('triples')}
                 className={`inline-flex items-center justify-center gap-3 whitespace-nowrap rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200 hover:bg-background/60 ${
                   viewMode === 'triples' 
-                    ? 'bg-background text-foreground shadow-sm border border-border/20' 
+                    ? 'bg-background text-foreground shadow-xs border border-border/20'
                     : 'text-muted-foreground'
                 }`}
               >
@@ -552,7 +552,7 @@ export function TripleViewer() {
                 onClick={() => setViewMode('entities')}
                 className={`inline-flex items-center justify-center gap-3 whitespace-nowrap rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200 hover:bg-background/60 ${
                   viewMode === 'entities' 
-                    ? 'bg-background text-foreground shadow-sm border border-border/20' 
+                    ? 'bg-background text-foreground shadow-xs border border-border/20'
                     : 'text-muted-foreground'
                 }`}
               >
@@ -592,7 +592,7 @@ export function TripleViewer() {
                         setIsAddingTriple(true)
                         setEditingIndex(null)
                       }}
-                      className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-nvidia-green hover:bg-nvidia-green/90 text-white rounded-lg transition-all shadow-sm hover:shadow-md"
+                      className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-nvidia-green hover:bg-nvidia-green/90 text-white rounded-lg transition-all shadow-xs hover:shadow-md"
                     >
                       <Plus className="h-4 w-4" />
                       <span>Add Triple</span>
@@ -603,7 +603,7 @@ export function TripleViewer() {
                       <button
                         onClick={storeInGraphDb}
                         disabled={isStoringToDb || !selectedDoc.triples || selectedDoc.triples.length === 0}
-                        className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all shadow-sm ${
+                        className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all shadow-xs ${
                           storeStatus === 'success' 
                             ? 'bg-green-50 border border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400' 
                             : storeStatus === 'error' 
@@ -623,7 +623,7 @@ export function TripleViewer() {
                       <div className="relative">
                         <button 
                           onClick={() => setShowExportMenu(!showExportMenu)} 
-                          className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-background border border-border hover:bg-muted/50 text-foreground rounded-lg transition-all shadow-sm hover:shadow-md relative z-40"
+                          className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-background border border-border hover:bg-muted/50 text-foreground rounded-lg transition-all shadow-xs hover:shadow-md relative z-40"
                         >
                           <Download className="h-4 w-4" />
                           <span>Export</span>
@@ -731,7 +731,7 @@ export function TripleViewer() {
                   </p>
                   <button
                     onClick={() => setIsAddingTriple(true)}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-nvidia-green hover:bg-nvidia-green/90 text-white rounded-lg transition-all shadow-sm hover:shadow-md"
+                    className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-nvidia-green hover:bg-nvidia-green/90 text-white rounded-lg transition-all shadow-xs hover:shadow-md"
                   >
                     <Plus className="h-4 w-4" />
                     <span>Add First Triple</span>
@@ -756,7 +756,7 @@ export function TripleViewer() {
                   {/* Primary Action - Add Entity */}
                   <button
                     onClick={() => setIsAddingEntity(true)}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-nvidia-green hover:bg-nvidia-green/90 text-white rounded-lg transition-all shadow-sm hover:shadow-md"
+                    className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-nvidia-green hover:bg-nvidia-green/90 text-white rounded-lg transition-all shadow-xs hover:shadow-md"
                   >
                     <Plus className="h-4 w-4" />
                     <span>Add Entity</span>
@@ -766,7 +766,7 @@ export function TripleViewer() {
                   <div className="relative">
                     <button 
                       onClick={() => setShowExportMenu(!showExportMenu)} 
-                      className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-background border border-border hover:bg-muted/50 text-foreground rounded-lg transition-all shadow-sm hover:shadow-md relative z-40"
+                      className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-background border border-border hover:bg-muted/50 text-foreground rounded-lg transition-all shadow-xs hover:shadow-md relative z-40"
                     >
                       <Download className="h-4 w-4" />
                       <span>Export</span>
@@ -809,7 +809,7 @@ export function TripleViewer() {
                       <button 
                         onClick={handleAddEntity}
                         disabled={!newEntityName.trim()}
-                        className="inline-flex items-center gap-2 px-4 py-3 text-sm font-medium bg-nvidia-green hover:bg-nvidia-green/90 text-white rounded-lg transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="inline-flex items-center gap-2 px-4 py-3 text-sm font-medium bg-nvidia-green hover:bg-nvidia-green/90 text-white rounded-lg transition-all shadow-xs hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Plus className="h-4 w-4" />
                         <span>Add</span>

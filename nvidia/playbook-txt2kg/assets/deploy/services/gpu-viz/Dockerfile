@@ -1,5 +1,5 @@
-# Use latest NVIDIA PyG container which includes cuGraph and graph-related packages
-FROM nvcr.io/nvidia/pyg:25.08-py3
+# NVIDIA PyG provides a matched PyTorch, PyG, and CUDA stack.
+FROM nvcr.io/nvidia/pyg:26.09-py3
 
 # Ensure we're running as root for system package installation
 USER root
@@ -19,7 +19,9 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# RelBench is unused by this service and pins an older scikit-learn.
+RUN pip uninstall -y relbench && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy the service code
 COPY unified_gpu_service.py .

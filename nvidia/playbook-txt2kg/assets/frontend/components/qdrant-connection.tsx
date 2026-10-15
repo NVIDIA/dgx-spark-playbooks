@@ -122,7 +122,7 @@ export function QdrantConnection({ className }: QdrantConnectionProps) {
       
       {error && (
         <div className="text-sm text-red-600 bg-red-50 p-2 rounded w-full overflow-auto max-h-20">
-          <p className="whitespace-normal break-words">Error: {error}</p>
+          <p className="whitespace-normal wrap-break-word">Error: {error}</p>
           {error.includes('404') && (
             <p className="mt-1 text-xs">
               The Qdrant server is running but the collection doesn't exist yet.

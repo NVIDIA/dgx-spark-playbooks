@@ -30,7 +30,7 @@ import { Document } from "@langchain/core/documents";
 import { RunnableSequence } from "@langchain/core/runnables";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import { PromptTemplate } from "@langchain/core/prompts";
-import { QdrantVectorStore } from "@langchain/community/vectorstores/qdrant";
+import { QdrantVectorStore } from "@langchain/qdrant";
 import { Embeddings } from "@langchain/core/embeddings";
 import { EmbeddingsService } from './embeddings';
 
@@ -364,4 +364,4 @@ Answer:
   }
 }
 
-export default RAGService.getInstance(); 
+export default RAGService.getInstance();

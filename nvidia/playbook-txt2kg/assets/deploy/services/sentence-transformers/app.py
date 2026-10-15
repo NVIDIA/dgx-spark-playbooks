@@ -28,12 +28,13 @@ app = Flask(__name__)
 
 # Get model name from environment variable
 model_name = os.environ.get("MODEL_NAME", "all-MiniLM-L6-v2")
+trust_remote_code = os.environ.get("SENTENCE_TRANSFORMERS_TRUST_REMOTE_CODE", "false").lower() in ("1", "true", "yes")
 logger.info(f"Loading model: {model_name}")
 
 # Load model during startup
 start_time = time.time()
 try:
-    model = SentenceTransformer(model_name)
+    model = SentenceTransformer(model_name, trust_remote_code=trust_remote_code)
     logger.info(f"Model loaded in {time.time() - start_time:.2f} seconds")
 except Exception as e:
     logger.error(f"Failed to load model: {e}")
@@ -105,4 +106,4 @@ def embeddings():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 80))) 
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 80)))

@@ -1,6 +1,6 @@
-# Connect Your Home with Living Home
+# Set up an AI Home Assistant
 
-> Reviewed device actions, automations, and local reports with Home Assistant
+> Control your smart home, and equip an agent with knowledge to help you maintain it
 
 ## Table of Contents
 

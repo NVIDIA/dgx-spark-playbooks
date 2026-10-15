@@ -1,6 +1,7 @@
-torch>=2.6.0
+torch>=2.14.1
 tqdm
 python-arango
 torch-geometric
-transformers
-numpy 
+transformers>=5.19.0
+sentence-transformers==6.1.0
+numpy

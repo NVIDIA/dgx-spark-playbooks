@@ -88,7 +88,7 @@ export function GraphToolbar({
 }: GraphToolbarProps) {
   return (
     <TooltipProvider>
-      <div className="bg-background/95 backdrop-blur-sm border border-border/50 rounded-lg p-3 shadow-sm">
+      <div className="bg-background/95 backdrop-blur-xs border border-border/50 rounded-lg p-3 shadow-xs">
         <div className="flex flex-wrap items-center gap-2 md:gap-4">
           
           {/* Primary Actions Group */}

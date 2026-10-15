@@ -172,7 +172,9 @@ All required assets are handled by the NemoClaw installer. No manual cloning is 
 
 - **Estimated time:** 30–60 MIN for a first full pass (install, onboard, model download depending on choice and network). Large Express models can add substantial download time. Optional Brave, Telegram, and cloudflared steps add time if you do them in a second session. Multi-node model download and first start can take more than an hour.
 - **Risk level:** Medium — you are running an AI agent in a sandbox; risks are reduced by isolation but not eliminated. Use a clean environment and do not connect sensitive data or production accounts.
-- **Last Updated:** 09/30/2026
+- **Last Updated:** 10/14/2026
+  - Documented the Hugging Face CLI prerequisite for multi-node, the optional HF token for the Express download, the DGX Spark Express model, the uninstall step counter, and the preserved `portable` config subdirectory
+  - The Multi-node tab now states that multi-node is not supported on DGX Station with Windows and WSL2
   - Open the Web UI with the dashboard link printed during setup.
 
 ## Instructions
@@ -441,6 +443,9 @@ If you prefer to perform the setup directly in a terminal, continue with Phase 1
 
 This single command handles everything: installs Node.js (if needed), installs OpenShell, clones the last known good (LKG) NemoClaw release automatically, builds the CLI, and creates a sandbox. The LKG release can lag the newest release tag; the installer follows this maintained release by default.
 
+> [!TIP]
+> **Optional: set a Hugging Face token first.** Express downloads large model weights (about 352 GB on DGX Station), and anonymous downloads can be rate-limited with HTTP 429. If that happens you must restart the installer. To avoid that, export a read token before running it: `export HF_TOKEN=<read-token>`.
+
 ```bash
 curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash
 ```
@@ -456,6 +461,9 @@ Express Install is supported on **DGX Spark** and **DGX Station**. It offers rec
 
 > [!NOTE]
 > Express Install selects the maintained Express model and policy for your detected hardware platform. Download size and load time vary by model — large Express models can require hundreds of GB of storage. To skip the Express prompt before running the installer, set `NEMOCLAW_NO_EXPRESS=1`; setting `NEMOCLAW_PROVIDER` also bypasses Express Install and uses that provider.
+
+> [!NOTE]
+> On **DGX Spark**, option 1 (managed vLLM) served `nvidia/Qwen3.6-35B-A3B-NVFP4` in QA testing on a 128 GB DGX Spark. The automatic profile can choose differently on other systems; run `nemoclaw <sandbox-name> status` to see the model your sandbox uses.
 
 > [!NOTE]
 > On **DGX Station**, Express Install recommends **NVIDIA Nemotron 3 Ultra**. DeepSeek-V4-Flash is also supported. To keep the one-confirmation Express flow but use DeepSeek-V4-Flash, run:
@@ -729,13 +737,13 @@ nemoclaw uninstall --yes --delete-models
 > curl -fsSL https://raw.githubusercontent.com/NVIDIA/NemoClaw/refs/heads/main/uninstall.sh | bash -s -- --yes
 > ```
 
-The uninstaller runs up to 7 steps:
+The uninstaller runs up to 7 steps. Its progress counter shows only the steps enabled by the flags you pass (for example, steps 5 and 7 are skipped without `--delete-models` and `--destroy-user-data`), so it can print fewer than 7:
 1. Stop NemoClaw helper services and port-forward processes
 2. Delete all OpenShell sandboxes, the NemoClaw gateway, and providers
 3. Remove the global `nemoclaw` npm package
 4. Remove NemoClaw/OpenShell Docker containers, images, and volumes
 5. Remove downloaded model weights (only with `--delete-models`)
-6. Remove config/state directories (`~/.config/openshell`, `~/.config/nemoclaw`) and the OpenShell binary
+6. Remove config/state directories (`~/.config/openshell`, `~/.config/nemoclaw`) and the OpenShell binary. If `~/.config/nemoclaw` contains a `portable` subdirectory, the uninstaller preserves it and removes only the other contents, so the directory itself can remain
 7. Remove preserved user data under `~/.nemoclaw/` (`rebuild-backups/`, `backups/`, `sandboxes.json`) — only with `--destroy-user-data`
 
 > [!NOTE]
@@ -847,6 +855,8 @@ You should see `● cloudflared` with a `trycloudflare.com` public URL.
 ## Multi-node inference for NemoClaw
 
 > [!NOTE]
+> **Multi-node is not supported on DGX Station running Windows with WSL2.** Two-node Windows/WSL testing is not supported at this time; use two DGX Stations running native DGX OS.
+>
 > **The instructions in this tab apply to DGX Station only.** Single-node setup for all supported hardware platforms is covered in the **Instructions** tab. For two DGX Sparks, see [Set Up vLLM on Two DGX Sparks](https://docs.nvidia.com/nemoclaw/latest/user-guide/openclaw/inference/local-inference/set-up-vllm-on-two-dgx-sparks). That profile is **Experimental** and intended for evaluation while physical two-node validation is pending; the Station commands below do not apply to Spark hardware.
 
 Deploy **NVIDIA Nemotron 3 Ultra** across two DGX Station nodes, then point NemoClaw on the head node at that shared vLLM endpoint.
@@ -856,6 +866,7 @@ Deploy **NVIDIA Nemotron 3 Ultra** across two DGX Station nodes, then point Nemo
 ### Step 1. Prerequisites
 - Complete the connectivity playbook for your DGX Station pair before starting this tab. Both high-speed fabric rails must be configured and validated.
 - Hugging Face [Access Token](https://huggingface.co/docs/hub/en/security-tokens) for downloading the model.
+- The Hugging Face CLI (`hf`) on both nodes. It is not preinstalled on DGX Station. If `command -v hf` prints nothing, install it with [the standalone installer](https://huggingface.co/docs/huggingface_hub/main/en/guides/cli#standalone-installer-recommended) before Phase 1 Step 3.
 - Docker and [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) installed on both nodes.
 - Both nodes must be connected to each other via the validated fabric.
 

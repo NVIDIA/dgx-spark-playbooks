@@ -29,6 +29,13 @@ Local GPU processing service with WebSocket support for real-time updates.
 - NVIDIA GPU with CUDA support (for GPU modes)
 - RAPIDS cuGraph (for local GPU processing)
 
+The GNN, GPU visualization, and remote WebGPU Dockerfiles use
+`nvcr.io/nvidia/pyg:26.09-py3`, with CUDA 13.4.1 and PyG 2.9.0.
+Check the [NVIDIA release notes](https://docs.nvidia.com/deeplearning/frameworks/pyg-release-notes/rel-26-09.html)
+and [CUDA driver compatibility guide](https://docs.nvidia.com/deploy/cuda-compatibility/)
+before using these optional services on a GPU host. Preserve the image's NVIDIA
+Torch build when installing application dependencies.
+
 ### Installation
 
 ```bash
