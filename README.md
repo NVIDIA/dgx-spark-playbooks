@@ -21,6 +21,7 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 
 ### NVIDIA
 
+- [Run Atomic Agent with a Local LLM](nvidia/playbook-atomic-agent/)
 - [Register AI Compute with Brev](nvidia/playbook-brev/)
 - [Set Up CLI Coding Agents with Local Inference](nvidia/playbook-cli-coding-agent/)
 - [Generate Images and Videos with ComfyUI](nvidia/playbook-comfyui/)
