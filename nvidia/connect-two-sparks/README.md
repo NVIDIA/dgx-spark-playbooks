@@ -43,6 +43,7 @@ a functional distributed computing environment.
 All required files for this playbook can be found [here on GitHub](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/connect-two-sparks/)
 
 - [**discover-sparks.sh**](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/connect-two-sparks/assets/discover-sparks) script for automatic node discovery and SSH key distribution
+- [**check-connectx-bandwidth**](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/connect-two-sparks/assets/check-connectx-bandwidth) runs a bounded per-rail RDMA health check and detects the degraded 8-25 Gb/s initialization state
 
 ## Time & risk
 
@@ -284,3 +285,4 @@ sudo ip addr del 192.168.101.11/24 dev enP2p1s0f1np1  # Adjust the interface nam
 | "Network unreachable" errors | Network interfaces not configured | Verify netplan config and `sudo netplan apply` |
 | SSH authentication failures | SSH keys not properly distributed | Re-run `./discover-sparks` and enter passwords |
 | Node 2 not visible in cluster | Network connectivity issue | Verify QSFP cable connection, check IP configuration |
+| Link reports 200 Gb/s, but `iperf3` and `ib_write_bw` are both limited to about 8-25 Gb/s | ConnectX-7 did not leave its degraded initialization state after boot or a cable change | Run the [bounded bandwidth health check](assets/performance_benchmarking_guide.md#detect-a-degraded-connectx-7-initialization), then follow its reboot and full AC-disconnect recovery procedure |
