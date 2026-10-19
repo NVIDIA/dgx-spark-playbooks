@@ -63,7 +63,7 @@ Use the matrix below to confirm your hardware platform and the default local inf
 
 | Hardware platform | OS | Memory  | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- |
-| **DGX Spark** | DGX OS (Linux) | 128 GB Unified Memory  | — |
+| **DGX Spark** | DGX OS (Linux) | 64GB or 128GB Unified Memory  | — |
 
 > [!NOTE] Only platforms listed in the Supported hardware platforms table above are covered by this playbook.
 

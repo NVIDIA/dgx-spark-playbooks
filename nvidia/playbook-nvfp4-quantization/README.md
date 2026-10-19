@@ -144,8 +144,8 @@ Container image, GPU device selection, and Model Optimizer pin differ by hardwar
 
 | Hardware platform | Container image | GPU device | Model Optimizer |
 | ----------------- | --------------- | ---------- | --------------- |
-| **DGX Spark** | `nvcr.io/nvidia/tensorrt-llm/release:spark-single-gpu-dev` | `--gpus all` | `NVIDIA/Model-Optimizer` @ `0.35.0` |
-| **DGX Station** | `nvcr.io/nvidia/vllm:25.12.post1-py3` | `--gpus "device=$GPU_ID"` (GB300) | `NVIDIA/Model-Optimizer` @ `0.41.0` |
+| **DGX Spark** | `nvcr.io/nvidia/tensorrt-llm/release:spark-single-gpu-dev` | `--gpus all` | `NVIDIA/Model-Optimizer` @ `0.47.0` |
+| **DGX Station** | `nvcr.io/nvidia/vllm:25.12.post1-py3` | `--gpus "device=$GPU_ID"` (GB300) | `NVIDIA/Model-Optimizer` @ `0.47.0` |
 
 ### DGX Station only — identify the GB300 GPU
 
@@ -181,21 +181,21 @@ docker run --rm -it --gpus all --ipc=host --ulimit memlock=-1 --ulimit stack=671
   -e HF_TOKEN=$HF_TOKEN \
   nvcr.io/nvidia/tensorrt-llm/release:spark-single-gpu-dev \
   bash -c "
-    git clone -b 0.35.0 --single-branch https://github.com/NVIDIA/Model-Optimizer.git /app/Model-Optimizer && \
+    git clone -b 0.47.0 --single-branch https://github.com/NVIDIA/Model-Optimizer.git /app/Model-Optimizer && \
     cd /app/Model-Optimizer && pip install -e '.[dev]' && \
     export ROOT_SAVE_PATH='/workspace/output_models' && \
-    /app/Model-Optimizer/examples/llm_ptq/scripts/huggingface_example.sh \
+    /app/Model-Optimizer/examples/hf_ptq/scripts/huggingface_example.sh \
     --model 'deepseek-ai/DeepSeek-R1-Distill-Llama-8B' \
     --quant nvfp4 \
     --tp 1 \
-    --export_fmt hf
+    --tasks quant
   "
 ```
 
 Expected output directory:
 
 ```bash
-export MODEL_PATH="./output_models/saved_models_DeepSeek-R1-Distill-Llama-8B_nvfp4_hf/"
+export MODEL_PATH="./output_models/saved_models_DeepSeek-R1-Distill-Llama-8B_nvfp4/"
 ```
 
 ### DGX Station
@@ -207,10 +207,10 @@ docker run --rm -it --gpus "device=$GPU_ID" --ipc=host --ulimit memlock=-1 --uli
   -e HF_TOKEN=$HF_TOKEN \
   nvcr.io/nvidia/vllm:25.12.post1-py3 \
   bash -c "
-    git clone -b 0.41.0 --single-branch https://github.com/NVIDIA/Model-Optimizer.git /app/Model-Optimizer && \
+    git clone -b 0.47.0 --single-branch https://github.com/NVIDIA/Model-Optimizer.git /app/Model-Optimizer && \
     cd /app/Model-Optimizer && pip install -e '.[dev]' && \
     export ROOT_SAVE_PATH='/workspace/output_models' && \
-    /app/Model-Optimizer/examples/llm_ptq/scripts/huggingface_example.sh \
+    /app/Model-Optimizer/examples/hf_ptq/scripts/huggingface_example.sh \
     --model deepseek-ai/DeepSeek-R1-Distill-Llama-8B \
     --quant nvfp4 \
     --tasks quant

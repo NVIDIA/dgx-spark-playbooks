@@ -38,7 +38,7 @@ Use the matrix below to confirm your hardware platform. The same registration wo
 
 | Hardware platform | OS | Memory  | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- |
-| **DGX Spark** | DGX OS | 128 GB Unified Memory | — |
+| **DGX Spark** | DGX OS | 64GB or 128GB Unified Memory | — |
 | **DGX Station** | DGX OS | Large HBM + Grace DRAM | — |
 
 > [!NOTE]

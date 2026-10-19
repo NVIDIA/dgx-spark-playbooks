@@ -583,11 +583,12 @@ Now open the dashboard URL in your remote machine's browser.
 > Use the URL exactly as printed by `dashboard-url`.
 
 > [!NOTE]
-> If the Web UI fails to load and the port forward may be stale, get the port from `nemoclaw my-assistant dashboard-url --quiet` and reset:
+> If the Web UI fails to load and the port forward may be stale, restore it with `nemoclaw my-assistant recover`. NemoClaw manages the dashboard forward itself, so `openshell forward stop` and `openshell forward start` do not work on it.
 > ```bash
-> openshell forward stop <port> my-assistant || true
-> openshell forward start <port> my-assistant --background
+> nemoclaw my-assistant recover
+> nemoclaw my-assistant dashboard-url --quiet
 > ```
+> Open the URL printed by `dashboard-url`.
 
 #### Option 2. Terminal UI
 
@@ -701,12 +702,14 @@ nemoclaw tunnel stop
 > [!NOTE]
 > For OpenClaw, this may also stop the in-sandbox gateway and temporarily interrupt dashboard, agent, and messaging access. It does not delete persistent session data.
 
-Stop the port forward:
+Stop the sandbox and its dashboard forward:
 
 ```bash
-openshell forward list          # find active forwards and their ports
-openshell forward stop <port>   # stop the dashboard forward (use the port shown above)
+nemoclaw my-assistant stop
 ```
+
+> [!NOTE]
+> This stops the sandbox but keeps its state, so you can bring it back later with `nemoclaw my-assistant recover`. The dashboard forward is managed by NemoClaw, so `openshell forward list` does not show it and `openshell forward stop` does not stop it.
 
 ### Step 8. Uninstall NemoClaw
 
@@ -1238,7 +1241,7 @@ Keep the Hugging Face caches unless reclaiming disk is intentional. Retaining th
 | Inference timeout or hangs | vLLM not running, the model is still loading, or the server is not reachable | Check the vLLM server: `curl http://127.0.0.1:8000/v1/models` should list the model you selected during onboarding or Express Install. If the request hangs, wait for `Application startup complete`, then check `nemoclaw my-assistant status` for the Inference health line. |
 | Agent gives no response or is very slow | First response can be slow, especially with larger models | Response time depends on model size (30B: a few seconds; larger models may take longer). Verify inference route: `nemoclaw my-assistant status`. |
 | Port 18789 already in use | Another process is bound to the port | `lsof -i :18789` then `kill <PID>`. If needed, `kill -9 <PID>` to force-terminate. |
-| Web UI port forward dies or dashboard unreachable | Port forward not active | `openshell forward stop 18789 my-assistant` then `openshell forward start 18789 my-assistant --background`. |
+| Web UI port forward dies or dashboard unreachable | Port forward not active | Run `nemoclaw my-assistant recover` to restore the dashboard forward, then open the URL printed by `nemoclaw my-assistant dashboard-url --quiet`. Do not use `openshell forward stop` or `start`: NemoClaw manages this forward, so they do not apply to it. |
 | Web UI shows `origin not allowed` | The browser URL does not match the URL printed by `dashboard-url` | Open the URL exactly as printed by `nemoclaw my-assistant dashboard-url --quiet`. |
 
 #### daemon.json cgroup fix

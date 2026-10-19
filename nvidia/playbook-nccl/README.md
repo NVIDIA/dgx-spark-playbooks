@@ -40,7 +40,7 @@ Use the matrix below to confirm your hardware platform, recommended defaults, an
 
 | Hardware platform | OS | Memory | Recommended default local settings | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- | :---- |
-| **DGX Spark** | DGX OS (Linux) | 128 GB Unified Memory | Build NCCL from source (`v2.31.2-1`, Blackwell `sm_121`) | ✅ (high-speed interconnect) |
+| **DGX Spark** | DGX OS (Linux) | 64GB or 128GB Unified Memory | Build NCCL from source (`v2.31.2-1`, Blackwell `sm_121`) | ✅ (high-speed interconnect) |
 
 ## Prerequisites
 

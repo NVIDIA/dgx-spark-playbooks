@@ -188,22 +188,31 @@ The skills refuse to guess what your hardware can do. Inspect it and read the re
 .dgx-station/bin/dgx-assist system inspect
 ```
 
-Expected output should show an exact compatibility profile and per-feature capabilities. The trusted release marker selects one of three profiles:
+Expected output should show an exact compatibility profile and per-feature
+capabilities. The trusted release marker selects one of three profiles. A
+profile is selected only when every field of the release identity matches one
+recognized identity exactly:
 
-| Profile | Identity | Behavior |
+| Profile | Exact release identity | Behavior |
 |---|---|---|
-| Software 1.0 | `7.4.1` or `7.4.1-GB300ws`; build `2026-02-20-05-22-42` | Guidance, diagnostics, read-only MIG inspection, and explicitly qualified recipes |
-| Software 2.0 | `7.5.0`; build `2026-06-16-11-48-10` | Capability-scoped qualified workflows |
+| Software 1.0 | `DGX_SWBUILD_VERSION` `7.4.1` or `7.4.1-GB300ws`; `DGX_SWBUILD_DATE` `2026-02-20-05-22-42`; `DGX_PRETTY_NAME` `NVIDIA DGX GB300WS` | Guidance, diagnostics, read-only MIG inspection, and explicitly qualified recipes |
+| Software 2.0 | `DGX_SWBUILD_VERSION` `7.5.0`; `DGX_SWBUILD_DATE` `2026-06-16-11-48-10`; `DGX_PRETTY_NAME` `NVIDIA DGX GB300WS` | Capability-scoped qualified workflows |
 | Unknown | Any other exact identity | General read-only evidence only |
 
-A recognized Software 2.0 profile requires this base identity and hardware evidence, and the release marker must also pass ownership, file-type, symlink, and mode checks:
+`DGX_PRETTY_NAME` belongs to the identity of both profiles, not to Software 2.0
+alone. A host whose version and build match a profile but whose release name
+differs — for example `NVIDIA DGX Server` instead of `NVIDIA DGX GB300WS` — is
+reported as unknown, because the shipped validation evidence is recorded
+against the complete identity rather than against the build string alone.
 
-| Field | Required value |
+Both recognized profiles additionally require this hardware evidence, and the
+release marker must pass ownership, file-type, symlink, and mode checks:
+
+| Requirement | Required value |
 |---|---|
-| `DGX_SWBUILD_VERSION` | `7.5.0` |
-| `DGX_SWBUILD_DATE` | `2026-06-16-11-48-10` |
-| `DGX_PRETTY_NAME` | `NVIDIA DGX GB300WS` |
+| Architecture | `aarch64` |
 | GB300 compute capability | `10.3` |
+| Release marker file | root-owned regular file, not a symlink, not group- or world-writable |
 
 Software 1.0 does not inherit Software 2.0 CDMM, ordering-service, or `vsloshd` expectations. It permits only recipes explicitly validated for its exact profile; MIG mutation and platform fixes remain blocked. A different build is reported as unknown rather than assumed compatible.
 
@@ -376,6 +385,7 @@ A successful end state is an agent in your project that inspects the real hardwa
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | `system inspect` reports restricted or unknown actions | Untrusted or unknown release identity, missing GB300 `10.3` compute capability, or an observed power-budget violation | Run `.dgx-station/bin/dgx-assist system inspect` and read the compatibility profile, capabilities, and restrictions. With `--json`, inspect `data.compatibility` and `data.rejection_reasons`. Do not bypass qualification or rely on product-name strings alone — a different build is not automatically compatible |
+| `system inspect` reports `UNQUALIFIED_RELEASE` on a host whose software build matches | The release identity is matched as a whole: `DGX_SWBUILD_VERSION`, `DGX_SWBUILD_DATE`, and `DGX_PRETTY_NAME` together. A matching version and build carrying a different release name — for example `NVIDIA DGX Server` instead of `NVIDIA DGX GB300WS` — is not a recognized profile | Compare all three trusted fields against the Step 6 table. `system inspect` prints them under `Release marker` as `Software version`, `Build date`, and `Release name`; with `--json` they are in `data.release_marker.trusted`. Qualified recipe execution stays blocked until the full identity matches a published profile, because the shipped validation evidence names the exact identity it was qualified on. Do not edit `/etc/dgx-release` to force a match |
 | Software 1.0 profile blocks MIG mutation and platform fixes | Expected behavior: the Software 1.0 profile is capability-scoped to guidance, diagnostics, read-only MIG inspection, and explicitly validated recipes | No action. Qualified recipe execution still works; MIG mutation and platform fixes require a profile that enables them |
 | No recipe resolves for your model | The bundled v1 catalog has one runnable Software 1.0 smoke model, `Qwen/Qwen2.5-Coder-1.5B-Instruct`; larger candidates are deliberately non-runnable | Run `.dgx-station/bin/dgx-assist recipe models` and `catalog status` to list exact IDs. Other stable reasons: experimental lifecycle, missing LaunchSpec, mutable model or image references, stale recipe hash, expired evidence, wrong release or hardware, ambiguity, or a hard preflight conflict. No error path substitutes a different model |
 | `playbook search` returns nothing, with `retrieval_trace.abstained=true` | Query terms did not overlap the pinned content | Narrow the query using hardware-specific terms from the Development Guide. Do not invent a command to fill the abstention |

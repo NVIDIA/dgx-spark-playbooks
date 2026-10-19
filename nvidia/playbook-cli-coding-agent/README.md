@@ -48,7 +48,7 @@ Use the matrix below to confirm your hardware platform, recommended default loca
 
 | Hardware platform | OS | Memory | Recommended default local settings | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- | :---- |
-| **DGX Spark** | DGX OS (Linux) | 128 GB Unified Memory | Ollama + `qwen3.6:35b-a3b-mtp-q4_K_M` (~23 GB); Claude Code / OpenCode / Codex via `ollama launch` | — |
+| **DGX Spark** | DGX OS (Linux) | 64GB or 128GB Unified Memory | Ollama + `qwen3.6:35b-a3b-mtp-q4_K_M` (~23 GB); Claude Code / OpenCode / Codex via `ollama launch` | — |
 
 ## Prerequisites
 

@@ -44,7 +44,7 @@ Use the matrix below to confirm your hardware platform, recommended default loca
 
 | Hardware platform | OS | Memory | Recommended default local settings | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- | :---- |
-| **DGX Spark** | DGX OS (Linux) | 128 GB Unified Memory | Python venv + PyTorch CUDA 13.0 (`cu130`) | — |
+| **DGX Spark** | DGX OS (Linux) | 64GB or 128GB Unified Memory | Python venv + PyTorch CUDA 13.0 (`cu130`) | — |
 
 ## Prerequisites
 

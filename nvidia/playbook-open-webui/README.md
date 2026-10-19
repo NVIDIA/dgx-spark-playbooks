@@ -55,7 +55,7 @@ Use the matrix below to confirm your hardware platform, recommended default loca
 
 | Hardware platform | OS | Memory | Recommended default local settings | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- | :---- |
-| **DGX Spark** | DGX OS (Linux) | 128 GB Unified Memory | Open WebUI + Ollama container (`ghcr.io/open-webui/open-webui:ollama`); desktop on port `8080`, NVIDIA Sync custom app on port `12000` | — |
+| **DGX Spark** | DGX OS (Linux) | 64GB or 128GB Unified Memory | Open WebUI + Ollama container (`ghcr.io/open-webui/open-webui:ollama`); desktop on port `8080`, NVIDIA Sync custom app on port `12000` | — |
 
 ## Prerequisites
 

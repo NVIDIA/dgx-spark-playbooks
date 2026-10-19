@@ -37,7 +37,7 @@ Use the matrix below to confirm your hardware platform, recommended default loca
 
 | Hardware platform | OS | Memory | Recommended default local settings | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- | :---- |
-| **DGX Spark** | DGX OS (Linux) | 128 GB Unified Memory | DGX Dashboard at `http://localhost:11000`; JupyterLab via dashboard | — |
+| **DGX Spark** | DGX OS (Linux) | 64GB or 128GB Unified Memory | DGX Dashboard at `http://localhost:11000`; JupyterLab via dashboard | — |
 
 ## Prerequisites
 

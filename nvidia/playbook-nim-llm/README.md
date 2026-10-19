@@ -38,7 +38,7 @@ Use the matrix below to confirm your hardware platform, recommended default loca
 
 | Hardware platform | OS | Memory | Recommended default local settings | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- | :---- |
-| **DGX Spark** | DGX OS (Linux) | 128 GB Unified Memory | `nvcr.io/nim/nvidia/nemotron-3.5-lightning-30b-a3b:latest` | — |
+| **DGX Spark** | DGX OS (Linux) | 64GB or 128GB Unified Memory | `nvcr.io/nim/nvidia/nemotron-3.5-lightning-30b-a3b:latest` | — |
 
    For full hardware x NIM support details, see [NIM for LLMs support matrix](https://docs.nvidia.com/nim/large-language-models/latest/reference/support-matrix.html).
 

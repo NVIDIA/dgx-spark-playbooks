@@ -82,7 +82,7 @@ Use the matrix below to confirm your hardware platform, recommended default loca
 
 | Hardware platform | OS | Memory | Recommended default local settings | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- | :---- |
-| **DGX Spark** | DGX OS (Linux) | 128 GB Unified Memory | Working NemoClaw sandbox with local inference (see companion playbook) | — |
+| **DGX Spark** | DGX OS (Linux) | 64GB or 128GB Unified Memory | Working NemoClaw sandbox with local inference (see companion playbook) | — |
 
 ## Prerequisites
 

@@ -7,11 +7,17 @@ Use this reference only after reading `system inspect` evidence.
 Station v1 recognizes these exact action-qualified release identities:
 
 - Software 1.0: `DGX_SWBUILD_VERSION=7.4.1` or `7.4.1-GB300ws`,
-  `DGX_SWBUILD_DATE=2026-02-20-05-22-42`
+  `DGX_SWBUILD_DATE=2026-02-20-05-22-42`,
+  `DGX_PRETTY_NAME=NVIDIA DGX GB300WS`
 - Software 2.0: `DGX_SWBUILD_VERSION=7.5.0`,
-  `DGX_SWBUILD_DATE=2026-06-16-11-48-10`
-- `DGX_PRETTY_NAME=NVIDIA DGX GB300WS`
-- a GB300 reporting compute capability `10.3`
+  `DGX_SWBUILD_DATE=2026-06-16-11-48-10`,
+  `DGX_PRETTY_NAME=NVIDIA DGX GB300WS`
+
+Both identities also require a GB300 reporting compute capability `10.3` on
+`aarch64`. `DGX_PRETTY_NAME` is part of both identities: a host whose version
+and build match a profile but whose release name differs is unknown, not
+compatible. Report the mismatched field instead of treating the version as
+sufficient.
 
 The release marker must be a root-owned regular file and must not be a symlink
 or group/world writable. Product and DMI names are supporting evidence only.

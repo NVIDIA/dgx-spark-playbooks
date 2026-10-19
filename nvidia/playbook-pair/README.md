@@ -98,7 +98,7 @@ memory, and whether you can use it in a PAIR cluster.
 | Hardware platform | OS | Memory | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- |
 | **RTX Spark** | Windows 11 on ARM | Unified memory; capacity depends on the system | ✅ (PAIR cluster) |
-| **DGX Spark** | DGX OS (Linux) | 128 GB Unified Memory | ✅ (PAIR cluster) |
+| **DGX Spark** | DGX OS (Linux) | 64GB or 128GB Unified Memory | ✅ (PAIR cluster) |
 | **GeForce RTX** | Windows 11 or Linux | Depends on the GPU and model | ✅ (PAIR cluster) |
 | **RTX PRO** | Windows 11 or Linux | Depends on the GPU and model | ✅ (PAIR cluster) |
 | **Mac (Apple silicon or Intel)** | macOS 13 or later | Depends on the Mac and model | ✅ (PAIR cluster) |

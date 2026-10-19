@@ -49,7 +49,7 @@ Use the matrix below to confirm your hardware platform, recommended default loca
 
 | Hardware platform | OS | Memory | Recommended default local settings | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- | :---- |
-| **DGX Spark** | DGX OS | 128 GB Unified Memory | Build from source (`CMAKE_CUDA_ARCHITECTURES=121a-real`); example model `unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_XL` | — |
+| **DGX Spark** | DGX OS | 64GB or 128GB Unified Memory | Build from source (`CMAKE_CUDA_ARCHITECTURES=121a-real`); example model `unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_XL` | — |
 
 ## Prerequisites
 

@@ -11,9 +11,15 @@ alone.
 | Software 1.0 | `7.4.1` or `7.4.1-GB300ws`; build `2026-02-20-05-22-42`; `NVIDIA DGX GB300WS` | Version-aware guidance, inspection, diagnostics, read-only MIG inspection, and exact recipes validated for this profile |
 | Software 2.0 | `7.5.0`; build `2026-06-16-11-48-10`; `NVIDIA DGX GB300WS` | Qualified workflows, subject to every live safety and content check |
 
+The exact identity is the trusted `DGX_SWBUILD_VERSION`, `DGX_SWBUILD_DATE`,
+and `DGX_PRETTY_NAME` taken together. A matching version and build with a
+different release name is a mismatch, because published validation evidence is
+recorded against the complete identity.
+
 An exact identity mismatch has support level `unknown`. On an unknown profile,
 use read-only host evidence and general guidance only. Do not provide a
-version-specific command.
+version-specific command. When reporting a mismatch, name the field that
+differs and its observed value.
 
 ## Capability differences
 

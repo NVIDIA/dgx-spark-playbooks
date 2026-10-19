@@ -27,7 +27,7 @@ The instructions, except for the DGX Dashboard, generalize to any remote device 
 
 - **Use NVIDIA Sync**: Connect to your DGX Spark and launch remote applications from your laptop
   - One time: Install NVIDIA Sync and add your Spark with its SSH credentials
-  - Optional one time: Set up the [Tailscale integration](tailscale-via-sync.md) to reach your Spark from another network
+  - Optional one time: Set up the Tailscale integration with the Enable Tailscale Tab to reach your Spark from another network
   - Repeat use: Connect in NVIDIA Sync and launch a terminal, the [DGX Dashboard](https://docs.nvidia.com/dgx/dgx-spark/dgx-dashboard.html#spark-dgx-dashboard), or the [Resource Monitor](https://docs.nvidia.com/sync/latest/resource-monitor.html)
 
 - **Manual path:** Use SSH commands to connect to your Spark and forward the DGX Dashboard to your laptop.
@@ -131,7 +131,7 @@ The instructions, except for the DGX Dashboard, generalize to any remote device 
 
 ## Next steps
 
-- Use NVIDIA Sync to [add Tailscale](tailscale-via-sync.md) so you can connect to your device from anywhere
+- Use NVIDIA Sync to add Tailscale (see the Enable Tailscale Tab) so you can connect to your device from anywhere
 - Use NVIDIA Sync to [cluster two or more DGX Spark devices](https://build.nvidia.com/playbooks/connect-multiple-sparks/cable-devices)
 - Use NVIDIA Sync to [launch a vLLM container](https://build.nvidia.com/playbooks/vllm)
 

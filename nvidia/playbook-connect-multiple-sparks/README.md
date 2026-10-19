@@ -56,7 +56,7 @@ Check the table below to see if this playbook is for your hardware.
 
 | Hardware platform | OS | Memory | Recommended default local settings | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- | :---- |
-| **DGX Spark** | DGX OS (Linux) | 64 GB or 128 GB Unified Memory | Direct or switch QSFP links | ✅ (200GbE QSFP) |
+| **DGX Spark** | DGX OS (Linux) | 64GB or 128GB Unified Memory | Direct or switch QSFP links | ✅ (200GbE QSFP) |
 
 ## Prerequisites
 

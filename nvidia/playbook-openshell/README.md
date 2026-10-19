@@ -142,7 +142,7 @@ python3 --version
 Expected output should show Ubuntu 24.04 (or compatible DGX OS), a detected GPU, a Docker server version, and Python 3.12+.
 
 > [!NOTE]
-> This playbook requires OpenShell 0.1.0 or later. If an OpenShell installation is already present on this machine, uninstall it first (see the [OpenShell uninstall docs](https://docs.nvidia.com/openshell/latest/about/installation#uninstall-openshell)) before continuing.
+> This playbook is validated against OpenShell v0.1.2 (Step 3 pins this version). If an OpenShell installation is already present on this machine, uninstall it first (see the [OpenShell uninstall docs](https://docs.nvidia.com/openshell/latest/about/installation#uninstall-openshell)) before continuing.
 
 ## Step 2. Docker configuration
 
@@ -176,14 +176,14 @@ docker run --rm --runtime=nvidia --gpus all ubuntu nvidia-smi
 
 ## Step 3. Install the OpenShell CLI
 
-Install OpenShell with the official installer, which installs the CLI, the policy prover, and a local gateway in one step, then starts the gateway automatically:
+Install OpenShell with the official installer, which installs the CLI, the policy prover, and a local gateway in one step, then starts the gateway automatically. This playbook is validated against **OpenShell v0.1.2**, so pin that release:
 
 ```bash
-curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh
+curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | OPENSHELL_VERSION=v0.1.2 sh
 ```
 
 > [!NOTE]
-> To pin a specific release, set `OPENSHELL_VERSION` to a release tag (`OPENSHELL_VERSION=v0.1.2 sh`) or `OPENSHELL_VERSION=pre`/`dev` for a prerelease/rolling build. See the [OpenShell installation docs](https://docs.nvidia.com/openshell/latest/about/installation) for macOS, Snap, and Kubernetes install paths. The installer is the only supported install route and is required for the gateway.
+> To use a different release, set `OPENSHELL_VERSION` to another release tag, or `OPENSHELL_VERSION=pre`/`dev` for a prerelease/rolling build — but command behavior in this playbook (such as `--upload` and `profile lint`) is only confirmed against v0.1.2. See the [OpenShell installation docs](https://docs.nvidia.com/openshell/latest/about/installation) for macOS, Snap, and Kubernetes install paths. The installer is the only supported install route and is required for the gateway.
 
 The installer picks a package for your platform (a `.deb` on Ubuntu, `.rpm` on Fedora/RHEL) and registers the `openshell-gateway` systemd user service. Open a new shell (or `source ~/.bashrc`) so `openshell` is on your `PATH`, then confirm the CLI can reach the gateway:
 
@@ -315,9 +315,9 @@ RUN apt-get update \
 
 RUN npm install -g --ignore-scripts "@earendil-works/pi-coding-agent@${PI_VERSION}"
 
-RUN mkdir -p /workspace && chown node:node /workspace
+RUN mkdir -p /sandbox && chown node:node /sandbox
 USER node
-WORKDIR /workspace
+WORKDIR /sandbox
 
 ENV PI_CODING_AGENT_DIR=/tmp/pi-agent
 COPY --chown=node:node models.json /tmp/pi-agent/models.json
@@ -476,14 +476,14 @@ openshell sandbox provider detach "$SANDBOX_NAME" local-vllm --wait
 
 ## Step 12. Work on a local project (optional)
 
-Point Pi at your own code by uploading a project directory at sandbox-creation time. `--upload` copies the directory in before the sandbox starts, skipping anything `.gitignore` excludes. `--upload` cannot be combined with a trailing main command, so create the sandbox first and start Pi inside it as a separate step:
+Point Pi at your own code by uploading a project directory at sandbox-creation time. `--upload` copies the directory in before the sandbox starts, skipping anything `.gitignore` excludes. `--upload` cannot be combined with a trailing main command, so create the sandbox first and start Pi inside it as a separate step. Upload to `/sandbox` — the Dockerfile's `WORKDIR` and the only project directory writable by the upload mechanism under the default filesystem policy; `/workspace` returns `Permission denied`:
 
 ```bash
 openshell sandbox create \
   --name pi-project \
   --from pi-agent:local \
   --provider local-vllm \
-  --upload .:/workspace
+  --upload .:/sandbox
 ```
 
 ```bash
