@@ -27,7 +27,7 @@ Running Hermes and its LLM **fully on your hardware platform** keeps conversatio
 
 ## What you'll accomplish
 
-Install Hermes on your hardware platform and connect it to a local LLM served by **vLLM**, which you set up with the [vLLM playbook](https://build.nvidia.com/playbooks/vllm/advanced) for a single device or the [vLLM cluster playbook](https://build.nvidia.com/playbooks/vllm-cluster/beginner) for a cluster. Chat with the agent from the terminal. Optionally set up a Telegram bot later if you want messaging access.
+Install Hermes on your hardware platform and connect it to a local LLM served by **vLLM**, which you set up with the [vLLM playbook](https://build.nvidia.com/playbooks/vllm/intermediate) for a single device or the [vLLM cluster playbook](https://build.nvidia.com/playbooks/vllm-cluster/intermediate) for a cluster. Chat with the agent from the terminal. Optionally set up a Telegram bot later if you want messaging access.
 
 - Set up the inference backend with vLLM  
 - Install Hermes and configure it against the local vLLM endpoint  
@@ -47,7 +47,7 @@ Install Hermes on your hardware platform and connect it to a local LLM served by
 **Required:**
 
 - Basic use of the Linux terminal and a text editor  
-- Familiarity with Docker and vLLM, or willingness to follow the [Serve LLMs with vLLM](https://build.nvidia.com/playbooks/vllm/advanced) playbook (single device) or the [vLLM cluster](https://build.nvidia.com/playbooks/vllm-cluster/beginner) playbook (cluster) first
+- Familiarity with Docker and vLLM, or willingness to follow the [Serve LLMs with vLLM](https://build.nvidia.com/playbooks/vllm/intermediate) playbook (single device) or the [vLLM cluster](https://build.nvidia.com/playbooks/vllm-cluster/intermediate) playbook (cluster) first
 - Awareness of the security considerations below
 
 **Optional:**
@@ -86,7 +86,7 @@ You cannot eliminate all risk; proceed at your own risk. **Recommended security 
 **Hardware requirements**
 
 - Supported hardware platform — see Supported hardware platforms matrix above  
-- Sufficient memory for the model you serve with vLLM (see the [vLLM playbook](https://build.nvidia.com/playbooks/vllm/advanced) for single-device recipes or the [vLLM cluster playbook](https://build.nvidia.com/playbooks/vllm-cluster/beginner) for clusters)
+- Sufficient memory for the model you serve with vLLM (see the [vLLM playbook](https://build.nvidia.com/playbooks/vllm/intermediate) for single-device recipes or the [vLLM cluster playbook](https://build.nvidia.com/playbooks/vllm-cluster/intermediate) for clusters)
 
 **Software requirements**
 
@@ -135,8 +135,8 @@ git --version
 
 Hermes will be configured against a local, OpenAI-compatible endpoint, so an inference backend must be running before you launch the Hermes installer. Set one up with the vLLM playbooks, which cover model and recipe selection for your hardware platform:
 
-- **Single device:** follow [Serve LLMs with vLLM](https://build.nvidia.com/playbooks/vllm/advanced).
-- **Cluster:** follow [Serve LLMs with vLLM on a cluster](https://build.nvidia.com/playbooks/vllm-cluster/beginner).
+- **Single device:** follow [Serve LLMs with vLLM](https://build.nvidia.com/playbooks/vllm/intermediate).
+- **Cluster:** follow [Serve LLMs with vLLM on a cluster](https://build.nvidia.com/playbooks/vllm-cluster/intermediate).
 
 Choose a model that supports tool calling, and keep the server running in a **separate terminal** (or as an NVIDIA Sync app) so it can run alongside Hermes. Note the model ID it serves. If Hermes runs on the same device as vLLM, the OpenAI-compatible API is at `http://localhost:8000/v1`; otherwise use the address of the node that serves the API.
 
@@ -186,7 +186,7 @@ The installer walks you through an interactive setup wizard. This playbook uses 
 
 #### DGX Station: DeepSeek V4.1 Flash settings
 
-On DGX Station, serve DeepSeek V4.1 Flash with the vLLM playbook's [Advanced tab](https://build.nvidia.com/playbooks/vllm/advanced), then use the exact model ID returned by `/v1/models` in the prompts above. This model needs one change from the wizard defaults. These settings were tested with Hermes Agent v0.21.7; the rest of this page was verified with v0.18.0.
+On DGX Station, serve DeepSeek V4.1 Flash with the vLLM playbook's [Advanced tab](https://build.nvidia.com/playbooks/vllm/intermediate), then use the exact model ID returned by `/v1/models` in the prompts above. This model needs one change from the wizard defaults. These settings were tested with Hermes Agent v0.21.7; the rest of this page was verified with v0.18.0.
 
 - **Reasoning effort:** the wizard's default (`medium`) fails with `HTTP 400: DeepSeek V4.1 reasoning_effort must be low, high, xhigh, max, or an integer within [1, 100]`.
 - **Tool calls:** with reasoning on, a request that follows a tool call can fail with `duplicate field \`reasoning\``.
@@ -243,7 +243,7 @@ You now have a working Hermes install for terminal use. Steps 4–8 below are op
 
 You configured an initial model during the Hermes install. To switch to a different one later, restart vLLM serving the new model handle, then re-point Hermes at the same local endpoint.
 
-1. Stop the current vLLM server, then use the recipe for the new model in the [Serve LLMs with vLLM](https://build.nvidia.com/playbooks/vllm/advanced) playbook (or the [vLLM cluster](https://build.nvidia.com/playbooks/vllm-cluster/beginner) playbook for a cluster). Do not reuse the previous model's settings for a different model unless that recipe documents them.
+1. Stop the current vLLM server, then use the recipe for the new model in the [Serve LLMs with vLLM](https://build.nvidia.com/playbooks/vllm/intermediate) playbook (or the [vLLM cluster](https://build.nvidia.com/playbooks/vllm-cluster/intermediate) playbook for a cluster). Do not reuse the previous model's settings for a different model unless that recipe documents them.
      
 2. Launch the Hermes model picker:
 

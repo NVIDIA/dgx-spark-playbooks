@@ -88,7 +88,7 @@ You will install the OpenShell CLI (`openshell`), deploy a gateway on your hardw
 
 ## Supported hardware platforms
 
-Use the matrix below to confirm your hardware platform, OS, memory, and whether multi-node applies. The same OpenShell + Pi workflow applies across supported hardware platforms. Set up the inference backend with the [vLLM playbook](https://build.nvidia.com/playbooks/vllm/advanced) for a single device or the [vLLM cluster playbook](https://build.nvidia.com/playbooks/vllm-cluster/beginner) for a cluster; model recommendations differ by platform.
+Use the matrix below to confirm your hardware platform, OS, memory, and whether multi-node applies. The same OpenShell + Pi workflow applies across supported hardware platforms. Set up the inference backend with the [vLLM playbook](https://build.nvidia.com/playbooks/vllm/intermediate) for a single device or the [vLLM cluster playbook](https://build.nvidia.com/playbooks/vllm-cluster/intermediate) for a cluster; model recommendations differ by platform.
 
 | Hardware platform | OS | Memory  | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- |
@@ -103,7 +103,7 @@ Use the matrix below to confirm your hardware platform, OS, memory, and whether 
 **Hardware requirements**
 
 - Supported hardware platform — see Supported hardware platforms matrix above
-- Sufficient memory for your chosen model (see the [vLLM playbook](https://build.nvidia.com/playbooks/vllm/advanced) for single-device recipes or the [vLLM cluster playbook](https://build.nvidia.com/playbooks/vllm-cluster/beginner) for clusters)
+- Sufficient memory for your chosen model (see the [vLLM playbook](https://build.nvidia.com/playbooks/vllm/intermediate) for single-device recipes or the [vLLM cluster playbook](https://build.nvidia.com/playbooks/vllm-cluster/intermediate) for clusters)
 
 **Software requirements**
 
@@ -231,13 +231,13 @@ journalctl --user -u openshell-gateway -f
 
 Set up an OpenAI-compatible API for local inference with the vLLM playbooks, which cover model and recipe selection for your hardware platform:
 
-- **Single device:** follow [Serve LLMs with vLLM](https://build.nvidia.com/playbooks/vllm/advanced).
-- **Cluster:** follow [Serve LLMs with vLLM on a cluster](https://build.nvidia.com/playbooks/vllm-cluster/beginner).
+- **Single device:** follow [Serve LLMs with vLLM](https://build.nvidia.com/playbooks/vllm/intermediate).
+- **Cluster:** follow [Serve LLMs with vLLM on a cluster](https://build.nvidia.com/playbooks/vllm-cluster/intermediate).
 
 Keep `--host 0.0.0.0` and port `8000` so sandboxes can reach the server.
 
 > [!NOTE]
-> If you already started a vLLM endpoint, for example by following the [Advanced tab](https://build.nvidia.com/playbooks/vllm/advanced), reuse that endpoint instead of serving a different model. Set `MODEL_HANDLE` (exported below) to the exact model ID returned by `curl http://localhost:8000/v1/models`.
+> If you already started a vLLM endpoint, for example by following the [Advanced tab](https://build.nvidia.com/playbooks/vllm/intermediate), reuse that endpoint instead of serving a different model. Set `MODEL_HANDLE` (exported below) to the exact model ID returned by `curl http://localhost:8000/v1/models`.
 
 > [!IMPORTANT]
 > Do not bind the server to `localhost` only. Sandboxes reach host-local services through the `host.openshell.internal` DNS alias (Step 6), which resolves to the gateway host — not to `127.0.0.1` inside the sandbox's own network namespace.

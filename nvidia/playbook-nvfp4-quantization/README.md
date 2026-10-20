@@ -144,7 +144,7 @@ Container image, GPU device selection, and Model Optimizer pin differ by hardwar
 
 | Hardware platform | Container image | GPU device | Model Optimizer |
 | ----------------- | --------------- | ---------- | --------------- |
-| **DGX Spark** | `nvcr.io/nvidia/tensorrt-llm/release:spark-single-gpu-dev` | `--gpus all` | `NVIDIA/Model-Optimizer` @ `0.47.0` |
+| **DGX Spark** | `nvcr.io/nvidia/tensorrt-llm/release:spark-single-gpu-dev` | `--gpus all` | `NVIDIA/Model-Optimizer` @ `0.41.0` |
 | **DGX Station** | `nvcr.io/nvidia/vllm:25.12.post1-py3` | `--gpus "device=$GPU_ID"` (GB300) | `NVIDIA/Model-Optimizer` @ `0.47.0` |
 
 ### DGX Station only — identify the GB300 GPU
@@ -181,16 +181,22 @@ docker run --rm -it --gpus all --ipc=host --ulimit memlock=-1 --ulimit stack=671
   -e HF_TOKEN=$HF_TOKEN \
   nvcr.io/nvidia/tensorrt-llm/release:spark-single-gpu-dev \
   bash -c "
-    git clone -b 0.47.0 --single-branch https://github.com/NVIDIA/Model-Optimizer.git /app/Model-Optimizer && \
+    git clone -b 0.41.0 --single-branch https://github.com/NVIDIA/Model-Optimizer.git /app/Model-Optimizer && \
     cd /app/Model-Optimizer && pip install -e '.[dev]' && \
     export ROOT_SAVE_PATH='/workspace/output_models' && \
     /app/Model-Optimizer/examples/hf_ptq/scripts/huggingface_example.sh \
     --model 'deepseek-ai/DeepSeek-R1-Distill-Llama-8B' \
     --quant nvfp4 \
     --tp 1 \
-    --tasks quant
+    --tasks quant \
+    --calib_dataset cnn_dailymail
   "
 ```
+
+> [!NOTE]
+> - Model Optimizer `0.41.0` keeps the container's PyTorch and Transformers versions. Newer releases, such as `0.47.0`, replace them during `pip install`, and the container's TensorRT-LLM then fails to load after export.
+> - `--calib_dataset cnn_dailymail` avoids needing access to the gated `nvidia/Nemotron-Post-Training-Dataset-v2` calibration dataset. If your `HF_TOKEN` has access to that dataset, you can remove this flag to use the default.
+> - On a 64 GB DGX Spark, Model Optimizer may offload part of the model to CPU when little GPU memory is free at launch. This is expected. With `0.41.0`, quantization and export still complete.
 
 Expected output directory:
 

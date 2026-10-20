@@ -78,7 +78,7 @@ Use the matrix below to confirm your hardware platform, OS, memory, and whether 
 **Hardware requirements**
 
 - Supported hardware platform — see Supported hardware platforms matrix above
-- Enough memory for your chosen model (see the [vLLM playbook](https://build.nvidia.com/playbooks/vllm/advanced) for single-device recipes or the [vLLM cluster playbook](https://build.nvidia.com/playbooks/vllm-cluster/beginner) for clusters)
+- Enough memory for your chosen model (see the [vLLM playbook](https://build.nvidia.com/playbooks/vllm/intermediate) for single-device recipes or the [vLLM cluster playbook](https://build.nvidia.com/playbooks/vllm-cluster/intermediate) for clusters)
 
 **Software requirements**
 
@@ -88,7 +88,7 @@ Use the matrix below to confirm your hardware platform, OS, memory, and whether 
 
 ## Set up the inference backend
 
-This playbook is an **agent** workflow, not a general inference-serving guide. Set up your inference backend with [Serve LLMs with vLLM](https://build.nvidia.com/playbooks/vllm/advanced) for a single device, or [Serve LLMs with vLLM on a cluster](https://build.nvidia.com/playbooks/vllm-cluster/beginner) for a cluster. Those playbooks cover model and recipe selection. For Ollama setup, see **Instructions**, Option B.
+This playbook is an **agent** workflow, not a general inference-serving guide. Set up your inference backend with [Serve LLMs with vLLM](https://build.nvidia.com/playbooks/vllm/intermediate) for a single device, or [Serve LLMs with vLLM on a cluster](https://build.nvidia.com/playbooks/vllm-cluster/intermediate) for a cluster. Those playbooks cover model and recipe selection. For Ollama setup, see **Instructions**, Option B.
 
 ## Time & risk
 
@@ -175,8 +175,8 @@ OpenClaw connects to a local, OpenAI-compatible endpoint. Set up the inference b
 
 Set up the inference backend from the vLLM playbooks, which cover model and recipe selection:
 
-- **Single device:** follow [Serve LLMs with vLLM](https://build.nvidia.com/playbooks/vllm/advanced).
-- **Cluster:** follow [Serve LLMs with vLLM on a cluster](https://build.nvidia.com/playbooks/vllm-cluster/beginner).
+- **Single device:** follow [Serve LLMs with vLLM](https://build.nvidia.com/playbooks/vllm/intermediate).
+- **Cluster:** follow [Serve LLMs with vLLM on a cluster](https://build.nvidia.com/playbooks/vllm-cluster/intermediate).
 
 1. Choose a model that supports tool calling, and keep the server running in a **separate terminal** (or as an NVIDIA Sync app).
 2. Wait until the server reports that it is ready, then verify:
@@ -280,7 +280,7 @@ You can also ask OpenClaw which model it’s using. In the gateway chat UI you c
 | OpenClaw dashboard URL not loading | Gateway not running or wrong host/port | **Restart the OpenClaw gateway** so it reloads `~/.openclaw/openclaw.json`. **Verify:** Check that the gateway process is running with `pgrep -f openclaw` or `ps aux \| grep openclaw`. **Find URL/token:** Check the original installer output (scroll up in your terminal) or look in gateway logs (typically `~/.openclaw/logs/`) for the dashboard URL and access token |
 | "Connection refused" to model (for example localhost:8000) | Local inference server not running, still loading, or wrong port | Confirm the backend is up (`curl http://localhost:8000/v1/models` for vLLM, or your Ollama status checks) and that `baseUrl` in `openclaw.json` matches the server |
 | OpenClaw says no model available | Provider not configured or model handle mismatch | Add the provider to `~/.openclaw/openclaw.json` and ensure `id`/`name` exactly match the served handle |
-| Out-of-memory or very slow inference | Model too large for available GPU memory or other GPU workloads | Use a smaller model (see the [vLLM playbook](https://build.nvidia.com/playbooks/vllm/advanced) recipes), lower context length / GPU memory utilization for vLLM, free GPU memory (close other apps), or check usage with `nvidia-smi` |
+| Out-of-memory or very slow inference | Model too large for available GPU memory or other GPU workloads | Use a smaller model (see the [vLLM playbook](https://build.nvidia.com/playbooks/vllm/intermediate) recipes), lower context length / GPU memory utilization for vLLM, free GPU memory (close other apps), or check usage with `nvidia-smi` |
 | WSL cannot reach model server on Windows host | `localhost` inside WSL is not the Windows host | Replace `127.0.0.1` / `localhost` in OpenClaw `baseUrl` with the Windows host IP as seen from WSL |
 | Install script fails or dependencies missing | Missing system packages | Install curl and any required build tools; see [OpenClaw documentation](https://docs.openclaw.ai) for current requirements |
 | Config changes not applied | Gateway not reloaded | Restart the OpenClaw gateway so it reloads `~/.openclaw/openclaw.json` |

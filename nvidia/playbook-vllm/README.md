@@ -338,11 +338,14 @@ Once the endpoint works, you can tune it for your workload, save the launch comm
 
 Use [NVIDIA Local AI Inference Recipes](https://nvidia.github.io/local-ai-inference-recipes/) to select a model, checkpoint precision, and vLLM configuration.
 
-| Device | Memory | Recipes |
-| --- | --- | --- |
-| DGX Spark | 64GB unified memory | [64GB Spark recipes](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-spark/index.html?memoryConfig=64) |
-| DGX Spark | 128GB unified memory | [128GB Spark recipes](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-spark/index.html?memoryConfig=128) |
-| DGX Station | 748GB coherent memory | [Station recipes](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-station/index.html?memoryConfig=748) |
+| Device | Memory | Recommended model | Recipes |
+| --- | --- | --- | --- |
+| DGX Spark | 64GB unified memory | [Qwen3.8 27B (NVFP4)](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-spark/index.html?model=qwen%2Fqwen3.8-27b&os=linux&backend=vllm&memory=64&precision=nvfp4&variant=&memoryConfig=64) | [64GB Spark recipes](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-spark/index.html?memoryConfig=64) |
+| DGX Spark | 128GB unified memory | [Qwen3.8 27B (NVFP4)](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-spark/index.html?model=qwen%2Fqwen3.8-27b&os=linux&backend=vllm&memory=128&precision=nvfp4&variant=&memoryConfig=128) | [128GB Spark recipes](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-spark/index.html?memoryConfig=128) |
+| DGX Station | 748GB coherent memory | See the note below | [Station recipes](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-station/index.html?memoryConfig=748) |
+
+The recommended Spark model is also one of the models in the Intermediate tab, so you can use either path.
+If you pick a different model in the recipe page, check its prerequisites before you download it.
 
 **Then, select a model and save the full recipe commands.**
 

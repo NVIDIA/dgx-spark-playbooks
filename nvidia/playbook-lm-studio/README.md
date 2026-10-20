@@ -30,7 +30,7 @@ This playbook shows you how to deploy LM Studio on your **hardware platform** to
 
 ## What you'll accomplish
 
-You'll deploy LM Studio on your hardware platform to run **Nemotron 3 Nano Omni** (`nvidia/nemotron-3-nano-omni`), and use the model from your laptop. More specifically, you will:
+You'll deploy LM Studio on your hardware platform to run **Nemotron 3.5 Super VL** (`nvidia/nemotron-3.5-super-vl`), and use the model from your laptop. More specifically, you will:
 
 - Install **llmster**, a headless, terminal-native LM Studio on the hardware platform
 - Run LLM inference locally via API
@@ -55,7 +55,7 @@ Use the matrix below to confirm your hardware platform, recommended defaults, an
 
 | Hardware platform | OS | Memory | Recommended default local settings | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- | :---- |
-| **DGX Spark** | DGX OS | 128 GB Unified Memory | llmster (`lms`) · API on port `1234` · example model `nvidia/nemotron-3-nano-omni` | — |
+| **DGX Spark** | DGX OS | 128 GB Unified Memory | llmster (`lms`) · API on port `1234` · example model `nvidia/nemotron-3.5-super-vl` | — |
 
 > [!NOTE]
 > Only platforms listed in the Supported hardware platforms table above are covered by this playbook.
@@ -86,7 +86,7 @@ Example models validated for the workflow in this playbook:
 
 | Model | Model path |
 |-------|------------|
-| **Nemotron 3 Nano Omni** | `nvidia/nemotron-3-nano-omni` |
+| **Nemotron 3.5 Super VL** | `nvidia/nemotron-3.5-super-vl` |
 | **Qwen3.6-35B-A3B** | `qwen/qwen3.6-35b-a3b` |
 | **GPT-OSS-120B** | `openai/gpt-oss-120b` |
 
@@ -151,6 +151,8 @@ curl -L -O https://raw.githubusercontent.com/lmstudio-ai/docs/main/_assets/nvidi
 curl -L -O https://raw.githubusercontent.com/lmstudio-ai/docs/main/_assets/nvidia-spark-playbook/bash/run.sh
 ```
 
+Open the script you downloaded and replace `<SPARK_LOCAL_IP>` with the actual IP address of your hardware platform. Step 3 shows how to find it. If you use LM Link (Step 4), use `localhost` instead. The script does not detect the IP address for you, and it fails with "LM Studio is not reachable" if the placeholder is left in.
+
 ## Step 3. Start the LM Studio API server
 
 Use `lms`, LM Studio's CLI, to start the server from your terminal on the hardware platform. Enable local network access so devices on the same trusted local network can reach the API:
@@ -183,10 +185,10 @@ LM Link is in **Preview** and is free for up to 2 users, 5 devices each. For det
 
 ## Step 5. Download a model to your hardware platform
 
-As an example, download **NVIDIA Nemotron 3 Nano Omni** from the LM Studio catalog (`nvidia/nemotron-3-nano-omni`):
+As an example, download **NVIDIA Nemotron 3.5 Super VL** from the LM Studio catalog (`nvidia/nemotron-3.5-super-vl`):
 
 ```bash
-lms get nvidia/nemotron-3-nano-omni
+lms get nvidia/nemotron-3.5-super-vl
 ```
 
 This download can take a while due to its size. Verify the download:
@@ -200,7 +202,7 @@ lms ls
 Load the model on your hardware platform so it can respond to requests from your laptop:
 
 ```bash
-lms load nvidia/nemotron-3-nano-omni
+lms load nvidia/nemotron-3.5-super-vl
 ```
 
 ## Step 7. Use the LM Studio SDK on the laptop
@@ -208,7 +210,9 @@ lms load nvidia/nemotron-3-nano-omni
 Install the LM Studio SDKs and use a simple script to send a prompt to your hardware platform and validate the response. Download the scripts from the **Overview** tab (or Step 2) and run the matching command from the directory that contains the script.
 
 > [!NOTE]
-> Within each script, replace `<HARDWARE_IP>` (or the script’s placeholder IP) with the IP address of your hardware platform on your local network. If you use LM Link, you can typically use `localhost` instead.
+> Make sure you replaced `<SPARK_LOCAL_IP>` (or the script’s placeholder IP, such as `<HARDWARE_IP>`) with the IP address of your hardware platform, as described in Step 2. If you use LM Link, you can typically use `localhost` instead.
+>
+> Also set the model in each script to the one you loaded in Step 6, `nvidia/nemotron-3.5-super-vl`. If the script names a different model, such as `openai/gpt-oss-120b`, the request fails because that model is not loaded.
 
 ### JavaScript
 
