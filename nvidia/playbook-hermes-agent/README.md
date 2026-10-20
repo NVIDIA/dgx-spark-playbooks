@@ -12,9 +12,6 @@
   - [3d. Finish the wizard and verify](#3d-finish-the-wizard-and-verify)
   - [O1. Verify outbound HTTPS to Telegram](#o1-verify-outbound-https-to-telegram)
   - [O2. Configure the Telegram gateway](#o2-configure-the-telegram-gateway)
-- [Agent-ready Models](#agent-ready-models)
-  - [Recommended models by hardware platform](#recommended-models-by-hardware-platform)
-  - [After the model is serving](#after-the-model-is-serving)
 - [Troubleshooting](#troubleshooting)
   - [Start over from scratch](#start-over-from-scratch)
 
@@ -30,9 +27,9 @@ Running Hermes and its LLM **fully on your hardware platform** keeps conversatio
 
 ## What you'll accomplish
 
-Install Hermes on your hardware platform and connect it to a local LLM served by **vLLM** (the agent-ready `nvidia/Qwen3.6-35B-A3B-NVFP4` recipe). Chat with the agent from the terminal. Optionally set up a Telegram bot later if you want messaging access.
+Install Hermes on your hardware platform and connect it to a local LLM served by **vLLM**, which you set up with the [vLLM playbook](https://build.nvidia.com/playbooks/vllm/advanced) for a single device or the [vLLM cluster playbook](https://build.nvidia.com/playbooks/vllm-cluster/beginner) for a cluster. Chat with the agent from the terminal. Optionally set up a Telegram bot later if you want messaging access.
 
-- Serve a local model with vLLM  
+- Set up the inference backend with vLLM  
 - Install Hermes and configure it against the local vLLM endpoint  
 - Chat from the Hermes terminal (TUI)  
 - Optionally set up Telegram messaging (see Instructions — optional section at the bottom)  
@@ -50,7 +47,7 @@ Install Hermes on your hardware platform and connect it to a local LLM served by
 **Required:**
 
 - Basic use of the Linux terminal and a text editor  
-- Familiarity with Docker and vLLM, or willingness to follow the [Serve LLMs with vLLM](https://build.nvidia.com/playbooks/vllm) playbook first  
+- Familiarity with Docker and vLLM, or willingness to follow the [Serve LLMs with vLLM](https://build.nvidia.com/playbooks/vllm/advanced) playbook (single device) or the [vLLM cluster](https://build.nvidia.com/playbooks/vllm-cluster/beginner) playbook (cluster) first
 - Awareness of the security considerations below
 
 **Optional:**
@@ -64,6 +61,7 @@ Use the matrix below to confirm your hardware platform and the default local inf
 | Hardware platform | OS | Memory  | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- |
 | **DGX Spark** | DGX OS (Linux) | 64GB or 128GB Unified Memory  | — |
+| **DGX Station** | DGX OS (Linux) | 748GB coherent memory | — |
 
 > [!NOTE] Only platforms listed in the Supported hardware platforms table above are covered by this playbook.
 
@@ -88,7 +86,7 @@ You cannot eliminate all risk; proceed at your own risk. **Recommended security 
 **Hardware requirements**
 
 - Supported hardware platform — see Supported hardware platforms matrix above  
-- Sufficient memory for the agent-ready model (see **Agent-ready Models** tab)
+- Sufficient memory for the model you serve with vLLM (see the [vLLM playbook](https://build.nvidia.com/playbooks/vllm/advanced) for single-device recipes or the [vLLM cluster playbook](https://build.nvidia.com/playbooks/vllm-cluster/beginner) for clusters)
 
 **Software requirements**
 
@@ -103,8 +101,9 @@ You cannot eliminate all risk; proceed at your own risk. **Recommended security 
 - **Estimated time:** 30 MIN for install and first-time terminal setup; model download time depends on size and network speed. Optional Telegram setup adds time.  
 - **Risk level:** **Medium** — the agent can execute commands and persist skills. Risk increases if you enable an optional messaging gateway without restricting allowed user IDs, or expose the local model endpoint beyond `localhost`. Always follow the security measures above.  
 - **Rollback:** Run `hermes uninstall` (with `sudo` if you installed a gateway as a system service) to remove Hermes, any gateway service, and the shell-profile entry. The data directory `~/.hermes` may still be present afterward; remove it manually if you want a full reset (see Cleanup in Instructions and the Troubleshooting tab). Stop the vLLM container separately (`docker rm` / `docker rmi`) if desired.  
-- **Last Updated:** 10/14/2026  
-  - Model-serving links now point to the vLLM Inference page (Intermediate tab) because the vLLM playbook no longer has an Agent-ready Models tab
+- **Last Updated:** 10/19/2026  
+  - Removed the Agent-ready Models tab; set up the inference backend from the vLLM playbook (single device) or the vLLM cluster playbook (cluster)
+  - Added DGX Station with `deepseek-ai/DeepSeek-V4.1-Flash`, including the reasoning setting it needs
   - Telegram messaging moved to an optional section at the bottom of Instructions; core path is terminal-only
 
 ## Instructions
@@ -132,19 +131,22 @@ git --version
 
 **What to look for:** A healthy system typically shows **Linux** in the `uname -a` output. Confirm that `curl --version` and `git --version` print version lines without errors.
 
-## Step 2. Serve a model with vLLM
+## Step 2. Set up the inference backend with vLLM
 
-Hermes will be configured against a local, OpenAI-compatible endpoint, so a model server must be running before you launch the Hermes installer. This playbook uses **vLLM** with the agent-ready recipe for your hardware platform — see the **Agent-ready Models** tab.
+Hermes will be configured against a local, OpenAI-compatible endpoint, so an inference backend must be running before you launch the Hermes installer. Set one up with the vLLM playbooks, which cover model and recipe selection for your hardware platform:
 
-Follow the [Serve LLMs with vLLM](https://build.nvidia.com/spark/vllm/intermediate) playbook’s Intermediate tab to launch the server in a **separate terminal** so it can run alongside Hermes. It serves an OpenAI-compatible API at `http://localhost:8000/v1`.
+- **Single device:** follow [Serve LLMs with vLLM](https://build.nvidia.com/playbooks/vllm/advanced).
+- **Cluster:** follow [Serve LLMs with vLLM on a cluster](https://build.nvidia.com/playbooks/vllm-cluster/beginner).
 
-Once the server reports `Application startup complete`, verify the API on **8000** in another terminal. A healthy server returns **JSON** with a top-level **`"data"`** array listing the served model:
+Choose a model that supports tool calling, and keep the server running in a **separate terminal** (or as an NVIDIA Sync app) so it can run alongside Hermes. Note the model ID it serves. If Hermes runs on the same device as vLLM, the OpenAI-compatible API is at `http://localhost:8000/v1`; otherwise use the address of the node that serves the API.
+
+Once the server reports that it is ready, verify the API on **8000** in another terminal. A healthy server returns **JSON** with a top-level **`"data"`** array listing the served model:
 
 ```shell
 curl -sS http://localhost:8000/v1/models
 ```
 
-You should see your served model handle (for example `nvidia/Qwen3.6-35B-A3B-NVFP4`) in the returned list.
+You should see the model ID you served in the returned list.
 
 > [!NOTE] Keep the vLLM endpoint bound to the hardware platform only. Do not forward `http://<host-ip>:8000` to your LAN or the public internet without strong authentication.
 
@@ -176,11 +178,34 @@ The installer walks you through an interactive setup wizard. This playbook uses 
      
 3. **"API key [optional]"** — Leave blank and press **Enter**; vLLM does not require a key for a local model.  
      
-4. **Model selection** — The installer lists the models served by your local endpoint (vLLM reports these via `/v1/models`). Select the agent-ready handle from the **Agent-ready Models** tab (for example `nvidia/Qwen3.6-35B-A3B-NVFP4`).  
+4. **Model selection** — The installer lists the models served by your local endpoint (vLLM reports these via `/v1/models`). Select the model ID you served with vLLM in Step 2.  
      
-5. **"Context length in tokens [leave blank for auto-detect]:"** — Press **Enter** to let Hermes auto-detect the context length from the served model (the agent-ready recipe serves `--max-model-len 262144`).  
+5. **"Context length in tokens [leave blank for auto-detect]:"** — Press **Enter** to let Hermes auto-detect the context length from the served model.  
      
 6. **"Display name [Local (localhost:8000)]"** — Press **Enter** to accept the suggested label, or type a custom name to identify this endpoint in the Hermes UI.
+
+#### DGX Station: DeepSeek V4.1 Flash settings
+
+On DGX Station, serve DeepSeek V4.1 Flash with the vLLM playbook's [Advanced tab](https://build.nvidia.com/playbooks/vllm/advanced), then use the exact model ID returned by `/v1/models` in the prompts above. This model needs one change from the wizard defaults. These settings were tested with Hermes Agent v0.21.7; the rest of this page was verified with v0.18.0.
+
+- **Reasoning effort:** the wizard's default (`medium`) fails with `HTTP 400: DeepSeek V4.1 reasoning_effort must be low, high, xhigh, max, or an integer within [1, 100]`.
+- **Tool calls:** with reasoning on, a request that follows a tool call can fail with `duplicate field \`reasoning\``.
+
+Turn reasoning off by adding this to `~/.hermes/config.yaml`. Keep the quotes around `"none"`; `hermes config set agent.reasoning_effort none` writes an empty value instead and has no effect:
+
+```yaml
+agent:
+  reasoning_effort: "none"
+```
+
+Then verify chat and a tool round trip:
+
+```shell
+hermes -z "Reply exactly HERMES_OK"
+hermes -z "Use the terminal tool to run exactly: printf HERMES_TOOL_OK. Do not run any other command. Report the command output."
+```
+
+The second command should report `HERMES_TOOL_OK`. To try it once without changing the config, add `--reasoning none` to the command. Answer quality with reasoning turned off has not been evaluated.
 
 **Non-interactive SSH fallback:** If the installer prints **"Setup wizard skipped (no terminal available)"**, or if you are validating the playbook through non-interactive SSH, configure the local vLLM endpoint with Hermes' config command instead of the prompts above:
 
@@ -188,11 +213,11 @@ The installer walks you through an interactive setup wizard. This playbook uses 
 export PATH="$HOME/.local/bin:$PATH"
 hermes config set model.provider custom
 hermes config set model.base_url http://localhost:8000/v1
-hermes config set model.default nvidia/Qwen3.6-35B-A3B-NVFP4
+hermes config set model.default <served-model-id>
 hermes -z "Reply exactly HERMES_OK"
 ```
 
-The last command should return `HERMES_OK`, confirming that Hermes can call the local vLLM model without opening the TUI.
+Replace `<served-model-id>` with the model ID returned by `curl -sS http://localhost:8000/v1/models`. The last command should return `HERMES_OK`, confirming that Hermes can call the local vLLM model without opening the TUI.
 
 ### 3c. Choose the terminal backend
 
@@ -218,7 +243,7 @@ You now have a working Hermes install for terminal use. Steps 4–8 below are op
 
 You configured an initial model during the Hermes install. To switch to a different one later, restart vLLM serving the new model handle, then re-point Hermes at the same local endpoint.
 
-1. Stop the current vLLM server, then use the appropriate canonical recipe in the [Serve LLMs with vLLM](https://build.nvidia.com/spark/vllm/intermediate) playbook for the new model. Do not reuse Qwen3.6-specific settings for a different model unless that recipe documents them.
+1. Stop the current vLLM server, then use the recipe for the new model in the [Serve LLMs with vLLM](https://build.nvidia.com/playbooks/vllm/advanced) playbook (or the [vLLM cluster](https://build.nvidia.com/playbooks/vllm-cluster/beginner) playbook for a cluster). Do not reuse the previous model's settings for a different model unless that recipe documents them.
      
 2. Launch the Hermes model picker:
 
@@ -279,7 +304,7 @@ The command pulls the latest Hermes version, applies any required dependency cha
 
 > [!WARNING] This removes the Hermes installation and any gateway service you configured. By default, `~/.hermes/` (configuration, conversation history, and skills) is preserved unless you opt into a full uninstall at the on-screen prompt.
 
-If you started vLLM in Step 2, stop the server. If you launched it as an NVIDIA Sync custom app from the [Serve LLMs with vLLM](https://build.nvidia.com/spark/vllm/intermediate) playbook, stop it from NVIDIA Sync.
+If you started vLLM in Step 2, stop the server. If you launched it as an NVIDIA Sync custom app from the [Serve LLMs with vLLM](https://build.nvidia.com/playbooks/vllm/intermediate) playbook, stop it from NVIDIA Sync.
 
 Run cleanup from an **interactive terminal**. The uninstaller may refuse non-interactive subprocesses and still asks you to choose whether to keep data or perform a full uninstall. For a full wipe, choose **Full uninstall** and type **`yes`** at the confirmation prompt.
 
@@ -382,34 +407,6 @@ sudo journalctl -u <hermes-gateway-unit> -e --no-pager -n 50
 
    From here you can send any prompt you would normally type in the TUI — Hermes will run on your hardware platform and stream the response back to Telegram.
 
-## Agent-ready Models
-
-## Agent-ready models for Hermes
-
-Hermes expects an **OpenAI-compatible** local endpoint. This playbook uses **vLLM** and the agent-ready model recipe validated for the supported hardware platform below.
-
-Serve the model with the [Serve LLMs with vLLM](https://build.nvidia.com/spark/vllm/intermediate) playbook (Intermediate tab), then return here to install and configure Hermes.
-
-### Recommended models by hardware platform
-
-| Hardware platform | Recommended agent-ready model | Serve with |
-| :---- | :---- | :---- |
-| **DGX Spark** | Agent-ready Qwen3.6-35B-A3B (NVFP4) — `nvidia/Qwen3.6-35B-A3B-NVFP4` | [vLLM playbook — Intermediate](https://build.nvidia.com/spark/vllm/intermediate) |
-
-Only platforms listed in the Supported hardware platforms table (Overview) are listed above.
-
-### After the model is serving
-
-1. Confirm the OpenAI-compatible API on port **8000**:
-
-```shell
-curl -sS http://localhost:8000/v1/models
-```
-
-You should see a JSON `"data"` array that includes your served model handle.
-
-2. Continue with the **Instructions** tab to install Hermes and point it at `http://localhost:8000/v1`.
-
 ## Troubleshooting
 
 ## Common issues
@@ -419,14 +416,16 @@ You should see a JSON `"data"` array that includes your served model handle.
 | `hermes: command not found` after install | Shell profile not reloaded in the current session | Run `source ~/.bashrc` (or `source ~/.zshrc`) and retry. Open a new terminal if the issue persists. |
 | `source ~/.bashrc` works in an interactive terminal, but `hermes` is still missing from a scripted SSH command | Many Ubuntu `.bashrc` files return early for non-interactive shells before the installer-added PATH lines run | In automation, run `export PATH="$HOME/.local/bin:$PATH"` before `hermes`, or call `~/.local/bin/hermes` directly. |
 | `sudo: hermes: command not found` during gateway install, uninstall, or printed `sudo hermes …` steps | `sudo` resets `PATH` and does not see the user-level `hermes` shim | Run `which hermes` as your normal user, then invoke that path with sudo, e.g. `sudo "$(which hermes)" uninstall` or `sudo /full/path/from/which/hermes gateway …`. |
-| Installer prints **"Setup wizard skipped (no terminal available)"** | The installer was launched from a non-interactive shell, CI job, or SSH command without a usable TTY | Either re-run `hermes setup` in an interactive terminal, or configure the endpoint directly: `hermes config set model.provider custom`, `hermes config set model.base_url http://localhost:8000/v1`, and `hermes config set model.default nvidia/Qwen3.6-35B-A3B-NVFP4`. |
+| `HTTP 400: DeepSeek V4.1 reasoning_effort must be low, high, xhigh, max, or an integer…` on the first chat (DGX Station) | The Hermes wizard default reasoning effort `medium` is not accepted by DeepSeek V4.1 Flash | Set `agent.reasoning_effort: "none"` (quoted) in `~/.hermes/config.yaml`; see Instructions, DGX Station: DeepSeek V4.1 Flash settings. |
+| `duplicate field \`reasoning\`` after a tool call (DGX Station) | With reasoning on, the follow-up request carries both `reasoning` and `reasoning_content` and vLLM's Rust frontend rejects it | Turn reasoning off as above, or run `hermes --reasoning none`. `hermes config set agent.reasoning_effort none` does not work because it writes an empty value. |
+| Installer prints **"Setup wizard skipped (no terminal available)"** | The installer was launched from a non-interactive shell, CI job, or SSH command without a usable TTY | Either re-run `hermes setup` in an interactive terminal, or configure the endpoint directly: `hermes config set model.provider custom`, `hermes config set model.base_url http://localhost:8000/v1`, and `hermes config set model.default <served-model-id>` (the ID returned by `curl http://localhost:8000/v1/models`). |
 | Installer cannot install `ripgrep` / `ffmpeg`, or prints `Non-interactive mode and no terminal available` | Optional helper install needs `sudo`, but the current shell cannot prompt for a password | Install manually in an interactive terminal with `sudo apt install -y ripgrep ffmpeg`. Hermes still runs without them, but file search is slower and TTS voice-message support is limited. |
 | Browser tools show `system dependency not met`, or Playwright Chromium install fails | Playwright needs Linux shared libraries installed through `sudo`, and the installer could not obtain sudo access | Core chat still works. To enable browser tools, run `cd ~/.hermes/hermes-agent && npx playwright install --with-deps chromium` in an interactive terminal and enter your sudo password. |
 | You want the gateway to start at boot, but `hermes gateway install` creates a user service | Current Hermes installs a user service by default unless `--system` is supplied | Use `sudo "$(which hermes)" gateway install --system --run-as-user "$USER"` (or replace `$(which hermes)` with `~/.local/bin/hermes` if needed). |
 | `hermes uninstall --yes` says it requires an interactive terminal, or still prompts for uninstall options | The uninstaller protects data deletion and expects a real TTY for confirmation | Run it directly in your terminal, or allocate a TTY over SSH (`ssh -t <host> 'hermes uninstall'`). For a full wipe, select **Full uninstall** and type `yes` when prompted. |
 | Installer asks about **OpenClaw import / migration** | Another agent framework was previously installed | For this playbook, answer **`n`**. OpenClaw migration is **out of scope** here and can leave gateway or messaging state confusing. If you already migrated by mistake, use **Start over from scratch** below. |
 | `~/.hermes` still exists after `uninstall` | Uninstaller preserves data unless you explicitly remove it | This is expected in some flows. Remove manually only if you want a full wipe: `rm -rf ~/.hermes` (see **Start over from scratch**). |
-| Hermes installer can't list any models at the model-selection prompt | vLLM is not running yet or is still loading the checkpoint | Sanity-check the endpoint in another terminal: `curl http://localhost:8000/v1/models` should return a `"data"` array containing your served model handle (for example `nvidia/Qwen3.6-35B-A3B-NVFP4`). If it is empty or unreachable, confirm the vLLM container is up and has finished loading (watch its terminal for `Application startup complete`), then re-run the Hermes installer. |
+| Hermes installer can't list any models at the model-selection prompt | vLLM is not running yet or is still loading the checkpoint | Sanity-check the endpoint in another terminal: `curl http://localhost:8000/v1/models` should return a `"data"` array containing your served model ID. If it is empty or unreachable, confirm the vLLM container is up and has finished loading (watch its terminal for the ready message), then re-run the Hermes installer. |
 | `Connection refused` to `http://localhost:8000/v1` from Hermes | vLLM server not running, still loading, or wrong port | Confirm the vLLM container is up and listening on `8000` (`docker ps`, then `curl http://localhost:8000/v1/models`). If it exited, relaunch it (see Instructions — Step 2). |
 | Out-of-memory or very slow inference | Served model is too large for available GPU memory, or other GPU workloads are competing | Check usage with `nvidia-smi`, free GPU memory by closing other workloads, or relaunch vLLM with a lower `--gpu-memory-utilization` / `--max-model-len` (or a smaller model handle) and re-point Hermes via `hermes model`. |
 | `hermes update` fails or the gateway does not restart | Gateway service still bound to the previous version, or insufficient permissions on a system-service install | Re-run `sudo "$(which hermes)" update` if the gateway was installed as a **System service** and plain `hermes update` cannot restart it. If the service is stuck, restart it manually: `sudo systemctl restart <hermes-gateway-unit>`. |

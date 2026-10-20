@@ -1,0 +1,60 @@
+# Adapted from NVIDIA Local AI Inference Recipes:
+# https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-spark-2gpu/index.html?model=z-ai%2Fglm-5.3-flash&os=linux&backend=vllm&memory=128&precision=fp4-local&memoryConfig=128
+# Pull the named image on the head before --setup. --no-build copies it without replacing it.
+# launch-cluster.sh adds the node count, node ranks, rendezvous address, and --headless.
+name: GLM 5.3 Flash on two 128GB DGX Sparks
+recipe_version: '1'
+model: nvidia/GLM-5.3-Flash-FP4-Local
+container: eugr/spark-vllm-b12x:nightly-20261015
+cluster_only: true
+build_args:
+- --no-build
+env:
+  CUTE_DSL_ARCH: sm_121a
+  SAFETENSORS_FAST_GPU: '1'
+  VLLM_ENABLE_ROCE_ALLREDUCE: '1'
+  VLLM_ROCE_ALLREDUCE_MAX_SIZE: 2MB
+  NCCL_BUFFSIZE: '1048576'
+  NCCL_MAX_CTAS: '8'
+  VLLM_WORKER_MULTIPROC_METHOD: spawn
+  VLLM_SSM_CONV_STATE_LAYOUT: DS
+  VLLM_USE_AOT_COMPILE: '1'
+  VLLM_USE_MEGA_AOT_ARTIFACT: '1'
+  VLLM_USE_V2_MODEL_RUNNER: '1'
+  VLLM_ENABLE_PCIE_ALLREDUCE: '0'
+  B12X_POLICY_MODE: auto
+  VLLM_B12X_MOE_FP4_FORCE_A16: '1'
+  B12X_W4A16_A4_PREFILL: '1'
+defaults:
+  host: 0.0.0.0
+  port: 8000
+  tensor_parallel: 2
+  gpu_memory_utilization: 0.87
+  max_model_len: 500000
+command: |
+  vllm serve nvidia/GLM-5.3-Flash-FP4-Local \
+    --host {host} \
+    --port {port} \
+    --tensor-parallel-size {tensor_parallel} \
+    --pipeline-parallel-size 1 \
+    --decode-context-parallel-size 1 \
+    --mamba-cache-mode align \
+    --enable-prefix-caching \
+    --enable-chunked-prefill \
+    --dtype bfloat16 \
+    --kv-cache-dtype fp8 \
+    --quantization modelopt_mixed \
+    --attention-backend B12X \
+    --block-size 256 \
+    --moe-backend b12x \
+    --linear-backend b12x \
+    --no-enable-flashinfer-autotune \
+    --load-format b12x \
+    --max-model-len {max_model_len} \
+    --max-num-seqs 4 \
+    --max-num-batched-tokens 4096 \
+    --speculative-config '{{"method":"mtp","num_speculative_tokens":5,"moe_backend":"humming","attention_backend":"B12X"}}' \
+    --reasoning-parser glm45 \
+    --tool-call-parser glm47 \
+    --enable-auto-tool-choice \
+    --gpu-memory-utilization {gpu_memory_utilization}

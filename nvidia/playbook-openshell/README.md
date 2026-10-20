@@ -88,7 +88,7 @@ You will install the OpenShell CLI (`openshell`), deploy a gateway on your hardw
 
 ## Supported hardware platforms
 
-Use the matrix below to confirm your hardware platform, OS, memory, and whether multi-node applies. The same OpenShell + Pi workflow applies across supported hardware platforms. Model recommendations differ by platform — see [vLLM Inference](https://build.nvidia.com/spark/vllm/intermediate).
+Use the matrix below to confirm your hardware platform, OS, memory, and whether multi-node applies. The same OpenShell + Pi workflow applies across supported hardware platforms. Set up the inference backend with the [vLLM playbook](https://build.nvidia.com/playbooks/vllm/advanced) for a single device or the [vLLM cluster playbook](https://build.nvidia.com/playbooks/vllm-cluster/beginner) for a cluster; model recommendations differ by platform.
 
 | Hardware platform | OS | Memory  | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- |
@@ -103,7 +103,7 @@ Use the matrix below to confirm your hardware platform, OS, memory, and whether 
 **Hardware requirements**
 
 - Supported hardware platform — see Supported hardware platforms matrix above
-- Sufficient memory for your chosen model (see [vLLM Inference](https://build.nvidia.com/spark/vllm/intermediate))
+- Sufficient memory for your chosen model (see the [vLLM playbook](https://build.nvidia.com/playbooks/vllm/advanced) for single-device recipes or the [vLLM cluster playbook](https://build.nvidia.com/playbooks/vllm-cluster/beginner) for clusters)
 
 **Software requirements**
 
@@ -122,8 +122,8 @@ Use the matrix below to confirm your hardware platform, OS, memory, and whether 
   - The sandbox default policy denies all outbound traffic not explicitly allowed. Misconfigured policies may block legitimate agent traffic; use `openshell logs` to diagnose.
   - Large model downloads may fail on unstable networks.
 - **Rollback:** Delete the sandbox with `openshell sandbox delete <sandbox-name>`, stop the gateway, and remove the vLLM container if you started one. See cleanup in the **Instructions** tab.
-- **Last Updated:** 10/14/2026
-  - Model and launch recipe links now point to the vLLM Inference page (Intermediate tab) because the vLLM playbook no longer has an Agent-ready Models tab
+- **Last Updated:** 10/19/2026
+  - Set up the inference backend from the vLLM playbook (single device) or the vLLM cluster playbook (cluster)
   - Rewritten for OpenShell 0.1.0: reference agent changed from OpenClaw to Pi, custom provider profiles replace managed inference routing, and the sandbox deploy flow builds a bring-your-own agent image instead of using a prebuilt community sandbox
 
 ## Instructions
@@ -227,14 +227,22 @@ Follow gateway logs in real time (press `Ctrl+C` to exit) using the following co
 journalctl --user -u openshell-gateway -f
 ```
 
-## Step 5. Serve a model with vLLM
+## Step 5. Set up the inference backend with vLLM
 
-Serve an OpenAI-compatible API for local inference. Use the recommended model and launch recipe for your hardware platform from [vLLM Inference](https://build.nvidia.com/spark/vllm/intermediate) (covers DGX Spark and DGX Station). Keep `--host 0.0.0.0` and port `8000` so sandboxes can reach the server.
+Set up an OpenAI-compatible API for local inference with the vLLM playbooks, which cover model and recipe selection for your hardware platform:
+
+- **Single device:** follow [Serve LLMs with vLLM](https://build.nvidia.com/playbooks/vllm/advanced).
+- **Cluster:** follow [Serve LLMs with vLLM on a cluster](https://build.nvidia.com/playbooks/vllm-cluster/beginner).
+
+Keep `--host 0.0.0.0` and port `8000` so sandboxes can reach the server.
+
+> [!NOTE]
+> If you already started a vLLM endpoint, for example by following the [Advanced tab](https://build.nvidia.com/playbooks/vllm/advanced), reuse that endpoint instead of serving a different model. Set `MODEL_HANDLE` (exported below) to the exact model ID returned by `curl http://localhost:8000/v1/models`.
 
 > [!IMPORTANT]
 > Do not bind the server to `localhost` only. Sandboxes reach host-local services through the `host.openshell.internal` DNS alias (Step 6), which resolves to the gateway host — not to `127.0.0.1` inside the sandbox's own network namespace.
 
-Once the server reports `Application startup complete`, verify the localhost endpoint:
+Once the server is ready (its log reports `Application startup complete` (or `OpenAI server is ready to accept requests` with the Rust frontend); `curl -sf http://localhost:8000/health` returns HTTP 200), verify the localhost endpoint:
 
 ```bash
 curl -sf http://localhost:8000/v1/models

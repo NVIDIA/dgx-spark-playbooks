@@ -8,6 +8,7 @@
 - [Cable the Devices](#cable-the-devices)
   - [Two-device direct link](#two-device-direct-link)
   - [Three-device direct ring](#three-device-direct-ring)
+  - [Four-device direct ring](#four-device-direct-ring)
   - [Switch-connected devices](#switch-connected-devices)
 - [Configure with NVIDIA Sync](#configure-with-nvidia-sync)
 - [Configure Manually](#configure-manually)
@@ -105,6 +106,7 @@ The procedure changes based on the number of devices and whether you use a switc
 | --- | --- | --- |
 | Two | Direct | One cable between the devices |
 | Three | Direct ring | Three cables; each device links to the other two |
+| Four | Direct ring | Four cables; each device links to the next device, and the last device links back to the first |
 | Two or more | Switch | One cable and one 200 Gbit/s link from each device to the switch |
 
 NVIDIA Sync and the provided helper support up to four devices through a switch. Larger switch clusters need manual configuration or your own automation.
@@ -158,6 +160,23 @@ Use the following cabling pattern to meet the NVIDIA provided helper's interface
 | 2 | Spark 2, port 0 | Spark 3, port 1 |
 | 3 | Spark 3, port 0 | Spark 1, port 1 |
 
+### Four-device direct ring
+
+Use four QSFP cables to make a ring.
+Each Spark will have **two** QSFP cables plugged into it.
+Connect port 0 of each Spark to port 1 of the next Spark.
+The last cable connects Spark 4 back to Spark 1 and closes the ring.
+
+Use this layout only with the Configure Manually tab.
+
+| Cable | From | To |
+| --- | --- | --- |
+| 1 | Spark 1, port 0 | Spark 2, port 1 |
+| 2 | Spark 2, port 0 | Spark 3, port 1 |
+| 3 | Spark 3, port 0 | Spark 4, port 1 |
+| 4 | Spark 4, port 0 | Spark 1, port 1 |
+
+Spark 1 and Spark 3 are not connected directly. Spark 2 and Spark 4 are not connected directly.
 
 ### Switch-connected devices
 
@@ -301,196 +320,199 @@ The ConnectX-7 network and inter-device SSH are now ready.
 
 ## Configure a DGX Spark cluster manually
 
-You will use the NVIDIA provided cluster helper scripts to configure the ConnectX-7 network and SSH access between DGX Sparks.
+You will use the `setup-cluster.sh` helper script from the [spark-vllm-docker](https://github.com/eugr/spark-vllm-docker) repository to configure the ConnectX-7 network and SSH access between DGX Sparks.
 
-You will follow the basic procedure and the choices that depend on your layout, so you can generalize the process to a larger cluster.
+The same script covers every layout in Cable the Devices: two devices with a direct link, three devices in a ring, four devices in a ring, and devices through a switch.
 
-The helper supports two to four devices. For more than four devices through a switch, use the same procedure with manual configuration or your own automation.
+The full reference for the script is [Automated cluster setup](https://github.com/eugr/spark-vllm-docker/blob/main/docs/NETWORKING.md#automated-cluster-setup) in that repository.
 
 > [!NOTE]
-> The helper changes network and SSH settings on each device. If NVIDIA Sync has already configured your cluster successfully, continue to your workload playbook.
+> The script changes network, SSH, and Docker group settings on each device. If NVIDIA Sync has already configured your cluster successfully, continue to your workload playbook.
 
 ## Step 1. Physically connect the devices
 
 **Follow the port wiring table for your layout in Cable the Devices.**
 
-The cables (and switch) establish the physical links. 
-In the following steps, you will use the helper scripts to configure the network so the devices are reachable by other software and workloads over those links.
+The cables (and switch) establish the physical links.
+In the following steps, you will use the script to configure the network so the devices are reachable by other software and workloads over those links.
 
-The cabling tab includes the port-to-port connections and switch preparation. 
-Complete those before checking the interfaces in Step 4.
+The cabling tab includes the port-to-port connections and switch preparation.
+Complete those before you run the script.
+The script does not configure the switch.
+## Step 2. Check the requirements on every device
 
-## Step 2. Pick a device in the cluster and download the helper scripts to it
+The script connects to every device over SSH on your management LAN. Each device must meet these requirements:
 
-You do **not** run the helper script from your laptop.
-You **must** run it from one of the devices (or "nodes") that you connected above in Step 1. 
+| Requirement | Details |
+| --- | --- |
+| Management IP address | Each device has an IPv4 address on your LAN that you can reach with SSH |
+| User account | The same username exists on every device, and that account has `sudo` access |
+| Software | Ubuntu Netplan with its Python `yaml` module, Python 3.10 or later, OpenSSH client and server, `ip`, `ping`, `ssh-keygen`, and `runuser` |
+| ConnectX-7 interfaces | The interfaces use the standard DGX Spark names, and they are not renamed, bonded, bridged, or attached to a VLAN |
 
-**First, choose one Spark from which to set up the cluster and open a terminal on it.**
+You do not need passwordless SSH before you start.
+The script asks for the account password when it first needs it.
+The script keeps the password in memory only. It does not write the password to a file.
 
-The helper script does its work no matter which node you pick. It sets up all of the devices (or "nodes") in the cluster from that one node, so that each node has the correct network configuration relative to the other nodes.
+The script does not install packages. If a package is missing, install it before you continue.
 
-The node you pick is configured as part of the cluster too, so at the end of the process all of the nodes are ready to use.
+## Step 3. Pick a device in the cluster and download the script to it
 
-**Then clone the NVIDIA playbook repository to that device, open the helper folder and inspect the files.**
+You do **not** run the script from your laptop.
+You **must** run it from one of the devices (or "nodes") that you connected in Step 1.
+
+**First, choose one Spark to be the head node and open a terminal on it.**
+
+The script sets up all of the nodes from the head node.
+The head node is configured as part of the cluster too, so at the end of the process all of the nodes are ready to use.
+For a ring, use Spark 1 from the wiring table as the head node.
+
+Run the script as your normal login user. Do not run it with `sudo`.
+
+**Then clone the repository to the head node and open its folder.**
 
 ```bash
-git clone https://github.com/NVIDIA/dgx-spark-playbooks
-cd dgx-spark-playbooks/nvidia/playbook-connect-multiple-sparks/assets/spark_cluster_setup
+git clone https://github.com/eugr/spark-vllm-docker.git
+cd spark-vllm-docker
 ```
 
-If you inspect the individual files, you can piece together the overall process of how the ConnectX-7 network can be configured in more general situations than those shown here.
+Only the head node needs the repository. The script sends its node helper to the other devices over SSH.
 
-| Files | Role | Behavior |
-| --- | --- | --- |
-| `spark_cluster_setup.sh` | Entry point for running checks or setup | You run it with a configuration file and a check or setup option in Steps 4 and 5 |
-| `spark_cluster_setup.py` | Coordinates checks, network setup, and SSH access across the devices | Invoked by `spark_cluster_setup.sh` |
-| `node_scripts/detect_and_configure_cluster_networking.py` | Discovers connections and configures network addresses on each device | Copied to each device and invoked by `spark_cluster_setup.py` during setup |
-| `config/*` | JSON files specifying device SSH information on the LAN | Used by `spark_cluster_setup.py` for `sudo` privileges and setting up inter-device SSH |
-
-## Step 3. Edit the appropriate JSON file to enable inter-device SSH 
-
-The helper script inspects all devices to verify the cabled layout and coordinate the interfaces, IP address and network plans for implementation on each device. 
-In addition, inter-device communications need to be set up with key based SSH access to avoid requiring a password.
-Finally, implementing a network configuration requires `sudo` permissions on each device. 
-
-So, you need to give the script the IP addresses, usernames and related passwords.   
-
-**First, copy the appropriate JSON template for your device count.**
-
-1. Select the appropriate JSON template from the table below, `<cluster-count.json>`
-2. Copy the template to a new file, `config/my-cluster.json`
-3. Change the permissions on the file so it's visible only to the user on the head node: chmod 600 config/my-cluster.json
-
-| Number of nodes | Sample file |
+| Files | Role |
 | --- | --- |
-| Two devices, direct or switch | `config/spark_config_b2b.json` |
-| Three devices, ring or switch | `config/spark_config_ring.json` |
-| Four devices through a switch | `config/spark_config_switch.json` |
+| `setup-cluster.sh` | Entry point. You run it with the management IP addresses and options in Steps 4 and 5 |
+| `setup-cluster.py` | Plans the network, sets up SSH, applies the configuration, and verifies it across the devices |
+| `setup_cluster_node.py` | Runs on each device to inspect interfaces, write Netplan files, and save backups |
 
-**Then, edit the copy to include every device to be clustered, including the head node.**
+## Step 4. Preview the setup with a dry run
 
-1. Open the file with a file editor like `vim`
-2. Edit the individual entries with the appropriate information from the table below
-3. Make sure to have correct entries for each device, including the head node
-4. Finally, save the file
+**Find the management IP address of each device.**
 
-| Field | Value to supply |
+List the addresses with the head node first.
+For a ring, list the devices in cable order: Spark 1, Spark 2, Spark 3, and then Spark 4 if present.
+In a ring, port 0 of each device connects to port 1 of the next device. This matches the wiring table in Cable the Devices.
+
+**Run the command for your layout with `--dry-run`.**
+
+Replace the example addresses with your management IP addresses.
+
+| Layout | Command |
 | --- | --- |
-| `ip_address` | The device's existing management IP address on your LAN |
-| `port` | Its SSH port, normally `22` |
-| `user` | A login account with sudo access |
-| `password` | The password for that account |
+| Two Sparks, direct | `./setup-cluster.sh 192.168.1.11 192.168.1.12 --topology direct --mtu 9000 --dry-run` |
+| Three Sparks, ring | `./setup-cluster.sh 192.168.1.11 192.168.1.12 192.168.1.13 --topology mesh --mtu 1500 --dry-run` |
+| Four Sparks, ring | `./setup-cluster.sh 192.168.1.11 192.168.1.12 192.168.1.13 192.168.1.14 --topology ring --mtu 1500 --dry-run` |
+| Sparks through a switch | `./setup-cluster.sh 192.168.1.11 192.168.1.12 192.168.1.13 192.168.1.14 --topology switch --mtu 1500 --dry-run` |
 
-> [!WARNING]
-> The JSON file stores passwords as plain text. Delete it when setup completes.
+Use `--mtu 9000` only for two Sparks with a direct link. Use `--mtu 1500` for all other layouts. These values match the MTU that NVIDIA Sync Cluster Assistant sets. If you leave out `--mtu`, the script uses 9000 for every layout.
 
-## Step 4. Run the setup script to inspect the ConnectX-7 interfaces, links and link speeds. 
+The script uses the name `mesh` for the three-device ring, because three devices in a ring are also a full mesh.
+The script uses the name `ring` for four devices in a ring.
 
-The helper uses the login details in your JSON file to check each device before changing the network:
+If you list the ring devices in the wrong order, the verification step fails. If LLDP is already running on the devices, the script compares your order with the LLDP neighbors and rejects an order that does not match.
+
+If you leave out `--topology`, the script tries to detect the layout from the active ports. With one active port on each device, the script selects `direct` for two devices and `switch` for three or more. The script cannot tell a two-device switch from a direct link, so give `--topology` for every layout.
+
+The dry run checks SSH and `sudo` access, inspects the ConnectX-7 interfaces, and validates the planned Netplan configuration in a temporary folder. The dry run does not change the network or SSH settings.
+
+**If a check fails, use the error information to fix the issue before you run the script again.**
+
+**Success:** The output shows the planned interface addresses for each device and ends with `Dry run complete; no persistent configuration was changed.`
+
+## Step 5. Run the setup
+
+**Run the same command without `--dry-run`.**
+
+For example, for two Sparks with a direct link:
+
+```bash
+./setup-cluster.sh 192.168.1.11 192.168.1.12 --topology direct --mtu 9000
+```
+
+The script prints the plan again and asks `Apply this cluster setup plan? [y/N]`. Review the plan, then type `y`.
+
+If the script shows an unknown host key fingerprint, verify the fingerprint before you accept it.
+
+`netplan apply` can briefly interrupt networking. Run the setup when the cluster is idle.
+
+**The script makes these changes on every device:**
 
 ```text
-Check LAN SSH and sudo access → Check active ConnectX-7 interfaces → Check link speeds
+Back up files → Create SSH keys → Add Docker group membership → Apply Netplan → Verify links and SSH → Save .env on the head node
 ```
 
-`spark_cluster_setup.py` coordinates these checks from the node where you run the helper. Pre-validation does not assign cluster addresses or change SSH settings.
+| Change | Location |
+| --- | --- |
+| ConnectX-7 network settings, with static IPv4 addresses and the MTU you selected | `/etc/netplan/98-spark-vllm-docker.yaml` |
+| A separate Ed25519 SSH key for each device | `~/.ssh/spark-vllm-cluster/` |
+| SSH settings that select that key for the cluster addresses | A block at the top of `~/.ssh/config` |
+| Public keys of all devices | `~/.ssh/authorized_keys` |
+| Membership in the `docker` group | The current user on every device |
+| Backups for the restore step | `/var/lib/spark-vllm-docker/setup-cluster/` on each device |
+| Restore manifest | `~/.local/state/spark-vllm-docker/cluster-setup.json` on the head node |
+| Launch configuration for spark-vllm-docker | `.env` in the repository folder on the head node |
 
-**Run the setup script with the pre-validation flag.** 
+The script also moves existing ConnectX-7 entries out of other files in `/etc/netplan` into its own file, so Netplan does not combine old addresses with the new ones. The script backs up those files first.
 
-```bash
-bash spark_cluster_setup.sh -c config/my-cluster.json --pre-validate-only
-```
+If setup fails or you press Ctrl-C, the script tries to roll back the changes on every device.
 
-**If a check fails, use the error information to troubleshoot the issue before re-running the script.**
+The script assigns `/24` subnets from `10.20.0.0/16` and gives each device the host numbers `.11`, `.12`, and so on, in the order you listed the devices.
+We recommend `/24` subnets for the ConnectX-7 network. NCCL uses `/24` as the default subnet size for subnet-aware routing. If you plan the network yourself, also use `/24` subnets.
+Each QSFP port has two Ethernet interfaces, one for each PCIe path, so each link uses two subnets.
 
-On failure, the script will output an error with relevant information for you to troubleshoot.
-
-**Success:** The output will print `Pre-setup validations completed successfully.`
-
-## Step 5. Back up the existing network implementation and create a new one to include the ConnectX-7 interfaces
-
-
-The helper repeats the checks from Step 4, then runs `detect_and_configure_cluster_networking.py` on each device. That script discovers the connected peers and turns the chosen addresses into a saved network configuration:
-
-```text
-Discover connections → Choose addresses → Build Netplan YAML → Save the file → Apply it
-```
-
-Netplan is how Linux reads and applies the saved interface and address settings. After the network scripts finish, the coordinator checks cluster connectivity and sets up key-based SSH between devices. It uses the LAN connections to coordinate the process throughout.
-
-**Back up existing network configuration on every device before applying changes.**
-
-The network script writes `/etc/netplan/40-cx7.yaml` on each device and replaces that file if it already exists. Preserve the existing file and inspect other Netplan files configuring the same interfaces, since Netplan combines their settings. See [Inspect and Verify a ConnectX-7 Cluster Network Plan](https://docs.nvidia.com/sync/latest/cluster-network-inspection.html) for how to inspect the saved configuration and compare it with the active network.
-
-
-**Run the helper from its own folder:**
-
-```bash
-bash spark_cluster_setup.sh -c config/my-cluster.json --run-setup
-```
-
-**The subnet plan follows the layout.**
-
-For these configurations, each connected QSFP port needs two subnets, one for each Ethernet interface representing a PCIe path. Corresponding interfaces on connected peers must share the appropriate subnet.
-
-| Layout | Subnet pattern | What changes as you adapt the setup |
-| --- | --- | --- |
-| Two Sparks, direct | Two subnets across the single cable | Match each subnet between the corresponding interfaces on both Sparks |
-| Three Sparks, ring | Two subnets per cable; six across the ring | Match assignments to the actual cable endpoints; each Spark participates in four subnets |
-| Sparks through a switch | Two shared subnets across the cluster | Give each additional Spark a unique address in each subnet |
+| Layout | Subnet pattern |
+| --- | --- |
+| Two Sparks, direct | Two subnets across the single cable |
+| Three Sparks, ring | Two subnets per cable; six across the ring |
+| Four Sparks, ring | Two subnets per cable; eight across the ring |
+| Sparks through a switch | Two shared subnets across the cluster; each Spark gets one address in each subnet |
 
 See [Understand the ConnectX-7 Network](https://docs.nvidia.com/dgx/dgx-spark/spark-clustering.html#understand-the-connectx-7-network) for the hardware explanation, subnet design, and addressing details.
 
-**For a larger switch cluster, extend the address plan across all nodes.**
+For other options, such as another subnet range or port selection, see [Automated cluster setup](https://github.com/eugr/spark-vllm-docker/blob/main/docs/NETWORKING.md#automated-cluster-setup).
 
-Adding a Spark requires another address in each of the two shared subnets, rather than another subnet pair. Choose subnets with enough available addresses for the planned cluster and room for expansion. Keep them separate from your management LAN and other existing networks.
+**Success:** The script prints `Cluster networking and mutual passwordless SSH are configured and verified.`
 
-Apply the matching interface and address settings on every node using Netplan or your own automation. Confirm the switch has enough suitable ports and capacity. Then establish passwordless SSH between the accounts that will run your workloads. A common username simplifies configuration; otherwise specify the destination user explicitly.
+Before it prints this message, the script checks ping on both interface paths at the full MTU, in both directions. The script also checks passwordless SSH from every device to every other device.
 
-For helper setup, the scripts create or reuse `~/.ssh/id_ed25519_shared`, distribute that shared key, and update SSH configuration. For your own setup, you can instead authorize each node's public key on its peers with `ssh-copy-id`. Configure access in every required direction.
+## Step 6. Log in again and verify the result
 
-**Verify the resulting network on every node.**
+**Open a new login session on each device.**
 
-Compare the Netplan configuration with the active interfaces and addresses, then test the peers expected for your topology.
+The `docker` group change applies only to new login sessions. Existing SSH sessions keep their old groups.
 
-| Check | Command | Expected result |
-| --- | --- | --- |
-| Active links | `ip -br link` | Connected interfaces show `LOWER_UP`; unused ports may show `NO-CARRIER` |
-| Assigned addresses | `ip -br addr` | Both interfaces of each connected port have addresses in their respective planned subnets |
-| Route to a peer | `ip route get <peer-cluster-IP>` | The route selects the intended ConnectX-7 interface |
-| Communication on each path | `ping -I <interface> -c 3 <peer-cluster-IP>` | The corresponding peer responds through that interface |
-| Passwordless SSH | `ssh -o BatchMode=yes <user>@<peer-cluster-IP> hostname` | The expected hostname prints without a password prompt |
-
-Verify and accept each peer's host key during an initial interactive SSH connection before using `BatchMode=yes`.
-
-Use cluster addresses for these checks. In a ring, choose the peer address on the subnet shared by the source and that peer; not every address on a peer is reachable through every link.
-
-See [Inspect and Verify a ConnectX-7 Cluster Network Plan](https://docs.nvidia.com/sync/latest/cluster-network-inspection.html) for how to compare configured and active settings and identify the expected peers. For helper setup, inspect `40-cx7.yaml` rather than the NVIDIA Sync filename used in that guide.
-
-**Success:** The helper prints `Spark cluster setup completed successfully.`, and the checks confirm the subnet plan, communication over both interface paths, and passwordless SSH between the required accounts.
-
-## Step 6. Remove the password file
-
-**After setup works, delete the JSON file containing the passwords:**
+**Run the doctor check from the head node.**
 
 ```bash
-rm config/my-cluster.json
+./setup-cluster.sh --doctor --dry-run
 ```
 
-If you used your own automation, remove any temporary credential files it created.
+The doctor check confirms the saved files, ConnectX-7 addresses, routes, MTU, links, passwordless SSH, the launch configuration, and Docker access. The command returns a nonzero exit status if any issue remains.
+
+**Success:** The output ends with `Doctor: all saved configuration, CX7 links, SSH, and Docker checks passed.`
+
+To repair the issues that the doctor check finds, run `./setup-cluster.sh --doctor` without `--dry-run`. The script lists the repairs and asks before it applies them.
 
 ## Next steps
 
 Open the distributed workload playbook you want to use. It provides the application configuration and performance tests for the network you just established.
 
-## Roll back the manual setup
+## Roll back the setup
 
-**Inspect the active configuration before restoring the previous settings.**
+**Run the restore command on the same head node, as the same user.**
 
-Follow [Inspect and Verify a ConnectX-7 Cluster Network Plan](https://docs.nvidia.com/sync/latest/cluster-network-inspection.html#remove-the-connectx-7-netplan-configuration-on-an-individual-node), using the filename your setup created. The helper uses `/etc/netplan/40-cx7.yaml`; NVIDIA Sync uses `/etc/netplan/99-nvidia-sync-cluster.yaml`.
+```bash
+./setup-cluster.sh --restore
+```
 
-Restore a saved configuration if setup replaced an existing file. If the cluster file was newly created, move it out of `/etc/netplan`, then regenerate and try the restored configuration as described in the documentation. Verify management access and confirm the cluster addresses have been removed.
+Restore uses the manifest on the head node and the backups on each device. Keep these files until restore is complete. Every device must be reachable over the management LAN.
 
-Network rollback does not remove SSH changes. Remove only the key authorizations and SSH settings added for this cluster. For a switch, also restore any port, bridge or VLAN, DHCP, link speed, or MTU settings you changed.
+Restore puts back the original Netplan, SSH, and `.env` files with their original permissions. Restore also removes the SSH keys and files that the script created, and reapplies the previous network configuration. Restore removes the `docker` group membership only if the script added it.
+
+If you edited a file that the script manages after setup, restore stops and names that file. Reconcile your edits, then run restore again.
+
+To change the layout, the head node, or the addresses, run restore first. Then run the setup again.
+
+For a switch, also restore any port, bridge or VLAN, DHCP, link speed, or MTU settings you changed on the switch.
 
 ## Troubleshooting
 

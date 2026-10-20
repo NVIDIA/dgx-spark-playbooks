@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-NAME="vllm-qwen36-35b-a3b"
+# Recipe commands: commands-DGX Spark | 128GB unified memory | [Qwen3.8 27B (NVFP4).md
+NAME="vllm-spark-128gb-qwen38-27b"
 PORT=8000
 HF_CACHE_DIR="${HF_HOME:-$HOME/.cache/huggingface}"
+CONTAINER_ID=""
 WAITER=""
 STATUS_FILE="$(mktemp)"
 
@@ -14,8 +16,10 @@ cleanup() {
     kill "${WAITER}" >/dev/null 2>&1 || true
     wait "${WAITER}" >/dev/null 2>&1 || true
   fi
-  docker stop "${NAME}" >/dev/null 2>&1 || true
-  docker rm "${NAME}" >/dev/null 2>&1 || true
+  if [[ -n "${CONTAINER_ID}" ]]; then
+    docker stop "${CONTAINER_ID}" >/dev/null 2>&1 || true
+    docker rm "${CONTAINER_ID}" >/dev/null 2>&1 || true
+  fi
   rm -f "${STATUS_FILE}"
   exit "${status}"
 }
@@ -24,46 +28,46 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 trap 'exit 129' HUP
 
-mkdir -p "$HOME/.cache/vllm" "$HOME/.cache/flashinfer" \
-  "$HOME/.cache/triton"
+mkdir -p "${HF_CACHE_DIR}" "$HOME/.cache/vllm" \
+  "$HOME/.cache/flashinfer" "$HOME/.triton"
+
 docker rm -f "${NAME}" >/dev/null 2>&1 || true
 
-docker run -d \
+CONTAINER_ID="$(docker run -d \
   --name "${NAME}" \
   --gpus all \
   --ipc host \
+  --network host \
+  --shm-size=16g \
   --ulimit memlock=-1 \
   --ulimit stack=67108864 \
   --entrypoint "" \
-  -p "127.0.0.1:${PORT}:8000" \
-  -v "$HF_CACHE_DIR:/root/.cache/huggingface:ro" \
+  -e "HF_TOKEN=${HF_TOKEN:-}" \
+  -v "${HF_CACHE_DIR}:/root/.cache/huggingface" \
   -v "$HOME/.cache/vllm:/root/.cache/vllm" \
   -v "$HOME/.cache/flashinfer:/root/.cache/flashinfer" \
-  -v "$HOME/.cache/triton:/root/.triton" \
-  -e HF_HUB_OFFLINE=1 \
-  -e VLLM_USE_RUST_FRONTEND=1 \
+  -v "$HOME/.triton:/root/.triton" \
   vllm/vllm-openai:v0.28.0 \
-  vllm serve nvidia/Qwen3.6-35B-A3B-NVFP4 \
-    --served-model-name nvidia/Qwen3.6-35B-A3B-NVFP4 \
-    --host 0.0.0.0 \
-    --port 8000 \
+  vllm serve nvidia/Qwen3.8-27B-NVFP4 \
+    --host 127.0.0.1 \
+    --port "${PORT}" \
     --trust-remote-code \
-    --enable-auto-tool-choice \
-    --tool-call-parser qwen3_coder \
-    --reasoning-parser qwen3 \
     --kv-cache-dtype fp8 \
-    --attention-backend flashinfer \
-    --moe-backend marlin \
-    --gpu-memory-utilization 0.5 \
+    --gpu-memory-utilization 0.8 \
     --max-model-len 262144 \
     --max-num-seqs 8 \
-    --max-num-batched-tokens 8192 \
+    --max-num-batched-tokens 16384 \
     --enable-chunked-prefill \
     --async-scheduling \
     --enable-prefix-caching \
-    --load-format fastsafetensors
+    --speculative-config '{"method":"dflash","model": "z-lab/Qwen3.8-27B-DFlash2", "num_speculative_tokens":8}' \
+    --load-format safetensors \
+    --reasoning-parser qwen3 \
+    --tool-call-parser qwen3_xml \
+    --enable-auto-tool-choice)"
 
-docker wait "${NAME}" > "${STATUS_FILE}" &
+# Keep this script running so Sync can stop the container when the app closes.
+docker wait "${CONTAINER_ID}" > "${STATUS_FILE}" &
 WAITER=$!
 wait "${WAITER}"
 WAITER=""
