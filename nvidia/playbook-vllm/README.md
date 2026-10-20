@@ -342,7 +342,7 @@ Use [NVIDIA Local AI Inference Recipes](https://nvidia.github.io/local-ai-infere
 | --- | --- | --- | --- |
 | DGX Spark | 64GB unified memory | [Qwen3.8 27B (NVFP4)](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-spark/index.html?model=qwen%2Fqwen3.8-27b&os=linux&backend=vllm&memory=64&precision=nvfp4&variant=&memoryConfig=64) | [64GB Spark recipes](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-spark/index.html?memoryConfig=64) |
 | DGX Spark | 128GB unified memory | [Qwen3.8 27B (NVFP4)](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-spark/index.html?model=qwen%2Fqwen3.8-27b&os=linux&backend=vllm&memory=128&precision=nvfp4&variant=&memoryConfig=128) | [128GB Spark recipes](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-spark/index.html?memoryConfig=128) |
-| DGX Station | 748GB coherent memory | See the note below | [Station recipes](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-station/index.html?memoryConfig=748) |
+| DGX Station | 748GB coherent memory | [DeepSeek V4 Flash 0731](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-station/index.html?model=deepseek%2Fdeepseek-v4-flash-0731&os=linux&backend=vllm&memory=&precision=fp4-fp8-mixed&variant=&memoryConfig=748) | [Station recipes](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-station/index.html?memoryConfig=748) |
 
 The recommended Spark model is also one of the models in the Intermediate tab, so you can use either path.
 If you pick a different model in the recipe page, check its prerequisites before you download it.
@@ -359,7 +359,7 @@ For example, a low-precision checkpoint needs a backend that can load and run it
 Start with the full configuration from one recipe.
 
 > [!NOTE]
-> [DeepSeek V4.1 Flash on Station](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-station/index.html?model=deepseek%2Fdeepseek-v4.1-flash&os=linux&backend=vllm&precision=fp4-fp8-mixed&memoryConfig=748) has extra host-memory, swap, and disk requirements. Its setup command includes a pinned model download and file-cache preparation. Keep those steps with the launch command.
+> [DeepSeek V4 Flash 0731 on Station](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-station/index.html?model=deepseek%2Fdeepseek-v4-flash-0731&os=linux&backend=vllm&memory=&precision=fp4-fp8-mixed&variant=&memoryConfig=748) is the recommended Station recipe. The recipe page marks it experimental. Its setup command uses `--gpus all`, so on a Station with more than one GPU, select the GB300 as described in Step 3. Keep the recipe's setup and launch commands together.
 
 **Success:** You have saved a complete recipe for your device and chosen model.
 
@@ -491,7 +491,7 @@ curl --fail-with-body -sS http://localhost:8000/v1/chat/completions \
 Reasoning can use the output-token budget before an answer appears; follow the recipe's request settings or raise the budget if the response ends with `finish_reason: length`.
 
 > [!NOTE]
-> For DeepSeek V4.1 Flash, add `"chat_template_kwargs":{"thinking":false}` to the JSON body of both tests here for a check with reasoning off. Reasoning controls differ by model; use the selected model's settings.
+> For DeepSeek V4 Flash, add `"chat_template_kwargs":{"thinking":false}` to the JSON body of both tests here for a check with reasoning off. Reasoning controls differ by model; use the selected model's settings.
 
 **Finally, test a tool call.**
 
@@ -586,7 +586,7 @@ If laptop port `8000` is busy, change the leftmost port to `8001` and use `http:
 
 **For Hermes or OpenShell, continue with the matching playbook.**
 
-- In the [Hermes playbook](https://build.nvidia.com/playbooks/hermes-agent), use the host-local API URL and the served model ID. For DeepSeek V4.1 Flash, follow that playbook's model-specific reasoning settings.
+- In the [Hermes playbook](https://build.nvidia.com/playbooks/hermes-agent), use the host-local API URL and the served model ID. For DeepSeek, follow that playbook's model-specific reasoning settings.
 - In the [OpenShell playbook](https://build.nvidia.com/playbooks/openshell), reuse this endpoint and continue at Step 6 after exporting `MODEL_HANDLE` as in its Step 5. Use the ID from `/v1/models`; the recipe may give the service an alias.
 
 **Success:** Your client reaches the existing vLLM service and uses the model you tested.

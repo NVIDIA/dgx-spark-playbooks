@@ -237,7 +237,7 @@ Set up an OpenAI-compatible API for local inference with the vLLM playbooks, whi
 Keep `--host 0.0.0.0` and port `8000` so sandboxes can reach the server.
 
 > [!NOTE]
-> If you already started a vLLM endpoint, for example by following the [Advanced tab](https://build.nvidia.com/playbooks/vllm/intermediate), reuse that endpoint instead of serving a different model. Set `MODEL_HANDLE` (exported below) to the exact model ID returned by `curl http://localhost:8000/v1/models`.
+> If you already started a vLLM endpoint, for example by following the [Intermediate tab](https://build.nvidia.com/playbooks/vllm/intermediate), reuse that endpoint instead of serving a different model. Set `MODEL_HANDLE` (exported below) to the exact model ID returned by `curl http://localhost:8000/v1/models`.
 
 > [!IMPORTANT]
 > Do not bind the server to `localhost` only. Sandboxes reach host-local services through the `host.openshell.internal` DNS alias (Step 6), which resolves to the gateway host — not to `127.0.0.1` inside the sandbox's own network namespace.

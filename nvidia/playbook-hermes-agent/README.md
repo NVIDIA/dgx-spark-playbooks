@@ -186,7 +186,7 @@ The installer walks you through an interactive setup wizard. This playbook uses 
 
 #### DGX Station: DeepSeek V4.1 Flash settings
 
-On DGX Station, serve DeepSeek V4.1 Flash with the vLLM playbook's [Advanced tab](https://build.nvidia.com/playbooks/vllm/intermediate), then use the exact model ID returned by `/v1/models` in the prompts above. This model needs one change from the wizard defaults. These settings were tested with Hermes Agent v0.21.7; the rest of this page was verified with v0.18.0.
+On DGX Station, serve DeepSeek V4.1 Flash with the vLLM playbook's [Intermediate tab](https://build.nvidia.com/playbooks/vllm/intermediate), then use the exact model ID returned by `/v1/models` in the prompts above. This model needs one change from the wizard defaults. These settings were tested with Hermes Agent v0.21.7; the rest of this page was verified with v0.18.0.
 
 - **Reasoning effort:** the wizard's default (`medium`) fails with `HTTP 400: DeepSeek V4.1 reasoning_effort must be low, high, xhigh, max, or an integer within [1, 100]`.
 - **Tool calls:** with reasoning on, a request that follows a tool call can fail with `duplicate field \`reasoning\``.
