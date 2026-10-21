@@ -101,9 +101,9 @@ You cannot eliminate all risk; proceed at your own risk. **Recommended security 
 - **Estimated time:** 30 MIN for install and first-time terminal setup; model download time depends on size and network speed. Optional Telegram setup adds time.  
 - **Risk level:** **Medium** — the agent can execute commands and persist skills. Risk increases if you enable an optional messaging gateway without restricting allowed user IDs, or expose the local model endpoint beyond `localhost`. Always follow the security measures above.  
 - **Rollback:** Run `hermes uninstall` (with `sudo` if you installed a gateway as a system service) to remove Hermes, any gateway service, and the shell-profile entry. The data directory `~/.hermes` may still be present afterward; remove it manually if you want a full reset (see Cleanup in Instructions and the Troubleshooting tab). Stop the vLLM container separately (`docker rm` / `docker rmi`) if desired.  
-- **Last Updated:** 10/19/2026  
+- **Last Updated:** 10/21/2026
   - Removed the Agent-ready Models tab; set up the inference backend from the vLLM playbook (single device) or the vLLM cluster playbook (cluster)
-  - Added DGX Station with `deepseek-ai/DeepSeek-V4.1-Flash`, including the reasoning setting it needs
+  - Aligned DGX Station guidance with DeepSeek V4 Flash 0731 in the vLLM Advanced tab; QA verified Hermes chat and tool use with `medium` reasoning
   - Telegram messaging moved to an optional section at the bottom of Instructions; core path is terminal-only
 
 ## Instructions
@@ -136,6 +136,7 @@ git --version
 Hermes will be configured against a local, OpenAI-compatible endpoint, so an inference backend must be running before you launch the Hermes installer. Set one up with the vLLM playbooks, which cover model and recipe selection for your hardware platform:
 
 - **Single device:** follow [Serve LLMs with vLLM](https://build.nvidia.com/playbooks/vllm/intermediate).
+- **DGX Station recommended model:** follow the [vLLM Advanced tab](https://build.nvidia.com/playbooks/vllm/advanced) for DeepSeek V4 Flash 0731 and its GB300 GPU selection instructions.
 - **Cluster:** follow [Serve LLMs with vLLM on a cluster](https://build.nvidia.com/playbooks/vllm-cluster/intermediate).
 
 Choose a model that supports tool calling, and keep the server running in a **separate terminal** (or as an NVIDIA Sync app) so it can run alongside Hermes. Note the model ID it serves. If Hermes runs on the same device as vLLM, the OpenAI-compatible API is at `http://localhost:8000/v1`; otherwise use the address of the node that serves the API.
@@ -184,18 +185,17 @@ The installer walks you through an interactive setup wizard. This playbook uses 
      
 6. **"Display name [Local (localhost:8000)]"** — Press **Enter** to accept the suggested label, or type a custom name to identify this endpoint in the Hermes UI.
 
-#### DGX Station: DeepSeek V4.1 Flash settings
+#### DGX Station: DeepSeek V4 Flash 0731 settings
 
-On DGX Station, serve DeepSeek V4.1 Flash with the vLLM playbook's [Intermediate tab](https://build.nvidia.com/playbooks/vllm/intermediate), then use the exact model ID returned by `/v1/models` in the prompts above. This model needs one change from the wizard defaults. These settings were tested with Hermes Agent v0.21.7; the rest of this page was verified with v0.18.0.
+On DGX Station, serve DeepSeek V4 Flash 0731 with the vLLM playbook's [Advanced tab](https://build.nvidia.com/playbooks/vllm/advanced), using the recommended [0731 recipe](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-station/index.html?model=deepseek%2Fdeepseek-v4-flash-0731&os=linux&backend=vllm&memory=&precision=fp4-fp8-mixed&variant=&memoryConfig=748). Use the exact model ID returned by `/v1/models` in the prompts above.
 
-- **Reasoning effort:** the wizard's default (`medium`) fails with `HTTP 400: DeepSeek V4.1 reasoning_effort must be low, high, xhigh, max, or an integer within [1, 100]`.
-- **Tool calls:** with reasoning on, a request that follows a tool call can fail with `duplicate field \`reasoning\``.
+Keep Hermes's `medium` reasoning setting. QA validated CLI chat, a terminal-tool round trip, and a multi-turn TUI session with this setting on 2026-10-21, using a DGX Station GB300, driver 610.43.02, and `vllm/vllm-openai:v0.31.0`. The vLLM API checks, including tool-result continuation, also passed. The installation walkthrough elsewhere on this page was verified with Hermes Agent v0.18.0.
 
-Turn reasoning off by adding this to `~/.hermes/config.yaml`. Keep the quotes around `"none"`; `hermes config set agent.reasoning_effort none` writes an empty value instead and has no effect:
+If you previously set reasoning to `"none"` for the older V4.1 Flash path, update the existing setting in `~/.hermes/config.yaml` when switching to 0731:
 
 ```yaml
 agent:
-  reasoning_effort: "none"
+  reasoning_effort: "medium"
 ```
 
 Then verify chat and a tool round trip:
@@ -205,7 +205,7 @@ hermes -z "Reply exactly HERMES_OK"
 hermes -z "Use the terminal tool to run exactly: printf HERMES_TOOL_OK. Do not run any other command. Report the command output."
 ```
 
-The second command should report `HERMES_TOOL_OK`. To try it once without changing the config, add `--reasoning none` to the command. Answer quality with reasoning turned off has not been evaluated.
+The second command should report `HERMES_TOOL_OK`. This validation covers the 0731 checkpoint and recipe; it does not establish a fix for the older V4.1 Flash startup or reasoning errors.
 
 **Non-interactive SSH fallback:** If the installer prints **"Setup wizard skipped (no terminal available)"**, or if you are validating the playbook through non-interactive SSH, configure the local vLLM endpoint with Hermes' config command instead of the prompts above:
 
@@ -416,8 +416,8 @@ sudo journalctl -u <hermes-gateway-unit> -e --no-pager -n 50
 | `hermes: command not found` after install | Shell profile not reloaded in the current session | Run `source ~/.bashrc` (or `source ~/.zshrc`) and retry. Open a new terminal if the issue persists. |
 | `source ~/.bashrc` works in an interactive terminal, but `hermes` is still missing from a scripted SSH command | Many Ubuntu `.bashrc` files return early for non-interactive shells before the installer-added PATH lines run | In automation, run `export PATH="$HOME/.local/bin:$PATH"` before `hermes`, or call `~/.local/bin/hermes` directly. |
 | `sudo: hermes: command not found` during gateway install, uninstall, or printed `sudo hermes …` steps | `sudo` resets `PATH` and does not see the user-level `hermes` shim | Run `which hermes` as your normal user, then invoke that path with sudo, e.g. `sudo "$(which hermes)" uninstall` or `sudo /full/path/from/which/hermes gateway …`. |
-| `HTTP 400: DeepSeek V4.1 reasoning_effort must be low, high, xhigh, max, or an integer…` on the first chat (DGX Station) | The Hermes wizard default reasoning effort `medium` is not accepted by DeepSeek V4.1 Flash | Set `agent.reasoning_effort: "none"` (quoted) in `~/.hermes/config.yaml`; see Instructions, DGX Station: DeepSeek V4.1 Flash settings. |
-| `duplicate field \`reasoning\`` after a tool call (DGX Station) | With reasoning on, the follow-up request carries both `reasoning` and `reasoning_content` and vLLM's Rust frontend rejects it | Turn reasoning off as above, or run `hermes --reasoning none`. `hermes config set agent.reasoning_effort none` does not work because it writes an empty value. |
+| `HTTP 400: DeepSeek V4.1 reasoning_effort must be low, high, xhigh, max, or an integer…` on the first chat (older DGX Station V4.1 Flash path) | The older V4.1 Flash configuration did not accept `medium`; this error was not observed in QA's recommended 0731 test | Follow the vLLM Advanced tab for DeepSeek V4 Flash 0731 and the Instructions section “DGX Station: DeepSeek V4 Flash 0731 settings”; `medium` passed with 0731. For the older V4.1 path only, the documented workaround was `agent.reasoning_effort: "none"` (quoted) in `~/.hermes/config.yaml`. |
+| `duplicate field \`reasoning\`` after a tool call (older DGX Station V4.1 Flash path) | In the older tested configuration, follow-up requests carried both `reasoning` and `reasoning_content`, which vLLM's Rust frontend rejected | The recommended 0731 path passed tool-result continuation and Hermes tool use with `medium`. For the older V4.1 path only, the documented workaround was `hermes --reasoning none` or the quoted config setting above; `hermes config set agent.reasoning_effort none` wrote an empty value. These 0731 results do not establish a V4.1 fix. |
 | Installer prints **"Setup wizard skipped (no terminal available)"** | The installer was launched from a non-interactive shell, CI job, or SSH command without a usable TTY | Either re-run `hermes setup` in an interactive terminal, or configure the endpoint directly: `hermes config set model.provider custom`, `hermes config set model.base_url http://localhost:8000/v1`, and `hermes config set model.default <served-model-id>` (the ID returned by `curl http://localhost:8000/v1/models`). |
 | Installer cannot install `ripgrep` / `ffmpeg`, or prints `Non-interactive mode and no terminal available` | Optional helper install needs `sudo`, but the current shell cannot prompt for a password | Install manually in an interactive terminal with `sudo apt install -y ripgrep ffmpeg`. Hermes still runs without them, but file search is slower and TTS voice-message support is limited. |
 | Browser tools show `system dependency not met`, or Playwright Chromium install fails | Playwright needs Linux shared libraries installed through `sudo`, and the installer could not obtain sudo access | Core chat still works. To enable browser tools, run `cd ~/.hermes/hermes-agent && npx playwright install --with-deps chromium` in an interactive terminal and enter your sudo password. |

@@ -91,6 +91,10 @@ export class ArangoDBService {
         url: connectionUrl,
         databaseName: dbName,
         auth: { username: user, password: pass },
+        // ArangoDB rejects chunked request bodies with HTTP 501. In Next.js
+        // production builds arangojs would otherwise send them without a
+        // Content-Length header.
+        forceContentLength: true,
       });
       this.connectionUrl = connectionUrl;
 

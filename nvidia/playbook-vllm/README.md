@@ -181,14 +181,19 @@ The recipe links give you more detail about the model settings used by these scr
 | DGX Spark | 64GB unified memory | [Qwen3.8 27B (NVFP4)](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-spark/index.html?model=qwen%2Fqwen3.8-27b&os=linux&backend=vllm&memory=64&precision=nvfp4&variant=&memoryConfig=64) | `docker pull vllm/vllm-openai:v0.28.0` | `hf download nvidia/Qwen3.8-27B-NVFP4` |
 | DGX Spark | 64GB unified memory | [Nemotron 3.5 Bolt 74B A9B](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-spark/index.html?model=nvidia%2Fnemotron-3.5-bolt-74b-a9b&os=linux&backend=vllm&memory=64&precision=iq2&variant=&memoryConfig=64) | `docker pull eugr/spark-vllm:nightly-20261016` | `hf download nvidia/NVIDIA-Nemotron-3.5-Bolt-74B-A9B-24GB` |
 | DGX Spark | 128GB unified memory | [Qwen3.8 Flash-Next](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-spark/index.html?model=qwen%2Fqwen3.8-flash-next&os=linux&backend=vllm&memory=128&precision=fp4-local&variant=&memoryConfig=128) | `docker pull eugr/spark-vllm-b12x:nightly-20261015` | `hf download nvidia/Qwen3.8-Flash-Next-FP4-Local` |
-| DGX Spark | 128GB unified memory | [Qwen3.8 27B (NVFP4)](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-spark/index.html?model=qwen%2Fqwen3.8-27b&os=linux&backend=vllm&memory=128&precision=nvfp4&variant=&memoryConfig=128) | `docker pull vllm/vllm-openai:v0.28.0` | `hf download nvidia/Qwen3.8-27B-NVFP4` |
+| DGX Spark | 128GB unified memory | [Qwen3.8 27B (NVFP4)](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-spark/index.html?model=qwen%2Fqwen3.8-27b&os=linux&backend=vllm&memory=128&precision=nvfp4&variant=&memoryConfig=128) | `docker pull nvcr.io/nvidia/vllm:26.10.pre1-py3@sha256:cb38bbefdbc3e9fe045f931dd72cbd58cd48985c7e09916bcc6c15c10f39b929` | `hf download nvidia/Qwen3.8-27B-NVFP4` |
 | DGX Station | 748GB coherent memory | [Qwen3.8 Flash-Next](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-station/index.html?model=qwen%2Fqwen3.8-flash-next&os=linux&backend=vllm&memory=&precision=nvfp4&variant=&memoryConfig=748) | `docker pull vllm/vllm-openai:qwen38-flash-next` | `hf download Inferact/Qwen3.8-Flash-Next-NVFP4` |
 | DGX Station | 748GB coherent memory | [Nemotron 3 Super 120B A12B](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-station/index.html?model=nvidia%2Fnemotron-3-super-120b-a12b&os=linux&backend=vllm&memory=&precision=nvfp4&variant=mtp&memoryConfig=748) | `docker pull vllm/vllm-openai:v0.31.0` | `hf download nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4` |
+
+The 128GB Spark Qwen3.8 27B script follows the [recipe at revision `7d1162c`](https://github.com/NVIDIA/local-ai-inference-recipes/blob/7d1162cfb965847d9412cef9bd5c5d4ade53d957/models/qwen/qwen3.8-27b/dgx-spark/linux/vllm/128gb/nvfp4/recipe.yaml), with the image pinned to its recorded tested digest. Keep its `0.60` memory target, kernel settings, and DFlash2 configuration together. The recipe reports startup instability at higher memory targets and requires the image's DFlash2 prefix-cache correctness fix. The script mounts only the Hugging Face cache to preserve the image's prebuilt kernel caches. Sync adds loopback binding and container start/stop handling; those adaptations need separate validation on a 128GB Spark.
 
 **Next, download the container and model on the DGX device.**
 
 1. Run the `docker pull` command from your row and wait for it to finish
 2. Run the `hf download` command from the same row and wait for it to finish
+
+> [!NOTE]
+> You can speed up the model download by temporarily setting `HF_HUB_DISABLE_XET=1` in the download command, i.e. `HF_HUB_DISABLE_XET=1 hf download <model>`. 
 
 **If you selected Qwen3.8 27B or Nemotron 3.5 Bolt, download the draft model needed for speculative decoding.**
 
@@ -336,7 +341,7 @@ Once the endpoint works, you can tune it for your workload, save the launch comm
 
 **First, open the recipe page for your device and memory size.**
 
-Use [NVIDIA Local AI Inference Recipes](https://nvidia.github.io/local-ai-inference-recipes/) to select a model, checkpoint precision, and vLLM configuration.
+Use [NVIDIA Local AI Inference Recipes](https://nvidia.github.io/local-ai-inference-recipes/) to select a model and vLLM configuration.
 
 | Device | Memory | Recommended model | Recipes |
 | --- | --- | --- | --- |
