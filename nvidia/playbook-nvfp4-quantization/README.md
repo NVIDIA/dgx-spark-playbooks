@@ -96,7 +96,8 @@ df -h .
   - Quantization is memory-intensive and can fail if GPU memory is insufficient
   - Output files are large and need adequate storage
 - **Rollback:** Remove the output directory and optionally remove pulled Docker images to restore the original state (see Cleanup in Instructions)
-- **Last Updated:** 08/03/2026
+- **Last Updated:** 10/21/2026
+  - Fixed the DGX Spark quantization command to use the `examples/llm_ptq/` script path for Model Optimizer 0.41.0
   - Updated Model Optimizer documentation and GitHub links after repository rename
   - 07/27/2026: Added supported hardware platforms matrix
 
@@ -184,7 +185,7 @@ docker run --rm -it --gpus all --ipc=host --ulimit memlock=-1 --ulimit stack=671
     git clone -b 0.41.0 --single-branch https://github.com/NVIDIA/Model-Optimizer.git /app/Model-Optimizer && \
     cd /app/Model-Optimizer && pip install -e '.[dev]' && \
     export ROOT_SAVE_PATH='/workspace/output_models' && \
-    /app/Model-Optimizer/examples/hf_ptq/scripts/huggingface_example.sh \
+    /app/Model-Optimizer/examples/llm_ptq/scripts/huggingface_example.sh \
     --model 'deepseek-ai/DeepSeek-R1-Distill-Llama-8B' \
     --quant nvfp4 \
     --tp 1 \
@@ -194,6 +195,7 @@ docker run --rm -it --gpus all --ipc=host --ulimit memlock=-1 --ulimit stack=671
 ```
 
 > [!NOTE]
+> - Model Optimizer `0.41.0` has the quantization script under `examples/llm_ptq/`. The `examples/hf_ptq/` path used in the DGX Station command exists only from `0.47.0`.
 > - Model Optimizer `0.41.0` keeps the container's PyTorch and Transformers versions. Newer releases, such as `0.47.0`, replace them during `pip install`, and the container's TensorRT-LLM then fails to load after export.
 > - `--calib_dataset cnn_dailymail` avoids needing access to the gated `nvidia/Nemotron-Post-Training-Dataset-v2` calibration dataset. If your `HF_TOKEN` has access to that dataset, you can remove this flag to use the default.
 > - On a 64 GB DGX Spark, Model Optimizer may offload part of the model to CPU when little GPU memory is free at launch. This is expected. With `0.41.0`, quantization and export still complete.

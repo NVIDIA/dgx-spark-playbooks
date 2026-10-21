@@ -126,7 +126,8 @@ All policy snippets and example prompts in this playbook are inline in the appli
 - **Estimated time:** 30–45 MIN to walk through all four applications. Each application individually takes 5–10 minutes once the prerequisites are in place. Plan an extra 10 minutes for the one-time [Policy Setup](https://build.nvidia.com/playbooks/nemoclaw-applications/policy-setup) tab if you have not enabled Telegram yet.
 - **Risk level:** **Medium.** Every application grants the agent additional capability beyond the default sandbox — outbound network for the news digest, filesystem access for code review, deck red-team, and calendar negotiation. Risk is reduced by tight per-application policies (host-level `chmod` on read-only source data backed by `share mount`'s SSHFS permission passthrough, scoped sandbox directories so the agent only sees one mounted tree at a time, explicit egress allowlists via `nemoclaw policy-add` presets, and in-prompt safety rules that survive single-message overrides) but is not eliminated. **Do not point these recipes at sensitive data, production accounts, or personal files** without reviewing the policy first.
 - **Rollback:** Each application tab includes a rollback section that either reverts the policy (network changes are hot-reloadable) or destroys and recreates the sandbox with the original policy. The [Troubleshooting](https://build.nvidia.com/playbooks/nemoclaw-applications/troubleshooting) tab covers common stuck-state recovery. You can always run `nemoclaw uninstall` to remove everything.
-- **Last Updated:** 09/30/2026
+- **Last Updated:** 10/21/2026
+  - Added `--stdin` to the tar-over-`nemoclaw exec` project uploads in the Software Development Agent, Deck Reviewer, and Calendar Negotiator tabs so the archive reaches the sandbox
   - Updated the example agent steps so sandbox setup, Telegram, scheduled digests, and troubleshooting match the current workflow.
 
 ## Daily Personal News Digest
@@ -361,12 +362,12 @@ mkdir -p ~/nemoclaw-projects
 cp -r ~/projects/my-app ~/nemoclaw-projects/my-app
 ```
 
-Now copy that working copy **into** the sandbox at `/sandbox/project`. The reliable, dependency-free way is to stream a tar over `nemoclaw exec` — it needs nothing installed on the host and works on every sandbox:
+Now copy that working copy **into** the sandbox at `/sandbox/project`. The reliable, dependency-free way is to stream a tar over `nemoclaw exec --stdin`. The `--stdin` flag forwards the archive from the host into the sandbox:
 
 ```bash
 ## Push the project into the sandbox
 tar czf - -C ~/nemoclaw-projects/my-app . \
-  | nemoclaw $SANDBOX_NAME exec -- bash -lc 'mkdir -p /sandbox/project && tar xzf - -C /sandbox/project'
+  | nemoclaw $SANDBOX_NAME exec --stdin -- bash -lc 'mkdir -p /sandbox/project && tar xzf - -C /sandbox/project'
 ```
 
 Confirm the project landed and that the sandbox cannot reach the public internet (the local inference endpoint stays available regardless — that's how the agent talks to the model):
@@ -632,12 +633,12 @@ ignore_paths:
 
 ### Bind the red-team directory into the sandbox
 
-Copy the red-team directory **into** the sandbox at `/sandbox/redteam`. The reliable, dependency-free way is to stream a tar over `nemoclaw exec` — it needs nothing installed on the host and works on every sandbox:
+Copy the red-team directory **into** the sandbox at `/sandbox/redteam`. The reliable, dependency-free way is to stream a tar over `nemoclaw exec --stdin`. The `--stdin` flag forwards the archive from the host into the sandbox:
 
 ```bash
 ## Push queue/, corpus/, profile.yaml, reports/, memory/ into the sandbox
 tar czf - -C ~/nemoclaw-redteam . \
-  | nemoclaw $SANDBOX_NAME exec -- bash -lc 'mkdir -p /sandbox/redteam && tar xzf - -C /sandbox/redteam'
+  | nemoclaw $SANDBOX_NAME exec --stdin -- bash -lc 'mkdir -p /sandbox/redteam && tar xzf - -C /sandbox/redteam'
 ```
 
 (Optional, strongly recommended) Make `queue/`, `corpus/`, and `profile.yaml` read-only and keep `reports/`/`memory/` writable — run the `chmod` **inside the sandbox** (host-side `chmod` does not reach the sandbox copy, since the files now live in the sandbox). This denies the agent (which runs as the unprivileged `sandbox` user) write access to your source artifacts and ground-truth corpus:
@@ -1061,12 +1062,12 @@ preferences:
 
 ### Bind the calendar directory into the sandbox
 
-Copy the calendar directory **into** the sandbox at `/sandbox/calendar`. The reliable, dependency-free way is to stream a tar over `nemoclaw exec` — it needs nothing installed on the host and works on every sandbox:
+Copy the calendar directory **into** the sandbox at `/sandbox/calendar`. The reliable, dependency-free way is to stream a tar over `nemoclaw exec --stdin`. The `--stdin` flag forwards the archive from the host into the sandbox:
 
 ```bash
 ## Push calendar.ics, profile.yaml, and bookings/ into the sandbox
 tar czf - -C ~/nemoclaw-calendar . \
-  | nemoclaw $SANDBOX_NAME exec -- bash -lc 'mkdir -p /sandbox/calendar && tar xzf - -C /sandbox/calendar'
+  | nemoclaw $SANDBOX_NAME exec --stdin -- bash -lc 'mkdir -p /sandbox/calendar && tar xzf - -C /sandbox/calendar'
 ```
 
 (Optional, strongly recommended) Make `calendar.ics` and `profile.yaml` read-only and keep `bookings/` writable — run the `chmod` **inside the sandbox** (the files now live there, so a host-side `chmod` would not reach them). The agent runs as the unprivileged `sandbox` user, so this denies it any overwrite of your source-of-truth calendar:

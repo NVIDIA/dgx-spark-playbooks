@@ -9,11 +9,6 @@
   - [JavaScript](#javascript)
   - [Python](#python)
   - [Bash](#bash)
-- [Agent-ready Models](#agent-ready-models)
-  - [Recommendations by hardware platform](#recommendations-by-hardware-platform)
-  - [DGX Spark: Agent-ready Qwen3.6-35B-A3B](#dgx-spark-agent-ready-qwen36-35b-a3b)
-  - [Verify from your laptop](#verify-from-your-laptop)
-  - [Next steps](#next-steps)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -82,15 +77,16 @@ Browse supported models and download paths on the [LM Studio model catalog](http
 | ----------------- | ------------ |
 | **DGX Spark** | [LM Studio model catalog](https://lmstudio.ai/models) |
 
-Example models validated for the workflow in this playbook:
+**Nemotron 3.5 Super VL (`nvidia/nemotron-3.5-super-vl`) is the recommended model for this playbook.** The Instructions tab uses it throughout.
+
+Example models:
 
 | Model | Model path |
 |-------|------------|
-| **Nemotron 3.5 Super VL** | `nvidia/nemotron-3.5-super-vl` |
-| **Qwen3.6-35B-A3B** | `qwen/qwen3.6-35b-a3b` |
+| **Nemotron 3.5 Super VL (recommended)** | `nvidia/nemotron-3.5-super-vl` |
 | **GPT-OSS-120B** | `openai/gpt-oss-120b` |
 
-Use the **Instructions** tab for the base workflow. For agentic workloads, see the **Agent-ready Models** tab.
+Use the **Instructions** tab for the base workflow.
 
 ## LM Link (optional)
 
@@ -116,8 +112,9 @@ Sample scripts for Step 7 of **Instructions** (hosted by LM Studio docs):
 - **Risk level:** Low
   - Large model downloads may take significant time depending on network speed
 - **Rollback:** Downloaded models can be removed manually from the models directory. Uninstall LM Studio or llmster (see Cleanup in the **Instructions** tab).
-- **Last Updated:** 07/31/2026
-  - Hardware platforms matrix, Find model recipes, and Agent-ready Models for serving LLMs with LM Studio
+- **Last Updated:** 10/21/2026
+  - Hardware platforms matrix and Find model recipes for serving LLMs with LM Studio
+  - Named Nemotron 3.5 Super VL as the recommended model and removed Qwen3.6-35B-A3B from the example models
 
 ## Instructions
 
@@ -185,7 +182,7 @@ LM Link is in **Preview** and is free for up to 2 users, 5 devices each. For det
 
 ## Step 5. Download a model to your hardware platform
 
-As an example, download **NVIDIA Nemotron 3.5 Super VL** from the LM Studio catalog (`nvidia/nemotron-3.5-super-vl`):
+Download **NVIDIA Nemotron 3.5 Super VL**, the recommended model for this playbook, from the LM Studio catalog (`nvidia/nemotron-3.5-super-vl`):
 
 ```bash
 lms get nvidia/nemotron-3.5-super-vl
@@ -242,7 +239,6 @@ bash run.sh
 ## Step 8. Next steps
 
 - Try downloading and serving different models from the [LM Studio model catalog](https://lmstudio.ai/models).
-- For agentic workloads, see the **Agent-ready Models** tab.
 - Use [LM Link](https://lmstudio.ai/link) to connect more devices and use models from your hardware platform from anywhere with end-to-end encryption.
 
 ## Step 9. Cleanup
@@ -254,55 +250,6 @@ If you want to remove the entire LM Studio application on a GUI client, quit LM 
 To uninstall llmster on the hardware platform, remove the folder `~/.lmstudio/llmster`.
 
 To remove downloaded models, delete the contents of `~/.lmstudio/models/`.
-
-## Agent-ready Models
-
-## Agent-ready models
-
-Agent-ready models are tuned for **agentic workloads** — tool calling, reasoning traces, and long multi-turn sessions. Use this tab to pick a recommended model for your hardware platform, then return to the **Instructions** tab for server setup and client scripts.
-
-Complete **Steps 1–3** in the **Instructions** tab first (install llmster and start the API server). Then download and load the recommended model below instead of the Nemotron example.
-
-### Recommendations by hardware platform
-
-| Hardware platform | Recommended agent-ready model | LM Studio model path |
-| ----------------- | ----------------------------- | -------------------- |
-| **DGX Spark** | Agent-ready Qwen3.6-35B-A3B | `qwen/qwen3.6-35b-a3b` |
-
-Only platforms listed in the Supported hardware platforms table (Overview) are listed above.
-
-### DGX Spark: Agent-ready Qwen3.6-35B-A3B
-
-Download and load the recommended agent-ready model on your hardware platform:
-
-```bash
-lms get qwen/qwen3.6-35b-a3b
-lms load qwen/qwen3.6-35b-a3b
-```
-
-Verify the model is available:
-
-```bash
-lms ls
-curl http://localhost:1234/api/v1/models
-```
-
-If you are calling from another machine on the LAN (without LM Link), use `http://<HARDWARE_IP>:1234` instead of `localhost`.
-
-For longer multi-turn agent sessions, load with a larger context window when supported:
-
-```bash
-lms load qwen/qwen3.6-35b-a3b --context-length 65536
-```
-
-### Verify from your laptop
-
-Use the client scripts from **Instructions** Step 7, or any tool that speaks the LM Studio / OpenAI-compatible API on port `1234`. With **LM Link**, point clients at `localhost:1234` after both devices join the same Link.
-
-### Next steps
-
-- **General serving workflow:** install, server start, and SDK scripts — see the **Instructions** tab
-- **More models:** [LM Studio model catalog](https://lmstudio.ai/models)
 
 ## Troubleshooting
 
