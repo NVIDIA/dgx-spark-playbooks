@@ -11,6 +11,8 @@ from megatron.bridge.training.mixed_precision import MixedPrecisionConfig, bf16_
 def nvfp4_mixed_precision() -> MixedPrecisionConfig:
     """NVFP4 mixed precision config with last 4 layers in BF16."""
     cfg = bf16_with_nvfp4_mixed()
+    # Keep NVFP4 compute enabled; use BF16 parameter storage for checkpoint compatibility.
+    cfg.fp4_param = False
     cfg.first_last_layers_bf16 = True
     cfg.num_layers_at_start_in_bf16 = 0
     cfg.num_layers_at_end_in_bf16 = 4

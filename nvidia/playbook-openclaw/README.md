@@ -66,7 +66,7 @@ Use the matrix below to confirm your hardware platform, OS, memory, and whether 
 
 | Hardware platform | OS | Memory  | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- |
-| **DGX Spark** | DGX OS (Linux) | 128 GB Unified Memory | — |
+| **DGX Spark** | DGX OS (Linux) | 64 GB or 128 GB Unified Memory | — |
 | **GeForce RTX** | Linux, Windows, WSL | Dedicated VRAM (size varies) | — |
 
 
@@ -95,7 +95,8 @@ This playbook is an **agent** workflow, not a general inference-serving guide. S
 - **Estimated time:** 30 MIN for install and first-time model setup; model download time depends on size and network
 - **Risk level:** **Medium to High**—the agent has access to whatever files, tools, and channels you configure. Risk increases significantly if you enable terminal/command execution skills or connect external accounts. Without proper isolation, this setup could expose sensitive data or allow code execution. **Always follow the security measures above.**
 - **Rollback:** Stop the OpenClaw gateway and uninstall via the same install script or by removing its directory; stop the local inference server separately if desired
-- **Last Updated:** 10/19/2026
+- **Last Updated:** 10/22/2026
+  - Updated the DGX Spark memory to "64 GB or 128 GB Unified Memory"
   - Removed the Agent-ready Models tab; set up the inference backend from the vLLM playbook (single device) or the vLLM cluster playbook (cluster)
   - Added supported hardware matrix for DGX Spark and RTX
 

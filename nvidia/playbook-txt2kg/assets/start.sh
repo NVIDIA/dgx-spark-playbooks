@@ -179,6 +179,25 @@ if ! eval "$CMD $PROFILES up -d --build"; then
   exit 1
 fi
 
+# docker compose can succeed while the app container exits afterward, so confirm
+# the Web UI answers before advertising it.
+if command -v curl >/dev/null 2>&1; then
+  WEB_UI_READY=false
+  for _ in $(seq 1 30); do
+    if curl -sfL http://localhost:3001 >/dev/null; then
+      WEB_UI_READY=true
+      break
+    fi
+    sleep 2
+  done
+  if [ "$WEB_UI_READY" != true ]; then
+    echo "" >&2
+    echo "ERROR: services started but the Web UI is not responding on http://localhost:3001." >&2
+    echo "       Check 'docker ps' and 'docker logs compose-app-1', then re-run ./start.sh." >&2
+    exit 1
+  fi
+fi
+
 echo ""
 echo "=========================================="
 echo "txt2kg is now running!"

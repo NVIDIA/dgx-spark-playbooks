@@ -57,10 +57,12 @@ The guided path supports two to four DGX Sparks. The command-line examples curre
 
 | Hardware platform | OS | Memory per device | Beginner | Intermediate | Advanced |
 | --- | --- | --- | :---: | :---: | :---: |
-| **Two DGX Sparks** | DGX OS (Linux) | 128 GB Unified Memory | ✅ | ✅ | ✅ |
-| **Three or four DGX Sparks** | DGX OS (Linux) | 128 GB Unified Memory | ✅ | — | — |
+| **Two DGX Sparks** | DGX OS (Linux) | 64 GB or 128 GB Unified Memory | ✅ | ✅ | ✅ |
+| **Three or four DGX Sparks** | DGX OS (Linux) | 64 GB or 128 GB Unified Memory | ✅ | — | — |
 
 The dashes mean this draft has no worked command-line example for those cluster sizes.
+
+Use DGX Sparks with the same memory size in one cluster: all 64 GB or all 128 GB.
 
 ## Prerequisites
 
@@ -85,7 +87,8 @@ The two-Spark worked example uses [`qwen3.8-27b-nvfp4-dflash2.yaml`](https://git
 - **Estimated time:** Plan for 30 minutes or longer when downloading a model for the first time. Cluster setup and download time vary with the number of devices and chosen model.
 - **Risk level:** Medium; the procedure changes the cluster network configuration and launches processes on multiple Sparks.
 - **Stop or rollback:** For Beginner, stop the model in NVIDIA Sync. For Intermediate and Advanced, stop the deployment on both Sparks from the head node before changing or deleting the cluster. Remove the cluster in NVIDIA Sync if you want to undo its network setup.
-- **Last Updated:** 09/28/2026
+- **Last Updated:** 10/22/2026
+  - Added 64 GB DGX Spark to the supported hardware matrix
   - Split the cluster workflow from the single-device vLLM playbook.
 
 ## Intermediate

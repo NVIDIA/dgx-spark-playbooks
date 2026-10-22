@@ -81,7 +81,7 @@ Use the matrix below to confirm your hardware platform, OS, memory, and multi-no
 
 | Hardware platform | OS | Memory  | Multi-node workflow |
 | :---- | :---- | :---- | :---- |
-| **DGX Spark** | DGX OS (Linux) | 128 GB Unified Memory | [Separate two-Spark guide](https://docs.nvidia.com/nemoclaw/latest/user-guide/openclaw/inference/local-inference/set-up-vllm-on-two-dgx-sparks) (Experimental; evaluation only) |
+| **DGX Spark** | DGX OS (Linux) | 64 GB or 128 GB Unified Memory | [Separate two-Spark guide](https://docs.nvidia.com/nemoclaw/latest/user-guide/openclaw/inference/local-inference/set-up-vllm-on-two-dgx-sparks) (Experimental; evaluation only) |
 | **DGX Station** | DGX OS (Linux) | Large HBM + Grace DRAM | ✅ (dual-node fabric) |
 
 
@@ -172,7 +172,8 @@ All required assets are handled by the NemoClaw installer. No manual cloning is 
 
 - **Estimated time:** 30–60 MIN for a first full pass (install, onboard, model download depending on choice and network). Large Express models can add substantial download time. Optional Brave, Telegram, and cloudflared steps add time if you do them in a second session. Multi-node model download and first start can take more than an hour.
 - **Risk level:** Medium — you are running an AI agent in a sandbox; risks are reduced by isolation but not eliminated. Use a clean environment and do not connect sensitive data or production accounts.
-- **Last Updated:** 10/14/2026
+- **Last Updated:** 10/22/2026
+  - Added 64 GB DGX Spark to the supported hardware matrix
   - Documented the Hugging Face CLI prerequisite for multi-node, the optional HF token for the Express download, the DGX Spark Express model, the uninstall step counter, and the preserved `portable` config subdirectory
   - The Multi-node tab now states that multi-node is not supported on DGX Station with Windows and WSL2
   - Open the Web UI with the dashboard link printed during setup.

@@ -45,7 +45,7 @@ Use the matrix below to confirm your hardware platform, recommended default loca
 
 | Hardware platform | OS | Memory | Recommended default local settings | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- | :---- |
-| **DGX Spark** | DGX OS (Linux) | 128 GB unified memory | Ollama backend with `gemma3:4b`; Live VLM WebUI installed with `pipx` | — |
+| **DGX Spark** | DGX OS (Linux) | 64 GB or 128 GB unified memory | Ollama backend with `gemma3:4b`; Live VLM WebUI installed with `pipx` | — |
 
 ## Prerequisites
 
@@ -84,7 +84,8 @@ No local ancillary files are required. The application and supporting documentat
   - The self-signed HTTPS certificate requires a one-time browser exception
   - Model downloads consume storage and network bandwidth
 - **Rollback:** Stop the application, then optionally uninstall it with `pipx uninstall live-vlm-webui`. This does not remove Ollama or downloaded models.
-- **Last Updated:** 09/07/2026
+- **Last Updated:** 10/22/2026
+  - Added 64 GB DGX Spark to the supported hardware matrix
   - Changed the validated default vision model to `gemma3:4b` and added troubleshooting for incompatible Ollama model architectures
 
 ## Instructions

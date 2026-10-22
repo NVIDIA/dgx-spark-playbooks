@@ -51,7 +51,7 @@ Use the matrix below to confirm your hardware platform, OS, memory, and whether 
 
 | Hardware platform | OS | Memory  | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- |
-| **DGX Spark** | DGX OS (Linux) | 128 GB Unified Memory | — |
+| **DGX Spark** | DGX OS (Linux) | 64 GB or 128 GB Unified Memory | — |
 | **DGX Station** | DGX OS (Linux) | Large HBM + Grace DRAM | — |
 
 
@@ -60,10 +60,10 @@ Use the matrix below to confirm your hardware platform, OS, memory, and whether 
 | Hardware platform | Default start command | Other stack options |
 | ----------------- | --------------------- | ------------------- |
 | **DGX Spark** | `./start.sh` → ArangoDB + Ollama | `./start.sh --neo4j` → Neo4j + Ollama; `./start.sh --vllm` → Neo4j + vLLM |
-| **DGX Station** | `./start.sh` → ArangoDB + Ollama | `./start.sh --neo4j` → Neo4j + Ollama; `./start.sh --vllm` → Neo4j + vLLM |
+| **DGX Station** | `./start.sh --neo4j` → Neo4j + Ollama | `./start.sh --vllm` → Neo4j + vLLM |
 
 > [!IMPORTANT]
-> The 64 KB page-size issue is specific to DGX Station; DGX Spark is not affected. On affected DGX Station systems, prefer `./start.sh --neo4j`. Some upstream ArangoDB and Qdrant container images can abort at startup with `<jemalloc>: Unsupported system page size`; the Neo4j + Ollama stack preserves the fast local Ollama flow while avoiding ArangoDB.
+> The 64 KB page-size issue is specific to DGX Station; DGX Spark is not affected. On DGX Station, use `./start.sh --neo4j` (Neo4j + Ollama). Some upstream ArangoDB and Qdrant container images can abort at startup with `<jemalloc>: Unsupported system page size`; the Neo4j + Ollama stack preserves the fast local Ollama flow while avoiding ArangoDB. Do not add `--vector-search` on DGX Station, because it starts Qdrant, which can abort with the same error.
 
 > [!NOTE]
 > Larger models can improve triple quality, but reasoning models need structured-output configuration for extraction. Choose a model that fits the memory available on your hardware platform, and verify extraction output when switching models. See **Instructions → Step 3** for defaults and links to explore more models.
@@ -93,7 +93,10 @@ Use the matrix below to confirm your hardware platform, OS, memory, and whether 
   - GPU memory needs depend on the chosen model
   - Document processing time scales with document size and complexity
 - **Rollback:** Stop and remove containers; optionally delete downloaded models (see Instructions)
-- **Last Updated:** 10/14/2026
+- **Last Updated:** 10/22/2026
+  - Added 64 GB DGX Spark to the supported hardware matrix
+  - DGX Station now defaults to `./start.sh --neo4j` (Neo4j + Ollama) and notes that `--vector-search` is not supported there because Qdrant aborts on 64 KB pages
+  - start.sh now waits for the Web UI on port 3001 before printing the success banner and exits non-zero if it never responds
   - Fixed vLLM triple extraction failing on every request with `responseFormat is not defined`, so the structured-output request now reaches vLLM and extraction stores clean triples instead of returning a 500
   - start.sh now exits non-zero and prints an error when the image build or compose startup fails, instead of reporting success
   - Added structured vLLM extraction handling and DGX Station vLLM GPU runtime setup fixes
@@ -129,7 +132,7 @@ Common options:
 ./start.sh --help            # Full option list
 ```
 
-DGX Spark is not affected by the 64 KB page-size issue. On affected DGX Station systems, start with `./start.sh --neo4j` to use Neo4j + Ollama.
+DGX Spark is not affected by the 64 KB page-size issue. On DGX Station, start with `./start.sh --neo4j` to use Neo4j + Ollama, and do not add `--vector-search`: Qdrant can abort with `<jemalloc>: Unsupported system page size` on the same 64 KB-page kernels.
 
 The script will:
 

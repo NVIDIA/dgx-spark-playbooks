@@ -52,7 +52,7 @@ Use the matrix below to confirm your hardware platform, recommended default loca
 
 | Hardware platform | OS | Memory | Recommended default local settings | Multi-node capable hardware |
 | :---- | :---- | :---- | :---- | :---- |
-| **DGX Spark** | DGX OS (Linux) | 128 GB Unified Memory | Docker image `vlm_demo` built from playbook assets | — |
+| **DGX Spark** | DGX OS (Linux) | 64 GB or 128 GB Unified Memory | Docker image `vlm_demo` built from playbook assets | — |
 
 ## Prerequisites
 
@@ -89,7 +89,8 @@ All required assets can be found [in this playbook repository](https://github.co
   - Training sustains high GPU and memory use; residual cache can cause pressure after UI or notebook sessions
   - Image dataset prep may require a Kaggle login and accepting dataset terms; video datasets need correct folder layout and `metadata.jsonl`
 - **Rollback:** Stop and remove Docker containers; delete downloaded models, datasets, and checkpoints under the mounted assets directory if needed
-- **Last Updated:** 10/09/2026
+- **Last Updated:** 10/22/2026
+  - Updated the DGX Spark memory to "64 GB or 128 GB Unified Memory"
   - Pinned `peft` in the Dockerfile so GRPO fine-tuning no longer fails on the base image's `torchao` version, and added a troubleshooting entry
 
 ## Instructions
