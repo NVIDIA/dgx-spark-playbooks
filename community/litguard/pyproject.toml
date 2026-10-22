@@ -1,0 +1,19 @@
+[project]
+name = "litguard"
+version = "0.1.0"
+description = "LitServe-based prompt injection detection server"
+requires-python = ">=3.10"
+dependencies = [
+    "litserve>=0.2.0",
+    "transformers>=4.40.0",
+    "torch>=2.0.0",
+    "pyyaml>=6.0",
+    "accelerate>=0.30.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/server"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
