@@ -89,7 +89,9 @@ The script will automatically:
 
 ## Step 3. Pull an Ollama model (optional)
 
-Download a language model for knowledge extraction. The default model loaded is Llama 3.1 8B:
+On first start, the Ollama container entrypoint automatically downloads `llama3.1:8b` if it is not already present. Wait for that pull to finish before processing documents (`docker logs ollama-compose -f`).
+
+To use a different model:
 
 ```bash
 docker exec ollama-compose ollama pull <model-name>
@@ -158,9 +160,12 @@ docker exec ollama-compose ollama rm llama3.1:8b
 
 | Symptom | Cause | Fix |
 |---------|--------|-----|
+| `pull access denied` for `ollama-custom` / image does not exist | Local image was never built, or Compose tried to pull it from a registry | Run `./start.sh` (builds images) or `docker compose -f deploy/compose/docker-compose.yml up -d --build` from `assets/` |
+| Port `11434` already in use / Ollama container fails to start | Another process (often host `ollama serve`) or container is bound to 11434 | Free the port (`pkill -f 'ollama serve'` or stop the other container), then run `./start.sh` again |
+| Vector DB / Qdrant "not connected" | Vector search profile was not started | Expected without vector search. Start with `./start.sh --vector-search` if you need Qdrant |
 | Ollama performance issues | Suboptimal settings for DGX Spark | Set environment variables:<br>`OLLAMA_FLASH_ATTENTION=1` (enables flash attention for better performance)<br>`OLLAMA_KEEP_ALIVE=30m` (keeps model loaded for 30 minutes)<br>`OLLAMA_MAX_LOADED_MODELS=1` (avoids VRAM contention)<br>`OLLAMA_KV_CACHE_TYPE=q8_0` (reduces KV cache VRAM with minimal performance impact) |
 | VRAM exhausted or memory pressure (e.g. when switching between Ollama models) | Linux buffer cache consuming GPU memory | Flush buffer cache: `sudo sync; sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'` |
-| Slow triple extraction | Large model or large context window | Reduce document chunk size or use faster models |
+| Slow triple extraction (even on small documents) | Default UI chunk size is 512 characters, so short files become many sequential LLM calls; first call also cold-loads the model | On **Process Documents**, raise chunk size (for example 4000–8000), or use a faster model. Wait for the initial model load to finish |
 | ArangoDB connection refused | Service not fully started | Wait 30s after start.sh, verify with `docker ps` |
 
 > [!NOTE]
