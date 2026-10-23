@@ -60,6 +60,7 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 - [Run NemoClaw with a Local LLM](nvidia/playbook-nemoclaw/)
 - [Set Up Example NemoClaw Agents](nvidia/playbook-nemoclaw-applications/)
 - [Serve Nemotron Nano and Super Models](nvidia/playbook-nemotron/)
+- [Set Up NetBird for Remote Access](nvidia/playbook-netbird/)
 - [Deploy NVIDIA NIM for LLM Inference](nvidia/playbook-nim-llm/)
 - [Run NVFP4 Pretraining with Megatron Bridge](nvidia/playbook-nvfp4-pretraining/)
 - [Quantize Models to NVFP4 with NVIDIA Model Optimizer](nvidia/playbook-nvfp4-quantization/)
