@@ -35,7 +35,7 @@ Each playbook includes prerequisites, step-by-step instructions, troubleshooting
 - [Monitor Your AI Compute with DGX Dashboard](nvidia/playbook-dgx-dashboard/)
 - [Set Up Agent Skills for DGX Station](nvidia/playbook-dgx-station-ai-skills/)
 - [Fine-Tune Specialized LLMs with Unsloth](nvidia/playbook-fine-tuning/)
-- [Fine-Tune FLUX.1 for Custom Image Generation](nvidia/playbook-flux-finetuning/)
+- [Fine-Tune FLUX.2 Klein for Custom Image Generation](nvidia/playbook-flux-finetuning/)
 - [Fine-Tune Isaac GR00T for Robot Skills](nvidia/playbook-gr00t/)
 - [Run Healthcare Agents with Local Inference](nvidia/playbook-healthcare-agent/)
 - [Run Hermes Agent with a Local LLM](nvidia/playbook-hermes-agent/)

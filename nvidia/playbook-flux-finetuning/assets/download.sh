@@ -14,6 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+set -eu
+
+: "${HF_TOKEN:?Set HF_TOKEN before downloading the gated FLUX.2 Klein checkpoints.}"
+
+. ./select_memory_profile.sh
+FLUX_MEMORY_PROFILE=$(select_flux_memory_profile)
+export FLUX_MEMORY_PROFILE
+
+mkdir -p models/diffusion_models models/text_encoders models/vae models/loras
+
 download_if_needed() {
   url="$1"
   file="$2"
@@ -24,7 +34,32 @@ download_if_needed() {
   fi
 }
 
-download_if_needed "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/ae.safetensors" "models/vae/ae.safetensors"
-download_if_needed "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/flux1-dev.safetensors" "models/checkpoints/flux1-dev.safetensors"
-download_if_needed "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors" "models/text_encoders/clip_l.safetensors"
-download_if_needed "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors" "models/text_encoders/t5xxl_fp16.safetensors"
+flux2_url="https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files"
+
+case "$FLUX_MEMORY_PROFILE" in
+  128gb)
+    klein_url="https://huggingface.co/Comfy-Org/flux2-klein-9B/resolve/main/split_files"
+    diffusion_url="https://huggingface.co/black-forest-labs/FLUX.2-klein-base-9B/resolve/main/flux-2-klein-base-9b.safetensors"
+    diffusion_file="models/diffusion_models/flux-2-klein-base-9b.safetensors"
+    text_encoder_url="$klein_url/text_encoders/qwen_3_8b.safetensors"
+    text_encoder_file="models/text_encoders/qwen_3_8b.safetensors"
+    ;;
+  64gb)
+    klein_url="https://huggingface.co/Comfy-Org/flux2-klein/resolve/main/split_files"
+    diffusion_url="$klein_url/diffusion_models/flux-2-klein-base-4b.safetensors"
+    diffusion_file="models/diffusion_models/flux-2-klein-base-4b.safetensors"
+    text_encoder_url="$klein_url/text_encoders/qwen_3_4b.safetensors"
+    text_encoder_file="models/text_encoders/qwen_3_4b.safetensors"
+    ;;
+esac
+
+echo "Using FLUX_MEMORY_PROFILE=$FLUX_MEMORY_PROFILE."
+download_if_needed "$diffusion_url" "$diffusion_file"
+download_if_needed "$text_encoder_url" "$text_encoder_file"
+download_if_needed "$flux2_url/vae/flux2-vae.safetensors" \
+  "models/vae/flux2-vae.safetensors"
+
+ln -sfn "$(basename "$diffusion_file")" \
+  "models/diffusion_models/flux-2-klein-base.safetensors"
+ln -sfn "$(basename "$text_encoder_file")" \
+  "models/text_encoders/qwen_3.safetensors"

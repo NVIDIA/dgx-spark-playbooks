@@ -115,7 +115,7 @@ Use https://build.nvidia.com/playbooks/hermes-agent.md and complete this playboo
 ```
 
 > [!NOTE]
-> This has been tested using OpenCode and Qwen 3.8 35B A3B NVFP4. Performance and outcome may vary based on agent and model selection.
+> This has been tested using OpenCode and [Qwen3.6 35B A3B NVFP4](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-spark/index.html?model=qwen%2Fqwen3.6-35b-a3b&os=linux&backend=vllm&memory=64&precision=nvfp4-w4a16&variant=mtp&memoryConfig=64). Performance and outcome may vary based on agent and model selection.
 
 > [!NOTE] These instructions target **Linux** on a supported hardware platform. Keep a separate terminal running vLLM while you install and use Hermes. Telegram messaging is **optional** — complete Steps 1–8 for terminal use first; only then follow the optional Telegram section at the bottom if you want a messaging gateway.
 

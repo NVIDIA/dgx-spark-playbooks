@@ -90,7 +90,8 @@ All required assets can be found [in the playbook repository](https://github.com
   - Only one model is qualified to launch in v1; larger bundled candidates are reported as non-runnable by design
   - MIG changes are disruptive and are blocked unless your release profile enables them and you explicitly approve the plan
 - **Rollback:** Run `assets/install.sh uninstall --target /path/to/project` to remove every manifest-owned file and the delimited context block. The installer preserves any managed file you modified and leaves unrelated context untouched. A user-scope CLI installed with `install-cli` is removed by deleting `~/.local/bin/dgx-assist`. Cached state lives under `~/.cache/dgx-assist/` and `~/.local/state/dgx-assist/` and can be deleted.
-- **Last Updated:** 08/03/2026
+- **Last Updated:** 10/21/2026
+  - `dgx-assist` now recognizes a WSL2 guest and reports `Compatibility: WSL2` with read-only diagnostics instead of an untrusted release marker
   - Install Agent Skills and `dgx-assist`, inspect the release profile, search pinned guidance, and run the qualified vLLM smoke recipe with approval on supported hardware platforms
 
 ## Instructions
@@ -189,15 +190,16 @@ The skills refuse to guess what your hardware can do. Inspect it and read the re
 ```
 
 Expected output should show an exact compatibility profile and per-feature
-capabilities. The trusted release marker selects one of three profiles. A
-profile is selected only when every field of the release identity matches one
-recognized identity exactly:
+capabilities. The trusted release marker selects a profile. A profile is
+selected only when every field of the release identity matches one recognized
+identity exactly:
 
 | Profile | Exact release identity | Behavior |
 |---|---|---|
 | Software 1.0 | `DGX_SWBUILD_VERSION` `7.4.1` or `7.4.1-GB300ws`; `DGX_SWBUILD_DATE` `2026-02-20-05-22-42`; `DGX_PRETTY_NAME` `NVIDIA DGX GB300WS` | Guidance, diagnostics, read-only MIG inspection, and explicitly qualified recipes |
 | Software 2.0 | `DGX_SWBUILD_VERSION` `7.5.0`; `DGX_SWBUILD_DATE` `2026-06-16-11-48-10`; `DGX_PRETTY_NAME` `NVIDIA DGX GB300WS` | Capability-scoped qualified workflows |
 | Unknown | Any other exact identity | General read-only evidence only |
+| WSL2 guest | No release marker is present and the kernel or environment identifies WSL2 (`microsoft` or `WSL2` in the kernel release, or `WSL_DISTRO_NAME` / `WSL_INTEROP` set). A marker that exists but fails the integrity checks is never treated as WSL2 | Host inspection and read-only diagnostics only. `system inspect` reports `Compatibility: WSL2` and the `WSL2_GUEST` reason. Run platform, MIG, and recipe workflows from the bare-metal DGX OS host |
 
 `DGX_PRETTY_NAME` belongs to the identity of both profiles, not to Software 2.0
 alone. A host whose version and build match a profile but whose release name
@@ -385,6 +387,7 @@ A successful end state is an agent in your project that inspects the real hardwa
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | `system inspect` reports restricted or unknown actions | Untrusted or unknown release identity, missing GB300 `10.3` compute capability, or an observed power-budget violation | Run `.dgx-station/bin/dgx-assist system inspect` and read the compatibility profile, capabilities, and restrictions. With `--json`, inspect `data.compatibility` and `data.rejection_reasons`. Do not bypass qualification or rely on product-name strings alone — a different build is not automatically compatible |
+| `system inspect` on a DGX Station under WSL2 reports `Compatibility: WSL2`, `Action scope: BLOCKED`, and the `WSL2_GUEST` reason | A WSL2 guest does not expose the bare-metal `/etc/dgx-release` marker, so no release profile can be matched and mutating capabilities stay off | This is expected. Use `system inspect` and `diagnose` for read-only evidence in WSL2. Run platform, MIG, and recipe workflows from the bare-metal DGX OS host. If the host is not WSL2 and still shows `UNKNOWN`, see the next rows |
 | `system inspect` reports `UNQUALIFIED_RELEASE` on a host whose software build matches | The release identity is matched as a whole: `DGX_SWBUILD_VERSION`, `DGX_SWBUILD_DATE`, and `DGX_PRETTY_NAME` together. A matching version and build carrying a different release name — for example `NVIDIA DGX Server` instead of `NVIDIA DGX GB300WS` — is not a recognized profile | Compare all three trusted fields against the Step 6 table. `system inspect` prints them under `Release marker` as `Software version`, `Build date`, and `Release name`; with `--json` they are in `data.release_marker.trusted`. Qualified recipe execution stays blocked until the full identity matches a published profile, because the shipped validation evidence names the exact identity it was qualified on. Do not edit `/etc/dgx-release` to force a match |
 | Software 1.0 profile blocks MIG mutation and platform fixes | Expected behavior: the Software 1.0 profile is capability-scoped to guidance, diagnostics, read-only MIG inspection, and explicitly validated recipes | No action. Qualified recipe execution still works; MIG mutation and platform fixes require a profile that enables them |
 | No recipe resolves for your model | The bundled v1 catalog has one runnable Software 1.0 smoke model, `Qwen/Qwen2.5-Coder-1.5B-Instruct`; larger candidates are deliberately non-runnable | Run `.dgx-station/bin/dgx-assist recipe models` and `catalog status` to list exact IDs. Other stable reasons: experimental lifecycle, missing LaunchSpec, mutable model or image references, stale recipe hash, expired evidence, wrong release or hardware, ambiguity, or a hard preflight conflict. No error path substitutes a different model |

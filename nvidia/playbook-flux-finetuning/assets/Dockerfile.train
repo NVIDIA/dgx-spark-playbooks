@@ -14,17 +14,42 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+FROM nvcr.io/nvidia/pytorch:26.09-py3
 
-FROM nvcr.io/nvidia/pytorch:25.09-py3
+ARG AI_TOOLKIT_COMMIT=31f4d92f8810bc68e77bf6dce73d6bdb57bc33ea
 
-RUN cd /workspace/ && \
-    git clone https://github.com/kohya-ss/sd-scripts.git && \
-    cd sd-scripts && \
-    git checkout sd3 && \
-    pip install -r requirements.txt && \
-    apt update && \
-    apt install -y libgl1-mesa-dev
+RUN git clone https://github.com/ostris/ai-toolkit.git /workspace/ai-toolkit && \
+    cd /workspace/ai-toolkit && \
+    git checkout "$AI_TOOLKIT_COMMIT"
 
-WORKDIR /workspace/sd-scripts
+COPY requirements.train.txt /tmp/requirements.train.txt
+RUN python -m pip install --no-cache-dir -r /tmp/requirements.train.txt && \
+    python -m pip install --no-cache-dir --no-deps \
+    invisible-watermark==0.2.0 torchao==0.10.0
+
+# Register only the two FLUX.2 Klein variants used by this playbook. This keeps
+# unrelated video/audio model dependencies out of the training image.
+COPY ai_toolkit_flux2_models.py \
+    /workspace/ai-toolkit/extensions_built_in/diffusion_models/__init__.py
+
+RUN mkdir -p /workspace/disabled_extensions && \
+    for extension in /workspace/ai-toolkit/extensions_built_in/*; do \
+      case "$(basename "$extension")" in \
+        diffusion_models|sd_trainer) ;; \
+        *) mv "$extension" /workspace/disabled_extensions/ ;; \
+      esac; \
+    done
+
+# AI Toolkit imports its optional audio stack from the shared image config module.
+# Keep this image-focused build independent of a mismatched upstream torchaudio wheel.
+RUN sed -i \
+    -e '/^import torchaudio$/d' \
+    -e '/^from toolkit.audio.album_artwork import add_album_artwork$/d' \
+    /workspace/ai-toolkit/toolkit/config_modules.py && \
+    sed -i \
+    -e '/^from toolkit.audio.preserve_pitch import time_stretch_preserve_pitch$/d' \
+    /workspace/ai-toolkit/toolkit/dataloader_mixins.py
+
+WORKDIR /workspace/ai-toolkit
 
 CMD ["/bin/bash"]

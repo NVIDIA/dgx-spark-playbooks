@@ -1,0 +1,86 @@
+job: extension
+config:
+  name: flux2_klein_9b_tjtoy_sparkgpu
+  process:
+    - type: diffusion_trainer
+      training_folder: /workspace/ai-toolkit/output
+      sqlite_db_path: /workspace/ai-toolkit/output/aitk_db.sqlite
+      device: cuda
+      performance_log_every: 10
+
+      network:
+        type: lora
+        linear: 256
+        linear_alpha: 256
+
+      save:
+        dtype: bf16
+        save_every: 1000
+        max_step_saves_to_keep: 1
+        save_format: diffusers
+        push_to_hub: false
+
+      datasets:
+        - folder_path: /workspace/ai-toolkit/flux_data/tjtoy
+          default_caption: "tjtoy toy"
+          trigger_word: tjtoy
+          caption_ext: txt
+          caption_dropout_rate: 0.0
+          shuffle_tokens: false
+          keep_tokens: 2
+          resolution: [1024]
+          num_repeats: 1
+          flip_x: true
+          cache_latents_to_disk: true
+          cache_text_embeddings: true
+
+        - folder_path: /workspace/ai-toolkit/flux_data/sparkgpu
+          default_caption: "sparkgpu gpu"
+          trigger_word: sparkgpu
+          caption_ext: txt
+          caption_dropout_rate: 0.0
+          shuffle_tokens: false
+          keep_tokens: 2
+          resolution: [1024]
+          num_repeats: 2
+          flip_x: true
+          cache_latents_to_disk: true
+          cache_text_embeddings: true
+
+      train:
+        batch_size: 2
+        steps: 1000
+        gradient_accumulation: 1
+        train_unet: true
+        train_text_encoder: false
+        gradient_checkpointing: false
+        noise_scheduler: flowmatch
+        optimizer: adamw8bit
+        optimizer_params:
+          weight_decay: 0.0001
+        lr: 0.0001
+        timestep_type: weighted
+        content_or_style: balanced
+        bypass_guidance_embedding: true
+        cache_text_embeddings: true
+        dtype: bf16
+        disable_sampling: true
+        loss_type: mse
+
+      model:
+        name_or_path: black-forest-labs/FLUX.2-klein-base-9B
+        arch: flux2_klein_9b
+        quantize: false
+        quantize_te: false
+        low_vram: false
+        compile: true
+        model_kwargs:
+          match_target_res: false
+
+      logging:
+        log_every: 1
+        use_ui_logger: false
+
+  meta:
+    name: "[name]"
+    version: "1.0"

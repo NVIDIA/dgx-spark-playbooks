@@ -19,6 +19,13 @@ and build match a profile but whose release name differs is unknown, not
 compatible. Report the mismatched field instead of treating the version as
 sufficient.
 
+A WSL2 guest has no release marker, so it matches no profile. `dgx-assist`
+recognizes WSL2 from the kernel release (`microsoft` or `WSL2`) or the
+`WSL_DISTRO_NAME` / `WSL_INTEROP` environment variables, but only when the
+marker is absent. It then reports `support_level` `wsl2`, with only
+`host_inspection` and `read_only_diagnostics` enabled. A marker that exists but
+fails the checks below is still untrusted, never WSL2.
+
 The release marker must be a root-owned regular file and must not be a symlink
 or group/world writable. Product and DMI names are supporting evidence only.
 Actions are capability-scoped: Software 1.0 enables only recipes explicitly

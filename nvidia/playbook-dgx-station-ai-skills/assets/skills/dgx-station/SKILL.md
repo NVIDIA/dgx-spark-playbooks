@@ -10,7 +10,7 @@ Ground every Station-specific answer in current host evidence and a retrieved NV
 ## Workflow
 
 1. Run `scripts/dgx-assist system inspect --json`.
-2. Read [references/software-compatibility.md](references/software-compatibility.md). Use `compatibility.profile_id`, `support_level`, and `capabilities`; do not branch on a version prefix.
+2. Read [references/software-compatibility.md](references/software-compatibility.md). Use `compatibility.profile_id`, `support_level`, and `capabilities`; do not branch on a version prefix. A `support_level` of `wsl2` means the host is a WSL2 guest: only `host_inspection` and `read_only_diagnostics` are available, so give read-only evidence, do not attempt mutation or recipes, and say that platform, MIG, and recipe workflows run from the bare-metal DGX OS host.
 3. Form a narrow playbook query from the user's question and run `scripts/dgx-assist playbook search "<query>" --json`.
 4. Apply the source-precedence rules in [references/sources.md](references/sources.md). Use only passages applicable to the detected profile. Cite their URL, heading, line span, source commit, and source-file digest.
 5. On the Software 1.0 capability-scoped profile, provide the supported inspection, diagnostics, compatibility guidance, and exact recipes qualified for that profile. Do not treat an absent Software 2.0-only service as a fault.

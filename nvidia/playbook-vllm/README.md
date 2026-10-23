@@ -181,11 +181,10 @@ The recipe links give you more detail about the model settings used by these scr
 | DGX Spark | 64GB unified memory | [Qwen3.8 27B (NVFP4)](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-spark/index.html?model=qwen%2Fqwen3.8-27b&os=linux&backend=vllm&memory=64&precision=nvfp4&variant=&memoryConfig=64) | `docker pull vllm/vllm-openai:v0.28.0` | `hf download nvidia/Qwen3.8-27B-NVFP4` |
 | DGX Spark | 64GB unified memory | [Nemotron 3.5 Bolt 74B A9B](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-spark/index.html?model=nvidia%2Fnemotron-3.5-bolt-74b-a9b&os=linux&backend=vllm&memory=64&precision=iq2&variant=&memoryConfig=64) | `docker pull eugr/spark-vllm:nightly-20261016` | `hf download nvidia/NVIDIA-Nemotron-3.5-Bolt-74B-A9B-24GB` |
 | DGX Spark | 128GB unified memory | [Qwen3.8 Flash-Next](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-spark/index.html?model=qwen%2Fqwen3.8-flash-next&os=linux&backend=vllm&memory=128&precision=fp4-local&variant=&memoryConfig=128) | `docker pull eugr/spark-vllm-b12x:nightly-20261015` | `hf download nvidia/Qwen3.8-Flash-Next-FP4-Local` |
-| DGX Spark | 128GB unified memory | [Qwen3.8 27B (NVFP4)](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-spark/index.html?model=qwen%2Fqwen3.8-27b&os=linux&backend=vllm&memory=128&precision=nvfp4&variant=&memoryConfig=128) | `docker pull nvcr.io/nvidia/vllm:26.10.pre1-py3@sha256:cb38bbefdbc3e9fe045f931dd72cbd58cd48985c7e09916bcc6c15c10f39b929` | `hf download nvidia/Qwen3.8-27B-NVFP4` |
+| DGX Spark | 128GB unified memory | [Qwen3.8 27B (NVFP4)](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-spark/index.html?model=qwen%2Fqwen3.8-27b&os=linux&backend=vllm&memory=128&precision=nvfp4&variant=&memoryConfig=128) | `docker pull nvcr.io/nvidia/vllm:26.10.pre1-py3` | `hf download nvidia/Qwen3.8-27B-NVFP4` |
 | DGX Station | 748GB coherent memory | [Qwen3.8 Flash-Next](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-station/index.html?model=qwen%2Fqwen3.8-flash-next&os=linux&backend=vllm&memory=&precision=nvfp4&variant=&memoryConfig=748) | `docker pull vllm/vllm-openai:qwen38-flash-next` | `hf download Inferact/Qwen3.8-Flash-Next-NVFP4` |
 | DGX Station | 748GB coherent memory | [Nemotron 3 Super 120B A12B](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-station/index.html?model=nvidia%2Fnemotron-3-super-120b-a12b&os=linux&backend=vllm&memory=&precision=nvfp4&variant=mtp&memoryConfig=748) | `docker pull vllm/vllm-openai:v0.31.0` | `hf download nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4` |
 
-The 128GB Spark Qwen3.8 27B script follows the [recipe at revision `7d1162c`](https://github.com/NVIDIA/local-ai-inference-recipes/blob/7d1162cfb965847d9412cef9bd5c5d4ade53d957/models/qwen/qwen3.8-27b/dgx-spark/linux/vllm/128gb/nvfp4/recipe.yaml), with the image pinned to its recorded tested digest. Keep its `0.60` memory target, kernel settings, and DFlash2 configuration together. The recipe reports startup instability at higher memory targets and requires the image's DFlash2 prefix-cache correctness fix. The script mounts only the Hugging Face cache to preserve the image's prebuilt kernel caches. Sync adds loopback binding and container start/stop handling; those adaptations need separate validation on a 128GB Spark.
 
 **Next, download the container and model on the DGX device.**
 
@@ -343,21 +342,17 @@ Once the endpoint works, you can tune it for your workload, save the launch comm
 
 Use [NVIDIA Local AI Inference Recipes](https://nvidia.github.io/local-ai-inference-recipes/) to select a model and vLLM configuration.
 
-| Device | Memory | Recommended model | Recipes |
-| --- | --- | --- | --- |
-| DGX Spark | 64GB unified memory | [Qwen3.8 27B (NVFP4)](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-spark/index.html?model=qwen%2Fqwen3.8-27b&os=linux&backend=vllm&memory=64&precision=nvfp4&variant=&memoryConfig=64) | [64GB Spark recipes](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-spark/index.html?memoryConfig=64) |
-| DGX Spark | 128GB unified memory | [Qwen3.8 27B (NVFP4)](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-spark/index.html?model=qwen%2Fqwen3.8-27b&os=linux&backend=vllm&memory=128&precision=nvfp4&variant=&memoryConfig=128) | [128GB Spark recipes](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-spark/index.html?memoryConfig=128) |
-| DGX Station | 748GB coherent memory | [DeepSeek V4 Flash 0731](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-station/index.html?model=deepseek%2Fdeepseek-v4-flash-0731&os=linux&backend=vllm&memory=&precision=fp4-fp8-mixed&variant=&memoryConfig=748) | [Station recipes](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-station/index.html?memoryConfig=748) |
+| Device | Memory | Recommended model |
+| --- | --- | --- |
+| DGX Spark | 64GB unified memory | [Qwen3.8 27B (NVFP4)](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-spark/index.html?model=qwen%2Fqwen3.8-27b&os=linux&backend=vllm&memory=64&precision=nvfp4&variant=&memoryConfig=64) |
+| DGX Spark | 128GB unified memory | [Qwen3.8 27B (NVFP4)](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-spark/index.html?model=qwen%2Fqwen3.8-27b&os=linux&backend=vllm&memory=128&precision=nvfp4&variant=&memoryConfig=128) |
+| DGX Station | 748GB coherent memory | [DeepSeek V4 Flash 0731](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-station/index.html?model=deepseek%2Fdeepseek-v4-flash-0731&os=linux&backend=vllm&memory=&precision=fp4-fp8-mixed&variant=&memoryConfig=748) | 
 
 The recommended Spark model is also one of the models in the Intermediate tab, so you can use either path.
 If you pick a different model in the recipe page, check its prerequisites before you download it.
 
-**Then, select a model and save the full recipe commands.**
+**Then, copy the "Start container" and "Launch" commands and save them to a file.**
 
-1. Set the hardware and memory size to match your device
-2. Select the model, **Linux**, and **vLLM**
-3. Choose the checkpoint precision and any recipe variant
-4. Read the prerequisites and limits, then save the setup and server commands and the recipe URL
 
 The checkpoint, image, environment settings, and server flags work together.
 For example, a low-precision checkpoint needs a backend that can load and run its format, and a speculative-decoding variant may need a second checkpoint.

@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+set -eu
+
 docker run -it \
     --rm \
     --gpus all \
@@ -23,8 +25,8 @@ docker run -it \
     --ulimit stack=67108864 \
     -v $(pwd)/models/vae:/workspace/ComfyUI/models/vae \
     -v $(pwd)/models/loras:/workspace/ComfyUI/models/loras \
-    -v $(pwd)/models/checkpoints:/workspace/ComfyUI/models/checkpoints \
+    -v $(pwd)/models/diffusion_models:/workspace/ComfyUI/models/diffusion_models \
     -v $(pwd)/models/text_encoders:/workspace/ComfyUI/models/text_encoders \
     -v $(pwd)/workflows/:/workspace/ComfyUI/user/default/workflows/ \
-    flux-comfyui \
+    flux2-comfyui \
     python main.py

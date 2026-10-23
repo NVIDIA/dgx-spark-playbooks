@@ -14,12 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-FROM nvcr.io/nvidia/pytorch:25.09-py3
+FROM nvcr.io/nvidia/pytorch:26.09-py3
 
 RUN cd /workspace/ && \
-    git clone https://github.com/comfyanonymous/ComfyUI.git && \
+    git clone --branch v0.40.0 --depth 1 https://github.com/comfyanonymous/ComfyUI.git && \
     cd ComfyUI && \
-    git checkout 4ffea0e864275301329ddb5ecc3fbc7211d7a802 && \
     sed -i '/torch/d' requirements.txt && \
     pip install -r requirements.txt && \
     pip install torchsde

@@ -305,7 +305,7 @@ Use https://build.nvidia.com/playbooks/open-webui.md and complete this playbook 
 ```
 
 > [!NOTE]
-> This has been tested using OpenCode and Qwen 3.8 35B A3B NVFP4. Performance and outcome may vary based on agent and model selection.
+> This has been tested using OpenCode and [Qwen3.6 35B A3B NVFP4](https://nvidia.github.io/local-ai-inference-recipes/hardware/dgx-spark/index.html?model=qwen%2Fqwen3.6-35b-a3b&os=linux&backend=vllm&memory=64&precision=nvfp4-w4a16&variant=mtp&memoryConfig=64). Performance and outcome may vary based on agent and model selection.
 
 ## Step 1. Configure Docker permissions
 

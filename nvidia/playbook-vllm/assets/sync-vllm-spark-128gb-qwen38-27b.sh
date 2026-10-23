@@ -46,7 +46,7 @@ CONTAINER_ID="$(docker run -d \
   --entrypoint "" \
   -e "HF_TOKEN=${HF_TOKEN:-}" \
   -v "${HF_CACHE_DIR}:/root/.cache/huggingface" \
-  nvcr.io/nvidia/vllm:26.10.pre1-py3@sha256:cb38bbefdbc3e9fe045f931dd72cbd58cd48985c7e09916bcc6c15c10f39b929 \
+  nvcr.io/nvidia/vllm:26.10.pre1-py3 \
   vllm serve nvidia/Qwen3.8-27B-NVFP4 \
     --host 127.0.0.1 \
     --port "${PORT}" \
