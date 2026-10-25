@@ -1,0 +1,30 @@
+# MACE / ML-interatomic-potential environment for DGX Spark (GB10 / sm_121).
+#
+# No source-built PyTorch: the stock CUDA-13 wheels ship sm_120 kernels that
+# forward-compat to GB10's sm_121. The two ENV lines at the bottom are the
+# Grace-specific fixes — without them the stack crashes before user code runs:
+#   OMP_NUM_THREADS  — bounds the unbounded OpenMP threads PyTorch's bundled
+#                      NVPL/ARM-Compute libs spawn at init (else allocator abort).
+#   LD_PRELOAD       — jemalloc clears a glibc-allocator corruption in e3nn's
+#                      GPU forward pass on aarch64.
+FROM python:3.12-slim
+
+# gcc + libc6-dev are required at *runtime*: on first CUDA kernel launch Triton
+# (pulled in by the cu130 torch wheel) JIT-compiles a launcher stub and needs a C
+# compiler AND the standard C headers on the box — python:3.12-slim ships neither,
+# so the stack aborts before user code runs. libc6-dev is listed explicitly because
+# --no-install-recommends would otherwise drop it (it's a gcc "recommend", not a
+# hard dep), leaving gcc unable to find stdio.h. This is a packaging gap, not Grace/arch.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libjemalloc2 gcc libc6-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Stock CUDA-13 PyTorch wheel (aarch64), then MACE + ASE.
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cu130 \
+    && pip install --no-cache-dir mace-torch ase
+
+ENV OMP_NUM_THREADS=8
+ENV LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2
+
+COPY validate_mace.py /work/validate_mace.py
+WORKDIR /work
