@@ -32,6 +32,7 @@ Before running any benchmarks, ensure the following prerequisites are met for yo
 
 ### Dual Spark
 - [Measure bandwidth for Dual Spark setup](#measure-bw-between-dual-sparks)
+  - [Detect a degraded ConnectX-7 initialization](#detect-a-degraded-connectx-7-initialization)
 - [Measure RDMA latency between Dual Sparks](#measure-rdma-latency-between-dual-sparks)
 
 ---
@@ -916,6 +917,45 @@ nvidia@spark-bd26:~$ ib_write_bw -d roceP2p1s0f0 -i 1 -p 12001 -F --report_gbits
 ```
 
 **Total throughput = 92.57 + 97.28 = 189.85 Gbps**
+
+### Detect a degraded ConnectX-7 initialization
+
+A ConnectX-7 endpoint can occasionally remain in a degraded initialization state after boot or a QSFP cable change. In this state, `ethtool` still reports a 200 Gb/s link, PCIe still reports 32 GT/s x4, and link error counters can remain clean, but both TCP and raw RDMA throughput are limited to approximately 8-25 Gb/s per rail. Changing MTU, TCP buffers, or queue counts does not correct this state.
+
+Use the bounded health-check helper to test a single rail. It validates the local link, runs `ib_write_bw` for five seconds, and returns status 2 when the result matches the degraded initialization signature.
+
+On the host Spark:
+
+```bash
+cd dgx-spark-playbooks/nvidia/connect-two-sparks/assets
+./check-connectx-bandwidth --server --device rocep1s0f0 --port 12000
+```
+
+Then run the client against the IP on the same rail:
+
+```bash
+cd dgx-spark-playbooks/nvidia/connect-two-sparks/assets
+./check-connectx-bandwidth \
+  --client 192.168.200.12 \
+  --device rocep1s0f0 \
+  --port 12000
+```
+
+Replace the device, IP address, and port with the values for the rail under test. Repeat in the reverse direction because an endpoint can be degraded in only one direction. A healthy rail should exceed the helper's conservative 80 Gb/s threshold; NVIDIA's example above measures 92.57 and 97.28 Gb/s on the two rails.
+
+> [!NOTE]
+> The mlx5 messages `PCIe slot power capability was not advertised` and `Detected insufficient power on the PCIe slot (27W)` can also occur on systems delivering healthy bandwidth. Do not use those messages alone to diagnose the degraded state; confirm it with a bandwidth measurement.
+
+If the helper reports `STALE INITIALIZATION STATE`:
+
+1. Stop distributed workloads on the affected endpoints.
+2. Connect the final intended QSFP topology and do not move or reconnect the cables during recovery.
+3. Update DGX OS and firmware by following the [DGX Spark update guide](https://docs.nvidia.com/dgx/dgx-spark/os-and-component-update.html).
+4. Reboot both endpoints with the final topology connected, then run the health check in both directions again.
+5. If the cap remains, run `sudo shutdown -h now` on both endpoints and wait for shutdown to finish. Disconnect the USB-C power cable from each Spark and disconnect each power adapter from its AC outlet. Wait at least 60 seconds, reconnect power without moving the QSFP cables, boot, and retest.
+6. If throughput remains degraded, collect an `nvidia-bug-report.sh` bundle and contact NVIDIA support. Repeated PCIe fatal AER errors should also be escalated rather than treated as this initialization state.
+
+The helper deliberately does not reset PCIe devices or unload drivers. Those operations interrupt the network and are not a verified substitute for the recovery sequence.
 
 ## Measure RDMA Latency Between Dual Sparks
 
