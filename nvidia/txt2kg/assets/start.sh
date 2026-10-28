@@ -151,9 +151,9 @@ fi
 # Execute the command
 echo ""
 echo "Starting services..."
-echo "Running: $CMD $PROFILES up -d"
+echo "Running: $CMD $PROFILES up -d --build"
 cd $(dirname "$0")
-eval "$CMD $PROFILES up -d"
+eval "$CMD $PROFILES up -d --build"
 
 echo ""
 echo "=========================================="
@@ -189,8 +189,8 @@ if [ "$USE_VLLM" = true ]; then
   echo ""
   echo "  2. Open http://localhost:3001 in your browser"
 else
-  echo "  1. Pull an Ollama model (if not already done):"
-  echo "     docker exec ollama-compose ollama pull llama3.1:8b"
+  echo "  1. Wait for Ollama to finish pulling llama3.1:8b on first start"
+  echo "     (check logs with: docker logs ollama-compose -f)"
   echo ""
   echo "  2. Open http://localhost:3001 in your browser"
 fi
