@@ -57,6 +57,6 @@ sed 's@session\\s*required\\s*pam_loginuid.so@session optional pam_loginuid.so@g
 # Start SSHD
 echo "Starting SSH"
 exec /usr/sbin/sshd -D
-sshd_rc = $?
+sshd_rc=$?
 echo "Failed to start SSHD, rc $sshd_rc"
 exit $sshd_rc
