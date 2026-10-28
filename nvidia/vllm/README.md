@@ -714,8 +714,13 @@ newgrp docker
 ## Step 2. Pull vLLM container image
 
 ```bash
-docker pull vllm/vllm-openai:latest
+export VLLM_QWEN_IMAGE="vllm/vllm-openai:v0.26.0"
+docker pull "$VLLM_QWEN_IMAGE"
 ```
+
+This recipe requires vLLM 0.26.0 or later. Earlier releases can produce missing
+or duplicate tool calls when MTP speculative decoding and prefix caching are
+used together with Qwen3.6's hybrid attention layers.
 
 ## Step 3. Launch the Agent Ready Qwen3.6 35B server
 
@@ -728,10 +733,10 @@ Launch the container and start the vLLM server with the agent-ready
 ## Get a token from https://huggingface.co/settings/tokens
 export HF_TOKEN="your_huggingface_token"
 
-docker run -it --gpus all -p 8000:8000 \
+docker run -it --gpus all -p 8000:8000 --name qwen36-vllm \
   -e HF_TOKEN="$HF_TOKEN" \
   -v ~/.cache/huggingface:/root/.cache/huggingface \
-  vllm/vllm-openai:latest \
+  "$VLLM_QWEN_IMAGE" \
   nvidia/Qwen3.6-35B-A3B-NVFP4 \
   --host 0.0.0.0 \
   --port 8000 \
@@ -773,14 +778,24 @@ curl http://localhost:8000/v1/chat/completions \
 
 Expected response should contain `"content": "204"` or similar mathematical calculation.
 
+The single request above checks connectivity. Before connecting an agent, run
+the multi-step tool-call check from the repository root:
+
+```bash
+python3 nvidia/vllm/assets/verify_qwen36_tools.py
+```
+
+The check makes 120 tool calls across ten repeated conversations and exits on a
+missing, duplicate, or malformed call. A successful run ends with `PASS: 120
+tool calls`.
 
 ## Step 4. Cleanup and rollback
 
 For container approach (non-destructive):
 
 ```bash
-docker rm $(docker ps -aq --filter ancestor=vllm/vllm-openai:latest)
-docker rmi vllm/vllm-openai:latest
+docker rm -f qwen36-vllm
+docker rmi "$VLLM_QWEN_IMAGE"
 ```
 
 ## Troubleshooting
@@ -793,6 +808,7 @@ docker rmi vllm/vllm-openai:latest
 | Container registry authentication fails | Invalid or expired GitLab token | Generate new auth token |
 | SM_121a architecture not recognized | Missing LLVM patches | Verify SM_121a patches applied to LLVM source |
 | CUDA out of memory | Insufficient GPU memory | Reduce --max-model-len and --max-num-seqs parameters |
+| Qwen3.6 returns missing, duplicate, or raw XML tool calls | vLLM older than 0.26.0 with MTP and prefix caching | Use the pinned image above. If an older image is required, remove `--speculative-config` and rerun the multi-step check |
 
 ## Common Issues for running on two Sparks
 | Symptom | Cause | Fix |
