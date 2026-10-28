@@ -13,6 +13,15 @@ Usage:
 import argparse
 import time
 import torch
+import transformers
+from packaging.version import Version
+
+def _dtype_kwargs(dtype):
+    """`dtype` keyword of `from_pretrained` exists since transformers 4.56 (PR #39782);
+    older versions use `torch_dtype`."""
+    if Version(transformers.__version__) >= Version("4.56"):
+        return {"dtype": dtype}
+    return {"torch_dtype": dtype}
 
 
 def main():
@@ -35,7 +44,7 @@ def main():
 
     model = AutoModelForCausalLM.from_pretrained(
         "meta-llama/Llama-3.1-8B",
-        torch_dtype=torch.bfloat16,
+        **_dtype_kwargs(torch.bfloat16),
         device_map="cuda",
     )
     model.train()
